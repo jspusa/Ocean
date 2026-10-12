@@ -26,6 +26,8 @@ function initializeIndividuals(r){
   f.tint=[pigment*(1+warm),pigment,pigment*(1-warm*.60)];
   f.finWear=bioValue(id,10)>.85?(bioValue(id,10)-.85)*3:0;
   f.effort=.6;f.bank=0;f.bioActive=true;
+  // Short reef fish beat more often; large cruising animals keep their own deformation rig.
+  if(sp>=0&&sp<8)f.bioMorph[3]*=[1.12,.90,.83,.81,1.08,1.28,.75,.94][sp];
   const scale=.91+.18*bioValue(id,11);for(let n=0;n<3;n++)f.s[n]=f.bioBaseScale[n]*scale;
  }
  for(let k=0;k<shoal.length;k++){
@@ -50,7 +52,9 @@ function initializeIndividuals(r){
 // No per-frame random numbers: revisiting time t produces exactly the same transform.
 function animalTrajectory(f,t,out){
  const id=f.bioSeed||1,s0=f.routeShape?f.routeShape[0]:bioValue(id,12),s1=f.routeShape?f.routeShape[1]:bioValue(id,13),phase=f.orbit;
- const pulse=.35*Math.sin(t*(.28+s0*.14)+f.bob);
+ // Analytically integrated burst/glide pace is continuous and never reverses a route.
+ const cadence=.30+s0*.18,burst=f.species<8?(f.species===0?.67:.48):.13;
+ const pulse=burst/cadence*Math.sin(t*cadence+f.bob);
  const a=phase+(t+pulse)*f.speed;
  const radius=f.radius*(.88+.13*Math.sin(a*1.71+s0*6.3)+.08*Math.sin(t*.063+s1*7));
  let x=f.center[0]+Math.cos(a)*radius+Math.sin(a*2.31+s1*6.3)*f.radius*.085;
@@ -79,46 +83,62 @@ function updateLife(t){
  }
 }
 function updateReefSchool(t){
- const cx=1+Math.sin(t*.023)*7,cy=-6.3+Math.sin(t*.057)*.45,cz=-13-Math.cos(t*.023)*5;
- for(const f of shoal){const id=f.bioSeed||bioHash(f.slot+1),q=f.schoolOffset||[0,0,0],delay=bioValue(id,17)*.6;
-  const a=f.phase+(t-delay)*.12,r=f.rad;
-  const x=Math.cos(a+r*3.7)*r*4.7,z=Math.sin(a+r*3.7)*r*3.1;
-  f.p[0]=cx+x+q[0]*.22*Math.sin(t*.41+f.phase);
-  f.p[1]=cy+Math.sin(a*1.27)*r*1.27+q[1]*.24;
-  f.p[2]=cz+z+q[2]*.2*Math.cos(t*.32+f.phase);
-  f.yaw=Math.atan2(-Math.cos(a+r*3.7)*3.1,-Math.sin(a+r*3.7)*4.7)+.10*Math.sin(t*.47+f.phase);
-  f.pitch=Math.cos(a*1.27)*.075;f.bank=Math.sin(a)*.04;f.effort=.62+.13*Math.sin(t*.31+f.phase);
+ // One current-following shoal. Turns travel along its body instead of every fish
+ // endlessly orbiting the same point like particles in a decorative vortex.
+ for(const f of shoal){
+  const id=f.bioSeed||bioHash(f.slot+1),q=f.schoolOffset||[0,0,0];
+  const delay=bioValue(id,17)*1.6,tt=t-delay,a=tt*.044;
+  const cx=1+Math.sin(a)*8.5,cz=-12-Math.cos(a*.79)*5.5;
+  const dx=Math.cos(a)*.374,dz=Math.sin(a*.79)*.191;
+  const heading=Math.atan2(dz,dx),c=Math.cos(heading),s=Math.sin(heading);
+  const along=Math.cos(f.phase)*f.rad*5.3,spread=Math.sin(f.phase)*f.rad*1.65;
+  const breathing=1+.12*Math.sin(tt*.27),ripple=.12*Math.sin(tt*.72+along*.65+f.phase);
+  f.p[0]=cx+c*along-s*(spread*breathing+ripple)+q[0]*.14;
+  f.p[1]=-6.7+Math.sin(tt*.07)*.38+q[1]*.58+Math.sin(f.phase*1.91)*f.rad*.48;
+  f.p[2]=cz+s*along+c*(spread*breathing+ripple)+q[2]*.12;
+  f.yaw=-heading+.06*Math.sin(tt*.72+along*.65+f.phase);
+  f.pitch=Math.cos(tt*.07)*.022;f.bank=.025*Math.sin(a);f.effort=.53+.15*Math.sin(tt*.72+f.phase);
  }
 }
-/* Higher-continuity fish anatomy; LOD uses the SAME contour and tags. */
+/* Species contour remains identical across high and low detail meshes. */
+function fishContour(s,t){
+ const shape=Math.pow(Math.max(.000001,Math.sin(t*Math.PI)),.72)*(1.11-.23*t)*(1-.24*Math.exp(-Math.pow((t-.91)/.095,2)));
+ let height=shape,width=shape,offset=0;
+ if(s.id==='butterfly'||s.id==='idol'){
+  height*=1+.12*Math.exp(-Math.pow((t-.40)/.23,2));
+  const snout=1-.43*Math.exp(-Math.pow((t-.10)/.10,2));height*=snout;width*=snout;
+ }else if(s.id==='parrot'){
+  height*=1+.14*Math.exp(-Math.pow((t-.17)/.12,2));width*=1+.12*Math.exp(-Math.pow((t-.20)/.16,2));offset=.018*Math.sin(t*Math.PI);
+ }else if(s.id==='wrasse'){height*=.93;offset=.009*Math.sin(t*Math.PI);}
+ else if(s.id==='chromis'||s.id==='decor'||s.id==='silver')height*=.93;
+ else if(s.id==='tang')height*=1+.05*Math.sin(t*Math.PI);
+ return {height:height*s.height,width:width*s.width,offset};
+}
 function fishGeometry(s,lod=false){
  const g=new Geometry();g.material=6;g.species=SPECIES.findIndex(x=>x.id===s.id);g.shadow=!lod;g.tag=1;
  const H=s.height,W=s.width,round=s.id==='clown',slender=['wrasse','chromis','decor','silver'].includes(s.id);
- const nu=lod?12:32,nv=lod?20:46;
- const body=(u,v)=>{const a=u*TAU,t=clamp(v,0,1),x=.57-t*1.1;
-  const shape=Math.pow(Math.max(.000001,Math.sin(t*Math.PI)),.72)*(1.11-.23*t)*(1-.24*Math.exp(-Math.pow((t-.91)/.095,2)));
-  return [x,Math.cos(a)*shape*H*(slender?.94:1),Math.sin(a)*shape*W];};
- surface(g,body,nu,nv,p=>fishColor(s,...p),-1);
- g.tag=2;g.sphere([.535,-.026,0],[.020,.014,.027],fishColor(s,.51,-.02,0),lod?8:18,lod?5:10);
- if(!lod){g.sphere([.555,-.027,0],[.007,.0018,.022],[.07,.055,.045],14,6);}
+ surface(g,(u,v)=>{const a=u*TAU,t=clamp(v,0,1),p=fishContour(s,t);return [.57-t*1.1,Math.cos(a)*p.height+p.offset,Math.sin(a)*p.width];},lod?12:32,lod?20:46,p=>fishColor(s,...p),-1);
+ g.tag=2;g.sphere([.535,-.026,0],[s.id==='parrot'?.034:.020,.014,.027],fishColor(s,.51,-.02,0),lod?8:18,lod?5:10);
+ if(!lod)g.sphere([.555,-.027,0],[.007,.0018,.022],[.07,.055,.045],14,6);
  for(const side of [-1,1]){
-  g.tag=4;g.sphere([.385,.056,side*W*.69],[.0188,.020,.009],round?[.30,.28,.19]:[.37,.39,.31],lod?8:18,lod?5:12);
-  g.sphere([.390,.057,side*(W*.69+.007)],[.0125,.0138,.006],[.009,.014,.019],lod?6:16,lod?4:10);
-  // No painted-on white eye dot. The moving light provides the corneal highlight.
-  g.tag=3;
-  const fin=round?[.57,.27,.075]:rgb(s.color).map(x=>x*.86);
-  // A fan of rays from a single anatomical insertion, never a rectangular flag.
+  const eyeWidth=fishContour(s,(.57-.385)/1.1).width*.96;
+  g.tag=4;g.sphere([.385,.056,side*eyeWidth],[.0188,.020,.009],round?[.30,.28,.19]:[.37,.39,.31],lod?8:18,lod?5:12);
+  g.sphere([.390,.057,side*(eyeWidth+.007)],[.0125,.0138,.006],[.009,.014,.019],lod?6:16,lod?4:10);
+  g.tag=3;const fin=round?[.57,.27,.075]:rgb(s.color).map(x=>x*.86);
   surface(g,(u,v)=>{const span=Math.sin(Math.PI*u),tip=.77+.23*span;
    return [.22-v*(.12+.13*span),-.018+v*(.042-.165*u)*tip,side*(W*.92+v*(.012+.12*span))];
-  },lod?8:22,lod?4:12,(p,u,v)=>{const c=s.id==='tang'?[.45,.57,.52]:fin;return c.map(x=>x*(.85+.13*v));},side>0?1:-1);
+  },lod?8:20,lod?4:10,(p,u,v)=>{const c=s.id==='tang'?[.45,.57,.52]:fin;return c.map(x=>x*(.85+.13*v));},side>0?1:-1);
+  // Paired pelvic fins contribute a separate, swept silhouette below the body.
+  surface(g,(u,v)=>{const span=Math.sin(Math.PI*u),root=fishContour(s,.43);return [.10-v*(.11+span*.10),-root.height*.80-v*H*(.14+span*.12),side*(W*.25+span*v*.045)];},lod?4:9,lod?2:4,fin,side>0?1:-1);
   if(!lod){let prev=null;g.tag=1.2;for(let j=0;j<20;j++){const a=-.67+j/19*1.32,pt=[.27-.045*Math.cos(a*1.8),a*H*.71,side*W*.93*Math.sqrt(Math.max(.1,1-a*a))];if(prev)g.tube(prev,pt,.0021,.0021,[.17,.19,.19],4);prev=pt;}}
  }
  g.tag=3.1;const tail=['tang','idol'].includes(s.id)?[.74,.65,.31]:rgb(s.color).map(v=>v*.90);
- surface(g,(u,v)=>{const a=(u-.5)*2,edge=1-Math.abs(a),fork=round?-.016:edge*.11;
-  return [-.49-v*(.32-fork),a*H*.80*(.20+.80*v),Math.sin(u*Math.PI)*.004];},lod?10:26,lod?3:9,(p,u,v)=>round&&Math.min(u,1-u,1-v)<.06?[.10,.09,.08]:tail,1);
- g.tag=3.2;for(const sign of [-1,1])surface(g,(u,v)=>{const x=.30-u*.73,t=(.57-x)/1.10,a=Math.PI*t,by=Math.pow(Math.sin(a),.72)*(1.11-.23*t)*H;
-  const crest=Math.sin(Math.PI*u)*(sign>0?.18:.13)*H;
-  return [x,sign*(by*.95+v*crest),.003*Math.sin(Math.PI*u)];},lod?12:36,lod?3:7,(p,u,v)=>round&&v>.87?[.10,.09,.09]:fishColor(s,p[0],p[1],0),sign>0?1:-1);
+ surface(g,(u,v)=>{const a=(u-.5)*2,edge=1-Math.abs(a),fork=round?-.022:edge*(slender?.19:.12);
+  return [-.49-v*(.34-fork),a*H*(slender?.96:.82)*(.20+.80*v),Math.sin(u*Math.PI)*.004];},lod?10:24,lod?3:8,(p,u,v)=>round&&Math.min(u,1-u,1-v)<.06?[.10,.09,.08]:tail,1);
+ g.tag=3.2;for(const sign of [-1,1])surface(g,(u,v)=>{const x=.30-u*.73,p=fishContour(s,(.57-x)/1.10);
+  const crest=Math.sin(Math.PI*u)*(sign>0?(s.id==='butterfly'?.34:.23):.18)*H;
+  const ray=lod?0:.004*Math.sin(u*TAU*15)*Math.pow(v,6);
+  return [x,p.offset+sign*(p.height*.96+v*crest+ray),.003*Math.sin(Math.PI*u)];},lod?12:36,lod?3:7,(p,u,v)=>round&&v>.87?[.10,.09,.09]:fishColor(s,p[0],p[1],0),sign>0?1:-1);
  if(s.id==='idol'){const pts=[[.15,.32,0],[.10,.53,0],[-.06,.73,0],[-.34,.82,0],[-.61,.81,0],[-.79,.85,0]];for(let i=0;i<pts.length-1;i++)g.tube(pts[i],pts[i+1],.014-i*.0022,.011-i*.0018,[.89,.89,.80],lod?4:8);}
  return g;
 }
@@ -131,8 +151,8 @@ function tableCoral(type=0){
  const ns=detail?72:32,nr=detail?12:6;
  for(let k=0;k<3;k++){
   const cx=Math.cos(k*3.5)*k*.13,cz=Math.sin(k*3.5)*k*.14,rad=1.0-k*.18;
-  const form=(u,v,under=false)=>{const a=u*TAU,r=v*rad*(.86+.065*Math.sin(a*5.3+k)+.045*Math.sin(a*9.1+k*4)+.024*Math.sin(a*17.));
-   const bowl=.13+k*.155+.18*v*v+(.045*Math.sin(a*4.6+k)+.015*Math.sin(a*14.))*Math.pow(v,3);
+  const form=(u,v,under=false)=>{const a=u*TAU,r=v*rad*(.86+.065*Math.sin(a*5+k)+.045*Math.sin(a*9+k*4)+.024*Math.sin(a*17.));
+   const bowl=.13+k*.155+.18*v*v+(.045*Math.sin(a*4+k)+.015*Math.sin(a*14.))*Math.pow(v,3);
    return [cx+Math.cos(a)*r,bowl-(under?.026*(1-.30*v):0),cz+Math.sin(a)*r];};
   surface(g,(u,v)=>form(u,v),ns,nr,(p,u,v)=>colors.map(c=>mix(c,.80,Math.pow(v,24)*.33)),1);
   surface(g,(u,v)=>form(u,v,true),ns,Math.max(3,nr>>1),colors.map(c=>c*.82),-1);

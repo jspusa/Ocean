@@ -1,0 +1,5 @@
+standalone.html
+qa/v08/*.png
+qa/v08/*.json
+.DS_Store
+__pycache__/

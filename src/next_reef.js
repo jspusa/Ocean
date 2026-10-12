@@ -18,7 +18,7 @@ function distantFishGeometry(s){
 }
 function distantTurtle(){const g=new Geometry();g.material=5;g.tag=1;g.sphere([-.16,-.012,0],[1.,.31,.70],[.55,.52,.32],26,14);g.tag=2;g.sphere([1.03,-.025,0],[.32,.14,.15],[.58,.61,.43],16,10);
  for(const side of [-1,1]){surface(g,(u,v)=>{const theta=v*TAU,span=u,w=.16+.15*Math.sin(span*Math.PI);return [.49-span*.51-span*span*.22+Math.cos(theta)*w*(1-span*.84),-.045-span*.045+Math.sin(theta)*.036*(1-span*.87),side*(.51+span*1.19)];},12,6,[.60,.62,.42],side===1?1:-1);g.tri([-.60,-.1,side*.40],[-1.30,-.14,side*.83],[-.81,-.12,side*.76],[.60,.62,.42]);}return g;}
-function distantRay(){const g=new Geometry();g.material=6;g.tag=1;surface(g,(u,v)=>{const z=(u*2-1)*1.90,w=1-Math.abs(z)/1.90;return [.50-v*(.72+w*.96)-Math.abs(z)*.32,.04+Math.sin(v*Math.PI)*.13*w,z];},24,12,[.25,.31,.33],1);g.tube([-1.1,.06,0],[-3.25,-.05,0],.027,.002,[.13,.18,.20],5);return g;}
+function distantRay(){return rayGeometry(true);}
 function distantWhale(){const g=new Geometry();g.material=10;g.tag=1;surface(g,(u,v)=>{const a=v*TAU,x=3.8-u*9.5,q=Math.pow(Math.sin(u*Math.PI),.70)*(1-u*.30);return [x,Math.cos(a)*q*.96,Math.sin(a)*q*.93];},42,18,[.24,.29,.30],1);for(const side of [-1,1]){g.tri([1.,-.4,side*.62],[-1.2,-.65,side*2.7],[-.8,-.36,side*.90],[.38,.44,.43]);g.tri([-5.3,0,0],[-6.4,.1,side*2.4],[-6.1,.05,side*.4],[.22,.26,.28]);}return g;}
 function addGroundTiles(r){
  const span=50,count=5;
@@ -85,18 +85,84 @@ function rockSurfaceMap(variant){
 function rockTop(item,variant,x,z){const {h,N,span}=rockSurfaceMap(variant);const dx=x-item.p[0],dz=z-item.p[2],a=item.yaw||0,c=Math.cos(a),s=Math.sin(a),lx=(c*dx-s*dz)/item.s[0],lz=(s*dx+c*dz)/item.s[2];
  const i=Math.round((lx/span+.5)*(N-1)),j=Math.round((lz/span+.5)*(N-1));if(i<0||i>=N||j<0||j>=N)return -Infinity;return item.p[1]+h[j*N+i]*item.s[1];}
 function rootHeight(x,z){let y=groundHeight(x,z);for(const a of placedReefRocks){if(Math.abs(x-a.item.p[0])>a.item.s[0]*1.7||Math.abs(z-a.item.p[2])>a.item.s[2]*1.7)continue;y=Math.max(y,rockTop(a.item,a.variant,x,z));}return y+.035;}
+// Silhouette-first reef LODs preserve open branches, scallops and sponge cavities.
 function distantColony(type){
- 
  const g=new Geometry();g.shadow=false;g.material=3;
- const colors=[[.61,.54,.43],[.49,.53,.52],[.45,.53,.47],[.60,.51,.37],[.53,.56,.46],[.66,.59,.42],[.69,.42,.30],[.42,.35,.40],[.61,.49,.41],[.55,.56,.45],[.57,.49,.46]];let col=colors[type];
- if(type===3||type===4){for(let k=0;k<2;k++){const radius=1-k*.22,h=.3+k*.25;surface(g,(u,v)=>{let a=u*TAU,r=v*radius;return [Math.cos(a)*r,h+.08*v*v,Math.sin(a)*r];},16,3,col,1);}g.tube([0,0,0],[0,.55,0],.05,.02,col,5);}
- else if(type===5){g.material=4;g.sphere([0,.24,0],[.76,.65,.65],col,12,8);}
- else if(type===7){g.material=8;for(let k=0;k<4;k++){let a=k*2.4;g.tube([Math.cos(a)*.25,0,Math.sin(a)*.25],[Math.cos(a)*.25,.7+.12*Math.sin(k),Math.sin(a)*.25],.11,.12,col,6);}}
- else if(type===6){g.material=7;for(let k=0;k<7;k++){let a=(k/6-.5)*2.5;g.tube([0,0,0],[Math.sin(a)*1.,Math.cos(a)*1.2,0],.014,.003,col,3);}}
- else{g.sphere([0,.32,0],[.60,.27,.60],col.map(c=>c*.88),10,6);for(let k=0;k<7;k++){const a=k*2.4,r=Math.sqrt(k/7)*.63,h=.50+Math.sqrt(1-r*r)*.23;g.tube([Math.cos(a)*r*.65,0,Math.sin(a)*r*.65],[Math.cos(a)*r,h,Math.sin(a)*r],.043,.025,col,4);}}
+ const colors=[[.61,.54,.43],[.49,.53,.52],[.45,.53,.47],[.60,.51,.37],[.53,.56,.46],[.66,.59,.42],[.69,.42,.30],[.42,.35,.40],[.61,.49,.41],[.55,.56,.45],[.57,.49,.46]],col=colors[type];
+ if(type===3||type===4){
+  for(let k=0;k<3;k++){const radius=1-k*.18,h=.13+k*.155,cx=Math.cos(k*3.5)*k*.13,cz=Math.sin(k*3.5)*k*.14;
+   surface(g,(u,v)=>{const a=u*TAU,r=v*radius*(.86+.065*Math.sin(a*5+k)+.045*Math.sin(a*9+k*4));return [cx+Math.cos(a)*r,h+.18*v*v+.035*Math.sin(a*5+k)*v*v*v,cz+Math.sin(a)*r];},20,4,col,1);
+  }g.tube([0,0,0],[0,.5,0],.07,.035,col,5);
+ }else if(type===5){return brainCoral(true);}
+ else if(type===7){return spongeGeometry(true);}
+ else if(type===6){return seaFanGeometry(true);}
+ else{
+  const mound=type>8,branches=mound?18:15;
+  for(let k=0;k<branches;k++){
+   const a=k*2.39996,r=Math.sqrt((k+.5)/branches)*.65,h=(.51+.22*Math.sqrt(1-r*r))*(mound?.76:1),base=[Math.cos(a)*r*.42,.015,Math.sin(a)*r*.42],fork=[Math.cos(a)*r*.80,h*.69,Math.sin(a)*r*.80];
+   g.tube(base,fork,.043,.028,col.map(c=>c*.83),4);
+   for(let j=0;j<2;j++){const az=a+(j?-.62:.62),tip=[Math.cos(a)*r+Math.cos(az)*.052,h+Math.sin(k*3.1)*.035,Math.sin(a)*r+Math.sin(az)*.052];g.tube(fork,tip,.027,.016,col,4);}
+  }
+ }
  return g;
 }
-
-// A perforated membrane connects the main branches; this is geometric/procedural, not a photo card.
-function fanCoral(){const g=structuralFanCoral();g.tag=21;g.shadow=false;
- surface(g,(u,v)=>{const a=u*TAU,r=v*(1+.055*Math.sin(a*5)+.022*Math.sin(a*13));return [Math.cos(a)*r*1.04,.66+Math.sin(a)*r*.67,Math.sin(a*4)*r*.014];},48,14,[.64,.30,.17],1);g.tag=0;return g;}
+// A fan grows from a holdfast into a lobed, anastomosing crown. The perforated
+// tissue follows this outline instead of the previous circular membrane card.
+function seaFanGeometry(low=false){
+ const g=new Geometry();g.material=7;g.shadow=false;const color=[.63,.33,.23],arms=low?9:13;
+ g.tube([0,-.045,0],[0,.26,0],.038,.027,color,7);
+ const reach=a=>1.20+.13*Math.cos(a*3)+.045*Math.sin(a*13);
+ const point=(a,v)=>{const r=reach(a)*v;return [Math.sin(a)*r,.16+Math.cos(a)*r,Math.sin(a*2.8)*r*.045+.055*r*r];};
+ for(let k=0;k<arms;k++){
+  const a=-1.29+k/(arms-1)*2.56;let prev=[0,.15,0];
+  for(let j=1;j<=5;j++){
+   const q=point(a,j/5);g.tube(prev,q,.021*(1-(j-1)/6),.021*(1-j/6),color,low?4:5);prev=q;
+   if(j>1&&j<5){const twig=point(a+(k%2?.11:-.11),Math.min(1,j/5+.16));g.tube(q,twig,.006,.0028,color.map(c=>c*1.1),4);}
+  }
+ }
+ if(!low){
+  g.tag=21;surface(g,(u,v)=>point(-1.29+u*2.56,v),44,14,[.65,.35,.23],1);
+ }else{
+  for(let ring=2;ring<6;ring++)for(let k=0;k<arms-1;k++){const a=-1.29+k/(arms-1)*2.56;g.tube(point(a,ring/5),point(a+2.56/(arms-1),ring/5),.0035,.0035,color,3);}
+ }
+ g.tag=0;return g;
+}
+function fanCoral(){return seaFanGeometry(!reefDetailLevel);}
+// Barrel walls, rim and dark inner bowl are actual geometry, visible from above.
+function spongeGeometry(low=false){
+ const g=new Geometry();g.material=8;g.shadow=true;
+ const cups=[[0,0,.82,.32],[-.42,.12,.63,.20],[.31,-.31,.48,.15]],ns=low?12:28,nv=low?6:15;
+ for(let k=0;k<cups.length;k++){
+  const [cx,cz,h,rad]=cups[k],col=k===0?[.43,.35,.27]:[.48,.39,.29];
+  const rim=a=>1+.045*Math.sin(a*9+k)+.035*Math.sin(a*4-k);
+  const top=a=>h*(1+.031*Math.sin(a*5+k)+.021*Math.cos(a*8));
+  const outside=(a,v)=>{const r=rad*(.79+.34*Math.sin(v*Math.PI*.82))*rim(a);return [cx+Math.cos(a)*r+.08*v*v,top(a)*v,cz+Math.sin(a)*r];};
+  surface(g,(u,v)=>outside(u*TAU,v),ns,nv,(p,u,v)=>col.map(c=>c*(.76+.22*v+.06*Math.sin(u*TAU*7))),-1);
+  surface(g,(u,v)=>{const a=u*TAU,t=.35+v*.65,r=rad*(.79+.34*Math.sin(t*Math.PI*.82))*rim(a)*.77;return [cx+Math.cos(a)*r+.08*t*t,top(a)*t,cz+Math.sin(a)*r];},ns,low?3:8,(p,u,v)=>col.map(c=>c*(.25+.29*v)),1);
+  for(let j=0;j<ns;j++){
+   const a=j/ns*TAU,b=(j+1)/ns*TAU,outerA=outside(a,1),outerB=outside(b,1),inner=p=>[cx+.08+(p[0]-cx-.08)*.77,p[1],cz+(p[2]-cz)*.77];
+   g.quad(outerA,outerB,inner(outerB),inner(outerA),col.map(c=>c*1.08));
+   const bottom=a=>[cx+Math.cos(a)*rad*.72+.010,h*.35,cz+Math.sin(a)*rad*.72];
+   g.tri([cx+.010,h*.31,cz],bottom(a),bottom(b),col.map(c=>c*.24));
+  }
+ }
+ return g;
+}
+function brainCoral(low=false){
+ const g=new Geometry();g.material=4;g.shadow=true;
+ surface(g,(u,v)=>{const a=u*TAU,b=v*Math.PI,sy=Math.sin(b),x=Math.cos(a)*sy,z=Math.sin(a)*sy;
+  const f=1+.06*Math.sin(a*5)*sy*sy+.036*Math.sin(a*9+b*3);return [x*.73*f,.20+Math.cos(b)*.60*f,z*.68*f];
+ },low?18:46,low?12:30,[.64,.58,.39],1);return g;
+}
+// Ribbon leaves have a tapered tip and twisted midrib; anchored roots stay still.
+function grass(){
+ const g=new Geometry();g.material=9;g.shadow=false;
+ for(let k=0;k<20;k++){
+  const a=k*2.39996,h=.30+.51*random(),r=.035+.17*random(),curl=.18+.28*random(),width=.016+.014*random();
+  const cx=Math.cos(a)*r,cz=Math.sin(a)*r,col=[.25+random()*.06,.36+random()*.08,.20+random()*.045];
+  surface(g,(u,v)=>{const angle=a+v*.55,leaf=(u-.5)*width*Math.pow(1-v,.55),lean=v*v*curl;
+   return [cx+Math.cos(a)*lean+Math.cos(angle)*leaf,h*v-.08*v*v,cz+Math.sin(a)*lean+Math.sin(angle)*leaf];
+  },2,8,(p,u,v)=>col.map(c=>c*(.69+.31*v)),1);
+ }
+ return g;
+}

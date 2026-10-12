@@ -80,11 +80,17 @@ function buildReef(r){seed=441072;obstacles.length=0;reefPatches.length=0;addGro
  for(let i=0;i<4;i++){let b=r.batch(rockGeometry(i),rocks[i]);b.maxDistance=30;let low=r.batch(rockGeometry(i,true),rocks[i]);low.minDistance=30;low.maxDistance=170;}
  let deb=rockGeometry(2,true);deb.shadow=false;let db=r.batch(deb,rubble);db.maxDistance=19;
  const makers=[()=>branchCoral(0),()=>branchCoral(1),()=>branchCoral(2),()=>tableCoral(0),()=>tableCoral(1),brainCoral,fanCoral,spongeGeometry,()=>branchCoral(3),()=>cauliflowerCoral(0),()=>cauliflowerCoral(1)];
- makers.forEach((make,i)=>{reefDetailLevel=1;const b=r.batch(make(),corals[i],i===6?3:0);b.shadow=true;b.maxDistance=3.8;
- reefDetailLevel=0;const mid=r.batch([5,7].includes(i)?distantColony(i):make(),corals[i],i===6?3:0);mid.shadow=true;mid.shadowProxy=true;mid.minDistance=3.8;mid.maxDistance=18;
- const far=r.batch(distantColony(i),corals[i],i===6?3:0);far.shadow=true;far.shadowProxy=true;far.minDistance=18;far.maxDistance=48;
+ makers.forEach((make,i)=>{reefDetailLevel=1;const b=r.batch(make(),corals[i],i===6?3:0);b.shadow=true;b.maxDistance=5.5;
+ reefDetailLevel=0;const mid=r.batch([5,7].includes(i)?distantColony(i):make(),corals[i],i===6?3:0);mid.shadow=true;mid.shadowProxy=true;mid.minDistance=5.5;mid.maxDistance=20;
+ const far=r.batch(distantColony(i),corals[i],i===6?3:0);far.shadow=true;far.shadowProxy=true;far.minDistance=20;far.maxDistance=55;
  });reefDetailLevel=1;
- for(let i=0;i<80;i++){let x=rr(-25,25),z=rr(-32,17);grassItems.push({p:[x,groundHeight(x,z)+.02,z],s:[.65,.55,.65],yaw:rr(0,TAU),phase:rr(0,TAU)});}r.batch(grass(),grassItems,3).maxDistance=30;
+ // Seagrass grows in irregular sheltered meadows, with open sand between patches.
+ const meadows=[[-3.6,15,2.5],[4.4,9.5,2.1],[-2.5,2.5,1.6],[15,12,2.9],[-17,16,2.5],[3,-16,2.0]];
+ for(let i=0;i<156;i++){
+  const meadow=meadows[i%meadows.length],a=rr(0,TAU),rad=Math.sqrt(random())*meadow[2],x=meadow[0]+Math.cos(a)*rad,z=meadow[1]+Math.sin(a)*rad*.65;
+  const floor=groundHeight(x,z);if(rootHeight(x,z)>floor+.22)continue;
+  const sc=rr(.60,1.22);grassItems.push({p:[x,floor+.018,z],s:[sc,sc*rr(.78,1.14),sc],yaw:rr(0,TAU),phase:rr(0,TAU)});
+ }r.batch(grass(),grassItems,3).maxDistance=35;
  // Close, carefully composed flora along the route instead of only background detail.
  r.batch(tableCoral(),[{p:[-4.3,rootHeight(-4.3,5.5),5.5],s:[1.42,1.12,1.3],yaw:1.1},{p:[6.1,rootHeight(6.1,-2.5),-2.5],s:[1.15,1.5,1.3],yaw:.4}]);
  r.batch(fanCoral(),[{p:[-5.6,rootHeight(-5.6,6.4),6.4],s:[1.25,1.6,1.25],yaw:1.0,phase:1},{p:[6.3,rootHeight(6.3,1),1],s:[1.4,1.8,1.4],yaw:.4,phase:2}]);

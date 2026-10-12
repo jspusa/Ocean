@@ -10,7 +10,7 @@ const recorder={batches:[],batch(geo,instances,kind=0,dynamic=false){const b={me
 buildReef(recorder);addLife(recorder);initializeIndividuals(recorder);updateLife(0);
 const nodeList=[],nodeMap=new Map();function nodeID(n){if(!nodeMap.has(n)){nodeMap.set(n,nodeList.length);nodeList.push(n);}return nodeMap.get(n);}
 const meshList=recorder.batches.map(b=>{let meta={};for(const k of ['kind','dynamic','material','species','visible','shadow','maxDistance','minDistance','shadowProxy'])if(b[k]!==undefined)meta[k]=b[k];return {meta,instanceIDs:b.instances.map(nodeID),mesh:b.mesh};});
-globalThis.capture={meshList,header:{format:'return-blue/indexed-scene/1',sourceVersion:'0.7.0',nodes:nodeList,obstacles,reefPatches,life:life.map(nodeID),decorLife:decorLife.map(nodeID),shoal:shoal.map(nodeID),diverBatch:recorder.batches.indexOf(diverBatch)}};
+globalThis.capture={meshList,header:{format:'return-blue/indexed-scene/1',sourceVersion:'0.8.0',nodes:nodeList,obstacles,reefPatches,life:life.map(nodeID),decorLife:decorLife.map(nodeID),shoal:shoal.map(nodeID),diverBatch:recorder.batches.indexOf(diverBatch)}};
 `,ctx,{timeout:300000});
 const {meshList,header}=ctx.capture,chunks=[];let offset=0;
 header.batches=meshList.map(({meta,instanceIDs,mesh})=>{if(!mesh.vertices.every(Number.isFinite))throw new Error("Non-finite mesh vertex; fix source geometry before publishing");const v=Buffer.from(mesh.vertices.buffer,mesh.vertices.byteOffset,mesh.vertices.byteLength),i=Buffer.from(mesh.indices.buffer,mesh.indices.byteOffset,mesh.indices.byteLength);const item={...meta,instanceIDs,vertexOffset:offset,vertexFloats:mesh.vertices.length,indexOffset:offset+v.length,indexCount:mesh.indices.length,radius:mesh.radius};chunks.push(v,i);offset+=v.length+i.length;return item;});

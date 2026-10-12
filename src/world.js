@@ -132,7 +132,28 @@ function turtleGeometry(){let g=new Geometry();g.material=5;g.tag=1;
  g.sphere([1.255,.007,side*.043],[.007,.005,.005],[.06,.08,.05],9,6);let prev=null;for(let i=0;i<15;i++){let a=i/14*Math.PI,p=[1.225+.052*Math.sin(a),-.055,side*.108*Math.cos(a)];if(prev)g.tube(prev,p,.0025,.0025,[.16,.18,.12],5);prev=p;}g.tag=2;
  }
  g.tube([-1.07,-.12,0],[-1.32,-.15,0],.060,.010,[.58,.61,.43],18);return g;}
-function rayGeometry(){let g=new Geometry();g.material=6;g.tag=1;let form=(u,v)=>{let z=(u*2-1)*1.90,w=1-Math.abs(z)/1.90,x=.50-v*(.72+w*.96)-Math.abs(z)*.32;return [x,.04+Math.sin(v*Math.PI)*.13*w,z];};surface(g,form,62,32,(p)=>{let n=.5+.5*Math.sin(p[0]*93+p[2]*53)*Math.sin(p[2]*85-p[0]*43);return n>.92?[.76,.78,.70]:[.25,.31,.33];},1);g.sphere([.41,.08,0],[.30,.115,.23],[.25,.31,.33],26,16);g.tube([-1.10,.06,0],[-3.25,-.05,0],.029,.002,[.13,.18,.20],10);g.tag=4;for(let s of [-1,1])g.sphere([.47,.15,s*.15],[.027,.015,.016],[.02,.04,.05],12,8);return g;}
+// A closed, cambered eagle-ray body: ventral belly, swept wings and whip tail.
+function rayGeometry(low=false){
+ const g=new Geometry();g.material=6;g.species=9;g.shadow=!low;g.tag=1;
+ const form=(u,v,under=false)=>{const z=(u*2-1)*1.90,w=Math.max(0,1-Math.abs(z)/1.90),lead=.47-Math.abs(z)*.44,chord=.035+1.36*Math.pow(w,.62);
+  return [lead-v*chord,(under?-.026-.055*Math.sin(v*Math.PI)*w:.033+.17*Math.sin(v*Math.PI)*Math.pow(w,.72))+Math.pow(1-w,3)*.028,z];};
+ const nu=low?24:58,nv=low?12:28;
+ surface(g,(u,v)=>form(u,v),nu,nv,[.22,.28,.27],-1);
+ g.tag=2;surface(g,(u,v)=>form(u,v,true),nu,low?6:16,[.66,.68,.60],1);
+ for(const v of [0,1])for(let i=0;i<nu;i++)g.quad(form(i/nu,v),form(i/nu,v,true),form((i+1)/nu,v,true),form((i+1)/nu,v),[.40,.45,.42]);
+ for(const u of [0,1])for(let j=0;j<nv;j++)g.quad(form(u,j/nv),form(u,(j+1)/nv),form(u,(j+1)/nv,true),form(u,j/nv,true),[.40,.45,.42]);
+ g.tag=1;g.sphere([.46,.055,0],[.29,.105,.22],[.26,.31,.29],low?14:26,low?8:16);
+ // Stable, uneven ivory spots follow the dorsal surface, including the outer wings.
+ if(!low)for(let i=0;i<82;i++){
+  const u=.08+.84*((i*.61803398875)%1),v=.16+.67*((i*.7548776662)%1),p=form(u,v),rad=.017+.008*((i*.41421356)%1);
+  for(let j=0;j<6;j++){const a=j/6*TAU,b=(j+1)/6*TAU;g.tri([p[0],p[1]+.006,p[2]],[p[0]+Math.cos(a)*rad,p[1]+.006,p[2]+Math.sin(a)*rad],[p[0]+Math.cos(b)*rad,p[1]+.006,p[2]+Math.sin(b)*rad],[.64,.66,.56],[[0,1,0],[0,1,0],[0,1,0]]);}
+ }
+ g.tag=2;let prev=[-.91,.03,0];for(let i=1;i<=14;i++){const t=i/14,p=[-.91-t*2.48,.03-.10*t+.07*Math.sin(t*Math.PI),Math.sin(t*3.2)*.055*t];g.tube(prev,p,.032*(1-(i-1)/14)+.002,.032*(1-t)+.002,[.16,.21,.20],low?4:7);prev=p;}
+ for(const side of [-1,1]){
+  g.tag=4;g.sphere([.48,.139,side*.148],[.026,.017,.014],[.015,.025,.023],low?7:14,low?5:9);
+  if(!low){g.tag=2;for(let k=0;k<5;k++)g.tube([.18-k*.095,-.042,side*.18],[.17-k*.095,-.042,side*.30],.003,.002,[.25,.31,.27],4);}
+ }return g;
+}
 // A fully three-dimensional, smoothly profiled whale; no imported model or silhouette sprite.
 function whaleGeometry(){const g=new Geometry();g.material=10;g.tag=1;const smoothStep=(a,b,x)=>{let t=clamp((x-a)/(b-a),0,1);return t*t*(3-2*t);};
  // Nonuniform head stations make a rounded, broad rostrum, not a pointed fish snout.

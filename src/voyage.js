@@ -1,4 +1,4 @@
-/* OPEN WATER / playable vertical slice, v0.7.
+/* OPEN WATER / playable vertical slice, v0.8.
  * Offline-first progression, photos with geometric scoring, chart, ship debrief.
  * The benchmark is a product target; neither this file nor its UI claims Wii parity.
  * All places/behaviours are authored fiction, not field measurements.
@@ -80,7 +80,7 @@ function gradePhoto(){
  for(const fish of life){const p=project(fish.p,renderer.vp),dist=V.dist(eye,fish.p);if(p[2]<=0||Math.abs(p[0])>.97||Math.abs(p[1])>.95||dist>110||blocked(eye,fish.p))continue;
   const ctr=Math.hypot(p[0],p[1]);if(ctr<best){chosen={fish,p,dist};best=ctr;}}
  if(!chosen)return {score:0,subject:null,breakdown:'風景留念 · 畫面內沒有可評分的生物',metrics:{}};
- const {fish,p,dist}=chosen;const size=Math.max(...fish.s)*(fish.species===10?9.5:fish.species===11?4.0:fish.species>=8?2.7:1.2),coverage=size/(Math.max(.3,dist)*Math.tan((renderer.photoFov||69)*Math.PI/360));
+ const {fish,p,dist}=chosen;const size=Math.max(...fish.s)*(fish.species===10?9.5:fish.species===11?4.0:fish.species>=8?2.7:1.2),coverage=size/(Math.max(.3,dist)*Math.tan((renderer.photoFov||renderer.fov||69)*Math.PI/360));
  const framing=Math.max(0,1-best*.60)*30,scale=clamp(coverage/.24,0,1)*30,steady=(1-clamp(Math.hypot(...player.velocity)/6,0,1))*20,light=clamp(1+eye[1]/85,.3,1)*20;
  const safeDistance=fish.species===10?12:fish.species>=8?2.5:1;
  let score=Math.round(framing+scale+steady+light);if(dist<safeDistance)score=Math.min(score,49);if(coverage>1.4)score=Math.min(score,49);
@@ -112,7 +112,7 @@ goHome=function(){
  const s=voyage.state;const duration=Math.max(0,diveSeconds-voyage.sessionStart);s.totalSeconds+=duration;const newlySeen=Math.max(0,persistent.seen.length-voyage.sessionSeen);
  const allDone=s.completed.length===ORDERS.length;
  if(allDone&&!s.ended){s.ended=true;s.finishedAt=new Date().toISOString();}
- legacyHome();s.resume=null;saveVoyage();renderShip();renderer.forceShadow=true;renderer.dirty=true;
+ if(voyage.photoMode)togglePhotoMode();legacyHome();s.resume=null;saveVoyage();renderShip();renderer.forceShadow=true;renderer.dirty=true;
  $('debriefTitle').textContent=allDone?'把海，帶回來了。':'這次的海，已經留下。';
  $('debriefCopy').textContent=allDone?'第一航程完成。那些地方沒有消失，隨時還能再潛一次。':'所有地標、圖鑑與委託進度都會保留。下一次，不必從頭開始。';
  $('debriefStats').innerHTML=`<span><b>${timeText(duration)}</b><small>這次潛水</small></span><span><b>${Math.round(voyage.sessionDistance)} m</b><small>這次游動</small></span><span><b>+${newlySeen}</b><small>新增生物</small></span><span><b>${s.completed.length}/6</b><small>航程記憶</small></span>`;
@@ -171,8 +171,9 @@ function validateImport(data){
  const importedSettings={...settings,sound:false};
  for(const key of ['quality','speed','sensitivity'])if(Number.isFinite(j.settings?.[key]))importedSettings[key]=key==='quality'?Math.round(clamp(j.settings[key],0,2)):clamp(j.settings[key],.4,2.4);
  for(const key of ['master','music','ambience','breath'])if(Number.isFinite(j.settings?.[key]))importedSettings[key]=clamp(j.settings[key],0,1);
- for(const key of ['hints','third','reduced','lamp','adaptive','startWithSound'])if(typeof j.settings?.[key]==='boolean')importedSettings[key]=j.settings[key];
+ for(const key of ['hints','third','reduced','lamp','adaptive','startWithSound','lookLock'])if(typeof j.settings?.[key]==='boolean')importedSettings[key]=j.settings[key];
  if(['day','late','blue'].includes(j.settings?.lighting))importedSettings.lighting=j.settings.lighting;
+ if(Number.isFinite(j.settings?.fov))importedSettings.fov=clamp(j.settings.fov,55,90);
  if(Number.isFinite(j.settings?.clarity))importedSettings.clarity=clamp(j.settings.clarity,.5,1.5);
  const entries=Array.isArray(j.log)?j.log.slice(-60).filter(e=>e&&typeof e.text==='string'&&Number.isFinite(e.date)).map(e=>({text:e.text.slice(0,250),date:e.date})):[];
  return {state,seen,photos,settings:importedSettings,log:entries};
@@ -212,7 +213,7 @@ function voyageTick(dt){
 }
 function pollGamepad(){
  let g;try{g=navigator.getGamepads?.()?.find(p=>p?.connected);}catch(_){return;}
- if(!g){if(voyage.gamepadAttached){resetInput();voyage.gamepadAttached=false;}return;}
+ if(!g){if(voyage.gamepadAttached||voyage.gamepadDepth){resetInput();voyage.gamepadAttached=false;voyage.gamepadDepth=false;}voyage.gamepadButtons=[];return;}
  const dead=v=>Math.abs(v)<.15?0:Math.sign(v)*(Math.abs(v)-.15)/.85;
  if(active&&!modal&&!photoOpen){const move=[dead(g.axes[0]||0),dead(g.axes[1]||0)],look=[dead(g.axes[2]||0),dead(g.axes[3]||0)];if(move.some(v=>v)||look.some(v=>v)){stopAuto();voyage.gamepadAttached=true;stick=move;lookStick=look;}else if(voyage.gamepadAttached){stick=move;lookStick=look;}
   const vertical=(g.buttons[7]?.value||0)-(g.buttons[6]?.value||0);if(Math.abs(vertical)>.04||voyage.gamepadDepth){verticalInput=vertical;voyage.gamepadDepth=Math.abs(vertical)>.04;}

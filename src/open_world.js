@@ -1,7 +1,7 @@
-/* OPEN WATER 0.7 — original continuous-world art and landmarks.
+/* OPEN WATER 0.8 — original continuous-world art and landmarks.
    Game metres, NOT surveyed coordinates or a real dive plan.
    The old sculpted core is retained; new vistas are authored as linked destinations. */
-const OPEN_WORLD={bounds:{x:270,z:295,centerZ:-90},boat:[-24,0,43],version:'0.7.0'};
+const OPEN_WORLD={bounds:{x:270,z:295,centerZ:-90},boat:[-24,0,43],version:'0.8.0'};
 const coreGroundHeight=groundHeight;
 groundHeight=function(x,z){
  const core=coreGroundHeight(x,z);
@@ -74,15 +74,19 @@ function wreckVessel(){
 }
 function dolphinGeometry(low=false){
  const g=new Geometry();g.material=14;g.shadow=true;
- surface(g,(u,v)=>{const a=v*TAU,x=1.75-u*3.85,q=Math.pow(Math.sin(u*Math.PI),.68)*(1-.57*u);return [x,Math.cos(a)*q*.48,Math.sin(a)*q*.46];},low?22:58,low?12:28,(p)=>p[1]<-.06?[.72,.76,.73]:[.29,.38,.42],1);
- g.sphere([1.62,-.08,0],[.54,.14,.15],[.51,.58,.58],low?12:24,12);
+ surface(g,(u,v)=>{const a=v*TAU,x=1.75-u*3.85,q=Math.pow(Math.sin(u*Math.PI),.65)*(1-.55*u)*(1+.10*Math.exp(-Math.pow((u-.15)/.12,2)));return [x,Math.cos(a)*q*.48,Math.sin(a)*q*.46];},low?22:58,low?12:28,(p)=>p[1]<-.06?[.72,.76,.73]:[.29,.38,.42],1);
+ // A narrow tapered rostrum and jaw line connect to the rounded melon.
+ surface(g,(u,v)=>{const a=v*TAU,w=.126*(1-.58*u)+.008*Math.sin(u*Math.PI);return [1.28+u*.86,-.096+Math.cos(a)*w*.65,Math.sin(a)*w];},low?14:26,low?8:16,[.51,.58,.58],-1);
+ g.sphere([2.125,-.096,0],[.035,.035,.054],[.51,.58,.58],low?10:18,low?6:10);
+ if(!low)for(const side of [-1,1]){let prev=null;for(let i=0;i<16;i++){const t=i/15,p=[1.30+t*.83,-.098,side*(.127*(1-.58*t))];if(prev)g.tube(prev,p,.0028,.002,[.18,.25,.26],4);prev=p;}}
+ g.sphere([1.10,.308,0],[.034,.003,.021],[.12,.20,.22],low?8:14,6);
  for(let s of [-1,1]){
-  g.sphere([1.2,.02,s*.263],[.043,.037,.025],[.024,.034,.038],10,8);
+  g.sphere([1.2,.02,s*.300],[.043,.037,.025],[.024,.034,.038],10,8);
   surface(g,(u,v)=>{let z=s*(.33+u*.77),x=.12-u*.5-(v-.5)*(.33*(1-u)+.04);return [x,-.13-u*.22+.035*Math.sin(v*TAU),z];},10,6,[.30,.40,.44],s);
   surface(g,(u,v)=>{let z=s*u*.94,x=-1.86-u*.19-(v-.5)*(.53*(1-u*.73));return [x,.01+.044*Math.sin(v*TAU),z];},14,6,[.28,.38,.42],s);
  }
  // Rounded dorsal fin instead of a free-floating triangle.
- for(let s of [-1,1])surface(g,(u,v)=>{const y=.29+u*.54,w=.51*(1-u);return [-.15+u*.13+(v-.5)*w,y,s*.026*Math.sin(v*Math.PI)*(1-u)];},12,8,[.29,.38,.42],s);
+ for(let s of [-1,1])surface(g,(u,v)=>{const y=.29+u*.54,w=.55*Math.pow(1-u,.78);return [-.15-u*.30+.11*Math.sin(u*Math.PI)+(v-.5)*w,y,s*.030*Math.sin(v*Math.PI)*(1-u)];},12,8,[.29,.38,.42],s);
  return g;
 }
 const dolphinSpec={id:'dolphin',name:'瓶鼻海豚',latin:'Tursiops spp. · 原創類群模型',en:'BOTTLENOSE DOLPHIN',color:0x698a99,zone:5,height:.22,width:.11,size:1,hint:'流線身形、短吻與弧形背鰭。',detail:'本版的原創伴游海豚。動物行為為遊戲編排，不可用作接近真實野生動物的指引。'};
@@ -99,12 +103,24 @@ buildReef=function(r){
   }
  });
  for(let k=0;k<4;k++){let hi=r.batch(rockGeometry(k),reefs[k]);hi.maxDistance=65;let lo=r.batch(rockGeometry(k,true),reefs[k]);lo.minDistance=65;lo.maxDistance=430;lo.shadowProxy=true;}
- for(const [make,items] of [[()=>tableCoral(0),plates],[()=>branchCoral(2),branches],[fanCoral,fans]]){reefDetailLevel=0;const hi=r.batch(make(),items);hi.maxDistance=32;const lo=r.batch(distantColony(make===fanCoral?6:3),items);lo.minDistance=32;lo.maxDistance=95;lo.shadow=false;}reefDetailLevel=1;
+ for(const [make,items,type] of [[()=>tableCoral(0),plates,3],[()=>branchCoral(2),branches,2],[fanCoral,fans,6]]){reefDetailLevel=0;const hi=r.batch(make(),items,type===6?3:0);hi.maxDistance=32;const lo=r.batch(distantColony(type),items,type===6?3:0);lo.minDistance=32;lo.maxDistance=95;lo.shadow=false;}reefDetailLevel=1;
  // Wider, spatially legible passage. Same generated stone style, different scale/context.
  const gy=groundHeight(-102,-76);r.batch(archGeometry(),[{p:[-102,gy-3,-76],s:[3.25,3.1,2.6],yaw:.12}]).maxDistance=240;
  for(let k=0;k<11;k++){const a=.12+k/10*(Math.PI-.24);obstacles.push({p:[-102+Math.cos(a)*14.3,gy-3+Math.sin(a)*14.2,-76],s:[3.1,3.5,3.4]});}
  const piers=[-1,1].map(side=>{const x=-102+side*14.1,z=-76;return {p:[x,groundHeight(x,z)+.55,z],s:[4.1,2.8,3.8],yaw:side*.6};});r.batch(rockGeometry(1),piers).maxDistance=220;for(const a of piers)obstacles.push({p:a.p.slice(),s:a.s.map(v=>v*.86)});
  const wy=groundHeight(99,-166);r.batch(wreckVessel(),[{p:[99,wy+.10,-166],yaw:-.24}]).maxDistance=230;
+ // Decades of attached growth give the wreck a different habitat and scale.
+ const wreckFans=[],wreckSponges=[],wreckPlates=[];
+ const toWreck=(x,y,z)=>{const c=Math.cos(-.24),s=Math.sin(-.24);return [99+c*x+s*z,wy+.10+y,-166-s*x+c*z];};
+ for(let k=0;k<28;k++){
+  const side=k%2?1:-1,z=-12+Math.floor(k/2)*1.83,width=3.8*Math.pow(Math.sin(Math.PI*(z+14.5)/31),.45),scale=.40+.28*random();
+  const inst={p:toWreck(side*width,2.18,z),s:[scale,scale*(1.1+random()*.30),scale],yaw:-.24+side*.70,phase:k*.84};
+  (k%5===0?wreckFans:k%3===0?wreckSponges:wreckPlates).push(inst);
+ }
+ const wf=r.batch(fanCoral(),wreckFans,3);wf.maxDistance=65;
+ const ws=r.batch(spongeGeometry(true),wreckSponges);ws.maxDistance=48;
+ reefDetailLevel=0;r.batch(tableCoral(1),wreckPlates).maxDistance=50;reefDetailLevel=1;
+
  // Small research logger outside the hull. Interaction is read-only; no salvage mechanic.
  const logger=new Geometry();logger.material=12;logger.box([0,0,0],[.66,.48,.37],[.84,.64,.25]);logger.box([0,.08,.196],[.4,.17,.035],[.055,.17,.18]);logger.tube([0,-1.8,0],[0,0,0],.025,.025,[.58,.61,.56],8);
  r.batch(logger,[{p:[95,wy+3,-147]}]).maxDistance=70;

@@ -1,4 +1,4 @@
-/* Return to the Blue — WebGL2 renderer / INDIVIDUAL WATERS 0.6 / shadows, mapped materials, depth-based compositing. No runtime dependencies. */
+/* Return to the Blue — WebGL2 renderer / living light / spectral water, refracted sunlight and depth-aware compositing. No runtime dependencies. */
 'use strict';
 const $=id=>document.getElementById(id), TAU=Math.PI*2;
 const clamp=(v,a,b)=>Math.min(b,Math.max(a,v)), mix=(a,b,t)=>a+(b-a)*t;
@@ -105,8 +105,22 @@ float caustic(vec2 p,float time){
  float frame=mod(time*6.,64.);float i=floor(frame),j=mod(i+1.,64.);
  vec2 q=fract(p*.145);vec2 a=(vec2(mod(i,8.),floor(i/8.))*256.+1.+q*254.)/2048.;
  vec2 b=(vec2(mod(j,8.),floor(j/8.))*256.+1.+q*254.)/2048.;
- float v=mix(texture(uCaustic,a).r,texture(uCaustic,b).r,fract(frame));
- return pow(max(v,0.),1.38)*4.5;
+ // Explicit gradients prevent the atlas wrap from selecting a blurred mip at tile seams.
+ vec2 gx=dFdx(p)*(.145*254./2048.),gy=dFdy(p)*(.145*254./2048.);
+ float blend=fract(frame);blend=blend*blend*(3.-2.*blend);
+ float v=mix(textureGrad(uCaustic,a,gx,gy).r,textureGrad(uCaustic,b,gx,gy).r,blend);
+ return pow(max(v,0.),1.32)*4.3;
+}
+`;
+// One optical model is shared by direct illumination, the water ceiling and the view ray.
+// Coefficients describe a clear tropical sea; they are artistic parameters, not a site survey.
+const WATER_OPTICS_GLSL=`
+vec3 waterExtinction(float clarity){return vec3(.060,.028,.018)*clarity;}
+vec3 sunThroughWater(float depth,float sunHeight){return exp(-vec3(.044,.018,.009)*depth/max(.40,sunHeight));}
+vec3 waterRadiance(vec3 direction,float depth,float sun){
+ float up=clamp(direction.y*.65+.48,0.,1.);
+ vec3 deep=vec3(.0018,.014,.034),shallows=vec3(.006,.086,.125);
+ return mix(deep,shallows,pow(up,1.1))*exp(-depth*.018)*(.42+.58*sun);
 }
 `;
 const FS=`#version 300 es
@@ -114,9 +128,10 @@ precision highp float;precision highp int;
 in vec3 vWorld;in vec3 vNormal;in vec3 vColor;in vec3 vLocal;in vec2 vUV;in float vTag;in float vSeed;in vec4 vShadow;in float vLodDistance;uniform vec3 uLODBounds;flat in vec4 vGenes;flat in vec3 vTint;in vec4 vDynamicShadow;uniform int uSamples;
 uniform vec3 uCamera;uniform float uTime;uniform vec3 uFog;uniform float uFogDensity;uniform float uSun;uniform int uKind;uniform int uMat;uniform int uSpecies;
 uniform sampler2D uSand;uniform sampler2D uSandN;uniform sampler2D uRock;uniform sampler2D uRockN;uniform sampler2D uShell;uniform sampler2D uShellN;uniform sampler2D uCoral;uniform sampler2D uCoralN;uniform highp sampler2DShadow uShadow;uniform highp sampler2DShadow uDynamicShadow;
-uniform float uShadowTexel;uniform float uShadows;uniform vec3 uLightDir;uniform vec3 uLightColor;
+uniform float uShadowTexel;uniform float uShadows;uniform vec3 uLightDir;uniform vec3 uAirLightDir;uniform vec3 uLightColor;
 out vec4 frag;
 ${NOISE_GLSL}
+${WATER_OPTICS_GLSL}
 vec3 triMap(sampler2D tex,vec3 p,vec3 n){vec3 w=pow(abs(n),vec3(5.));w/=dot(w,vec3(1.));return texture(tex,p.yz).rgb*w.x+texture(tex,p.xz).rgb*w.y+texture(tex,p.xy).rgb*w.z;}
 vec3 triNormal(sampler2D tex,vec3 p,vec3 n,float strength){vec3 w=pow(abs(n),vec3(5.));w/=dot(w,vec3(1.));vec3 a=texture(tex,p.yz).xyz*2.-1.,b=texture(tex,p.xz).xyz*2.-1.,c=texture(tex,p.xy).xyz*2.-1.;vec3 v=vec3(0.,a.x,a.y)*w.x+vec3(b.x,0.,b.y)*w.y+vec3(c.x,c.y,0.)*w.z;return normalize(n+v*strength);}
 float visibility(vec3 n){
@@ -225,19 +240,22 @@ void main(){
  if(uMat==13){rough=.92;base*=.76+.32*noise(vLocal*1.6);n=normalize(n+vec3(noise(vLocal*8.)-.5,0.,noise(vLocal*7.+3.)-.5)*.11);}
  if(uMat==14){rough=.34;float grain=noise(vLocal*40.);base*=.97+.05*grain;}
  if(uMat==15){float upn=smoothstep(.1,.6,geomN.y),alt=smoothstep(-.5,6.,vWorld.y);base=mix(vec3(.49,.47,.39),vec3(.19,.30,.19),upn*alt);rough=.95;}
- vec3 L=normalize(uLightDir);vec3 E=normalize(uCamera-vWorld);
+ vec3 L=normalize(vWorld.y<0.?uLightDir:uAirLightDir);vec3 E=normalize(uCamera-vWorld);
  float NoL=max(0.,dot(n,L)),NoV=max(.03,dot(n,E));float sh=visibility(n);float hemi=clamp(n.y*.5+.5,0.,1.);
  // Work in linear light; water-to-surface reflection is not dry-plastic gloss.
  vec3 albedo=pow(clamp(base,vec3(0.),vec3(1.)),vec3(2.2));float depth=max(0.,-vWorld.y);
- vec3 waterAbsorb=exp(-vec3(.026,.012,.005)*depth/max(.45,L.y));
- vec3 ambient=mix(vec3(.039,.060,.080),vec3(.18,.255,.32),hemi)*occ*exp(-depth*.016);
- ambient*=mix(.80,1.,sh);
- float irradiance=2.08*uSun;
+ vec3 waterAbsorb=sunThroughWater(depth,L.y);
+ // Skylight and a restrained sandy-bottom bounce retain detail beneath ledges.
+ vec3 ambient=mix(vec3(.040,.062,.067),vec3(.16,.24,.27),hemi)*occ*exp(-depth*.020);
+ ambient+=vec3(.045,.044,.031)*(1.-hemi)*occ*exp(-depth*.04)*uSun;
+ ambient*=mix(.66,1.,sh);
+ float irradiance=1.72*uSun;
  vec3 direct=uLightColor*irradiance*NoL*sh*waterAbsorb;
  vec2 surfacePoint=vWorld.xz-vWorld.y*L.xz/max(.30,L.y);
- float ca=caustic(surfacePoint,uTime)*max(0.,dot(geomN,L))*sh*.145*uSun;
- ca*=exp(-depth*.050);
- vec3 col=albedo*(ambient+direct+uLightColor*ca);
+ vec2 drift=vec2(sin(surfacePoint.y*.16+uTime*.12),cos(surfacePoint.x*.18-uTime*.10))*.22;
+ float ca=caustic(surfacePoint+drift,uTime)*max(0.,dot(geomN,L))*sh*.35*uSun;
+ ca*=exp(-depth*.038)/(1.+depth*.022)*(1.-smoothstep(-.08,.02,vWorld.y));
+ vec3 col=albedo*(ambient+direct+uLightColor*waterAbsorb*ca);
  // A small two-sided transmission approximation for fins and growing tissue.
  if(thickness<.5||uMat==3||uMat==7){float back=pow(max(0.,dot(-n,L)),1.4);
   col+=albedo*uLightColor*waterAbsorb*back*(thickness<.5?.21:.045)*sh*uSun;}
@@ -259,46 +277,80 @@ const SHADOW_FS=`#version 300 es
 precision highp float;precision highp int;in float vTag;uniform int uMat;void main(){if(uMat==7&&vTag>20.)discard;}`;
 const SKY_FS=`#version 300 es
 precision highp float;in vec2 uv;out vec4 frag;
-uniform mat4 uInvVP;uniform vec3 uCamera;uniform vec3 uLightDir;uniform vec3 uLightColor;uniform float uSun;uniform float uTime;
+uniform mat4 uInvVP;uniform vec3 uCamera;uniform vec3 uAirLightDir;uniform vec3 uLightColor;uniform float uSun;uniform float uTime;
 float hash(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}
 float n2(vec2 p){vec2 i=floor(p),f=fract(p);f=f*f*(3.-2.*f);return mix(mix(hash(i),hash(i+vec2(1,0)),f.x),mix(hash(i+vec2(0,1)),hash(i+1.),f.x),f.y);}
 void main(){vec4 w=uInvVP*vec4(uv*2.-1.,.99999,1.);vec3 rd=normalize(w.xyz/w.w-uCamera);vec3 sky;
- if(uCamera.y>-.18){float a=pow(max(0.,rd.y),.45);sky=mix(vec3(.50,.66,.73),vec3(.055,.22,.45),a);float sun=pow(max(dot(rd,normalize(uLightDir)),0.),1800.);sky+=uLightColor*(sun*14.+pow(max(dot(rd,normalize(uLightDir)),0.),24.)*.10);vec2 cp=rd.xz/max(.09,rd.y)*1.3+vec2(uTime*.003,0);float cloud=n2(cp)*.6+n2(cp*2.05)*.27+n2(cp*4.1)*.13;float cw=smoothstep(.58,.76,cloud)*smoothstep(.01,.13,rd.y);sky=mix(sky,vec3(.92,.94,.91),cw*.74);sky*=.3+.7*uSun;}
+ if(uCamera.y>-.18){float a=pow(max(0.,rd.y),.45);sky=mix(vec3(.50,.66,.73),vec3(.055,.22,.45),a);float sun=pow(max(dot(rd,normalize(uAirLightDir)),0.),1800.);sky+=uLightColor*(sun*14.+pow(max(dot(rd,normalize(uAirLightDir)),0.),24.)*.10);vec2 cp=rd.xz/max(.09,rd.y)*1.3+vec2(uTime*.003,0);float cloud=n2(cp)*.6+n2(cp*2.05)*.27+n2(cp*4.1)*.13;float cw=smoothstep(.58,.76,cloud)*smoothstep(.01,.13,rd.y);sky=mix(sky,vec3(.92,.94,.91),cw*.74);sky*=.3+.7*uSun;}
  else {float up=clamp(rd.y*.62+.50,0.,1.);sky=mix(vec3(.0008,.008,.035),vec3(.0018,.080,.21),pow(up,.78))*exp(-max(0.,-uCamera.y)*.013)*(.55+.45*uSun);}
  frag=vec4(sky,1.);gl_FragDepth=1.;
 }`;
 
+// The long-wave mesh and filtered capillary normals use the same stationary ocean field.
+const WATER_WAVES_GLSL=`
+float oceanPhase(vec2 p,float time,float k,vec2 direction){
+ float frequency=.105*pow(1.62,k);
+ return dot(p,direction)*frequency+time*sqrt(9.81*frequency)*.43+k*k*.81;
+}
+vec3 oceanWave(vec2 p,float time,float footprint){
+ vec3 result=vec3(0.);
+ for(int i=0;i<10;i++){float k=float(i),angle=k*2.399963+.37;vec2 direction=vec2(cos(angle),sin(angle));
+  float frequency=.105*pow(1.62,k),phase=oceanPhase(p,time,k,direction);
+  float filtered=1.-smoothstep(.55,2.5,footprint*frequency);
+  float slope=.023/(1.+k*.18)*filtered;
+  result.xy+=direction*cos(phase)*slope;
+  result.z+=sin(phase)*slope/frequency;
+ }
+ return result;
+}
+`;
 const WATER_VS=`#version 300 es
-precision highp float;layout(location=0) in vec3 aPosition;uniform mat4 uVP;out vec3 vP;void main(){vP=aPosition;gl_Position=uVP*vec4(aPosition,1.);}`;
+precision highp float;layout(location=0) in vec3 aPosition;uniform mat4 uVP;uniform vec3 uCamera;uniform float uTime;out vec3 vP;
+${WATER_WAVES_GLSL}
+void main(){vec3 p=aPosition;p.xz+=uCamera.xz;p.y=oceanWave(p.xz,uTime,3.).z;vP=p;gl_Position=uVP*vec4(p,1.);}`;
 const WATER_FS=`#version 300 es
 precision highp float;
-in vec3 vP;uniform vec3 uCamera;uniform float uTime;uniform float uSun;uniform vec3 uFog;uniform vec3 uLightDir;uniform vec3 uLightColor;out vec4 frag;
+in vec3 vP;uniform vec3 uCamera;uniform float uTime;uniform float uSun;uniform vec3 uFog;uniform vec3 uLightDir;uniform vec3 uAirLightDir;uniform vec3 uLightColor;out vec4 frag;
 ${NOISE_GLSL}
-void main(){vec2 p=vP.xz;float tm=uTime*.27;
+${WATER_OPTICS_GLSL}
+${WATER_WAVES_GLSL}
+vec3 skyRadiance(vec3 direction){
+ float elevation=pow(clamp(direction.y,0.,1.),.42);
+ vec3 sky=mix(vec3(.42,.57,.64),vec3(.065,.20,.36),elevation);
+ vec2 projected=direction.xz/max(.15,direction.y)*1.05+vec2(uTime*.002,0.);
+ float clouds=noise(vec3(projected,2.6))*.66+noise(vec3(projected*2.06,6.1))*.34;
+ float cloudCover=smoothstep(.54,.76,clouds)*smoothstep(.01,.18,direction.y);
+ sky=mix(sky,vec3(.80,.83,.80),cloudCover*.70);
+ float alignment=max(dot(direction,normalize(uAirLightDir)),0.);
+ sky+=uLightColor*(pow(alignment,1900.)*11.+pow(alignment,34.)*.15)*uSun;
+ return sky*(.34+.66*uSun);
+}
+void main(){
+ vec2 p=vP.xz;float footprint=max(length(dFdx(p)),length(dFdy(p)));
+ vec2 slope=oceanWave(p,uTime,footprint).xy;
+ vec3 N=normalize(vec3(-slope.x,1.,-slope.y)),E=normalize(uCamera-vP);
  if(uCamera.y>-.18){
- vec2 grad=vec2(0.);float footprint=max(length(dFdx(p)),length(dFdy(p)));
- // Twelve directional components, de-correlated phase/speed. Filter sub-pixel ripples.
- for(int i=0;i<12;i++){float k=float(i),ang=k*2.399963+.37;vec2 dir=vec2(cos(ang),sin(ang));
- float freq=.095*pow(1.42,k),speed=.20+sqrt(freq)*.75,phase=dot(p,dir)*freq+uTime*speed*(mod(k,2.)*2.-1.)+k*k*.81;
- float attenuation=1.-smoothstep(.7,2.9,footprint*freq);grad+=dir*cos(phase+sin(dot(p,vec2(.037,-.024))+k)*.44)*(.052/(1.+k*.12))*attenuation;}
- vec3 N=normalize(vec3(-grad.x,1.,-grad.y)),E=normalize(uCamera-vP),R=reflect(-E,N);float fres=.020+.98*pow(1.-max(dot(E,N),0.),5.);
- vec3 reflected=mix(vec3(.40,.58,.68),vec3(.045,.18,.36),pow(clamp(R.y,0.,1.),.40));
- float cloud=noise(vec3(R.xz/(max(.15,R.y))*.77,1.3));reflected+=vec3(.10,.105,.10)*smoothstep(.39,.75,cloud);
- float glint=pow(max(dot(normalize(normalize(uLightDir)+E),N),0.),180./(1.+footprint*.25));
- float coast=exp(-length(vP.xz-vec2(-24.,43.))*.012);vec3 water=mix(vec3(.001,.035,.063),vec3(.009,.13,.16),coast*.48);
- vec3 col=mix(water,reflected,fres)+uLightColor*glint*.34;col*=.35+.65*uSun;frag=vec4(col,1.);return;}
-
- float dx=cos(p.x*.83+p.y*.43+tm)*.035+cos(p.x*1.91-p.y*.70-tm*.8)*.018;
- float dz=cos(p.x*.83+p.y*.43+tm)*.018-cos(p.x*1.91-p.y*.70-tm*.8)*.007;
- vec3 n=normalize(vec3(dx,-1.,dz)),view=normalize(vP-uCamera);float cost=abs(dot(n,view));
- float snell=smoothstep(.649,.671,cost);float ca=caustic(p*.31,uTime*.64);
- vec3 sky=mix(vec3(.006,.070,.095),vec3(.52,.70,.79),snell);
- vec3 ray=normalize(vec3(view.x+dx*2.,view.y,view.z+dz*2.));
- float disc=pow(max(dot(ray,normalize(uLightDir)),0.),1400.);
- float glow=pow(max(dot(ray,normalize(uLightDir)),0.),28.);
- sky+=uLightColor*(disc*8.+glow*.23)*snell*uSun;
- sky+=vec3(.02,.075,.10)*(dx+dz)*1.1*(1.-snell);
- sky*=.45+.55*uSun;frag=vec4(sky,1.);
+  vec3 reflected=skyRadiance(reflect(-E,N));float cosine=max(dot(E,N),0.);
+  float fresnel=.0204+.9796*pow(1.-cosine,5.);
+  float coast=exp(-length(vP.xz-vec2(-24.,43.))*.018);
+  vec3 water=mix(vec3(.002,.030,.051),vec3(.006,.115,.117),coast*.64);
+  frag=vec4(mix(water*(.35+.65*uSun),reflected,fresnel),1.);return;
+ }
+ // Water-to-air refraction creates the 97-degree Snell window. Outside it the
+ // surface reflects the darker ocean, rather than drawing a painted blue ceiling.
+ vec3 outgoing=-E;N=-N;
+ vec3 airRay=refract(outgoing,N,1.333);float window=step(.001,dot(airRay,airRay));
+ float cosI=clamp(-dot(outgoing,N),.001,1.),cosT=sqrt(max(0.,1.-1.333*1.333*(1.-cosI*cosI)));
+ float rs=(1.333*cosI-cosT)/(1.333*cosI+cosT+.0001);
+ float rp=(cosI-1.333*cosT)/(cosI+1.333*cosT+.0001);
+ float fresnel=window>.5?clamp((rs*rs+rp*rp)*.5,0.,1.):1.;
+ vec3 reflectedDirection=reflect(outgoing,N);
+ vec3 reflected=waterRadiance(reflectedDirection,5.,uSun)*1.8;
+ // Broad bottom light in the reflection stays subtle and has no repeating reef decals.
+ reflected+=vec3(.010,.028,.026)*pow(max(0.,-reflectedDirection.y),2.);
+ vec3 transmitted=skyRadiance(airRay/max(length(airRay),.001));
+ vec3 col=mix(transmitted,reflected,fresnel);
+ frag=vec4(max(col,vec3(0.)),1.);
 }`;
 const POINT_VS=`#version 300 es
 precision highp float;layout(location=0) in vec4 aP;uniform mat4 uVP;uniform float uTime;uniform vec3 uCamera;uniform float uScale;out float vAlpha;out float vType;
@@ -307,7 +359,7 @@ void main(){vec3 cell=vec3(48.,32.,48.);vec3 p=aP.xyz;
  p=mod(p-uCamera+cell*.5,cell)-cell*.5+uCamera;
  float d=distance(p,uCamera);gl_Position=uVP*vec4(p,1.);
  gl_PointSize=clamp((.32+aP.w*.9)*uScale/max(gl_Position.w,1.),.7,3.4);
- vAlpha=.21*(1.-smoothstep(9.,23.,d))*smoothstep(.6,3.,d);vType=aP.w;}`;
+ vAlpha=.19*(1.-smoothstep(9.,23.,d))*smoothstep(.6,3.,d)*(1.-smoothstep(-.65,-.05,p.y));vType=aP.w;}`;
 const POINT_FS=`#version 300 es
 precision highp float;in float vAlpha;in float vType;out vec4 frag;
 void main(){float r=length(gl_PointCoord-.5);frag=vec4(.37,.66,.84,(1.-smoothstep(.04,.5,r))*vAlpha);}`;
@@ -324,6 +376,8 @@ precision highp float;in vec2 uv;out vec4 frag;
 uniform sampler2D uDepth;uniform sampler2D uVolumeShadow;
 uniform vec2 uResolution;uniform vec2 uVolumeResolution;uniform mat4 uInvVP;uniform mat4 uLightVP;
 uniform vec3 uEye;uniform vec3 uLightDir;uniform vec3 uLightColor;uniform float uTime;uniform float uSun;uniform float uClarity;uniform int uQuality;
+${NOISE_GLSL}
+${WATER_OPTICS_GLSL}
 vec3 at(vec2 p,float d){vec4 h=uInvVP*vec4(p*2.-1.,d*2.-1.,1.);return h.xyz/h.w;}
 float visibility(vec3 p){vec4 a=uLightVP*vec4(p,1.);vec3 q=a.xyz/a.w*.5+.5;
  if(any(lessThan(q,vec3(.002)))||any(greaterThan(q,vec3(.998))))return 1.;
@@ -331,25 +385,52 @@ float visibility(vec3 p){vec4 a=uLightVP*vec4(p,1.);vec3 q=a.xyz/a.w*.5+.5;
 void main(){float d=texture(uDepth,uv).r;vec3 p=at(uv,min(d,.99999));vec3 delta=p-uEye;float dist=min(length(delta),700.);vec3 rd=normalize(delta);
  float ao=0.;
  if(uQuality>0&&d<.9999){vec3 n=normalize(cross(dFdx(p),dFdy(p)));if(dot(n,uEye-p)<0.)n=-n;
-  float radius=clamp(90./(dist+3.),2.,18.);int count=uQuality==2?6:4;
-  for(int i=0;i<6;i++){if(i>=count)break;float a=float(i)*2.39996;vec2 off=vec2(cos(a),sin(a))/uResolution*radius;
+  float radius=clamp(uResolution.y*.14/(dist+3.),2.,24.);int count=uQuality==2?8:4;
+  for(int i=0;i<8;i++){if(i>=count)break;float a=float(i)*2.39996;vec2 off=vec2(cos(a),sin(a))/uResolution*radius*(.55+float(i)*.065);
    float dd=texture(uDepth,uv+off).r;vec3 q=at(uv+off,dd)-p;float l=length(q);ao+=smoothstep(.18,.85,dot(n,q/max(.001,l)))*exp(-l*l*1.8)*step(.05,l);}
-  ao=min(.35,ao*.13);
+  ao=min(.34,ao*(uQuality==2?.095:.16));
  }
  if(uEye.y>-.18){frag=vec4(0.,0.,0.,1.-ao);return;}
- const vec3 extinction=vec3(.046,.023,.0125);int steps=uQuality==2?10:uQuality==1?7:4;
- float span=min(dist,78.),phase=.28+1.3*pow(max(dot(rd,normalize(uLightDir)),0.),6.);vec3 scatter=vec3(0.);
- for(int i=0;i<10;i++){if(i>=steps)break;float s=(float(i)+.5)*span/float(steps);vec3 q=uEye+rd*s;float dep=max(0.,-q.y);
-  vec2 surf=q.xz-q.y*uLightDir.xz/max(.2,uLightDir.y);float wave=sin(surf.x*.46+sin(surf.y*.27)*.75+uTime*.070)*sin(surf.y*.49-surf.x*.12+uTime*.034);
-  float beam=.28+1.25*pow(max(0.,wave),8.);vec3 solar=exp(-vec3(.044,.022,.014)*dep);
-  scatter+=uLightColor*solar*visibility(q)*beam*exp(-extinction*uClarity*s)*span/float(steps)*.0046*phase*uSun;
+ vec3 extinction=waterExtinction(uClarity);int steps=uQuality==2?12:uQuality==1?8:4;
+ float span=min(dist,80.);if(rd.y>.001)span=min(span,max(0.,-uEye.y/rd.y));
+ float mu=dot(rd,normalize(uLightDir));const float anisotropy=.74;
+ float phase=.20+.34*(1.-anisotropy*anisotropy)/pow(max(.045,1.+anisotropy*anisotropy-2.*anisotropy*mu),1.5);
+ // Stratification is shared by neighboring pixels: per-pixel jitter without a temporal
+ // history produces a visible diagonal mesh in clear water, especially on phones.
+ vec3 scatter=vec3(0.);float stepLength=span/float(steps);
+ for(int i=0;i<12;i++){if(i>=steps)break;float stratum=.30+fract(float(i)*.618033989)*.40;float s=(float(i)+stratum)*stepLength;vec3 q=uEye+rd*s;float dep=max(0.,-q.y);
+  vec2 surf=q.xz-q.y*uLightDir.xz/max(.2,uLightDir.y);
+  // Broad, irregular swell focuses shafts. Atlas caustics supply only a little detail;
+  // using their fine periodic lattice as the beam mask creates a striped curtain.
+  vec2 warp=vec2(sin(surf.y*.041+uTime*.018),cos(surf.x*.037-uTime*.015))*.52;
+  float swell=noise(vec3(surf*.105+warp,uTime*.025));
+  float focused=pow(smoothstep(.34,.76,swell),3.);
+  float beam=.08+focused*(.54+min(caustic(surf*.64,uTime*.83),2.4)*.055);
+  vec3 solar=sunThroughWater(dep,uLightDir.y);
+  scatter+=uLightColor*solar*visibility(q)*beam*exp(-extinction*s)*stepLength*.011*phase*uSun;
  }
  frag=vec4(scatter,1.-ao);
+}`;
+// A small bilateral filter is evaluated only at the volumetric resolution. It removes
+// sampling structure in shafts while retaining the depth boundary around nearby animals.
+const VOLUME_FILTER_FS=`#version 300 es
+precision highp float;in vec2 uv;out vec4 frag;
+uniform sampler2D uVolume;uniform sampler2D uDepth;uniform vec2 uVolumeResolution;uniform mat4 uInvVP;uniform vec3 uEye;uniform int uQuality;
+float distanceAt(vec2 p){float d=texture(uDepth,p).r;vec4 h=uInvVP*vec4(p*2.-1.,min(d,.99999)*2.-1.,1.);return min(length(h.xyz/h.w-uEye),100.);}
+void main(){float center=distanceAt(uv),sum=0.;vec4 filtered=vec4(0.);
+ for(int y=-1;y<=1;y++)for(int x=-1;x<=1;x++){
+  if(uQuality==0&&x!=0&&y!=0)continue;
+  vec2 q=uv+vec2(x,y)/uVolumeResolution*1.15;
+  float spatial=float((x==0?2:1)*(y==0?2:1));float weight=spatial*exp(-abs(distanceAt(q)-center)*.85);
+  filtered+=texture(uVolume,q)*weight;sum+=weight;
+ }
+ frag=filtered/max(sum,.001);
 }`;
 const POST_FS=`#version 300 es
 precision highp float;in vec2 uv;out vec4 frag;
 uniform sampler2D uScene;uniform sampler2D uDepth;uniform sampler2D uVolume;
 uniform vec2 uResolution;uniform vec2 uVolumeResolution;uniform mat4 uInvVP;uniform vec3 uEye;uniform float uTime;uniform float uSun;uniform float uExposure;uniform float uClarity;uniform float uLamp;uniform int uQuality;
+${WATER_OPTICS_GLSL}
 vec3 world(vec2 p,float d){vec4 h=uInvVP*vec4(p*2.-1.,d*2.-1.,1.);return h.xyz/h.w;}
 vec3 film(vec3 x){return clamp((x*(2.51*x+.03))/(x*(2.43*x+.59)+.14),0.,1.);}
 void main(){float d=texture(uDepth,uv).r;vec3 p=world(uv,min(d,.99999)),rd=normalize(p-uEye);float distanceTo=min(length(p-uEye),700.);
@@ -361,13 +442,16 @@ void main(){float d=texture(uDepth,uv).r;vec3 p=world(uv,min(d,.99999)),rd=norma
   fog+=texture(uVolume,q)*w;weights+=w;}
  fog/=weights;col*=fog.a;
  if(uLamp>.5&&d<.9999){float cone=pow(max(0.,1.-length((uv-.5)*vec2(uResolution.x/uResolution.y,1.))*1.6),5.);col+=col*vec3(2.0,1.6,1.1)*cone/(1.+distanceTo*distanceTo*.022);}
- vec3 trans=exp(-vec3(.046,.023,.0125)*uClarity*distanceTo);float depth=max(0.,-uEye.y),up=clamp(rd.y*.7+.48,0.,1.);
- vec3 water=mix(vec3(.0008,.009,.040),vec3(.002,.080,.19),pow(up,.90))*exp(-depth*.015)*(.5+.5*uSun);
+ vec3 trans=exp(-waterExtinction(uClarity)*distanceTo);float depth=max(0.,-uEye.y);
+ vec3 water=waterRadiance(rd,depth,uSun);
  if(uEye.y<=-.18){if(d>.99995)col=water+fog.rgb;else col=col*trans+water*(1.-trans)+fog.rgb;}
  else if(d<.99995){float haze=1.-exp(-distanceTo*.0011);col=mix(col,vec3(.43,.60,.69),haze);}
 
  col=film(col*uExposure);col=pow(col,vec3(1./2.2));
- col*=1.-.065*pow(length((uv-.5)*vec2(1.,.85))*1.4,2.);
+ col*=1.-.035*pow(length((uv-.5)*vec2(1.,.85))*1.4,2.);
+ // Sub-visible ordered grain removes 8-bit gradient bands without softening the reef.
+ float dither=fract(52.9829189*fract(dot(gl_FragCoord.xy,vec2(.06711056,.00583715))))-.5;
+ col+=dither/255.;
  frag=vec4(col,1.);
 }`;
 
@@ -398,7 +482,7 @@ float lb=L(b);frag=vec4(lb<lo||lb>hi?a:b,1.);
 
 class Renderer{
  constructor(canvas,initialQuality=null){this.canvas=canvas;const g=canvas.getContext('webgl2',{alpha:false,antialias:false,depth:true,preserveDrawingBuffer:false,powerPreference:'high-performance'});if(!g)throw new Error('請以支援 WebGL 2 的一般瀏覽器開啟。');this.gl=g;this.maxTextureSize=g.getParameter(g.MAX_TEXTURE_SIZE);this.mobile=matchMedia('(pointer:coarse)').matches;this.batches=[];this.fog=[.0008,.005,.028];this.lightDir=V.norm([-.36,1.,.30]);this.lightColor=[1.05,1.02,.93];this.clarity=1.;this.lamp=false;this.dynamicScale=1;this.lighting="day";this.fogDensity=.034;this.sun=1.02;this.quality=initialQuality??(this.mobile?1:2);this.exposure=1.11;this.drawCalls=0;this.frame=0;
-  this.program=this.makeProgram(VS,FS);this.shadowProgram=this.makeProgram(VS,SHADOW_FS);this.waterProgram=this.makeProgram(WATER_VS,WATER_FS);this.pointProgram=this.makeProgram(POINT_VS,POINT_FS);this.rayProgram=this.makeProgram(RAY_VS,RAY_FS);this.postProgram=this.makeProgram(POST_VS,POST_FS);this.volumeProgram=this.makeProgram(POST_VS,VOLUME_FS);this.bubbleProgram=this.makeProgram(BUBBLE_VS,BUBBLE_FS);this.aaProgram=this.makeProgram(POST_VS,AA_FS);this.skyProgram=this.makeProgram(POST_VS,SKY_FS);this.msaaSamples=0;
+  this.program=this.makeProgram(VS,FS);this.shadowProgram=this.makeProgram(VS,SHADOW_FS);this.waterProgram=this.makeProgram(WATER_VS,WATER_FS);this.pointProgram=this.makeProgram(POINT_VS,POINT_FS);this.rayProgram=this.makeProgram(RAY_VS,RAY_FS);this.postProgram=this.makeProgram(POST_VS,POST_FS);this.volumeProgram=this.makeProgram(POST_VS,VOLUME_FS);this.volumeFilterProgram=this.makeProgram(POST_VS,VOLUME_FILTER_FS);this.bubbleProgram=this.makeProgram(BUBBLE_VS,BUBBLE_FS);this.aaProgram=this.makeProgram(POST_VS,AA_FS);this.skyProgram=this.makeProgram(POST_VS,SKY_FS);this.msaaSamples=0;
   this.floatColor=!!g.getExtension('EXT_color_buffer_float');this.aniso=g.getExtension('EXT_texture_filter_anisotropic');this.textures=[];this.loaded=this.loadTextures();g.enable(g.DEPTH_TEST);g.disable(g.CULL_FACE);this.lightVP=mm(ortho(-51,51,-51,51,.1,180),lookAt([-42,84,14],[0,-12,-12]));
   this.setupWater();this.setupBubbles();this.setupParticles();this.setupRays();this.setupShadow();this.postVAO=g.createVertexArray();this.resize();
  }
@@ -452,7 +536,17 @@ class Renderer{
  }
  drawBatch(b){this.gl.bindVertexArray(b.vao);this.gl.drawElementsInstanced(this.gl.TRIANGLES,b.count,b.indexType,0,b.drawCount);this.drawCalls++;}
  frustum(vp){let p=[];for(let a=0;a<3;a++)for(let sign of [-1,1]){let q=[vp[3]+sign*vp[a],vp[7]+sign*vp[4+a],vp[11]+sign*vp[8+a],vp[15]+sign*vp[12+a]],n=Math.hypot(q[0],q[1],q[2]);p.push(q.map(x=>x/n));}return p;}
- setupWater(){let g=this.gl;this.waterVAO=g.createVertexArray();g.bindVertexArray(this.waterVAO);let b=g.createBuffer();g.bindBuffer(g.ARRAY_BUFFER,b);g.bufferData(g.ARRAY_BUFFER,new Float32Array([-1800,0,-1800,-1800,0,1800,1800,0,1800,-1800,0,-1800,1800,0,1800,1800,0,-1800]),g.STATIC_DRAW);this.attr(0,3,12,0);g.bindVertexArray(null);}
+ setupWater(){
+  const g=this.gl,segments=this.mobile?64:112,positions=[];
+  // Quadratic spacing concentrates displacement geometry near the swimmer and leaves
+  // the horizon cheap. The wave field stays in world coordinates as this grid follows.
+  const coordinate=i=>{const t=i/segments*2-1;return Math.sign(t)*t*t*1400;};
+  for(let z=0;z<segments;z++)for(let x=0;x<segments;x++){
+   const x0=coordinate(x),x1=coordinate(x+1),z0=coordinate(z),z1=coordinate(z+1);
+   positions.push(x0,0,z0,x0,0,z1,x1,0,z1,x0,0,z0,x1,0,z1,x1,0,z0);
+  }
+  this.waterCount=positions.length/3;this.waterVAO=g.createVertexArray();g.bindVertexArray(this.waterVAO);this.waterBuffer=g.createBuffer();g.bindBuffer(g.ARRAY_BUFFER,this.waterBuffer);g.bufferData(g.ARRAY_BUFFER,new Float32Array(positions),g.STATIC_DRAW);this.attr(0,3,12,0);g.bindVertexArray(null);
+ }
  setupBubbles(){const g=this.gl;this.bubbles=[];this.lastBubbleTime=-1;this.bubbleVAO=g.createVertexArray();g.bindVertexArray(this.bubbleVAO);this.bubbleBuffer=g.createBuffer();g.bindBuffer(g.ARRAY_BUFFER,this.bubbleBuffer);g.bufferData(g.ARRAY_BUFFER,512*4*4,g.DYNAMIC_DRAW);this.attr(0,4,16,0);g.bindVertexArray(null);}
  renderBubbles(eye,t){const g=this.gl;const dt=Math.max(0,Math.min(.1,t-(this.bubbleTime??t)));this.bubbleTime=t;
  if(typeof active!=='undefined'&&active){let breathPhase=(typeof oceanAudio!=='undefined'&&oceanAudio.enabled&&oceanAudio.ctx)?((oceanAudio.ctx.currentTime-oceanAudio.startedAt)%7.6)/7.6:(t%7.6)/7.6;
@@ -493,6 +587,7 @@ class Renderer{
   // Volumetrics/AO are soft phenomena: evaluate fewer pixels, reconstruct with depth weights.
   const fraction=this.quality===2?.5:this.quality===1?.4:.3;this.volumeW=Math.max(2,Math.ceil(w*fraction));this.volumeH=Math.max(2,Math.ceil(h*fraction));
   dispose(this.volumeFBO,this.volumeColor);this.volumeColor=texture(this.volumeW,this.volumeH,this.floatColor?g.RGBA16F:g.RGBA8);this.volumeFBO=target(this.volumeColor);
+  dispose(this.volumeFilteredFBO,this.volumeFilteredColor);this.volumeFilteredColor=texture(this.volumeW,this.volumeH,this.floatColor?g.RGBA16F:g.RGBA8);this.volumeFilteredFBO=target(this.volumeFilteredColor);
   g.bindFramebuffer(g.FRAMEBUFFER,null);
  }
  setupMultisampling(w,h){
@@ -517,15 +612,19 @@ class Renderer{
   }
   g.bindRenderbuffer(g.RENDERBUFFER,null);g.bindFramebuffer(g.FRAMEBUFFER,null);
  }
- common(p,eye,vp,t){let g=this.gl;g.useProgram(p.p);if(this.textures[8]){this.bindTex(9,this.textures[8]);g.uniform1i(this.uniform(p,'uCaustic'),9);}g.uniformMatrix4fv(this.uniform(p,'uVP'),false,vp);g.uniformMatrix4fv(this.uniform(p,'uLightVP'),false,this.lightVP);g.uniformMatrix4fv(this.uniform(p,'uDynamicLightVP'),false,this.dynamicLightVP||this.lightVP);g.uniform1i(this.uniform(p,'uSamples'),this.msaaSamples||0);g.uniform3fv(this.uniform(p,'uCamera'),eye);g.uniform1f(this.uniform(p,'uTime'),t);g.uniform1f(this.uniform(p,'uSwim'),typeof player==='undefined'?.4:Math.min(1,Math.hypot(...player.velocity)/1.6));g.uniform1f(this.uniform(p,'uSun'),this.sun);g.uniform3fv(this.uniform(p,'uFog'),this.fog);g.uniform3fv(this.uniform(p,'uLightDir'),this.lightDir);g.uniform3fv(this.uniform(p,'uLightColor'),this.lightColor);}
+ common(p,eye,vp,t){let g=this.gl;g.useProgram(p.p);if(this.textures[8]){this.bindTex(9,this.textures[8]);g.uniform1i(this.uniform(p,'uCaustic'),9);}g.uniformMatrix4fv(this.uniform(p,'uVP'),false,vp);g.uniformMatrix4fv(this.uniform(p,'uLightVP'),false,this.lightVP);g.uniformMatrix4fv(this.uniform(p,'uDynamicLightVP'),false,this.dynamicLightVP||this.lightVP);g.uniform1i(this.uniform(p,'uSamples'),this.msaaSamples||0);g.uniform3fv(this.uniform(p,'uCamera'),eye);g.uniform1f(this.uniform(p,'uTime'),t);g.uniform1f(this.uniform(p,'uSwim'),typeof player==='undefined'?.4:Math.min(1,Math.hypot(...player.velocity)/1.6));g.uniform1f(this.uniform(p,'uSun'),this.sun);g.uniform3fv(this.uniform(p,'uFog'),this.fog);g.uniform3fv(this.uniform(p,'uLightDir'),this.lightDir);g.uniform3fv(this.uniform(p,'uAirLightDir'),this.airLightDir||this.lightDir);g.uniform3fv(this.uniform(p,'uLightColor'),this.lightColor);}
  bindTex(unit,tex){let g=this.gl;g.activeTexture(g.TEXTURE0+unit);g.bindTexture(g.TEXTURE_2D,tex);}
  render(eye,target,t){
   this.dirty=false;const begin=performance.now(),g=this.gl;this.drawCalls=0;this.shadowDraws=0;
-  this.view=lookAt(eye,target);this.vp=mm(perspective((this.photoFov||(this.width<this.height?67:69))*Math.PI/180,this.width/this.height,.16,950),this.view);const inv=inverse4(this.vp);
+  this.view=lookAt(eye,target);this.vp=mm(perspective((this.photoFov||this.fov||(this.width<this.height?67:69))*Math.PI/180,this.width/this.height,.16,950),this.view);const inv=inverse4(this.vp);
   const profile=this.lighting==='late'?{dir:[-.67,.57,-.33],color:[1.28,1.05,.86],sun:.95}:this.lighting==='blue'?{dir:[-.4,.3,-.6],color:[.52,.74,1.05],sun:.40}:{dir:[-.36,.86,-.34],color:[1.10,1.07,.96],sun:1.12};
-  this.lightDir=V.norm(profile.dir);this.lightColor=profile.color;this.sun=profile.sun;
+  this.airLightDir=V.norm(profile.dir);
+  const underwater=eye[1]<-.18;
+  const sx=this.airLightDir[0]/1.333,sz=this.airLightDir[2]/1.333;
+  this.lightDir=underwater?[sx,Math.sqrt(1-sx*sx-sz*sz),sz]:this.airLightDir;
+  this.lightColor=profile.color;this.sun=profile.sun;
   const center=[Math.round(eye[0]/16)*16,Math.round(eye[1]/16)*16-4,Math.round(eye[2]/16)*16-12];
-  const key=center.join(',')+this.lighting;
+  const key=center.join(',')+this.lighting+(underwater?'water':'air');
   g.enable(g.DEPTH_TEST);g.depthMask(true);g.disable(g.BLEND);
   if(this._shadowKey!==key||this.forceShadow){
    this._shadowKey=key;this.forceShadow=false;this.lightVP=stableLightMatrix(mm(ortho(-40,40,-40,40,.1,230),lookAt(V.add(center,V.mul(this.lightDir,100)),center)),this.shadowSize);
@@ -549,7 +648,7 @@ class Renderer{
   for(const b of this.batches){if(!b.visible)continue;this.updateBatch(b,eye,planes);if(!b.drawCount)continue;
    this.submittedTriangles+=b.count/3*b.drawCount;this.submittedVertices+=b.vertexCount*b.drawCount;
    const ls=this.mobile?(this.quality===0?.64:.82):(this.quality===0?.75:1);g.uniform3f(this.uniform(p,'uLODBounds'),(b.minDistance||0)*ls,(b.maxDistance||220)*ls,b.maxDistance&&b.maxDistance<180?.60:0);g.uniform1i(this.uniform(p,'uKind'),b.kind);g.uniform1i(this.uniform(p,'uMat'),b.material);g.uniform1i(this.uniform(p,'uSpecies'),b.species);this.drawBatch(b);}
-  g.disable(g.SAMPLE_ALPHA_TO_COVERAGE);this.common(this.waterProgram,eye,this.vp,t);g.bindVertexArray(this.waterVAO);g.drawArrays(g.TRIANGLES,0,6);this.drawCalls++;
+  g.disable(g.SAMPLE_ALPHA_TO_COVERAGE);this.common(this.waterProgram,eye,this.vp,t);g.bindVertexArray(this.waterVAO);g.drawArrays(g.TRIANGLES,0,this.waterCount);this.submittedTriangles+=this.waterCount/3;this.submittedVertices+=this.waterCount;this.drawCalls++;
   g.enable(g.BLEND);g.blendFunc(g.SRC_ALPHA,g.ONE_MINUS_SRC_ALPHA);g.depthMask(false);
   this.common(this.pointProgram,eye,this.vp,t);g.uniform1f(this.uniform(this.pointProgram,'uScale'),this.canvas.height*.044);g.bindVertexArray(this.particleVAO);if(eye[1]<-.18){g.drawArrays(g.POINTS,0,this.quality===0?240:520);this.renderBubbles(eye,t);}g.depthMask(true);g.disable(g.BLEND);g.disable(g.DEPTH_TEST);
   if(this.msaaFBO){
@@ -558,10 +657,12 @@ class Renderer{
   }
   const postUniforms=pp=>{g.useProgram(pp.p);this.bindTex(0,this.sceneColor);this.bindTex(1,this.sceneDepth);this.bindTex(2,this.shadowTexture);this.bindTex(3,this.volumeColor);
    g.uniform1i(this.uniform(pp,'uScene'),0);g.uniform1i(this.uniform(pp,'uDepth'),1);g.uniform1i(this.uniform(pp,'uVolumeShadow'),2);g.uniform1i(this.uniform(pp,'uVolume'),3);
+   this.bindTex(9,this.textures[8]);g.uniform1i(this.uniform(pp,'uCaustic'),9);
    g.uniform2f(this.uniform(pp,'uResolution'),this.canvas.width,this.canvas.height);g.uniform2f(this.uniform(pp,'uVolumeResolution'),this.volumeW,this.volumeH);g.uniform1f(this.uniform(pp,'uTime'),t);g.uniform1i(this.uniform(pp,'uQuality'),this.quality);g.uniform1f(this.uniform(pp,'uExposure'),this.exposure);
    g.uniformMatrix4fv(this.uniform(pp,'uInvVP'),false,inv);g.uniformMatrix4fv(this.uniform(pp,'uLightVP'),false,this.lightVP);g.uniform3fv(this.uniform(pp,'uEye'),eye);g.uniform3fv(this.uniform(pp,'uLightDir'),this.lightDir);g.uniform3fv(this.uniform(pp,'uLightColor'),this.lightColor);g.uniform1f(this.uniform(pp,'uSun'),this.sun);g.uniform1f(this.uniform(pp,'uClarity'),this.clarity);g.uniform1f(this.uniform(pp,'uLamp'),this.lamp?1:0);g.bindVertexArray(this.postVAO);};
   g.bindFramebuffer(g.FRAMEBUFFER,this.volumeFBO);g.viewport(0,0,this.volumeW,this.volumeH);postUniforms(this.volumeProgram);this.bindTex(3,null);g.drawArrays(g.TRIANGLES,0,3);
-  g.bindFramebuffer(g.FRAMEBUFFER,this.aaFBO);g.viewport(0,0,this.canvas.width,this.canvas.height);postUniforms(this.postProgram);g.drawArrays(g.TRIANGLES,0,3);
-  g.bindFramebuffer(g.FRAMEBUFFER,null);g.useProgram(this.aaProgram.p);this.bindTex(0,this.aaColor);g.uniform1i(this.uniform(this.aaProgram,'uImage'),0);g.uniform2f(this.uniform(this.aaProgram,'uPixel'),1/this.canvas.width,1/this.canvas.height);g.drawArrays(g.TRIANGLES,0,3);g.bindVertexArray(null);this.drawCalls+=3;this.frame++;this.cpuRenderMs=performance.now()-begin;
+  g.bindFramebuffer(g.FRAMEBUFFER,this.volumeFilteredFBO);postUniforms(this.volumeFilterProgram);g.drawArrays(g.TRIANGLES,0,3);
+  g.bindFramebuffer(g.FRAMEBUFFER,this.aaFBO);g.viewport(0,0,this.canvas.width,this.canvas.height);postUniforms(this.postProgram);this.bindTex(3,this.volumeFilteredColor);g.drawArrays(g.TRIANGLES,0,3);
+  g.bindFramebuffer(g.FRAMEBUFFER,null);g.useProgram(this.aaProgram.p);this.bindTex(0,this.aaColor);g.uniform1i(this.uniform(this.aaProgram,'uImage'),0);g.uniform2f(this.uniform(this.aaProgram,'uPixel'),1/this.canvas.width,1/this.canvas.height);g.drawArrays(g.TRIANGLES,0,3);g.bindVertexArray(null);this.drawCalls+=4;this.frame++;this.cpuRenderMs=performance.now()-begin;
  }
 }

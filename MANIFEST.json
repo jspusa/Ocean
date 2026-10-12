@@ -1,6 +1,6 @@
 {
-  "version": "0.7.0",
-  "status": "playable vertical slice; not Wii parity/commercial acceptance",
+  "version": "0.8.0",
+  "scope": "served game and build sources",
   "files": [
     {
       "path": ".nojekyll",
@@ -9,38 +9,18 @@
     },
     {
       "path": "CREDITS.md",
-      "bytes": 4001,
-      "sha256": "13c9657893821d1cab5ccba1c7a1f2708ccefb8a6740a55ba3c146f6eac7fbfa"
-    },
-    {
-      "path": "FEATURE_PARITY.md",
-      "bytes": 4783,
-      "sha256": "80f230db813ca3bf520ea2f5a18ec6bf21a1a7c687ee8ccd449cbe7291a03907"
-    },
-    {
-      "path": "LICENSE",
-      "bytes": 1242,
-      "sha256": "92d1974624eac36a81f851171d74dd440ba35f1448186a677fd7764a239fdb9b"
+      "bytes": 4848,
+      "sha256": "a67b88f44abf8c04ed1d9721f3eafc25429ccf4f3989a566ca5190a1fb165e05"
     },
     {
       "path": "README.md",
-      "bytes": 6878,
-      "sha256": "545e88b353b2de0294d6d8d6b8bc01250eada39438f4ba233c1390bea8085c67"
-    },
-    {
-      "path": "RELEASE_CHECKLIST.md",
-      "bytes": 3686,
-      "sha256": "75f87b19d517b0d94aa1a8299cd62898aeab456b7f5de2107003bb8b81b56d2d"
-    },
-    {
-      "path": "TEST_REPORT.md",
-      "bytes": 5991,
-      "sha256": "f806d7442f3a95683205ae1060c9587a7ec5ed1b474ad8ca1b056b73f6310678"
+      "bytes": 3250,
+      "sha256": "04566dd58443b83e3cd97a575560412bc2ac83a5e70c7dada15e46eff498e9fb"
     },
     {
       "path": "VERSION",
       "bytes": 6,
-      "sha256": "967d9afb101346667166f2e76e81910bc190488d7d41d50ca0072e9d92f00e32"
+      "sha256": "a66780da23103beaf12432b418508966b31a2a3a787f9468a5b6cdaa8667c1ef"
     },
     {
       "path": "assets/caustics.jpg",
@@ -64,68 +44,68 @@
     },
     {
       "path": "assets/guide_butterfly.jpg",
-      "bytes": 12828,
-      "sha256": "1ca3b8c55251fd8ffa570ec1ea87f9e68cd5d2601b8391d8d182c079cea49fc4"
+      "bytes": 14653,
+      "sha256": "ef92090705f5e1f5c45a4aaec3ffa6182b2efa5c6634582529a352c65ff7d356"
     },
     {
       "path": "assets/guide_chromis.jpg",
-      "bytes": 10613,
-      "sha256": "d37860c40246002bee6bcf0567d98afbabbc2b573ebdd95c2b83dc32febbe607"
+      "bytes": 11592,
+      "sha256": "ac83fa7adada05dbdb855400ad2ec68d8982b62bc65264738a2b2b0e24999019"
     },
     {
       "path": "assets/guide_clown.jpg",
-      "bytes": 13435,
-      "sha256": "ef6b7c3905ec1e62cbcc69719a6382231aa85e4fa7e0075c8d6a778d5037a600"
+      "bytes": 14640,
+      "sha256": "8c123b6cea9bb70411d60338186ec712748ffc3f5880d30ff5e0aa651b7db8fa"
     },
     {
       "path": "assets/guide_dolphin.jpg",
-      "bytes": 11940,
-      "sha256": "4ae66266637c925de117b4aa29fb7b9715db023f08783c95aff246318609027c"
+      "bytes": 11821,
+      "sha256": "6eaf6f4599b18b3d2e28e1136d563ef064e9043f9bd3e1bfa066345776db5fb7"
     },
     {
       "path": "assets/guide_idol.jpg",
-      "bytes": 12128,
-      "sha256": "e8be6dfbed71af3f422bd582cd51f8319ee5bd9cb6cfed8c902db498515e4759"
+      "bytes": 13935,
+      "sha256": "2a6c1e8fdaa738ec357f2326040192a0d1a7accd62583de21d9b6e6f776e7f19"
     },
     {
       "path": "assets/guide_parrot.jpg",
-      "bytes": 10562,
-      "sha256": "a1b6cc711d04edd5d4e9f44d7c5e4bb987a78d33095743b75d417769baa25ae3"
+      "bytes": 12012,
+      "sha256": "8ebabc9854255cee707fc26f06eab924085953d9935c9efd6d799861dca270b6"
     },
     {
       "path": "assets/guide_ray.jpg",
-      "bytes": 8079,
-      "sha256": "4fa617726a7675e7b8fbcb32cef5107109138beea4a6139f5fc7a8121d38044b"
+      "bytes": 9628,
+      "sha256": "c7026600a715c5b99987b7c2aeb0bfe1f55119be0f9e8f0e42a4a5c76c308546"
     },
     {
       "path": "assets/guide_sergeant.jpg",
-      "bytes": 13275,
-      "sha256": "4bef0bb1b19cdb04173882fee231340895b78faf15a6f78aec87c6e707a2e56d"
+      "bytes": 14448,
+      "sha256": "885e292d35e7d3a24a9c14bab4159b94ec692e8e44e9d9fd0a1212e02eeea451"
     },
     {
       "path": "assets/guide_tang.jpg",
-      "bytes": 10517,
-      "sha256": "2c69ed75c0780356fc1ded75e9bd5edeefc10350ce0b4451ea019ee87291fe40"
+      "bytes": 11981,
+      "sha256": "1ca4a09381e433a1b33a3a4872a0f6b3dfef86651d0963913fc165c5d112ab45"
     },
     {
       "path": "assets/guide_turtle.jpg",
-      "bytes": 12113,
-      "sha256": "7dd8669e37c02e2945ccc187314851f58700f865b35ef65c9964451b23ecfcf8"
+      "bytes": 13622,
+      "sha256": "9a508d1a69ce637945f7b6018265c39d4852db298b29cb2267c296b84b831fca"
     },
     {
       "path": "assets/guide_whale.jpg",
-      "bytes": 9140,
-      "sha256": "0d08ebe41e342312fea9215724e18acc5b6796914b0cf393f31091292ac0e38f"
+      "bytes": 10622,
+      "sha256": "56f53f03084aad8f80fbcbdc952c9ee5bf4e8e71ccc3edfca25212d951b35339"
     },
     {
       "path": "assets/guide_wrasse.jpg",
-      "bytes": 10867,
-      "sha256": "d2fc10d9bad1e6456f7b91fdd944f65f61dff44086a8ab7bd6a95c0d6d1cb06f"
+      "bytes": 11948,
+      "sha256": "ea811bbea99a79dc13ecaea10cbd0421e995fa4c79b86af7bf551d7bca46443d"
     },
     {
       "path": "assets/reef.mesh.gz",
-      "bytes": 13995465,
-      "sha256": "5413ec108a6a7b4fbc65f83e97e5fe242088adc7186982f9862f448ee18c9f62"
+      "bytes": 14094578,
+      "sha256": "6fa3fa8b16b9dab426f3c278cb8a4803f1275e6ff287fe09809be39b3cd57bb5"
     },
     {
       "path": "assets/rock_diff.jpg",
@@ -160,32 +140,17 @@
     {
       "path": "bake_scene.cjs",
       "bytes": 2936,
-      "sha256": "47a0255d4080c24d02f3882f5e0913fa09d89c5375e37f09931df2d8339a124f"
+      "sha256": "ee624b36cc49d789d610d022facde1caeeea3eac02b61352da6bf07858caacc6"
     },
     {
       "path": "build.py",
-      "bytes": 2364,
-      "sha256": "b8b478f1f58133df7e92530482f51d69ee9763391f3f835011b884a682d5e639"
-    },
-    {
-      "path": "compose_music.py",
-      "bytes": 6305,
-      "sha256": "cbaa83f9788e691f7ff6a8614ccbf8cae7bd12f779280fc50cd8caf98117189a"
+      "bytes": 3099,
+      "sha256": "15d5976ab3ac8d7da8d09ce33316fd6a69b23775553dd8e10400360dde49d2b7"
     },
     {
       "path": "index.html",
-      "bytes": 11209,
-      "sha256": "a8ace65318b0302e804890beed6f9b33325785c791e064b9649234590f3b28ff"
-    },
-    {
-      "path": "make_detail_assets.py",
-      "bytes": 4420,
-      "sha256": "97d74e1b6ee35e2089d7e6310cd43dbd66dfa1e6aa4bed6158eff5b379fdd15a"
-    },
-    {
-      "path": "make_textures.py",
-      "bytes": 3900,
-      "sha256": "064e0e1fc8ea291fa2f044cf6f223f1d14e6e5a177283c7a3eb091d905358fa1"
+      "bytes": 11996,
+      "sha256": "1377f9371c6b97393de25be459ba02e4010bb0a0a9ebd2cc24f4b0f061eb7b00"
     },
     {
       "path": "music/blue_silence.mp3",
@@ -204,8 +169,8 @@
     },
     {
       "path": "src/app.js",
-      "bytes": 52122,
-      "sha256": "37335eb2acb7b89d3c3556328e16db16523ac35757c9286d5605492bedba99e9"
+      "bytes": 54326,
+      "sha256": "48c4268bcf82f2af7fc9f31631aa7e2eab5632e86d213b50c9ab459231273966"
     },
     {
       "path": "src/audio.js",
@@ -214,138 +179,63 @@
     },
     {
       "path": "src/config.js",
-      "bytes": 1095,
-      "sha256": "53534d06651866bfbcab184ce24a5cb10306cf02946518fa6ce1f462b2300cdc"
+      "bytes": 1139,
+      "sha256": "1ecb2102156c539beaf53574d35ea708cc63cc76d5ed838b1b6ccc3c94ef7541"
     },
     {
       "path": "src/engine.js",
-      "bytes": 57943,
-      "sha256": "d18d0a05721e0c871ac7e2e3ffa6154f3347548b29b2acccfe5b7a3fb0ac46a9"
+      "bytes": 63579,
+      "sha256": "b886c825cda4a44e383d86ae1de59cb30d6489fa2cd5f350a1972469cc6155c9"
     },
     {
       "path": "src/individuals.js",
-      "bytes": 14594,
-      "sha256": "c974af5688243e3aded81a60f8c7010648cfe94690505b93bfc4343d430ccd1e"
+      "bytes": 16216,
+      "sha256": "fed0608a38645c9382f25faef98dda10b792227dd478244d7991bfdee8201dcc"
     },
     {
       "path": "src/next_reef.js",
-      "bytes": 10152,
-      "sha256": "8347bffb997d6903122dc4fc1c74ad4ef9488883090d9fbfa18561d476c32ecf"
+      "bytes": 13268,
+      "sha256": "433a0d49e1985cacbdae3ce28f403c343113fc7bfb1cdd67fbef8660bb3dd2ef"
     },
     {
       "path": "src/open_world.js",
-      "bytes": 12491,
-      "sha256": "5b4346c185f41e11ea5d11338c947686f8de40ef771dd26ce1a1c49e549e71a1"
+      "bytes": 13901,
+      "sha256": "c197f02246fa0f82d52488b4925bf8f72d395e88c37ffee8ed098d7b1fcc1cc8"
     },
     {
       "path": "src/performance.js",
-      "bytes": 6293,
-      "sha256": "c136d69dd2adabb8554b9821f12603a5fefba9e8ea88e7b78e99fd46a8a48905"
+      "bytes": 7571,
+      "sha256": "e97deba9c9a69202b01c32ed54209473c148b9b3d699e40637f27074b2b388aa"
     },
     {
       "path": "src/reef_detail.js",
-      "bytes": 15985,
-      "sha256": "c041a5eb1187b4a7d2c14ff195b7c146aff8ce976a6b26c32ac59598a235de2a"
+      "bytes": 16382,
+      "sha256": "4524d4b9ce58609b2380acabcffb8a8a03333b6198b5146ab3379db14495eb8e"
     },
     {
       "path": "src/scene_cache.js",
       "bytes": 2948,
-      "sha256": "9a143854636f7f88b8dbf131988652d6740cc4627a820ba6cdf3eec4013ef0f5"
+      "sha256": "d86cd964ad6dc7b23fbc455ba174bcd79ad0f9c382e19068c5e4ed4967d03dd9"
     },
     {
       "path": "src/shell.html",
-      "bytes": 10663,
-      "sha256": "c1c38e4530c24940ec4505ca08c5c3a022d9e7ec8ff4e12d5d00302320ac67c7"
+      "bytes": 11424,
+      "sha256": "6e16539f2f83966caa71deb09c34960a427b5987d144e16a4bfaa102934f818e"
     },
     {
       "path": "src/style.css",
-      "bytes": 57699,
-      "sha256": "b0de7f50c7dde43342128e5a6a3c6af73c7159c0c91e8e70ce6a01260286a8ac"
+      "bytes": 47048,
+      "sha256": "f8ce23f8365b413317a2c84645988b55d17c88041144453ab25a6f73f381be05"
     },
     {
       "path": "src/voyage.js",
-      "bytes": 29893,
-      "sha256": "18f6bb04c5b8d946fa20c548ec2046ac2bb029e91aa0bc1092536f15e14e7719"
+      "bytes": 30115,
+      "sha256": "ce256ca1c84be99d6ab6786a2c58dc241fe9d3e549fe2b1fef0d10e202ce3931"
     },
     {
       "path": "src/world.js",
-      "bytes": 28949,
-      "sha256": "94684cb98362b624dde85f16804b9a25af1755712f386dede663c03fc4c8e8ed"
-    },
-    {
-      "path": "tests/v07/capture_suite.py",
-      "bytes": 2841,
-      "sha256": "8d8df83d87bf56476456e8cedb192f7faa709baa7f81a9d04dd06b67608fe671"
-    },
-    {
-      "path": "tests/v07/captures.json",
-      "bytes": 2991,
-      "sha256": "2c62b1d729c2cdb130f522d4dee93b842f1e005f00a8c8a2c9d8afbdfdc53c0b"
-    },
-    {
-      "path": "tests/v07/check_http.py",
-      "bytes": 822,
-      "sha256": "823c18bd0f9066bbe7987e37fb30443ef4059a112701999bada2b1f3c00e670b"
-    },
-    {
-      "path": "tests/v07/desktop-results.json",
-      "bytes": 6026,
-      "sha256": "31e200af81289b42d89eca90075295ba8068bd3d999826cdc484f999cdd72b4d"
-    },
-    {
-      "path": "tests/v07/guide-results.json",
-      "bytes": 180,
-      "sha256": "9b3295c23616bf8549ea77b2daf3f6cbd78beba8571684fb818c8571ba5acf65"
-    },
-    {
-      "path": "tests/v07/health.html",
-      "bytes": 26,
-      "sha256": "77c1dec56ba9f452e48f27e5feec2da66ee149a934cafaa18007cdca5c90d985"
-    },
-    {
-      "path": "tests/v07/http-results.json",
-      "bytes": 347,
-      "sha256": "a7cc63b1b9e0eff266be43f3c572a0535a0ce04c10269dcc97474c47e131b976"
-    },
-    {
-      "path": "tests/v07/layout-results.json",
-      "bytes": 3618,
-      "sha256": "f22d8b2ae252e6f2fecd1bb904784d1a9a8159fb44b99928518b8011882b7ef0"
-    },
-    {
-      "path": "tests/v07/layout_check.py",
-      "bytes": 1688,
-      "sha256": "8ec5b8c7dfbfc25d3124a3e7f733a45d424dd039f03836d8c96263f2b02a1eaa"
-    },
-    {
-      "path": "tests/v07/mobile-results.json",
-      "bytes": 7681,
-      "sha256": "144680eb3e481fdf1d22dd5ae1165102ea14cbf0bbe4f76706c2d87638725b7c"
-    },
-    {
-      "path": "tests/v07/regression.py",
-      "bytes": 16798,
-      "sha256": "009478310964233437b838a0e8366e6674b3d0e2f2b9ebda553eb900ea70e0f8"
-    },
-    {
-      "path": "tests/v07/render_guide.py",
-      "bytes": 2296,
-      "sha256": "d22866d8a74b2fd2a50007396f3d743ef5b980259905872e89a419f6804682c1"
-    },
-    {
-      "path": "tests/v07/static-results.json",
-      "bytes": 3007,
-      "sha256": "32fce5c28066189d5da2ec56cb4d002e976044714f81c816986d24ae01754c75"
-    },
-    {
-      "path": "tests/v07/static_check.py",
-      "bytes": 3238,
-      "sha256": "192a40a4d560790718fcb4a68cd46681cfa4100b696ede3feb54e4f3128de482"
-    },
-    {
-      "path": "tools/sculpt_coral.py",
-      "bytes": 2836,
-      "sha256": "1d91998991e1f914e99cc21d98b259316e7a1da74663c2cca0e787d71c7f9c9a"
+      "bytes": 30320,
+      "sha256": "07690f083b69adaa549f66ff33b30de7e344e94298445d72b53aa435c2b76325"
     }
   ]
 }
