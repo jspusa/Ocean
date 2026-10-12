@@ -1,0 +1,141 @@
+name: Import Ocean v0.7 release
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - Shilang_Ocean_GitHub_Pages_v0.7.zip
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: ocean-release-import
+  cancel-in-progress: false
+
+jobs:
+  import:
+    if: github.repository == 'jspusa/Ocean'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Check out the requested revision
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Verify and unpack the original v0.7 release
+        run: |
+          python3 - <<'PY'
+          import hashlib
+          import json
+          import os
+          import stat
+          import zipfile
+          from pathlib import Path, PurePosixPath
+
+          root = Path.cwd().resolve()
+          archive = root / 'Shilang_Ocean_GitHub_Pages_v0.7.zip'
+          expected = 'c27229f5159e4d89b4faa15867984b7d7d3c1183a1f131afa9878363296da58d'
+          if not archive.is_file():
+              raise SystemExit('Upload Shilang_Ocean_GitHub_Pages_v0.7.zip to the repository root first. Do not rename or recompress it.')
+          if hashlib.sha256(archive.read_bytes()).hexdigest() != expected:
+              raise SystemExit('The archive is not the approved v0.7 file. No game files were changed.')
+
+          payload = {}
+          with zipfile.ZipFile(archive) as bundle:
+              entries = bundle.infolist()
+              names = [entry.filename for entry in entries]
+              if len(names) != 70 or len(names) != len(set(names)):
+                  raise SystemExit('Unexpected or duplicate archive entries.')
+              if sum(entry.file_size for entry in entries) > 100 * 1024 * 1024:
+                  raise SystemExit('Archive exceeds the extraction budget.')
+              for entry in entries:
+                  name = entry.filename
+                  path = PurePosixPath(name)
+                  mode = entry.external_attr >> 16
+                  if (entry.is_dir() or path.is_absolute() or '\\' in name or
+                      '..' in path.parts or not path.parts or
+                      path.parts[0] in {'.git', '.github'} or stat.S_ISLNK(mode)):
+                      raise SystemExit('Unsafe archive path: ' + name)
+                  destination = root.joinpath(*path.parts)
+                  if not destination.resolve().is_relative_to(root):
+                      raise SystemExit('Destination escapes the repository: ' + name)
+                  payload[name] = bundle.read(entry)
+
+          manifest = json.loads(payload['MANIFEST.json'])
+          if manifest.get('version') != '0.7.0' or payload.get('VERSION') != b'0.7.0\n':
+              raise SystemExit('Unexpected release version.')
+          records = manifest['files']
+          if len(records) != len({record['path'] for record in records}):
+              raise SystemExit('Duplicate manifest paths.')
+          if {record['path'] for record in records} != set(payload) - {'MANIFEST.json'}:
+              raise SystemExit('The manifest does not cover all release files.')
+          for record in records:
+              content = payload[record['path']]
+              if len(content) != record['bytes'] or hashlib.sha256(content).hexdigest() != record['sha256']:
+                  raise SystemExit('Integrity check failed: ' + record['path'])
+
+          required = {'index.html', '.nojekyll', 'src/config.js', 'src/app.js',
+                      'src/open_world.js', 'src/voyage.js', 'assets/reef.mesh.gz',
+                      'music/shallows.mp3', 'music/blue_silence.mp3'}
+          if not required.issubset(payload):
+              raise SystemExit('Required game files are missing.')
+
+          # All validation completes before any release file is written.
+          # Existing files outside the release manifest are left untouched.
+          for name, content in payload.items():
+              destination = root / name
+              destination.parent.mkdir(parents=True, exist_ok=True)
+              temporary = destination.with_name(destination.name + '.ocean-import-tmp')
+              temporary.write_bytes(content)
+              temporary.replace(destination)
+          paths = sorted(payload)
+          (root / '.ocean-imported-files.json').write_text(json.dumps(paths), encoding='utf-8')
+          summary = os.environ.get('GITHUB_STEP_SUMMARY')
+          if summary:
+              with open(summary, 'a', encoding='utf-8') as output:
+                  output.write('## Ocean v0.7 integrity checks passed\n\n')
+                  output.write('Verified the original archive SHA-256 and all 69 manifest entries. Extracted 70 unchanged release files.\n\n')
+                  output.write('This imports the game; it does not claim GitHub Pages is already enabled or deployed.\n')
+          print('Verified and extracted', len(paths), 'release files.')
+          PY
+
+      - name: Check JavaScript syntax
+        run: |
+          set -eu
+          for file in src/*.js; do node --check "$file"; done
+
+      - name: Commit only the imported release files
+        run: |
+          python3 - <<'PY'
+          import json
+          import subprocess
+          from pathlib import Path
+
+          paths_file = Path('.ocean-imported-files.json')
+          paths = json.loads(paths_file.read_text(encoding='utf-8'))
+          subprocess.run(['git', 'add', '--', *paths], check=True)
+          paths_file.unlink()
+          result = subprocess.run(['git', 'diff', '--cached', '--quiet'])
+          if result.returncode == 0:
+              print('The approved release is already installed; no new commit is needed.')
+          elif result.returncode == 1:
+              subprocess.run(['git', 'config', 'user.name', 'github-actions[bot]'], check=True)
+              subprocess.run(['git', 'config', 'user.email', '41898282+github-actions[bot]@users.noreply.github.com'], check=True)
+              subprocess.run(['git', 'commit', '-m', 'Import complete Return to the Blue v0.7 release'], check=True)
+              subprocess.run(['git', 'push', 'origin', 'HEAD:main'], check=True)
+          else:
+              raise SystemExit(result.returncode)
+          PY
+
+      - name: Explain the website activation step
+        run: |
+          cat >> "$GITHUB_STEP_SUMMARY" <<'EOF_SUMMARY'
+
+          ## Source import completed
+          The source code, models, textures, music and documentation are now in the repository root. The original ZIP is retained.
+
+          To activate the playable website, open **Settings → Pages → Deploy from a branch → main → /(root) → Save** after this import succeeds. This workflow does not change repository visibility or Pages settings.
+          EOF_SUMMARY
