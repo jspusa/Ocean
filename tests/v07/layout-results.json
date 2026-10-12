@@ -1,0 +1,162 @@
+{
+  "scope": "CSS only, no rendered world",
+  "checks": [
+    {
+      "check": "distinct hit areas 390x844",
+      "pass": true,
+      "detail": {
+        "bad": [],
+        "rects": {
+          "viewBtn": {
+            "x": 315.984375,
+            "y": 86,
+            "width": 58.015625,
+            "height": 38,
+            "top": 86,
+            "right": 374,
+            "bottom": 124,
+            "left": 315.984375
+          },
+          "observeBtn": {
+            "x": 315.984375,
+            "y": 130,
+            "width": 58.015625,
+            "height": 38,
+            "top": 130,
+            "right": 374,
+            "bottom": 168,
+            "left": 315.984375
+          },
+          "autoBtn": {
+            "x": 285,
+            "y": 230,
+            "width": 38,
+            "height": 38,
+            "top": 230,
+            "right": 323,
+            "bottom": 268,
+            "left": 285
+          },
+          "mapBtn": {
+            "x": 334,
+            "y": 230,
+            "width": 38,
+            "height": 38,
+            "top": 230,
+            "right": 372,
+            "bottom": 268,
+            "left": 334
+          },
+          "lampBtn": {
+            "x": 342,
+            "y": 183,
+            "width": 28,
+            "height": 28,
+            "top": 183,
+            "right": 370,
+            "bottom": 211,
+            "left": 342
+          }
+        }
+      }
+    },
+    {
+      "check": "distinct hit areas 844x390",
+      "pass": true,
+      "detail": {
+        "bad": [],
+        "rects": {
+          "viewBtn": {
+            "x": 696.96875,
+            "y": 73,
+            "width": 58.015625,
+            "height": 40,
+            "top": 73,
+            "right": 754.984375,
+            "bottom": 113,
+            "left": 696.96875
+          },
+          "observeBtn": {
+            "x": 761.984375,
+            "y": 73,
+            "width": 58.015625,
+            "height": 40,
+            "top": 73,
+            "right": 820,
+            "bottom": 113,
+            "left": 761.984375
+          },
+          "lampBtn": {
+            "x": 792,
+            "y": 126,
+            "width": 27,
+            "height": 27,
+            "top": 126,
+            "right": 819,
+            "bottom": 153,
+            "left": 792
+          }
+        }
+      }
+    },
+    {
+      "check": "distinct hit areas 768x1024",
+      "pass": true,
+      "detail": {
+        "bad": [],
+        "rects": {
+          "viewBtn": {
+            "x": 602,
+            "y": 87,
+            "width": 68,
+            "height": 38,
+            "top": 87,
+            "right": 670,
+            "bottom": 125,
+            "left": 602
+          },
+          "observeBtn": {
+            "x": 677,
+            "y": 87,
+            "width": 68,
+            "height": 38,
+            "top": 87,
+            "right": 745,
+            "bottom": 125,
+            "left": 677
+          },
+          "autoBtn": {
+            "x": 663,
+            "y": 230,
+            "width": 38,
+            "height": 38,
+            "top": 230,
+            "right": 701,
+            "bottom": 268,
+            "left": 663
+          },
+          "mapBtn": {
+            "x": 712,
+            "y": 230,
+            "width": 38,
+            "height": 38,
+            "top": 230,
+            "right": 750,
+            "bottom": 268,
+            "left": 712
+          },
+          "lampBtn": {
+            "x": 714,
+            "y": 183,
+            "width": 34,
+            "height": 34,
+            "top": 183,
+            "right": 748,
+            "bottom": 217,
+            "left": 714
+          }
+        }
+      }
+    }
+  ]
+}

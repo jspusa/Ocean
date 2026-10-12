@@ -1,0 +1,351 @@
+{
+  "version": "0.7.0",
+  "status": "playable vertical slice; not Wii parity/commercial acceptance",
+  "files": [
+    {
+      "path": ".nojekyll",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "CREDITS.md",
+      "bytes": 4001,
+      "sha256": "13c9657893821d1cab5ccba1c7a1f2708ccefb8a6740a55ba3c146f6eac7fbfa"
+    },
+    {
+      "path": "FEATURE_PARITY.md",
+      "bytes": 4783,
+      "sha256": "80f230db813ca3bf520ea2f5a18ec6bf21a1a7c687ee8ccd449cbe7291a03907"
+    },
+    {
+      "path": "LICENSE",
+      "bytes": 1242,
+      "sha256": "92d1974624eac36a81f851171d74dd440ba35f1448186a677fd7764a239fdb9b"
+    },
+    {
+      "path": "README.md",
+      "bytes": 6878,
+      "sha256": "545e88b353b2de0294d6d8d6b8bc01250eada39438f4ba233c1390bea8085c67"
+    },
+    {
+      "path": "RELEASE_CHECKLIST.md",
+      "bytes": 3686,
+      "sha256": "75f87b19d517b0d94aa1a8299cd62898aeab456b7f5de2107003bb8b81b56d2d"
+    },
+    {
+      "path": "TEST_REPORT.md",
+      "bytes": 5991,
+      "sha256": "f806d7442f3a95683205ae1060c9587a7ec5ed1b474ad8ca1b056b73f6310678"
+    },
+    {
+      "path": "VERSION",
+      "bytes": 6,
+      "sha256": "967d9afb101346667166f2e76e81910bc190488d7d41d50ca0072e9d92f00e32"
+    },
+    {
+      "path": "assets/caustics.jpg",
+      "bytes": 1245706,
+      "sha256": "3b819f517fbfdd321e65e6fa3f4f24e0fc24690d15ee7f151d98606686bbd8f2"
+    },
+    {
+      "path": "assets/coral_diff.jpg",
+      "bytes": 311300,
+      "sha256": "f45c15400e135a01e2ae0ec7c3a10ea758823ae343fc2ae46013cbd6bee79a26"
+    },
+    {
+      "path": "assets/coral_forms.json",
+      "bytes": 3585323,
+      "sha256": "085b086d68310dc5382460a727d69b326f264d3574cec8627dbeb6629589d708"
+    },
+    {
+      "path": "assets/coral_nor_gl.jpg",
+      "bytes": 230833,
+      "sha256": "da8ef709fa49db13083b1c312155b3aa8a3eae81fee230678bff30767c48703f"
+    },
+    {
+      "path": "assets/guide_butterfly.jpg",
+      "bytes": 12828,
+      "sha256": "1ca3b8c55251fd8ffa570ec1ea87f9e68cd5d2601b8391d8d182c079cea49fc4"
+    },
+    {
+      "path": "assets/guide_chromis.jpg",
+      "bytes": 10613,
+      "sha256": "d37860c40246002bee6bcf0567d98afbabbc2b573ebdd95c2b83dc32febbe607"
+    },
+    {
+      "path": "assets/guide_clown.jpg",
+      "bytes": 13435,
+      "sha256": "ef6b7c3905ec1e62cbcc69719a6382231aa85e4fa7e0075c8d6a778d5037a600"
+    },
+    {
+      "path": "assets/guide_dolphin.jpg",
+      "bytes": 11940,
+      "sha256": "4ae66266637c925de117b4aa29fb7b9715db023f08783c95aff246318609027c"
+    },
+    {
+      "path": "assets/guide_idol.jpg",
+      "bytes": 12128,
+      "sha256": "e8be6dfbed71af3f422bd582cd51f8319ee5bd9cb6cfed8c902db498515e4759"
+    },
+    {
+      "path": "assets/guide_parrot.jpg",
+      "bytes": 10562,
+      "sha256": "a1b6cc711d04edd5d4e9f44d7c5e4bb987a78d33095743b75d417769baa25ae3"
+    },
+    {
+      "path": "assets/guide_ray.jpg",
+      "bytes": 8079,
+      "sha256": "4fa617726a7675e7b8fbcb32cef5107109138beea4a6139f5fc7a8121d38044b"
+    },
+    {
+      "path": "assets/guide_sergeant.jpg",
+      "bytes": 13275,
+      "sha256": "4bef0bb1b19cdb04173882fee231340895b78faf15a6f78aec87c6e707a2e56d"
+    },
+    {
+      "path": "assets/guide_tang.jpg",
+      "bytes": 10517,
+      "sha256": "2c69ed75c0780356fc1ded75e9bd5edeefc10350ce0b4451ea019ee87291fe40"
+    },
+    {
+      "path": "assets/guide_turtle.jpg",
+      "bytes": 12113,
+      "sha256": "7dd8669e37c02e2945ccc187314851f58700f865b35ef65c9964451b23ecfcf8"
+    },
+    {
+      "path": "assets/guide_whale.jpg",
+      "bytes": 9140,
+      "sha256": "0d08ebe41e342312fea9215724e18acc5b6796914b0cf393f31091292ac0e38f"
+    },
+    {
+      "path": "assets/guide_wrasse.jpg",
+      "bytes": 10867,
+      "sha256": "d2fc10d9bad1e6456f7b91fdd944f65f61dff44086a8ab7bd6a95c0d6d1cb06f"
+    },
+    {
+      "path": "assets/reef.mesh.gz",
+      "bytes": 13995465,
+      "sha256": "5413ec108a6a7b4fbc65f83e97e5fe242088adc7186982f9862f448ee18c9f62"
+    },
+    {
+      "path": "assets/rock_diff.jpg",
+      "bytes": 903525,
+      "sha256": "4700e02d365e21bebb89696c321854bacedf12e1c3dcdc7a0aed4ffa622ddaef"
+    },
+    {
+      "path": "assets/rock_nor_gl.jpg",
+      "bytes": 1311852,
+      "sha256": "4627612be3a3462bfdc13eeec4d57b16a02d18753c7e85d3b55434b4648c0e0a"
+    },
+    {
+      "path": "assets/sand_diff.jpg",
+      "bytes": 1153854,
+      "sha256": "b8d6f475972e4a3ac5bd0767f3fdcc6de5fab7aa1362ff4b0ece115351277f0b"
+    },
+    {
+      "path": "assets/sand_nor_gl.jpg",
+      "bytes": 1073743,
+      "sha256": "783241cd9b1254126881e2781f5d9393c64c930577b8d30c7d81d53d584b53a9"
+    },
+    {
+      "path": "assets/shell_diff.jpg",
+      "bytes": 361534,
+      "sha256": "d7a1d83ab19ec313bea0bbfa434f92e2ed091ac54f429cd4b7b7ee55bd179e74"
+    },
+    {
+      "path": "assets/shell_nor_gl.jpg",
+      "bytes": 59277,
+      "sha256": "3015c96d1280251bc210114fc3e85ffda39051f524fbc078d2559048569371ed"
+    },
+    {
+      "path": "bake_scene.cjs",
+      "bytes": 2936,
+      "sha256": "47a0255d4080c24d02f3882f5e0913fa09d89c5375e37f09931df2d8339a124f"
+    },
+    {
+      "path": "build.py",
+      "bytes": 2364,
+      "sha256": "b8b478f1f58133df7e92530482f51d69ee9763391f3f835011b884a682d5e639"
+    },
+    {
+      "path": "compose_music.py",
+      "bytes": 6305,
+      "sha256": "cbaa83f9788e691f7ff6a8614ccbf8cae7bd12f779280fc50cd8caf98117189a"
+    },
+    {
+      "path": "index.html",
+      "bytes": 11209,
+      "sha256": "a8ace65318b0302e804890beed6f9b33325785c791e064b9649234590f3b28ff"
+    },
+    {
+      "path": "make_detail_assets.py",
+      "bytes": 4420,
+      "sha256": "97d74e1b6ee35e2089d7e6310cd43dbd66dfa1e6aa4bed6158eff5b379fdd15a"
+    },
+    {
+      "path": "make_textures.py",
+      "bytes": 3900,
+      "sha256": "064e0e1fc8ea291fa2f044cf6f223f1d14e6e5a177283c7a3eb091d905358fa1"
+    },
+    {
+      "path": "music/blue_silence.mp3",
+      "bytes": 1681182,
+      "sha256": "dab03e0f2956568609b53ac29a170b0d2bf0344c87b95f15c8a253e672fa3701"
+    },
+    {
+      "path": "music/score.json",
+      "bytes": 449,
+      "sha256": "73974908313dfedb37d856613a7bf4d8b64a829c97ed6fbae8dbc8eb771c2bda"
+    },
+    {
+      "path": "music/shallows.mp3",
+      "bytes": 1681178,
+      "sha256": "6246c62d0de24c65f3a5023f786d10c11b9a0d724b95be48977a9d1481fba257"
+    },
+    {
+      "path": "src/app.js",
+      "bytes": 52122,
+      "sha256": "37335eb2acb7b89d3c3556328e16db16523ac35757c9286d5605492bedba99e9"
+    },
+    {
+      "path": "src/audio.js",
+      "bytes": 9151,
+      "sha256": "511f8ce11be0d37b00e40b4bfb898da632badd51288f5f2278dd623cf27bfaa6"
+    },
+    {
+      "path": "src/config.js",
+      "bytes": 1095,
+      "sha256": "53534d06651866bfbcab184ce24a5cb10306cf02946518fa6ce1f462b2300cdc"
+    },
+    {
+      "path": "src/engine.js",
+      "bytes": 57943,
+      "sha256": "d18d0a05721e0c871ac7e2e3ffa6154f3347548b29b2acccfe5b7a3fb0ac46a9"
+    },
+    {
+      "path": "src/individuals.js",
+      "bytes": 14594,
+      "sha256": "c974af5688243e3aded81a60f8c7010648cfe94690505b93bfc4343d430ccd1e"
+    },
+    {
+      "path": "src/next_reef.js",
+      "bytes": 10152,
+      "sha256": "8347bffb997d6903122dc4fc1c74ad4ef9488883090d9fbfa18561d476c32ecf"
+    },
+    {
+      "path": "src/open_world.js",
+      "bytes": 12491,
+      "sha256": "5b4346c185f41e11ea5d11338c947686f8de40ef771dd26ce1a1c49e549e71a1"
+    },
+    {
+      "path": "src/performance.js",
+      "bytes": 6293,
+      "sha256": "c136d69dd2adabb8554b9821f12603a5fefba9e8ea88e7b78e99fd46a8a48905"
+    },
+    {
+      "path": "src/reef_detail.js",
+      "bytes": 15985,
+      "sha256": "c041a5eb1187b4a7d2c14ff195b7c146aff8ce976a6b26c32ac59598a235de2a"
+    },
+    {
+      "path": "src/scene_cache.js",
+      "bytes": 2948,
+      "sha256": "9a143854636f7f88b8dbf131988652d6740cc4627a820ba6cdf3eec4013ef0f5"
+    },
+    {
+      "path": "src/shell.html",
+      "bytes": 10663,
+      "sha256": "c1c38e4530c24940ec4505ca08c5c3a022d9e7ec8ff4e12d5d00302320ac67c7"
+    },
+    {
+      "path": "src/style.css",
+      "bytes": 57699,
+      "sha256": "b0de7f50c7dde43342128e5a6a3c6af73c7159c0c91e8e70ce6a01260286a8ac"
+    },
+    {
+      "path": "src/voyage.js",
+      "bytes": 29893,
+      "sha256": "18f6bb04c5b8d946fa20c548ec2046ac2bb029e91aa0bc1092536f15e14e7719"
+    },
+    {
+      "path": "src/world.js",
+      "bytes": 28949,
+      "sha256": "94684cb98362b624dde85f16804b9a25af1755712f386dede663c03fc4c8e8ed"
+    },
+    {
+      "path": "tests/v07/capture_suite.py",
+      "bytes": 2841,
+      "sha256": "8d8df83d87bf56476456e8cedb192f7faa709baa7f81a9d04dd06b67608fe671"
+    },
+    {
+      "path": "tests/v07/captures.json",
+      "bytes": 2991,
+      "sha256": "2c62b1d729c2cdb130f522d4dee93b842f1e005f00a8c8a2c9d8afbdfdc53c0b"
+    },
+    {
+      "path": "tests/v07/check_http.py",
+      "bytes": 822,
+      "sha256": "823c18bd0f9066bbe7987e37fb30443ef4059a112701999bada2b1f3c00e670b"
+    },
+    {
+      "path": "tests/v07/desktop-results.json",
+      "bytes": 6026,
+      "sha256": "31e200af81289b42d89eca90075295ba8068bd3d999826cdc484f999cdd72b4d"
+    },
+    {
+      "path": "tests/v07/guide-results.json",
+      "bytes": 180,
+      "sha256": "9b3295c23616bf8549ea77b2daf3f6cbd78beba8571684fb818c8571ba5acf65"
+    },
+    {
+      "path": "tests/v07/health.html",
+      "bytes": 26,
+      "sha256": "77c1dec56ba9f452e48f27e5feec2da66ee149a934cafaa18007cdca5c90d985"
+    },
+    {
+      "path": "tests/v07/http-results.json",
+      "bytes": 347,
+      "sha256": "a7cc63b1b9e0eff266be43f3c572a0535a0ce04c10269dcc97474c47e131b976"
+    },
+    {
+      "path": "tests/v07/layout-results.json",
+      "bytes": 3618,
+      "sha256": "f22d8b2ae252e6f2fecd1bb904784d1a9a8159fb44b99928518b8011882b7ef0"
+    },
+    {
+      "path": "tests/v07/layout_check.py",
+      "bytes": 1688,
+      "sha256": "8ec5b8c7dfbfc25d3124a3e7f733a45d424dd039f03836d8c96263f2b02a1eaa"
+    },
+    {
+      "path": "tests/v07/mobile-results.json",
+      "bytes": 7681,
+      "sha256": "144680eb3e481fdf1d22dd5ae1165102ea14cbf0bbe4f76706c2d87638725b7c"
+    },
+    {
+      "path": "tests/v07/regression.py",
+      "bytes": 16798,
+      "sha256": "009478310964233437b838a0e8366e6674b3d0e2f2b9ebda553eb900ea70e0f8"
+    },
+    {
+      "path": "tests/v07/render_guide.py",
+      "bytes": 2296,
+      "sha256": "d22866d8a74b2fd2a50007396f3d743ef5b980259905872e89a419f6804682c1"
+    },
+    {
+      "path": "tests/v07/static-results.json",
+      "bytes": 3007,
+      "sha256": "32fce5c28066189d5da2ec56cb4d002e976044714f81c816986d24ae01754c75"
+    },
+    {
+      "path": "tests/v07/static_check.py",
+      "bytes": 3238,
+      "sha256": "192a40a4d560790718fcb4a68cd46681cfa4100b696ede3feb54e4f3128de482"
+    },
+    {
+      "path": "tools/sculpt_coral.py",
+      "bytes": 2836,
+      "sha256": "1d91998991e1f914e99cc21d98b259316e7a1da74663c2cca0e787d71c7f9c9a"
+    }
+  ]
+}

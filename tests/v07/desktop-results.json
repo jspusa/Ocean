@@ -1,0 +1,267 @@
+{
+  "version": "0.7.0",
+  "mode": "desktop",
+  "seconds": 62.61,
+  "environment": "Chromium144/LinuxXvfb/ANGLE-SwiftShader, set_content portable, memory localStorage fixture, manually stepped simulation (not a FPS benchmark)",
+  "checks": [
+    {
+      "check": "Compiled v0.7 scene boots; no procedural fallback",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "check": "12 animal groups / 9 landmarks",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "check": "WebGL shader compilation and initial draw succeed",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "check": "Instance IDs remain unique",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "check": "No remote runtime dependencies",
+      "pass": true,
+      "detail": []
+    },
+    {
+      "check": "Real above-water ship camera",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "check": "Actual MSAA samples allocated",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "check": "Voyage begins at anchorage, not in a menu-only scene",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "check": "Keyboard moves through real game space",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "check": "Key release clears input",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "check": "Drag look changes angle",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "check": "Measured distance follows simulation, not camera teleport",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "check": "Map creates waypoint without teleporting",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "check": "Cruise toggles active state",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "check": "Photo mode changes actual camera field of view",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "check": "Pause opens pause panel",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "check": "Resume closes pause",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "check": "Standard gamepad axes are read",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "check": "Controller Start pauses",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "check": "Controller Start resumes from pause",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "check": "Controller disconnect clears input",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "check": "Close observation follows a real turtle",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "check": "Photo contains a rendered JPEG and geometric score",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "check": "Real-animal photo score diagnostic",
+      "pass": true,
+      "detail": {
+        "score": 98,
+        "species": "綠蠵龜",
+        "metrics": {
+          "framing": 30,
+          "scale": 30,
+          "steady": 20,
+          "light": 18,
+          "distance": 4.09
+        }
+      }
+    },
+    {
+      "check": "No GL error after capture and MSAA resolve",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "check": "Next chooses a different same-species actual animal",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "check": "Distant specimen cannot teleport in journey mode",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "check": "Journal has twelve cards",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "check": "Dolphin detail can be opened",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "check": "Both original music stems decode to non-zero samples",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "check": "Arrival triggers only after travel and discovery",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "check": "Three discoveries complete naturalist",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "check": "Photographer requires scored photo",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "check": "World-space gate discovery completes passage",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "check": "Remote logger interaction is rejected",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "check": "Nearby logger opens original story and completes archive",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "check": "Visible real whale observation completes final memory",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "check": "Returning to ship finishes six-memory voyage",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "check": "Save is restored from storage fixture",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "check": "Unknown imported IDs/settings are filtered",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "check": "Foreign save format is rejected",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "check": "Actual save download contains six memories and a JPEG",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "check": "Actual save-file input restores settings/progress",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "check": "Cancel import leaves current progress unchanged",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "check": "Storage-full error is caught and reported",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "check": "Saving recovers after storage is available",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "check": "No uncaught page errors after interactions",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "check": "Page error list is empty",
+      "pass": true,
+      "detail": []
+    }
+  ],
+  "pageErrors": [],
+  "requests": [],
+  "notTested": [
+    "physical phone/Safari/hardware gamepad",
+    "hardware GPU FPS/thermal",
+    "public GitHub Pages",
+    "human full playthrough",
+    "Wii measured quality parity"
+  ]
+}

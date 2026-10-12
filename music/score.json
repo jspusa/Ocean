@@ -1,0 +1,13 @@
+{
+  "title": "重返蔚藍 / Return to the Blue",
+  "duration_seconds": 120,
+  "tempo_bpm": 64,
+  "meter": "4/4",
+  "bars": 32,
+  "stems": [
+    "shallows.mp3",
+    "blue_silence.mp3"
+  ],
+  "authorship": "Original procedural composition and synthesis for this project. No third-party audio, recordings, melodies, or soundfonts.",
+  "mix": "Equal-power crossfade by simulated depth; master and music controls independent from procedural ambience."
+}

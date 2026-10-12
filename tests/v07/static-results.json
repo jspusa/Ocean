@@ -1,0 +1,146 @@
+{
+  "version": "0.7.0",
+  "checks": [
+    {
+      "check": "JS syntax app.js",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "check": "JS syntax audio.js",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "check": "JS syntax config.js",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "check": "JS syntax engine.js",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "check": "JS syntax individuals.js",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "check": "JS syntax next_reef.js",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "check": "JS syntax open_world.js",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "check": "JS syntax performance.js",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "check": "JS syntax reef_detail.js",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "check": "JS syntax scene_cache.js",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "check": "JS syntax voyage.js",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "check": "JS syntax world.js",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "check": "Every runtime local reference exists",
+      "pass": true,
+      "detail": 37
+    },
+    {
+      "check": "All runtime references are project-subpath relative",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "check": "No standalone script/style file fetch",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "check": "No unresolved build insertion markers",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "check": "No packaged font files",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "check": "Guide thumbnails for all 12 species",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "check": "Original two music stems exist",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "check": "Compiled scene is 0.7.0",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "check": "Compiled meshes in supported budget",
+      "pass": true,
+      "detail": {
+        "batches": 304,
+        "instances": 3331,
+        "packedBytes": 13995465,
+        "decodedBytes": 31361808
+      }
+    },
+    {
+      "check": "All indexed vertices are finite",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "check": "Every index refers to a valid vertex",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "check": "Every instance ID references a node",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "check": "Runtime module ordering includes world / voyage",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "check": "Source fallback includes new world",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "check": "Sources and built entry have matching version",
+      "pass": true,
+      "detail": null
+    }
+  ],
+  "sha256Standalone": "b63572c504d752b8258536d2d90aacb633ea84daaf0e7d0f7f7731f3fc29916a"
+}
