@@ -22,7 +22,7 @@ function readVoyage(raw){
  for(const key of ['distance','whaleWatch','dives','totalSeconds'])if(Number.isFinite(raw[key]))s[key]=clamp(raw[key],0,1e8);
  for(const key of ['reading','ended','companion'])s[key]=raw[key]===true;
  s.finishedAt=typeof raw.finishedAt==='string'?raw.finishedAt.slice(0,50):null;
- s.waypoint=raw.waypoint==='boat'||LANDMARKS.some(l=>l.id===raw.waypoint)?raw.waypoint:'garden';
+ s.waypoint=raw.waypoint==='boat'||(typeof raw.waypoint==='string'&&raw.waypoint.startsWith('habitat:')&&SPECIES.some(sp=>sp.fauna&&'habitat:'+sp.id===raw.waypoint))||LANDMARKS.some(l=>l.id===raw.waypoint)?raw.waypoint:'garden';
  s.photoCredits=Array.isArray(raw.photoCredits)?[...new Set(raw.photoCredits.filter(n=>Number.isSafeInteger(n)&&n>0))].slice(-160):[];
  if(s.completed.length===ORDERS.length&&s.waypoint==='anchorage'&&!raw.features?.navigation)s.waypoint='boat';
  if(raw.bestPhotos&&typeof raw.bestPhotos==='object')for(const sp of SPECIES){let p=raw.bestPhotos[sp.id];if(p&&Number.isFinite(p.score))s.bestPhotos[sp.id]={score:Math.round(clamp(p.score,0,100)),individual:String(p.individual||'').slice(0,70),date:Number(p.date)||0};}
@@ -68,8 +68,8 @@ function renderShip(){
  $('saveStatus').textContent=(!storageOK||!voyage.storageOK)?'瀏覽器儲存受限 · 請匯出存檔':voyage.loaded?'航程已讀取 · 自動保存在此瀏覽器':'自動保存在此瀏覽器 · 可匯出備份';
  $('shipFinal').classList.toggle('hidden',!s.ended);
 }
-function toggleCruise(){if(!active||modal)return;voyage.state.cruise=!voyage.state.cruise;stopAuto();$('cruiseBtn').classList.toggle('active',voyage.state.cruise);toast(voyage.state.cruise?'巡航推進已開啟 · 移動速度提高，不自動駕駛':'已回到緩慢觀察速度');}
-function togglePhotoMode(){if(!active)return;voyage.photoMode=!voyage.photoMode;renderer.photoFov=voyage.photoMode?48:null;$('cameraFrame').classList.toggle('hidden',!voyage.photoMode);$('photoModeBtn').classList.toggle('active',voyage.photoMode);renderer.dirty=true;}
+function toggleCruise(){if(!active||modal)return;if(typeof oceanMicrocosm!=='undefined'&&oceanMicrocosm.isViewing())oceanMicrocosm.exit('cruise');voyage.state.cruise=!voyage.state.cruise;stopAuto();$('cruiseBtn').classList.toggle('active',voyage.state.cruise);toast(voyage.state.cruise?'巡航推進已開啟 · 移動速度提高，不自動駕駛':'已回到緩慢觀察速度');}
+function togglePhotoMode(){if(!active)return;if(typeof oceanMicrocosm!=='undefined'&&oceanMicrocosm.isViewing())oceanMicrocosm.exit('camera');voyage.photoMode=!voyage.photoMode;renderer.photoFov=voyage.photoMode?48:null;$('cameraFrame').classList.toggle('hidden',!voyage.photoMode);$('photoModeBtn').classList.toggle('active',voyage.photoMode);renderer.dirty=true;}
 function readLogger(){
  const p=[95,groundHeight(99,-166)+3,-147];if(V.dist(player.p,p)>8){toast('先靠近沉船旁的黃色記錄器。');return false;}
  voyage.state.reading=true;evaluateOrders();saveVoyage();
@@ -79,13 +79,14 @@ function observeWhale(dt){const f=life.find(f=>f.species===10);if(!f)return;cons
  if(distance>=12&&distance<=85&&p[2]>0&&Math.abs(p[0])<.88&&Math.abs(p[1])<.75&&!blocked(eye,f.p)){voyage.state.whaleWatch=Math.min(5,voyage.state.whaleWatch+dt);if(voyage.lastWhale===0){radio('先停一下。那個影子會自己游進光裡。');voyage.lastWhale=t;}}
 }
 function gradePhoto(){
- let chosen=null,best=Infinity;
- for(const fish of life){const p=project(fish.p,renderer.vp),dist=V.dist(eye,fish.p);if(p[2]<=0||Math.abs(p[0])>.97||Math.abs(p[1])>.95||dist>110||blocked(eye,fish.p))continue;
+ let chosen=null,best=Infinity;const macro=typeof oceanMicrocosm!=='undefined'&&oceanMicrocosm.isViewing()?oceanMicrocosm.target():null;
+ for(const fish of macro?[macro]:life){const aim=animalFocusPoint(fish),p=project(aim,renderer.vp),dist=V.dist(eye,aim);if(p[2]<=0||Math.abs(p[0])>.97||Math.abs(p[1])>.95||dist>110||fish.retreat>.8||fish.faunaVisibility<.8||blocked(eye,aim,fish.fauna?.001:.13))continue;
+  if(fish.fauna&&dist>speciesTraits(fish.species).observeDistance*2)continue;
   const ctr=Math.hypot(p[0],p[1]);if(ctr<best){chosen={fish,p,dist};best=ctr;}}
  if(!chosen)return {score:0,subject:null,breakdown:'風景留念 · 畫面內沒有可評分的生物',metrics:{}};
- const {fish,p,dist}=chosen;const size=Math.max(...fish.s)*(fish.species===10?9.5:fish.species===11?4.0:fish.species>=8?2.7:1.2),coverage=size/(Math.max(.3,dist)*Math.tan((renderer.photoFov||renderer.fov||69)*Math.PI/360));
+ const {fish,p,dist}=chosen;const size=Math.max(...fish.s)*(fish.fauna?(SPECIES[fish.species].bodyLength||1):fish.species===10?9.5:fish.species===11?4.0:fish.species>=8?2.7:1.2),coverage=size/(Math.max(fish.fauna?.004:.3,dist)*Math.tan((renderer.photoFov||renderer.fov||69)*Math.PI/360));
  const framing=Math.max(0,1-best*.60)*30,scale=clamp(coverage/.24,0,1)*30,steady=(1-clamp(Math.hypot(...player.velocity)/6,0,1))*20,light=clamp(1+eye[1]/85,.3,1)*20;
- const safeDistance=fish.species===10?12:fish.species>=8?2.5:1;
+ const safeDistance=fish.fauna?Math.max(.01,size*.8):fish.species===10?12:fish.species>=8?2.5:1;
  let score=Math.round(framing+scale+steady+light);if(dist<safeDistance)score=Math.min(score,49);if(coverage>1.4)score=Math.min(score,49);
  return {score,subject:fish,breakdown:dist<safeDistance?'再退開一些，給生物留出空間。':coverage>1.4?'輪廓超出畫面，退後一點再取景。':score>=80?'輪廓清楚、取景穩定，留下了一次完整相遇。':score>=60?'已取得清晰紀錄。放慢移動，可讓下一張更好。':'把生物放進畫面中央，等牠自然游近。',metrics:{framing:Math.round(framing),scale:Math.round(scale),steady:Math.round(steady),light:Math.round(light),distance:+dist.toFixed(2)}};
 }
@@ -150,14 +151,20 @@ const legacyFind=findSpecies;
 findSpecies=function(index,specific=null){
  const candidates=life.filter(f=>f.species===index);let fish=specific||candidates.reduce((a,f)=>!a||V.dist(f.p,player.p)<V.dist(a.p,player.p)?f:a,null);
  if(!fish)return;
+ if(SPECIES[index].traits?.micro){closePanel();if(typeof oceanMicrocosm!=='undefined'&&V.dist(animalFocusPoint(fish),player.p)<=speciesTraits(index).observeDistance){oceanMicrocosm.enter(fish.uid);}else{markPlace('habitat:'+SPECIES[index].id);toast('已標記棲地；游近後開啟微觀探索，尋找細小的身影。');}return;}
  if(voyage.state.mode==='journey'&&V.dist(fish.p,player.p)>(index===10?85:20)){
-  const place=LANDMARKS[SPECIES[index].zone];voyage.state.waypoint=place.id;toast('已標記示意棲地。先親自游近，再觀察這位訪客。');closePanel();return;}
+  const sp=SPECIES[index],place=sp.fauna?'habitat:'+sp.id:LANDMARKS[sp.zone].id;markPlace(place);toast('已標記棲地。先親自游近，再觀察這位訪客。');return;}
  legacyFind(index,fish);
- if(index>=10)followDistance=index===10?24:5.0;else if(index>=8)followDistance=4;else followDistance=1.8;
+ followDistance=speciesTraits(index).viewDistance;
  chooseObservationSide(fish);player.p=collide(V.add(fish.p,viewingOffset(fish)));resetInput();auto=true;follow=fish;setAutoUI();
 };
 // Chart marks a real game-space destination, never teleports from a route button.
-function voyageDestination(id=voyage.state.waypoint){return id==='boat'?{id:'boat',name:'研究船',x:OPEN_WORLD.boat[0],z:OPEN_WORLD.boat[2],radius:12}:LANDMARKS.find(l=>l.id===id);}
+function voyageDestination(id=voyage.state.waypoint){
+ if(typeof id==='string'&&id.startsWith('habitat:')){
+  const sp=SPECIES.find(s=>s.fauna&&'habitat:'+s.id===id),f=sp&&life.find(f=>SPECIES[f.species]===sp);if(!f)return null;
+  const p=f.home||f.center||f.p;return {id,name:sp.name+'棲地',x:p[0],y:p[1]+.6,z:p[2],radius:3};
+ }
+ return id==='boat'?{id:'boat',name:'研究船',x:OPEN_WORLD.boat[0],z:OPEN_WORLD.boat[2],radius:12}:LANDMARKS.find(l=>l.id===id);}
 function markPlace(id){const l=voyageDestination(id);if(!l)return;voyage.state.waypoint=id;saveVoyage();closePanel();toast('已標記：'+l.name+' · 跟隨方位前進');}
 renderMap=function(){
  panelTitle('YOUR EXPEDITION CHART','海，比眼前更遠');
@@ -176,6 +183,7 @@ drawMap=function(){
  x.drawImage(chartTerrain,0,0,w,h);oceanFeatures.drawMap(x,w,h);
  x.font='10px sans-serif';x.fillStyle='#9abfbd';x.fillText('N ↑',w-35,22);x.fillText('歸潮海域 / ORIGINAL CONCEPT',17,22);
  if(active){const p=chartPoint(player.p[0],player.p[2],w,h),to=voyageDestination();if(to){const q=chartPoint(to.x,to.z,w,h);x.strokeStyle='#d6ca9e65';x.setLineDash([4,7]);x.beginPath();x.moveTo(...p);x.lineTo(...q);x.stroke();x.setLineDash([]);}x.save();x.translate(...p);x.rotate(player.yaw);x.fillStyle='#edf5e8';x.beginPath();x.moveTo(0,-8);x.lineTo(-5,6);x.lineTo(5,6);x.closePath();x.fill();x.restore();}
+ const habitat=voyageDestination();if(habitat?.id.startsWith('habitat:')){const p=chartPoint(habitat.x,habitat.z,w,h);x.strokeStyle='#e4cc91';x.fillStyle='#e4cc91';x.beginPath();x.arc(...p,6,0,TAU);x.stroke();x.font='11px sans-serif';x.fillText(habitat.name,p[0]+10,p[1]-9);}
  LANDMARKS.forEach((l,i)=>{const p=chartPoint(l.x,l.z,w,h),known=voyage.state.visited.includes(l.id),sel=voyage.state.waypoint===l.id;x.strokeStyle=sel?'#e4cc91':known?'#a5d9d0':'#6b969e';x.fillStyle=known?'#a5d9d0':'#0d3040';x.beginPath();x.arc(...p,sel?8:5,0,TAU);x.fill();x.stroke();x.fillStyle=sel?'#e4cc91':known?'#d3e9e2':'#8babaf';x.font='11px sans-serif';x.fillText(String(i+1).padStart(2,'0')+' '+l.name,p[0]+12,p[1]+4);});
 };
 function renderVoyagePanel(){
@@ -191,7 +199,7 @@ function readPhotoMetadata(raw){
  const result={};if(typeof raw.knowledgeEligible==='boolean')result.knowledgeEligible=raw.knowledgeEligible;
  if(raw.camera&&typeof raw.camera==='object'){
   const c=raw.camera,finite=(v,a,b,f)=>Number.isFinite(v)?clamp(v,a,b):f;
-  result.camera={mode:c.mode==='lens'?'lens':'normal',zoom:finite(c.zoom,25,90,69),aperture:finite(c.aperture,0,16,0),focus:finite(c.focus,0,80,0),exposure:finite(c.exposure,-1.5,1.5,0)};
+  result.camera={mode:['lens','macro'].includes(c.mode)?c.mode:'normal',zoom:finite(c.zoom,8,90,69),aperture:finite(c.aperture,0,16,0),focus:finite(c.focus,0,80,0),exposure:finite(c.exposure,-1.5,1.5,0)};
  }
  if(raw.metrics&&typeof raw.metrics==='object'){result.metrics={};for(const k of ['framing','scale','steady','light','distance'])if(Number.isFinite(raw.metrics[k]))result.metrics[k]=clamp(raw.metrics[k],0,k==='distance'?110:100);}
  return result;
@@ -244,7 +252,7 @@ function paintVoyageHUD(){
  const s=voyage.state,o=currentOrder(),name=s.mode==='free'?'自由重遊':o?o.title:'把海帶回去';$('objectiveName').textContent=name;$('objectiveCount').textContent=s.mode==='free'?'OPEN WATER':s.completed.length+' / 6';
  $('objectiveDetail').textContent=s.mode==='free'?'沒有任務倒數，去你想去的地方。':o?o.description:'返回研究船，整理這次航程。';
  $('waypointHUD').classList.toggle('hidden',!active||modal!==null||document.body.classList.contains('cinematic'));
- const l=voyageDestination();if(l){const pos=[l.x,l.id==='boat'?0:groundHeight(l.x,l.z)+12,l.z],p=project(pos,renderer.vp);const dist=Math.hypot(player.p[0]-l.x,player.p[2]-l.z);const back=p[2]<0;const px=clamp((back?-p[0]:p[0])*.5+.5,.10,.9),py=clamp((back?p[1]:-p[1])*.5+.5,.22,.72);const el=$('waypointHUD');el.style.left=px*100+'%';el.style.top=py*100+'%';$('waypointName').textContent=l.name;$('waypointDistance').textContent=Math.round(dist)+' m';el.classList.toggle('behind',back);el.classList.toggle('arrived',dist<(l.radius||12));}
+ const l=voyageDestination();if(l){const pos=[l.x,Number.isFinite(l.y)?l.y:l.id==='boat'?0:groundHeight(l.x,l.z)+12,l.z],p=project(pos,renderer.vp);const dist=l.id.startsWith('habitat:')?V.dist(player.p,pos):Math.hypot(player.p[0]-l.x,player.p[2]-l.z);const back=p[2]<0;const px=clamp((back?-p[0]:p[0])*.5+.5,.10,.9),py=clamp((back?p[1]:-p[1])*.5+.5,.22,.72);const el=$('waypointHUD');el.style.left=px*100+'%';el.style.top=py*100+'%';$('waypointName').textContent=l.name;$('waypointDistance').textContent=Math.round(dist)+' m';el.classList.toggle('behind',back);el.classList.toggle('arrived',dist<(l.radius||12));}
  const logger=[95,groundHeight(99,-166)+3,-147];$('interactBtn').classList.toggle('hidden',V.dist(player.p,logger)>8||s.reading);
  $('companionBtn').classList.toggle('hidden',!persistent.seen.includes('dolphin'));$('companionBtn').classList.toggle('active',s.companion);
 }

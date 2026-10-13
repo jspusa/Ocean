@@ -4,10 +4,16 @@
 
 **Blocked by:** 02, 03, 07
 
-**Status:** ready-for-agent
+**Status:** in-progress
 
 - [ ] 上述玩家可操作流程全部存在。
 - [ ] 經實際瀏覽器、狀態保存及必要失敗案例驗證。
 - [ ] 差距與證據已記錄；未以名稱或 fixture 代替完整行為。
 
 範圍依據：[規格](../SPEC.md)、[原作查證](../../WII-PARITY-REFERENCE.md)。
+
+## 0.11 切片範圍與既有驗收邊界
+
+按已核對的一代圖鑑條目新增豆丁海馬、Cinderella Sea Slug、斑點花園鰻、Randall’s Pistol Shrimp、Painted Frogfish、Luna Lionfish、Broadclub Cuttlefish、Chambered Nautilus；每種具獨立識別形態、尺度、棲地與動作。擴充同一圖鑑／熟悉度／JPEG 攝影／水族館，微觀模式需近距離與遮蔽門檻，不能由列表跨海傳送。
+
+沿用 SPEC 已定的玩家介面、公開行為狀態與真實幾何／渲染驗收介面：不同動作、退縮／再出現、未見／被遮擋不能解鎖、舊保存與新 UID、相機成像与原圖保存、手機直橫向操作。純行為測試處理能力分類及重複發現；瀏覽器確認可見性与跨系統結果。此切片不是完整 214 條目完成標記。

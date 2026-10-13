@@ -173,7 +173,7 @@ function whaleGeometry(){const g=new Geometry();g.material=10;g.tag=1;const smoo
  return g;}
 function diverGeometry(){let g=new Geometry(),suit=rgb(0x223e49),trim=rgb(0x68afa9),tank=rgb(0xb0b8ac),skin=rgb(0xb39379);g.sphere([0,0,0],[.32,.22,.66],suit,16,10);g.tube([0,.24,-.45],[0,.24,.4],.16,.16,tank,12);g.tube([0,.26,-.50],[0,.26,-.36],.11,.11,trim,10);g.sphere([0,.05,-.86],[.22,.22,.24],skin,24,16);g.box([0,.07,-1.05],[.39,.17,.08],rgb(0x376b73));for(let side of [-1,1]){g.tube([side*.22,-.03,.37],[side*.20,-.1,1.1],.13,.10,suit,10);g.tube([side*.2,-.1,1.1],[side*.29,-.2,1.64],.10,.08,suit,10);g.quad([side*.12,-.20,1.55],[side*.43,-.20,1.55],[side*.5,-.2,2.22],[side*.04,-.2,2.22],trim);g.tube([side*.23,0,-.37],[side*.56,-.18,-.52],.09,.075,suit,8);g.tube([side*.56,-.18,-.52],[side*.44,-.26,-.86],.075,.05,suit,8);g.sphere([side*.44,-.26,-.9],[.07,.06,.12],skin,9,6);}g.material=0;return g;}
 function addLife(r){let counts=[4,9,8,7,16,62,7,9,3,3,1];
- for(let idx=0;idx<SPECIES.length;idx++){let s=SPECIES[idx],geo=idx<8?fishGeometry(s):idx===8?turtleGeometry():idx===9?rayGeometry():whaleGeometry(),arr=[],anchor=s.zone===0?[-8,-4]:s.zone===1?[10,-16]:[-1,-35];
+ for(let idx=0;idx<counts.length;idx++){let s=SPECIES[idx],geo=idx<8?fishGeometry(s):idx===8?turtleGeometry():idx===9?rayGeometry():whaleGeometry(),arr=[],anchor=s.zone===0?[-8,-4]:s.zone===1?[10,-16]:[-1,-35];
  for(let k=0;k<counts[idx];k++){let center,rad,height;
  if(idx===0){center=[-5.6,-9.1,1.0];rad=rr(.30,.92);height=.42;}
  else{center=[anchor[0]+rr(-4,4),0,anchor[1]+rr(-5,5)];rad=idx===5?rr(3.5,7.3):idx>=8?rr(7,13):rr(2,6.5);height=idx===8?rr(5.8,7):idx===9?rr(7,10):rr(3.1,5.8);}

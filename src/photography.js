@@ -9,7 +9,7 @@ const PhotographyRules=(()=>{
   if(!p||!Number.isSafeInteger(p.date)||p.date<=0)return null;
   const m={date:p.date,area:String(p.area||'海域').slice(0,70),species:String(p.species||'海底風景').slice(0,60),individual:typeof p.individual==='string'?p.individual.slice(0,70):null,grade:Math.round(finite(p.grade,0,100)),bytes:Math.round(finite(p.bytes,0,limits.imageBytes))};
   if(p.pinned===true)m.pinned=true;if(typeof p.knowledgeEligible==='boolean')m.knowledgeEligible=p.knowledgeEligible;
-  if(p.camera){const c=p.camera;m.camera={mode:c.mode==='lens'?'lens':'normal',zoom:finite(c.zoom,25,90,69),aperture:finite(c.aperture,0,16),focus:finite(c.focus,0,80),exposure:finite(c.exposure,-1.5,1.5)};}
+  if(p.camera){const c=p.camera;m.camera={mode:['lens','macro'].includes(c.mode)?c.mode:'normal',zoom:finite(c.zoom,8,90,69),aperture:finite(c.aperture,0,16),focus:finite(c.focus,0,80),exposure:finite(c.exposure,-1.5,1.5)};}
   if(p.metrics){m.metrics={};for(const k of ['framing','scale','steady','light','distance'])if(Number.isFinite(p.metrics[k]))m.metrics[k]=finite(p.metrics[k],0,k==='distance'?110:100);}
   return m;
  }

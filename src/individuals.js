@@ -28,7 +28,9 @@ function initializeIndividuals(r){
   f.effort=.6;f.bank=0;f.bioActive=true;
   // Short reef fish beat more often; large cruising animals keep their own deformation rig.
   if(sp>=0&&sp<8)f.bioMorph[3]*=[1.12,.90,.83,.81,1.08,1.28,.75,.94][sp];
-  const scale=.91+.18*bioValue(id,11);for(let n=0;n<3;n++)f.s[n]=f.bioBaseScale[n]*scale;
+  // These anatomical models use the catalogue's metre scale (including a 2.4 cm
+  // sea horse). Individual identity may change pigment, never the animal's size.
+  const scale=f.fauna?1:.91+.18*bioValue(id,11);for(let n=0;n<3;n++)f.s[n]=f.bioBaseScale[n]*scale;
  }
  for(let k=0;k<shoal.length;k++){
   const f=shoal[k],id=bioHash(k+82491),sc=.165+.078*bioValue(id,0);
@@ -71,9 +73,64 @@ function animalTrajectory(f,t,out){
  out[0]=x;out[1]=Math.min(-1.05,y);out[2]=z;
 }
 const trajectoryTmp=[0,0,0],trajectoryPrev=[0,0,0];
+// Habitat-relative paths are separate from the travelling reef fish. The root is
+// supplied by world generation; benthic animals never sample a remote seabed or
+// inherit a large circular fish route. All lengths are metres, not display units.
+function faunaTrajectory(f,time,out){
+ const home=f.home||f.center,sp=SPECIES[f.species],id=sp?.id,phase=f.phase??f.bob??0,size=f.s?.[0]||sp?.size||.1,yaw=f.homeYaw||0;
+ const radius=Math.max(0,Number.isFinite(f.radius)?f.radius:size*1.5);let x=0,y=0,z=0;
+ if(id==='cinderella_slug'){
+  const r=Math.min(radius,size*.85),a=time*.018+phase;x=Math.sin(a)*r;z=Math.sin(a*.47)*r*.24;
+ }else if(id==='pistol_shrimp'){
+  // Leave the opening briefly, stop to forage, then withdraw along the same ledge.
+  x=(.5+.5*Math.sin(time*.37+phase))*Math.min(radius,size*.65);
+ }else if(id==='frogfish'){
+  const beat=time/11+phase,step=Math.floor(beat)+smooth01(clamp((beat%1)/.17,0,1)),r=Math.min(radius,size*.45);
+  x=Math.sin(step*.61)*r;z=Math.sin(step*.29)*r*.35;
+ }else if(id==='lionfish'){
+  const r=Math.min(radius,size*3),a=time*.10+phase;x=Math.sin(a)*r;z=Math.sin(a*.5)*r*.52;y=Math.sin(a*.73)*size*.14;
+ }else if(id==='cuttlefish'){
+  const r=Math.min(radius,size*.65),a=time*.18+phase;x=Math.sin(a)*r;z=Math.sin(a*.63)*r*.48;y=Math.sin(a*1.31)*size*.16;
+ }else if(id==='nautilus'){
+  // Integrated jet pulse: non-negative speed, with a long glide between pulses.
+  const a=(time+.78*Math.sin(time*.72+phase))*.075+phase,r=Math.min(radius,size*2.4);
+  x=Math.sin(a)*r;z=Math.sin(a*.61)*r*.58;y=Math.sin(a*.84)*size*.20;
+ }
+ const c=Math.cos(yaw),s=Math.sin(yaw);out[0]=home[0]+c*x+s*z;out[1]=home[1]+y;out[2]=home[2]-s*x+c*z;return out;
+}
+const faunaAhead=[0,0,0],faunaBehind=[0,0,0];
+// Public seam used by the world, aquarium and tests. It updates only pose/state;
+// home, uid and s are immutable. react:false is a deterministic exhibit playback.
+function faunaMotionPose(f,time,out=f.p,context=null){
+ const id=SPECIES[f.species]?.id,phase=f.phase??f.bob??0,home=f.home||f.center;
+ faunaTrajectory(f,time,out);faunaTrajectory(f,time+.055,faunaAhead);faunaTrajectory(f,time-.055,faunaBehind);
+ const dx=faunaAhead[0]-faunaBehind[0],dy=faunaAhead[1]-faunaBehind[1],dz=faunaAhead[2]-faunaBehind[2],speed=Math.hypot(dx,dy,dz)/.11;
+ const anchored=id==='pygmy_seahorse'||id==='garden_eel'||id==='pistol_shrimp';
+ f.yaw=anchored||speed<.00001?(f.homeYaw||0):Math.atan2(-dz,dx);
+ if(id==='frogfish'){
+  const beat=time/11+phase,step=Math.floor(beat)+smooth01(clamp((beat%1)/.17,0,1));
+  // Keep facing the last step during a pause, without relying on frame history.
+  f.yaw=(f.homeYaw||0)+Math.atan2(-Math.cos(step*.29)*.29*.35,Math.cos(step*.61)*.61);
+ }
+ f.pitch=anchored||id==='cinderella_slug'||id==='frogfish'?0:clamp(Math.atan2(dy,Math.hypot(dx,dz)),-.12,.12);
+ f.bank=0;f.effort=clamp(speed/Math.max(.001,f.s?.[0]||.1),.08,.65);
+ const react=context?context.react!==false:typeof active!=='undefined'&&active;
+ const observer=context?.observerPosition||(react&&typeof player!=='undefined'?player.p:null),velocity=context?.observerVelocity||(react&&typeof player!=='undefined'?player.velocity:null);
+ const delta=Number.isFinite(f.faunaTime)?clamp(time-f.faunaTime,0,.25):0;
+ if(!react||time<(f.faunaTime??time)){f.retreat=0;f.faunaAlarmUntil=0;}
+ if(react&&(id==='garden_eel'||id==='pistol_shrimp')){
+  const distance=observer?Math.hypot(observer[0]-home[0],observer[1]-home[1],observer[2]-home[2]):Infinity;
+  if(velocity&&Math.hypot(...velocity)>.55&&distance<(id==='garden_eel'?1.25:.65))f.faunaAlarmUntil=time+3.2;
+  const alarm=time<(f.faunaAlarmUntil||0),target=alarm?1:0;
+  f.retreat=(f.retreat||0)+(target-(f.retreat||0))*(1-Math.exp(-delta*(alarm?15:.78)));
+ }else f.retreat=0;
+ const natural=id==='pistol_shrimp'?smooth01((Math.sin(time*.37+phase)-.35)/.55):0;
+ f.faunaVisibility=clamp(1-Math.max(f.retreat,natural),0,1);f.faunaVisible=f.faunaVisibility>.12;f.faunaTime=time;return out;
+}
 function updateLife(t){
  updateReefSchool(t);
  for(const f of allLife){
+  if(f.fauna){faunaMotionPose(f,t,f.p);continue;}
   animalTrajectory(f,t,f.p);animalTrajectory(f,t+.055,trajectoryTmp);animalTrajectory(f,t-.055,trajectoryPrev);
   const dx=trajectoryTmp[0]-f.p[0],dy=trajectoryTmp[1]-f.p[1],dz=trajectoryTmp[2]-f.p[2];
   f.yaw=Math.atan2(-dz,dx);f.pitch=clamp(Math.atan2(dy,Math.hypot(dx,dz)),-.29,.29);

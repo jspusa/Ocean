@@ -1,7 +1,7 @@
 /* OPEN WATER 0.8 — original continuous-world art and landmarks.
    Game metres, NOT surveyed coordinates or a real dive plan.
    The old sculpted core is retained; new vistas are authored as linked destinations. */
-const OPEN_WORLD={bounds:{x:270,z:295,centerZ:-90},boat:[-24,0,43],version:'0.10.0'};
+const OPEN_WORLD={bounds:{x:270,z:295,centerZ:-90},boat:[-24,0,43],version:'0.11.0'};
 const coreGroundHeight=groundHeight;
 groundHeight=function(x,z){
  const core=coreGroundHeight(x,z);
@@ -132,8 +132,8 @@ buildReef=function(r){
 };
 const spawnCoreLife=addLife;
 addLife=function(r){
- // Legacy generator enumerates all species; supply the existing 11 only, then append dolphins.
- const ds=SPECIES.pop();spawnCoreLife(r);SPECIES.push(ds);
+ // Core generator owns its eleven original entries; later species are appended separately.
+ spawnCoreLife(r);
  const rays=life.filter(f=>f.species===9);rays.forEach((f,i)=>{f.center=[101+i*2,0,-87-i*8];f.fixedDepth=-16-i*2;f.radius=15+i*3;f.speed=.022+i*.003;});
  const whale=life.find(f=>f.species===10);whale.center=[-10,0,-231];whale.fixedDepth=-34;whale.radius=26;whale.speed=.010;whale.s=[1.85,1.85,1.85];
  const dolphin=[];for(let i=0;i<3;i++){const f={p:[110,-7,-73],s:[.95+i*.08,.95+i*.08,.95+i*.08],yaw:0,pitch:0,phase:i*2.1,species:11,orbit:i*2.1,radius:19,center:[108,0,-83],fixedDepth:-8-i*1.5,height:10,speed:.065,bob:i*2.7,tint:[1,1,1]};life.push(f);dolphin.push(f);}

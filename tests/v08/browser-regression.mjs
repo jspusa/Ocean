@@ -13,7 +13,7 @@ await mkdir('qa/v08',{recursive:true});
 try{
  await page.goto(url);await page.waitForFunction(()=>window.__ocean?.ready||!document.getElementById('errorBox').classList.contains('hidden'),{timeout:90000});
  await eq('Compiled scene and shaders boot',()=>window.__ocean?.ready&&renderer.sceneLoad.compiled&&renderer.gl.getError()===0);
- await eq('Stable creature IDs and existing content',()=>SPECIES.length===12&&LANDMARKS.length===9&&new Set([...life,...decorLife,...shoal].map(f=>f.uid)).size===life.length+decorLife.length+shoal.length);
+ await eq('Stable creature IDs and existing content',()=>SPECIES.length===20&&LANDMARKS.length===9&&new Set([...life,...decorLife,...shoal].map(f=>f.uid)).size===life.length+decorLife.length+shoal.length);
  await eq('New save uses immersive view and adaptive quality',()=>!settings.third&&settings.adaptive);
  await page.evaluate(()=>{window.__freeze=true;$('welcomeAudio').checked=false;});
  await page.locator('#shipSettings').click();await page.waitForFunction(()=>document.activeElement?.id==='closePanel');
@@ -37,7 +37,7 @@ try{
  const firstId=await page.evaluate(()=>follow.uid);await page.locator('#nextIndividual').click();check('Next individual changes subject',await page.evaluate(()=>follow.uid)!==firstId);
  await page.evaluate(()=>{stopAuto();voyage.state.mode='journey';player.p=LANDMARKS[0].spawn.slice();findSpecies(10)});
  await eq('Story mode preserves exploration gate',()=>!follow&&voyage.state.waypoint==='pelagic');
- await page.keyboard.press('j');check('All twelve guide cards remain',await page.locator('.species-card').count()===12);await page.locator('#closePanel').click();
+ await page.keyboard.press('j');check('All twenty guide cards include legacy and new fauna',await page.locator('.species-card').count()===20);await page.locator('#closePanel').click();
  for(const quality of [0,1,2])for(const light of ['day','late','blue']){
   await page.evaluate(({quality,light})=>{renderer.quality=quality;renderer.dynamicScale=1;renderer.resize();settings.lighting=light;settings.third=false;__renderView([0,-8,7],[0,-9,-1],18)}, {quality,light});
   await eq(`Shader render quality ${quality} / ${light}`,()=>renderer.gl.getError()===0);

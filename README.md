@@ -1,12 +1,20 @@
-# 重返蔚藍 · 相遇之海 — LIVING OCEAN 0.10
+# 重返蔚藍 · 相遇之海 — LIVING OCEAN 0.11
 
 一個可以直接在電腦與手機瀏覽器遊玩的原創海洋探索遊戲。
 
 **[開始潛水](https://jspusa.github.io/Ocean/)**
 
-從研究船下水，在珊瑚花園與遠洋之間游動，觀察十二類生物、拍照、相遇和收藏。本版延續 0.8 的水下光影、原創模型與自動畫質，加入生物互動、探索工具、研究委託及水族館，並補上沖印、甲板生活與移船。Wii 第一代《Endless Ocean》的完整功能對等仍在進行，缺口列於 [功能追蹤](FEATURE_PARITY.md)。
+從研究船下水，在珊瑚花園與遠洋之間游動，觀察二十類生物、拍照、相遇和收藏。本版延續 0.8 的水下光影、原創模型與自動畫質，加入生物互動、探索工具、研究委託及水族館，並補上沖印、甲板生活與移船。Wii 第一代《Endless Ocean》的完整功能對等仍在進行，缺口列於 [功能追蹤](FEATURE_PARITY.md)。
 
-## 0.10 可玩的新內容
+## 0.11 微小生命
+
+- 新增豆丁海馬、灰姑娘海蛞蝓、花園鰻、蘭氏槍蝦、彩繪躄魚、月斑蓑鮋、寬腕烏賊與鸚鵡螺，八種各自建立原創幾何；共新增 31 個固定身分的個體，圖鑑目前為 20 類。
+- 生物保持公尺尺度，例如豆丁海馬高 24 mm、槍蝦體長 28 mm。海馬附著、海蛞蝓爬行、花園鰻縮洞、槍蝦覓食躲藏、躄魚緩行、鰭裙波動與噴水滑行各有動作，沒有將牠們放大成大型魚。
+- 下水後從「工具 → 微觀探索」沿聲音或畫面方向提示尋找微小生命。靠近可見的生物，再點標記進入局部鏡頭，環視、放大、安靜觀察及拍照；游泳位置不變，不能從遠處直接解鎖。
+- 微觀照片沿用底片、回船沖印、相簿與完整備份。觀察筆記和個體身分會保存；藏起來或被礁石擋住的生物不會獲得觀察／照片進度，反覆開關鏡頭也不能累加同一次發現。
+- 水族館使用相同尺寸、模型與動作，新增細小生物的近看與手機雙指縮放。動作與棲地是原創遊戲近似；尺寸與形態依據見 [生物參考](docs/parity/FAUNA-REFERENCE.md)。
+
+## 0.10 延續的船上與攝影生活
 
 - 水下拍攝保存到 20 格底片；回船在沖印桌選片，收入最多 120 張的相簿，才可用於攝影投稿。支援放大、下載 JPEG 原圖、刪除與投稿附件保護，不自動覆蓋照片。
 - 原圖改存本機 IndexedDB，底片與相簿共用 96 MiB 上限。完整備份包含影像本體；舊版相簿自動搬移。空間不足、跨分頁衝突與遺失原圖會顯示可操作的恢復方式。
@@ -25,7 +33,7 @@
 - 航程模式每瓶氣量可使用 20 分鐘；耗盡自動回船並保留成果，暫停時不消耗。自由重遊不消耗氣量。研究桌可休息到晨、昏、夜並選擇隨時間改變光照。
 - 水族館依觀察進度解鎖，熟悉的生物可手動或自動配置、移除、清空，進入實際三維展缸觀賞。
 
-氣量、熟悉度門檻、委託與水族館容量是本作設計值，不聲稱等於原作數值。尚缺完整潛區／故事／生物內容、完整角色及船上事件、虎鯨夥伴、微觀探索及雙人連線；這些需求仍保留。來源與驗收範圍見 [官方資料盤點](docs/WII-PARITY-REFERENCE.md) 和 [完整規格](docs/parity/SPEC.md)。
+氣量、熟悉度門檻、委託與水族館容量是本作設計值，不聲稱等於原作數值。尚缺完整潛區／故事／生物內容、完整角色及船上事件、虎鯨夥伴、完整微觀生態內容及雙人連線；這些需求仍保留。來源與驗收範圍見 [官方資料盤點](docs/WII-PARITY-REFERENCE.md) 和 [完整規格](docs/parity/SPEC.md)。
 
 ## 畫面與操作
 
@@ -35,7 +43,7 @@
 
 手機使用左搖桿移動、右搖桿環視，↑／↓ 調整深度；支援多點觸控、直向與橫向。點「工具」可使用新系統。標準手把保留雙搖桿及扳機輸入；新增工具的完整手把操作尚未實作，實體手機和手把全面驗證仍待完成。
 
-故事模式須親自游向地標，海圖只標記航向。自由重遊可從圖鑑選擇近距離觀察。桌機與手機預設自動畫質，可依負載降低或恢復解析度。
+故事模式須親自游向地標，海圖只標記航向。自由重遊可從圖鑑選擇大型生物近距離觀察；微觀物種仍須親自接近棲地。桌機與手機預設自動畫質，可依負載降低或恢復解析度。
 
 ## 保存
 
@@ -52,7 +60,7 @@ python3 build.py --pack-only
 python3 -m http.server 8000
 ```
 
-幾何改動需執行完整 `python3 build.py`。本版擴寬研究船的實際甲板與欄杆，重新烘焙 0.10 場景；場景定位標記讓移船能更新同一艘實體研究船。編譯也產生可離線開啟的 `standalone.html`；它不列入 Git，網站沒有 Service Worker。
+幾何改動需執行完整 `python3 build.py`。本版重新烘焙 0.11 場景，包含新增模型、實際尺度、固定個體與棲地支撐；船的定位標記繼續支援移船。編譯也產生可離線開啟的 `standalone.html`；它不列入 Git，網站沒有 Service Worker。
 
 驗證：
 
@@ -60,6 +68,13 @@ python3 -m http.server 8000
 python3 tests/parity/static_check.py
 node tests/v08/reef_invariants.cjs
 node tests/parity/expedition.cjs
+node tests/parity/fauna.cjs
+node tests/parity/fauna-motion.cjs
+node tests/parity/fauna-world.cjs
+node tests/parity/microcosm.cjs
+node tests/parity/microcosm-browser.mjs
+node tests/parity/fauna-visual.cjs
+node tests/parity/fauna-visual.cjs --touch
 node tests/parity/ecology.cjs
 node tests/parity/exploration.cjs
 node tests/parity/aquarium.cjs
@@ -78,6 +93,7 @@ node tests/parity/browser.mjs http://127.0.0.1:8000/
 node tests/parity/browser.mjs http://127.0.0.1:8000/ --mobile
 node tests/v08/browser-regression.mjs http://127.0.0.1:8000/
 node tests/v08/browser-regression.mjs http://127.0.0.1:8000/ --mobile
+node tests/parity/performance.mjs
 node tests/parity/delivery.mjs
 ```
 

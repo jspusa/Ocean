@@ -10,7 +10,7 @@ const oceanEcology=(()=>{
  const num=(n,max=1e6)=>Number.isFinite(n)?Math.max(0,Math.min(max,n)):0;
  const species=id=>SPECIES.find(s=>s.id===id);
  const dolphinUID=uid=>typeof uid==='string'&&/^dolphin-\d{3}$/.test(uid)&&knownUID(uid);
- const knownUID=uid=>typeof uid==='string'&&/^[a-z]+-\d{3}$/.test(uid)&&life.some(f=>f.uid===uid&&SPECIES[f.species]?.id===uid.replace(/-\d{3}$/,''));
+ const knownUID=uid=>typeof uid==='string'&&/^[a-z][a-z_]*-\d{3}$/.test(uid)&&life.some(f=>f.uid===uid&&SPECIES[f.species]?.id===uid.replace(/-\d{3}$/,''));
  const cleanName=name=>String(name||'').replace(/[\u0000-\u001f<>]/g,'').trim().slice(0,18)||'海之友';
  function sanitize(raw){
   const out=initial();if(!raw||typeof raw!=='object')return out;
@@ -33,17 +33,17 @@ const oceanEcology=(()=>{
  const playAllowed=()=>active&&!modal&&!photoOpen&&!voyage.photoMode&&!document.body.classList.contains?.('cinematic');
  function inRange(f,contact=false){
   if(!f||!f.uid||f.species<0||!SPECIES[f.species])return false;
-  const limit=contact?(f.species===10?12:f.species===11?5.2:f.species>=8?4:2.8):(f.species===10?80:20);
-  if(V.dist(player.p,f.p)>limit||V.dist(eye,f.p)>limit+V.dist(eye,player.p)+2||blocked(eye,f.p)||blocked(player.p,f.p))return false;
-  const p=project(f.p,renderer.vp);return p.every(Number.isFinite)&&p[2]>0&&Math.abs(p[0])<.96&&Math.abs(p[1])<.92;
+  const point=animalFocusPoint(f);const traits=speciesTraits(f.species),limit=contact?traits.contactDistance:traits.observeDistance;if(f.retreat>.8||f.faunaVisibility<.8)return false;
+  if(V.dist(player.p,point)>limit||V.dist(eye,point)>limit+V.dist(eye,player.p)+2||blocked(eye,point,SPECIES[f.species].fauna?.001:.13)||blocked(player.p,point,SPECIES[f.species].fauna?.001:.13))return false;
+  const p=project(point,renderer.vp);return p.every(Number.isFinite)&&p[2]>0&&Math.abs(p[0])<.96&&Math.abs(p[1])<.92;
  }
  function chooseTarget(){
   if(!playAllowed())return null;let target=null,best=Infinity;
-  for(const f of life){if(!inRange(f,true))continue;const p=project(f.p,renderer.vp),score=Math.hypot(p[0],p[1])+.01*V.dist(player.p,f.p);if(score<best){target=f;best=score;}}
+  for(const f of life){if(!inRange(f,true))continue;const p=project(animalFocusPoint(f),renderer.vp),score=Math.hypot(p[0],p[1])+.01*V.dist(player.p,f.p);if(score<best){target=f;best=score;}}
   return target;
  }
- function targetDisc(f){const c=renderer.canvas.getBoundingClientRect(),p=project(f.p,renderer.vp),distance=V.dist(eye,f.p),size=f.species===10?4:f.species===11?1.0:f.species>=8?.85:.35;
-  return {x:c.left+(p[0]*.5+.5)*c.width,y:c.top+(.5-p[1]*.5)*c.height,r:clamp(c.height*size/(Math.max(1,distance)*Math.tan((renderer.photoFov||renderer.fov||69)*Math.PI/360)),34,140)};
+ function targetDisc(f){const c=renderer.canvas.getBoundingClientRect(),p=project(animalFocusPoint(f),renderer.vp),distance=V.dist(eye,animalFocusPoint(f)),size=speciesTraits(f.species).targetRadius;
+  return {x:c.left+(p[0]*.5+.5)*c.width,y:c.top+(.5-p[1]*.5)*c.height,r:clamp(c.height*size/(Math.max(.006,distance)*Math.tan((renderer.photoFov||renderer.fov||69)*Math.PI/360)),34,140)};
  }
  function hit(f,x,y){if(!inRange(f,true))return false;const d=targetDisc(f);return Math.hypot(x-d.x,y-d.y)<=d.r;}
  function setTool(tool){runtime.tool=runtime.tool===tool?null:tool;runtime.gesture=null;if(runtime.tool){releaseMouseLook();if(typeof oceanExploration!=='undefined')oceanExploration.setPen(null);}paintHUD();return runtime.tool;}
@@ -70,20 +70,28 @@ const oceanEcology=(()=>{
   runtime.lastTap.set(f.uid,-100);const r=individual(f);r.trust=Math.min(100,r.trust+1);runtime.lastContact.set(f.uid,{kind:'tap',time:runtime.now});addKnowledge(f,.5);save();say(SPECIES[f.species].name+'回應了你的輕觸。');return true;
  }
  function feedAt(f,x,y){
-  if(!playAllowed()||!f||f.species>=8||!hit(f,x,y)||runtime.now-runtime.lastFeed<7)return false;
+  if(!playAllowed()||!f||!speciesTraits(f.species).feedable||!hit(f,x,y)||runtime.now-runtime.lastFeed<7)return false;
   runtime.lastFeed=runtime.now;const toward=V.norm(V.sub(player.p,f.p)),p=V.add(f.p,V.mul(toward,.42));runtime.food.push({p,born:runtime.now,uid:f.uid});runtime.food=runtime.food.slice(-2);
   const r=individual(f);r.feeds++;r.trust=Math.min(100,r.trust+4);addKnowledge(f,2);save();say('少量食物散開了；附近的小魚正游近。');return true;
  }
  function observeTarget(dt){
-  const f=focusFish&&inRange(focusFish)?focusFish:null;
+  const candidate=typeof oceanMicrocosm!=='undefined'&&oceanMicrocosm.isViewing()?oceanMicrocosm.target():focusFish;
+  const f=candidate&&inRange(candidate)?candidate:null;
   if(!f){if(runtime.encounter)runtime.lastObserved.set(runtime.encounter.uid,runtime.now);runtime.encounter=null;return;}
   if(runtime.encounter?.uid!==f.uid){
    if(runtime.encounter)runtime.lastObserved.set(runtime.encounter.uid,runtime.now);
    const fresh=runtime.now-(runtime.lastObserved.get(f.uid)??-100)>18;
-   runtime.encounter={uid:f.uid,points:0,fresh};if(fresh)field(f).encounters++;
+   runtime.encounter={uid:f.uid,points:0,seconds:0,discovered:false,fresh};if(fresh)field(f).encounters++;
   }
-  const r=field(f);r.seconds+=dt;individual(f).seconds+=dt;
+  const r=field(f);r.seconds+=dt;individual(f).seconds+=dt;runtime.encounter.seconds+=dt;
   if(runtime.encounter.fresh&&runtime.encounter.points<7){const earned=Math.min(dt*.9,7-runtime.encounter.points);runtime.encounter.points+=earned;addKnowledge(f,earned);}
+ }
+ function discover(f){
+  if(!playAllowed()||!f||fishByUID(f.uid)!==f||!inRange(f))return false;
+  const encounter=runtime.encounter;
+  if(!encounter||encounter.uid!==f.uid||!encounter.fresh||encounter.seconds<1.2||encounter.discovered)return false;
+  encounter.discovered=true;const points=Math.max(0,Math.min(4-field(f).points,7-encounter.points));
+  if(points){encounter.points+=points;addKnowledge(f,points);}save();return true;
  }
  function befriend(uid){
   const f=fishByUID(uid);if(!playAllowed()||!f||f.species!==11||!inRange(f,true))return false;const r=individual(f);
@@ -95,7 +103,7 @@ const oceanEcology=(()=>{
  function setName(uid,name){const p=state().partners.find(p=>p.uid===uid);if(!p)return false;p.name=cleanName(name);save();return true;}
  function releaseGrab(){runtime.riding=false;runtime.grabbedUID=null;}
  function grabAnimal(uid){
-  const f=fishByUID(uid);if(!playAllowed()||!f||f.species<8||!inRange(f,true))return false;
+  const f=fishByUID(uid);if(!playAllowed()||!f||!speciesTraits(f.species).grabbable||!inRange(f,true))return false;
   const isPartner=partner()?.uid===uid&&state().accompany;
   if(isPartner&&individual(f).trust<24){say('同行夥伴需要 24% 信任，才願意帶你游泳。');return false;}
   stopAuto();runtime.grabbedUID=uid;runtime.riding=!!isPartner;runtime.tool=null;runtime.gesture=null;
@@ -104,7 +112,7 @@ const oceanEcology=(()=>{
  }
  function toggleRide(){
   if(runtime.grabbedUID||runtime.riding){releaseGrab();say('已鬆手，繼續自由探索。');return true;}
-  const f=chooseTarget();if(f&&f.species>=8)return grabAnimal(f.uid);
+  const f=chooseTarget();if(f&&speciesTraits(f.species).grabbable)return grabAnimal(f.uid);
   const p=partner();if(p&&grabAnimal(p.uid))return true;
   say('靠近畫面中的大型生物，再抓握同行。');return false;
  }
@@ -193,7 +201,7 @@ const oceanEcology=(()=>{
  function afterLife(time){
   const dt=clamp(time-(runtime.lastTime??time-1/60),0,.1);runtime.lastTime=time;runtime.now=time;
   runtime.food=runtime.food.filter(c=>time-c.born<8);
-  for(const f of life){if(f.species>=8)continue;let cloud=null,distance=7;
+  for(const f of life){if(!speciesTraits(f.species).feedable)continue;let cloud=null,distance=7;
    for(const c of runtime.food){const d=V.dist(f.p,c.p);if(d<distance&&!blocked(f.p,c.p)){distance=d;cloud=c;}}
    let current=runtime.reactions.get(f.uid);
    if(cloud){current=current||f.p.slice();const phase=(f.bioSeed||1)%97+time*.7,target=V.add(cloud.p,[Math.sin(phase)*.48,-.08+Math.cos(phase*1.3)*.20,Math.cos(phase)*.48]);const next=moveToward(current,target,1.05,dt);runtime.reactions.set(f.uid,next);const d=V.sub(next,current);f.p=next.slice();if(V.len(d)>.0001)f.yaw=Math.atan2(-d[2],d[0]);f.effort=.82;
@@ -208,11 +216,11 @@ const oceanEcology=(()=>{
   const hud=node('ecologyHUD');if(!hud)return;const f=chooseTarget();runtime.target=f?.uid||null;document.body.classList.toggle('ecology-tool',!!runtime.tool&&playAllowed());
   hud.classList.toggle('hidden',!playAllowed()||!(f||runtime.tool||runtime.grabbedUID||(state().accompany&&partner())));
   const name=node('ecologyTarget');name.textContent=f?SPECIES[f.species].name+' · 信任 '+Math.round(individual(f).trust)+'%':'靠近一位生物，再選輕撫或餵食';
-  node('ecologyPet').classList.toggle('active',runtime.tool==='pet');node('ecologyFeed').classList.toggle('active',runtime.tool==='feed');node('ecologyRide').textContent=runtime.grabbedUID?'鬆手':'抓握同行';node('ecologyRide').classList.toggle('hidden',!runtime.grabbedUID&&!(f&&f.species>=8)&&!partner());
+  node('ecologyPet').classList.toggle('active',runtime.tool==='pet');node('ecologyFeed').classList.toggle('active',runtime.tool==='feed');node('ecologyRide').textContent=runtime.grabbedUID?'鬆手':'抓握同行';node('ecologyRide').classList.toggle('hidden',!runtime.grabbedUID&&!(f&&speciesTraits(f.species).grabbable)&&!partner());
   node('ecologyBefriend').classList.toggle('hidden',!f||f.species!==11||state().partners.some(p=>p.uid===f.uid));
   node('ecologyWhistle').classList.toggle('hidden',!partner());
   const disc=node('ecologyTouch');disc.classList.toggle('hidden',!f||!runtime.tool||!playAllowed());
-  if(f&&runtime.tool){const p=targetDisc(f);disc.style.left=p.x+'px';disc.style.top=p.y+'px';disc.style.width=disc.style.height=p.r*2+'px';disc.textContent=runtime.tool==='pet'?'來回輕撫 · 連點觸碰':f.species<8?'點一下餵食':'這位訪客不接受食物';}
+  if(f&&runtime.tool){const p=targetDisc(f);disc.style.left=p.x+'px';disc.style.top=p.y+'px';disc.style.width=disc.style.height=p.r*2+'px';disc.textContent=runtime.tool==='pet'?'來回輕撫 · 連點觸碰':speciesTraits(f.species).feedable?'點一下餵食':'這位訪客不接受食物';}
  }
  function paintTraining(){
   const tr=runtime.training,show=!!tr&&modal==='training'&&!active;
@@ -284,9 +292,10 @@ const oceanEcology=(()=>{
   shouldAnimate(){return !!runtime.training&&!active&&modal==='training';},
   escape(){if(runtime.grabbedUID){releaseGrab();return true;}if(runtime.tool){runtime.tool=null;runtime.gesture=null;paintHUD();return true;}return false;},
   pointerCaptured(){return !!runtime.gesture||!!runtime.training?.gesture;},
+  onDiscovery(f){return discover(f);},
   photoMetadata(photo){const f=fishByUID(photo.individual);photo.knowledgeEligible=!!f&&inRange(f);},
   onPhoto(photo){const f=fishByUID(photo.individual);if(f&&(typeof photo.knowledgeEligible==='boolean'?photo.knowledgeEligible:inRange(f))){field(f).photos++;addKnowledge(f,1.5);save();}}
  };
  oceanFeatures.register(hooks);
- return {initial,sanitize,state,knowledge,inRange,setTool,beginGesture,moveGesture,endGesture,feedAt,befriend,selectPartner,setName,toggleRide,grabAnimal,whistle,beginTraining,commandTrick,queueGesture,trainingPartPoint,beginTrainingGesture,moveTrainingGesture,endTrainingGesture,startPerformance,praiseTrick,afterLife,hooks,snapshot:()=>({tool:runtime.tool,food:runtime.food.length,target:runtime.target,riding:runtime.riding,grabbedUID:runtime.grabbedUID,training:runtime.training,partnerPosition:runtime.partnerPos?.slice(),now:runtime.now})};
+ return {initial,sanitize,state,knowledge,inRange,discover,setTool,beginGesture,moveGesture,endGesture,feedAt,befriend,selectPartner,setName,toggleRide,grabAnimal,whistle,beginTraining,commandTrick,queueGesture,trainingPartPoint,beginTrainingGesture,moveTrainingGesture,endTrainingGesture,startPerformance,praiseTrick,afterLife,hooks,snapshot:()=>({tool:runtime.tool,food:runtime.food.length,target:runtime.target,riding:runtime.riding,grabbedUID:runtime.grabbedUID,training:runtime.training,partnerPosition:runtime.partnerPos?.slice(),now:runtime.now})};
 })();
