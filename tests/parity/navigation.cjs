@@ -1,0 +1,13 @@
+'use strict';
+const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/strict');
+const src=fs.readFileSync('src/navigation.js','utf8').split('const oceanNavigation=')[0];const c=vm.createContext({});vm.runInContext(src+';globalThis.rules=NavigationRules;',c);const r=c.rules;let count=0;
+const check=(name,fn)=>{fn();count++;console.log('PASS '+name)};
+const fresh=()=>({mode:'journey',completed:[],visited:[]});
+check('new journey begins at the home anchorage only',()=>{const v=fresh();assert.equal(r.moorings.filter(m=>r.unlocked(m,v)).length,1);assert.equal(r.sanitize(null).mooring,'home')});
+check('first memory opens west mooring and west discovery opens east',()=>{let v=fresh();v.completed=['arrival'];assert(r.unlocked(r.moorings[1],v));assert(!r.unlocked(r.moorings[2],v));v.completed.push('passage');assert(r.unlocked(r.moorings[2],v))});
+check('direct personal discovery also opens a mooring',()=>{for(const m of r.moorings.slice(1)){const v=fresh();v.visited=[m.visited];assert(r.unlocked(m,v))}});
+check('free exploration has all moorings',()=>{const v={...fresh(),mode:'free'};assert(r.moorings.every(m=>r.unlocked(m,v)))});
+check('invalid saved mooring and non-finite move count repair safely',()=>{assert.equal(r.sanitize({mooring:'not-a-place',moves:Infinity}).mooring,'home');assert.equal(r.sanitize({moves:Infinity}).moves,0);assert.equal(r.sanitize({moves:-5}).moves,0)});
+check('boundary is horizontal and keeps depth without mutating input',()=>{const a=[400,-52,10],p=r.constrain(a,[20,0,10]);assert.equal(p[0],200);assert.equal(p[1],-52);assert.equal(a[0],400)});
+check('range moves with the boat and preserves valid positions',()=>{for(const m of r.moorings){const p=[m.p[0]+20,-8,m.p[2]-20];assert.equal(JSON.stringify(r.constrain(p,m.p)),JSON.stringify(p));const far=r.constrain([m.p[0]+300,-8,m.p[2]+400],m.p);assert(Math.abs(Math.hypot(far[0]-m.p[0],far[2]-m.p[2])-r.range)<1e-8)}});
+console.log(count+' navigation checks passed');

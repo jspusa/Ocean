@@ -11,7 +11,7 @@ async function loadCompiledScene(renderer){
   if(bytes.byteLength<8||bytes.byteLength>80*1024*1024||view.getUint32(0,true)!==0x35424652)throw new Error('invalid scene header');
   const length=view.getUint32(4,true);base=8+length;if(base>bytes.byteLength||base%4)throw new Error('invalid scene offsets');
   header=JSON.parse(new TextDecoder().decode(new Uint8Array(bytes,8,length)));
-  if(header.sourceVersion!=='0.8.0'||header.format!=='return-blue/indexed-scene/1'||header.batches.length>600||header.nodes.length>20000)throw new Error('unsupported scene');
+  if(header.sourceVersion!==OPEN_WORLD.version||header.format!=='return-blue/indexed-scene/1'||header.batches.length>600||header.nodes.length>20000)throw new Error('unsupported scene');
   for(const b of header.batches){
    if(b.vertexOffset%4||b.indexOffset%4||b.vertexFloats%12||b.indexCount%3||base+b.vertexOffset+b.vertexFloats*4>bytes.byteLength||base+b.indexOffset+b.indexCount*4>bytes.byteLength||!Number.isFinite(b.radius))throw new Error('invalid mesh range');
    if(b.instanceIDs.some(i=>!Number.isInteger(i)||i<0||i>=header.nodes.length))throw new Error('invalid instance reference');
@@ -21,7 +21,7 @@ async function loadCompiledScene(renderer){
  for(let i=0;i<header.batches.length;i++){
   const b=header.batches[i];const mesh={vertices:new Float32Array(bytes,base+b.vertexOffset,b.vertexFloats),indices:new Uint32Array(bytes,base+b.indexOffset,b.indexCount),radius:b.radius};
   const batch=renderer.batch({indexed:mesh,material:b.material,species:b.species,shadow:b.shadow},b.instanceIDs.map(n=>header.nodes[n]),b.kind,b.dynamic);
-  for(const k of ['minDistance','maxDistance','shadowProxy','visible'])if(b[k]!==undefined)batch[k]=b[k];
+  for(const k of ['minDistance','maxDistance','shadowProxy','visible','sceneRole'])if(b[k]!==undefined)batch[k]=b[k];
   if(i%12===0){$('loadDetail').textContent='展開礁體 · '+Math.round(i/header.batches.length*100)+'%';await pause();}
  }
  obstacles.push(...header.obstacles);reefPatches.push(...header.reefPatches);life.push(...header.life.map(n=>header.nodes[n]));decorLife.push(...header.decorLife.map(n=>header.nodes[n]));shoal.push(...header.shoal.map(n=>header.nodes[n]));allLife=life.concat(decorLife);diverBatch=renderer.batches[header.diverBatch];

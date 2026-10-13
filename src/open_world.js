@@ -1,7 +1,7 @@
 /* OPEN WATER 0.8 — original continuous-world art and landmarks.
    Game metres, NOT surveyed coordinates or a real dive plan.
    The old sculpted core is retained; new vistas are authored as linked destinations. */
-const OPEN_WORLD={bounds:{x:270,z:295,centerZ:-90},boat:[-24,0,43],version:'0.8.0'};
+const OPEN_WORLD={bounds:{x:270,z:295,centerZ:-90},boat:[-24,0,43],version:'0.10.0'};
 const coreGroundHeight=groundHeight;
 groundHeight=function(x,z){
  const core=coreGroundHeight(x,z);
@@ -40,15 +40,17 @@ addGroundTiles=function(r){
 // Cross-section hull. These meshes are authored here, not copied game assets.
 function researchVessel(){
  const g=new Geometry();g.material=12;const white=[.88,.88,.82],navy=[.06,.16,.23],metal=[.53,.59,.58],teak=[.53,.35,.20];
- surface(g,(u,v)=>{const z=(u-.5)*15.8,angle=Math.PI*v,w=2.32*Math.pow(Math.sin(Math.PI*u),.32),y=.62-Math.sin(angle)*1.82;return [Math.cos(angle)*w,y,z];},54,16,(p,u,v)=>p[1]>.17?white:navy,1);
- g.box([0,.59,-.2],[3.65,.18,11.7],teak);
+ surface(g,(u,v)=>{const z=(u-.5)*15.8,angle=Math.PI*v,w=3.20*Math.pow(Math.sin(Math.PI*u),.32),y=.62-Math.sin(angle)*1.82;return [Math.cos(angle)*w,y,z];},54,16,(p,u,v)=>p[1]>.17?white:navy,1);
+ // A connected deck and side passages, matching oceanShip's boat-local bounds.
+ const deckWidth=z=>2.95*Math.pow(Math.sin(Math.PI*(z/15.8+.5)),.32);
+ for(let i=0;i<44;i++){const z=-6.55+i*12.7/44,z1=z+12.7/44,w=deckWidth(z),w1=deckWidth(z1);g.quad([-w,.68,z],[-w1,.68,z1],[w1,.68,z1],[w,.68,z],teak);g.quad([-w,.50,z],[w,.50,z],[w1,.50,z1],[-w1,.50,z1],teak);for(const s of [-1,1])g.quad([s*w,.50,z],[s*w,.68,z],[s*w1,.68,z1],[s*w1,.50,z1],white);}
  g.box([0,1.42,-.8],[3.5,1.6,5.1],white);g.box([0,2.35,-.75],[4.05,.18,5.7],white);
  // Windows separated by actual mullions; cabin interior is intentionally opaque.
  for(let s of [-1,1])for(let z of [-2.35,-.85,.65])g.box([s*1.757,1.78,z],[.03,.65,1.26],[.055,.19,.23]);
  g.box([0,1.78,-3.362],[2.92,.70,.035],[.055,.19,.23]);g.box([0,1.30,1.764],[.81,1.5,.04],navy);
  for(let s of [-1,1]){
-  for(let i=0;i<10;i++){const z=-6.1+i*1.35,w=1.87*Math.pow(Math.sin(Math.PI*(z/15.8+.5)),.32);g.tube([s*w,.67,z],[s*w,1.41,z],.027,.027,metal,6);if(i<9){const z1=z+1.35,w1=1.87*Math.pow(Math.sin(Math.PI*(z1/15.8+.5)),.32);g.tube([s*w,1.41,z],[s*w1,1.41,z1],.03,.03,metal,6);}}
-  for(let z of [-3.1,2.8,4.5]){g.sphere([s*2.10,.2,z],[.20,.62,.22],[.05,.075,.082],12,9);g.tube([s*2.08,.9,z],[s*2.1,.40,z],.014,.014,[.63,.58,.44],5);}
+  for(let i=0;i<10;i++){const z=-6.1+i*1.35,w=2.85*Math.pow(Math.sin(Math.PI*(z/15.8+.5)),.32);g.tube([s*w,.67,z],[s*w,1.41,z],.027,.027,metal,6);if(i<9){const z1=z+1.35,w1=2.85*Math.pow(Math.sin(Math.PI*(z1/15.8+.5)),.32);g.tube([s*w,1.41,z],[s*w1,1.41,z1],.03,.03,metal,6);}}
+  for(let z of [-3.1,2.8,4.5]){const w=3.16*Math.pow(Math.sin(Math.PI*(z/15.8+.5)),.32);g.sphere([s*w,.2,z],[.20,.62,.22],[.05,.075,.082],12,9);g.tube([s*(w-.03),.9,z],[s*w,.40,z],.014,.014,[.63,.58,.44],5);}
  }
  g.tube([0,2.4,-.6],[0,4.7,-.6],.055,.04,metal,10);g.tube([-1,4.25,-.6],[1,4.25,-.6],.035,.035,metal,8);
  g.box([0,4.53,-.6],[1.35,.17,.28],white);g.box([.53,3.65,-.6],[.75,.46,.022],[.66,.19,.12]);
@@ -125,7 +127,7 @@ buildReef=function(r){
  const logger=new Geometry();logger.material=12;logger.box([0,0,0],[.66,.48,.37],[.84,.64,.25]);logger.box([0,.08,.196],[.4,.17,.035],[.055,.17,.18]);logger.tube([0,-1.8,0],[0,0,0],.025,.025,[.58,.61,.56],8);
  r.batch(logger,[{p:[95,wy+3,-147]}]).maxDistance=70;
  // Above-water home base and distant islands are real meshes, not a wallpaper.
- const boat=r.batch(researchVessel(),[{p:OPEN_WORLD.boat.slice(),yaw:-.14}]);boat.maxDistance=600;
+ const boat=r.batch(researchVessel(),[{p:OPEN_WORLD.boat.slice(),yaw:-.14}]);boat.maxDistance=600;boat.sceneRole='research-vessel';
  for(let k=0;k<3;k++){const isles=[{p:[-235,-13,120],s:[76,63,61],yaw:.7},{p:[168,-10,168],s:[89,48,70],yaw:.2},{p:[225,-6,-10],s:[52,41,76],yaw:.5}];const g=rockGeometry(k,true);g.material=15;const b=r.batch(g,[isles[k]]);b.maxDistance=1000;b.shadow=false;}
 };
 const spawnCoreLife=addLife;

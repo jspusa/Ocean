@@ -284,7 +284,8 @@ const oceanEcology=(()=>{
   shouldAnimate(){return !!runtime.training&&!active&&modal==='training';},
   escape(){if(runtime.grabbedUID){releaseGrab();return true;}if(runtime.tool){runtime.tool=null;runtime.gesture=null;paintHUD();return true;}return false;},
   pointerCaptured(){return !!runtime.gesture||!!runtime.training?.gesture;},
-  onPhoto(photo){const f=fishByUID(photo.individual);if(f&&inRange(f)){field(f).photos++;addKnowledge(f,1.5);save();}}
+  photoMetadata(photo){const f=fishByUID(photo.individual);photo.knowledgeEligible=!!f&&inRange(f);},
+  onPhoto(photo){const f=fishByUID(photo.individual);if(f&&(typeof photo.knowledgeEligible==='boolean'?photo.knowledgeEligible:inRange(f))){field(f).photos++;addKnowledge(f,1.5);save();}}
  };
  oceanFeatures.register(hooks);
  return {initial,sanitize,state,knowledge,inRange,setTool,beginGesture,moveGesture,endGesture,feedAt,befriend,selectPartner,setName,toggleRide,grabAnimal,whistle,beginTraining,commandTrick,queueGesture,trainingPartPoint,beginTrainingGesture,moveTrainingGesture,endTrainingGesture,startPerformance,praiseTrick,afterLife,hooks,snapshot:()=>({tool:runtime.tool,food:runtime.food.length,target:runtime.target,riding:runtime.riding,grabbedUID:runtime.grabbedUID,training:runtime.training,partnerPosition:runtime.partnerPos?.slice(),now:runtime.now})};

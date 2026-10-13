@@ -24,7 +24,7 @@ try{
  await eq('View, clarity and FOV survive reload',()=>settings.third&&settings.fov===82&&settings.clarity===1.15);
  await page.evaluate(()=>{window.__freeze=true;settings.fov=69;settings.clarity=.88;settings.third=false;settings.sound=false;$('welcomeAudio').checked=false;});
  await page.locator('#startBtn').click();await page.waitForFunction(()=>document.getElementById('welcome').classList.contains('hidden'));
- await eq('Start dive at anchorage',()=>active&&V.dist(player.p,LANDMARKS[8].spawn)<.01);
+ await eq('Start dive at anchorage',()=>active&&V.dist(player.p,oceanNavigation.entry())<.01);
  await page.keyboard.down('w');const before=await page.evaluate(()=>player.p.slice());await page.evaluate(()=>{for(let i=0;i<120;i++)updatePlayer(1/120)});await page.keyboard.up('w');
  check('WASD moves the diver',(await page.evaluate(()=>player.p.slice())).some((x,i)=>Math.abs(x-before[i])>.2));
  await page.keyboard.press('Escape');await eq('Escape pauses',()=>modal==='pause');await page.locator('#resumeBtn').click();
@@ -32,7 +32,7 @@ try{
  if(!mobile)check('Drag camera rotates',Math.abs(await page.evaluate(()=>player.yaw)-oldYaw)>.1);
  await page.keyboard.press('x');await eq('Photo lens activates',()=>voyage.photoMode&&renderer.photoFov===48);await page.keyboard.press('x');
  await page.evaluate(()=>{voyage.state.mode='free';t=18;updateLife(t);findSpecies(8);updateCamera();applyVisualSettings();renderer.render(eye,target,t);updateHUD();});
- await page.locator('#photoBtn').click();await eq('1920-limited photo captures actual JPEG and score',()=>persistent.photos.length===1&&persistent.photos[0].url.startsWith('data:image/jpeg;')&&Number.isFinite(persistent.photos[0].grade));
+ await page.locator('#photoBtn').click();await page.waitForFunction(()=>!voyage.photoBusy&&voyage.state.features.photography.film.length===1);await eq('1920-limited film captures actual JPEG and score',async()=>{const archive=await oceanPhotography.exportArchive(),p=archive.images[0],m=archive.state.film[0];const image=new Image();image.src=p.url;await image.decode();return archive.state.film.length===1&&p.url.startsWith('data:image/jpeg;')&&Number.isFinite(m.grade)&&image.width<=1920});
  await eq('Capture has no WebGL error',()=>renderer.gl.getError()===0);
  const firstId=await page.evaluate(()=>follow.uid);await page.locator('#nextIndividual').click();check('Next individual changes subject',await page.evaluate(()=>follow.uid)!==firstId);
  await page.evaluate(()=>{stopAuto();voyage.state.mode='journey';player.p=LANDMARKS[0].spawn.slice();findSpecies(10)});

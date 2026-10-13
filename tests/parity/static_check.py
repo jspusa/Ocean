@@ -17,7 +17,7 @@ check('No packaged font files',not any(p.suffix.lower() in {'.ttf','.otf','.woff
 check('Guide thumbnails for all 12 species',len(list((R/'assets').glob('guide_*.jpg')))==12)
 check('Original two music stems exist',all((R/'music'/n).stat().st_size>10000 for n in ['shallows.mp3','blue_silence.mp3']))
 raw=gzip.decompress((R/'assets/reef.mesh.gz').read_bytes());magic,sz=struct.unpack_from('<II',raw);h=json.loads(raw[8:8+sz]);base=8+sz
-check('Compiled scene is 0.8.0',h['sourceVersion']=='0.8.0' and magic==0x35424652)
+check('Compiled scene matches authored world version',h['sourceVersion']==re.search(r"version:'([^']+)'",(R/'src/open_world.js').read_text()).group(1) and magic==0x35424652)
 check('Compiled meshes in supported budget',len(h['batches'])<=600 and len(h['nodes'])<=20000,{'batches':len(h['batches']),'instances':len(h['nodes']),'packedBytes':(R/'assets/reef.mesh.gz').stat().st_size,'decodedBytes':len(raw)})
 finite=True;indices=True;refsok=True
 for b in h['batches']:
@@ -28,7 +28,7 @@ check('All indexed vertices are finite',finite);check('Every index refers to a v
 check('Runtime module ordering includes world / voyage',html.index('open_world.js')<html.index('scene_cache.js')<html.index('app.js')<html.index('voyage.js'))
 check('Source fallback includes new world', 'open_world.js' in (R/'bake_scene.cjs').read_text())
 check('Sources and built entry have matching version', (R/'VERSION').read_text().strip()==version and '?v='+version in config and ('· '+'.'.join(version.split('.')[:2])) in (R/'src/shell.html').read_text() and '?v='+version in html)
-check('Feature modules register before explicit bootstrap', all(html.index(n+'.js')<html.index('bootstrap.js') for n in ['voyage','features','ecology','exploration','expedition','aquarium']) and 'boot();' not in (R/'src/app.js').read_text() and re.sub(r'//[^\n]*', '', (R/'src/bootstrap.js').read_text()).strip()=='boot();')
+check('Feature modules register before explicit bootstrap', all(html.index(n+'.js')<html.index('bootstrap.js') for n in ['voyage','features','ecology','exploration','expedition','aquarium','photography','navigation','ship']) and 'boot();' not in (R/'src/app.js').read_text() and re.sub(r'//[^\n]*', '', (R/'src/bootstrap.js').read_text()).strip()=='boot();')
 manifest=json.loads((R/'MANIFEST.json').read_text())
 check('Release manifest matches every recorded file',manifest['version']==version and all((R/f['path']).stat().st_size==f['bytes'] and hashlib.sha256((R/f['path']).read_bytes()).hexdigest()==f['sha256'] for f in manifest['files']))
 result={'version':version,'checks':checks,'sha256Standalone':hashlib.sha256((R/'standalone.html').read_bytes()).hexdigest()};(R/'qa/parity/static-results.json').write_text(json.dumps(result,ensure_ascii=False,indent=2));raise SystemExit(not all(c['pass'] for c in checks))

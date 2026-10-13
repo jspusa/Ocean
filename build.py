@@ -5,7 +5,7 @@ Python 3.10+ and Node.js 18+; standard libraries only, no npm dependencies.
 from pathlib import Path
 import base64,hashlib,json,subprocess,sys
 ROOT=Path(__file__).resolve().parent
-JS_FILES=['engine.js','world.js','reef_detail.js','next_reef.js','individuals.js','open_world.js','scene_cache.js','audio.js','performance.js','app.js','voyage.js','features.js','ecology.js','exploration.js','expedition.js','aquarium.js','bootstrap.js']
+JS_FILES=['engine.js','world.js','reef_detail.js','next_reef.js','individuals.js','open_world.js','scene_cache.js','audio.js','performance.js','app.js','voyage.js','features.js','ecology.js','exploration.js','expedition.js','aquarium.js','photography.js','navigation.js','ship.js','bootstrap.js']
 def main():
     version=(ROOT/'VERSION').read_text().strip()
     if '--pack-only' not in sys.argv:
