@@ -70,9 +70,11 @@
 | CPU回歸 | 既有fauna18、motion14、world8、photography17、microcosm18、exploration32、expedition16、navigation7、ship12、aquarium12；reef invariants37與3768動作樣本 | ★★★ |
 | 語法、場景結構與完整檔案清單 | `static_check.py` 43；76份檔案的本機雜湊一致 | ★★★ |
 | 完整離線版 | 桌面／觸控合計10項，file模式無網路請求 | ★★★ |
-| 公開發布與公開版一致性 | 0.12.0首次公開11項／76份檔案核對通過；0.12.1修正版待發布核對 | ★★★／☆☆☆ |
+| 公開發布與公開版一致性 | 0.12.1公開11項全部通過；遠端MANIFEST與本機一致，76份檔案長度及SHA-256全通過 | ★★★ |
 
-0.12.0首次遊戲提交 `4db79f8209e08d0d15084b708aea30ce5073556b` 已發布；GitHub Pages於2026-10-13 07:07:10 UTC回報該提交built。公開 [0.12](https://jspusa.github.io/Ocean/?v=0.12.0) 的電腦／觸控啟動、潛水、工具與門檻檢查通過，沒有未捕捉腳本錯誤；遠端MANIFEST與本機測試版逐字一致，76份檔案全部核對雜湊。證據在本機 `qa/parity/published-delivery.json`。
+最終0.12.1遊戲提交 `b7443bd6862d1ddcc80870d098e80cd1cb840afa` 已發布；GitHub Pages於2026-10-13 07:16:50 UTC回報built。[公開0.12.1](https://jspusa.github.io/Ocean/?v=0.12.1) 通過11項及全部76份檔案的長度／SHA-256核對。新版本號更新了程式與素材網址，避免沿用0.12.0瀏覽器快取；`qa/parity/published-delivery.json` 保留最終修正版證據。
+
+0.12.0首次遊戲提交 `4db79f8209e08d0d15084b708aea30ce5073556b` 已發布；GitHub Pages於2026-10-13 07:07:10 UTC回報該提交built。公開 [0.12](https://jspusa.github.io/Ocean/?v=0.12.0) 的電腦／觸控啟動、潛水、工具與門檻檢查通過，沒有未捕捉腳本錯誤；遠端MANIFEST與本機測試版逐字一致，76份檔案全部核對雜湊。歷史第一次交付亦已驗證，最終證據以上方0.12.1為準。
 
 編譯場景341網格、3509共享節點；解壓38,883,708 bytes、gzip16,250,694 bytes。0.12.1離線檔36,225,784 bytes；模組入口12,718 bytes。場景在既定24MB壓縮／80MB解碼／600網格預算內。
 
