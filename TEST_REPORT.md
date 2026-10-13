@@ -15,7 +15,7 @@
 | 水族館跨面板生命週期回歸 | `aquarium-browser.cjs` 桌機 21 項 | ★★★ |
 | 魚隻／礁體幾何 | 37 項、3,768 組運動取樣 | ★★★ |
 | 靜態完整性與離線交付 | 靜態 38 項；離線桌機／觸控合計 10 項，無網路請求 | ★★★ |
-| 線上交付 | 發布後核對完整 MANIFEST 與桌機／觸控啟動 | ★☆☆ |
+| 線上交付 | 公開網址 11 項通過；56 份檔案 bytes／SHA-256 與本機候選版全數相符 | ★★★ |
 | 實體手機／手把與全程真人遊玩 | 尚未執行 | ☆☆☆ |
 
 星星只表示所列檢查的驗證程度，不是功能對等百分比。沿用 v08 路徑的回歸腳本已配合新「船邊入水／底片」流程更新預期，仍驗證原有移動、相機成像和操作能力。
@@ -40,6 +40,6 @@
 
 ## 交付
 
-網站維持純靜態、同來源資產與子路徑；離線 `standalone.html` 由建置產生。最終發布會比對 MANIFEST 的全部 bytes／SHA-256 並檢查桌機與觸控啟動。來源、測試指令見 [README](README.md)。QA 圖片與 JSON 位於忽略的 `qa/parity/`、`qa/v08/`。
+網站維持純靜態、同來源資產與子路徑；離線 `standalone.html` 由建置產生。2026-10-13 已發布 `b92cfda40cb1e49c9f8b2ba3dbb5cce8f51ad3f0`，GitHub Pages 狀態 built；公開網址的桌機／觸控啟動與 56 份 MANIFEST 檔案的 bytes／SHA-256 全數比對通過，共 11 項。來源、測試指令見 [README](README.md)。QA 圖片與 JSON 位於忽略的 `qa/parity/`、`qa/v08/`。
 
 歷史報告：[0.9](docs/TEST_REPORT-v09.md)、[0.8](docs/TEST_REPORT-v08.md)。原作一手內容研究另見 [內容盤點](docs/WII-CONTENT-INVENTORY.md)，查證結果與本作實作數量分開。

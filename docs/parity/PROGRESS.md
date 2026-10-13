@@ -4,6 +4,8 @@
 
 ## 本版狀態
 
+0.10 遊戲提交 `b92cfda40cb1e49c9f8b2ba3dbb5cce8f51ad3f0` 已於 2026-10-13 發布，公開網址啟動與 56 份資產雜湊全數驗證。
+
 延續 0.9 的互動／夥伴訓練、探索／筆跡／打撈、委託／訪客、水族館，0.10 新增：
 
 - 真實 JPEG 底片 → 回船選片沖印 → 相簿 → 投稿；20 底片／120 相簿／96 MiB 原圖，容量、舊版搬移、資料庫失敗救援、多分頁衝突、完整備份與附件固定。
@@ -22,3 +24,7 @@ TEST_REPORT.md 是最新檢查與限制；REVIEW-v010.md 記錄兩軸審查與�
 5. 工作單 13：完成新增工具完整手把操作，實體手把／手機、長時段與完整真人玩法驗證。現有手機檢查是 Chromium 觸控模擬，沒有實體手機驗收。
 
 所有後續切片仍需 UI、實際三維結果、保存重載、失敗案例與回歸。可以持續交付局部版本；只有完整矩陣與全部 33 條玩家故事有證據後，才可將持續目標設為完成。
+
+## 下一切片的擴充前置
+
+先將 world／open_world 的固定物種索引與 ecology 的 `species>=8` 抓握判定改為明確能力資料；individuals 需支援附著、爬行、洞穴伸縮與懸停，水族館同步相同動作分類。建議先完成 Pygmy Seahorse、Cinderella Sea Slug、Spotted Garden Eel、Randall’s Pistol Shrimp 的可辨識模型與微觀流程，再加 Painted Frogfish、Luna Lionfish、Broadclub Cuttlefish、Chambered Nautilus。名稱在 214 條目盤點內；模型與玩法尚未實作，棲地與資料需進一步查證。
