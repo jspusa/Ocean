@@ -102,6 +102,27 @@ void main(){vec3 p=aPosition,n=aNormal;vLocal=p;vUV=aUV;vTag=aTag;
   float y=p.y,z=p.z,ny=n.y,nz=n.z,c=cos(aPose.x),s=sin(aPose.x);
   p.y=y*c-z*s;p.z=y*s+z*c;n.y=ny*c-nz*s;n.z=ny*s+nz*c;
  }
+ // Deep-water rig: Pose.w is radians/second; metres remain entirely in instance
+ // scale. Tag 6 is only the esca or tail photophore, never an animal's eyes.
+ if(uKind==10){
+  float beat=uTime*max(.1,aPose.w)+aExtra.x;bool fin=aTag>2.5&&aTag<3.5,limb=aTag>4.5&&aTag<5.5;
+  if(uSpecies==27){
+   float tail=1.-smoothstep(-.50,.18,p.x),wave=beat+p.x*3.4,amp=.022+.013*aPose.y;
+   p.z+=sin(wave)*amp*tail*tail;n.x-=cos(wave)*3.4*amp*tail*tail*n.z;
+   if(fin&&abs(p.z)>.09)p.y+=sin(beat*.67+sign(p.z)*1.5)*.016*smoothstep(.09,.28,abs(p.z));
+  }else if(uSpecies==28){
+   if(limb){float w=smoothstep(-.16,.45,p.x),phase=beat+p.x*9.+aPosition.z*13.;p.y+=sin(phase)*.013*w;p.z+=cos(phase*.81)*.009*w;n.x-=cos(phase)*.117*w*n.y;}
+   if(fin)p.y+=sin(beat*1.4+p.x*15.)*.007*smoothstep(.02,.09,abs(p.z));
+  }else if(uSpecies==29){
+   float w=1.-smoothstep(-.52,.18,p.x),wave=beat+p.x*7.;p.z+=sin(wave)*.055*w*w;n.x-=cos(wave)*.385*w*w*n.z;
+  }else if(uSpecies==30){
+   if(limb||aTag>5.5){float h=max(0.,p.y-.19),bend=sin(beat*.78)*.055;p.x+=bend*h;p.z+=cos(beat*.62)*.070*h;n.y-=bend*n.x;}
+   if(fin)p.z+=sin(beat+p.x*4.)*.012;
+  }else if(uSpecies==31&&limb){
+   float w=smoothstep(.065,.46,abs(p.z)),gait=beat+p.x*24.+sign(p.z)*1.5708;
+   p.x+=sin(gait)*.009*w;p.y+=max(0.,cos(gait))*.010*w;
+  }
+ }
  // Habitat fauna share this deformation in the colour and shadow programs.
  // Pose.w is withdrawal, independent of immutable metre-scale instance size.
  if(uKind==8){
@@ -179,7 +200,7 @@ vec3 waterRadiance(vec3 direction,float depth,float sun){
 const FS=`#version 300 es
 precision highp float;precision highp int;
 in vec3 vWorld;in vec3 vNormal;in vec3 vColor;in vec3 vLocal;in vec2 vUV;in float vTag;in float vSeed;in vec4 vShadow;in float vLodDistance;uniform vec3 uLODBounds;flat in vec4 vGenes;flat in vec3 vTint;in vec4 vDynamicShadow;uniform int uSamples;
-uniform vec3 uCamera;uniform float uTime;uniform vec3 uFog;uniform float uFogDensity;uniform float uSun;uniform int uKind;uniform int uMat;uniform int uSpecies;
+uniform vec3 uCamera;uniform float uTime;uniform float uTorch;uniform vec3 uViewForward;uniform vec3 uFog;uniform float uFogDensity;uniform float uSun;uniform int uKind;uniform int uMat;uniform int uSpecies;
 uniform sampler2D uSand;uniform sampler2D uSandN;uniform sampler2D uRock;uniform sampler2D uRockN;uniform sampler2D uShell;uniform sampler2D uShellN;uniform sampler2D uCoral;uniform sampler2D uCoralN;uniform highp sampler2DShadow uShadow;uniform highp sampler2DShadow uDynamicShadow;
 uniform float uShadowTexel;uniform float uShadows;uniform vec3 uLightDir;uniform vec3 uAirLightDir;uniform vec3 uLightColor;
 out vec4 frag;
@@ -356,6 +377,7 @@ void main(){
    }
   }
  }
+ if(uKind==10){rough=uSpecies==31?.70:.49;if(vTag>2.5&&vTag<3.5){rough=.52;thickness=.3;}if(vTag>3.5&&vTag<4.5)rough=.16;}
  vec3 L=normalize(vWorld.y<0.?uLightDir:uAirLightDir);vec3 E=normalize(uCamera-vWorld);
  float NoL=max(0.,dot(n,L)),NoV=max(.03,dot(n,E));float sh=visibility(n);float hemi=clamp(n.y*.5+.5,0.,1.);
  // Work in linear light; water-to-surface reflection is not dry-plastic gloss.
@@ -386,6 +408,15 @@ void main(){
  float F=F0+(1.-F0)*pow(1.-VoH,5.);
  col+=uLightColor*waterAbsorb*D*G*F*NoL*sh*irradiance;
  col+=vec3(.015,.028,.035)*pow(1.-NoV,4.)*occ;
+ // A camera-mounted lamp lights visible surface normals in world space. Its
+ // outgoing path loses warm wavelengths before the view ray attenuates it again.
+ if(uTorch>.5&&vWorld.y<0.){
+  float lampDistance=length(vWorld-uCamera);
+  float cone=smoothstep(.76,.987,dot(-E,normalize(uViewForward)));
+  vec3 lampTransmission=exp(-vec3(.044,.018,.009)*lampDistance);
+  col+=albedo*vec3(1.0,.87,.68)*lampTransmission*cone*max(.04,dot(n,E))*6.0/(1.+lampDistance*lampDistance*.045);
+ }
+ if(uKind==10&&vTag>5.5&&vTag<6.5)col+=vec3(.20,.56,.40)*(1.+.04*sin(uTime*.7+vSeed));
  frag=vec4(max(col,vec3(0.)),clamp(coverage,.0,1.));
 
 }`;
@@ -571,7 +602,7 @@ void main(){float d=texture(uDepth,uv).r;vec3 p=world(uv,min(d,.99999)),rd=norma
   float dd=texture(uDepth,q).r;float nd=length(world(q,min(dd,.99999))-uEye);float w=(x==0?1.-f.x:f.x)*(y==0?1.-f.y:f.y)*exp(-abs(nd-distanceTo)*.8)+.0001;
   fog+=texture(uVolume,q)*w;weights+=w;}
  fog/=weights;col*=fog.a;
- if(uLamp>.5&&d<.9999){float cone=pow(max(0.,1.-length((uv-.5)*vec2(uResolution.x/uResolution.y,1.))*1.6),5.);col+=col*vec3(2.0,1.6,1.1)*cone/(1.+distanceTo*distanceTo*.022);}
+
  vec3 trans=exp(-waterExtinction(uClarity)*distanceTo);float depth=max(0.,-uEye.y);
  vec3 water=waterRadiance(rd,depth,uSun);
  if(uEye.y<=-.18){if(d>.99995)col=water+fog.rgb;else col=col*trans+water*(1.-trans)+fog.rgb;}
@@ -650,7 +681,7 @@ class Renderer{
    const i=b.instances[k],p=i.p,sc=i.s||UNIT3,tint=i.tint||UNIT3;
    if(eye&&planes){const dx=p[0]-eye[0],dy=p[1]-eye[1],dz=p[2]-eye[2],d2=dx*dx+dy*dy+dz*dz;
     if(d2>max2||d2<min2)continue;
-    const r=b.radius*Math.max(sc[0],sc[1],sc[2])*((b.kind===8||b.kind===9)?1.15:1);let outside=false;
+    const r=b.radius*Math.max(sc[0],sc[1],sc[2])*((b.kind===8||b.kind===9||b.kind===10)?1.15:1);let outside=false;
     for(let n=0;n<6;n++){const pl=planes[n];if(pl[0]*p[0]+pl[1]*p[1]+pl[2]*p[2]+pl[3]<-r){outside=true;break;}}
     if(outside)continue;
    }
@@ -660,7 +691,7 @@ class Renderer{
    const m=i.bioMorph||BIO_NEUTRAL,genes=i.bioGenes||BIO_DEFAULT;
    a[j++]=m[0];a[j++]=m[1];a[j++]=m[2];a[j++]=m[3];
    a[j++]=genes[0];a[j++]=genes[1];a[j++]=genes[2];a[j++]=genes[3];
-   a[j++]=i.bank||0;a[j++]=i.effort??.7;a[j++]=(b.kind===9||b.kind===7)?clamp(i.partnerFinPulse||0,0,1):(i.finWear||0);a[j++]=b.kind===8?1-clamp(i.faunaVisibility??(1-(i.retreat||0)),0,1):b.kind===9?(i.cetaceanBeat||2.3):0;
+   a[j++]=i.bank||0;a[j++]=i.effort??.7;a[j++]=(b.kind===9||b.kind===7)?clamp(i.partnerFinPulse||0,0,1):(i.finWear||0);a[j++]=b.kind===8?1-clamp(i.faunaVisibility??(1-(i.retreat||0)),0,1):b.kind===9?(i.cetaceanBeat||2.3):b.kind===10?(i.abyssBeat||1.7):0;
   }
   b.drawCount=j/24;if(j){this.gl.bindBuffer(this.gl.ARRAY_BUFFER,b.ib);this.gl.bufferSubData(this.gl.ARRAY_BUFFER,0,a,0,j);}
  }
@@ -742,12 +773,12 @@ class Renderer{
   }
   g.bindRenderbuffer(g.RENDERBUFFER,null);g.bindFramebuffer(g.FRAMEBUFFER,null);
  }
- common(p,eye,vp,t){let g=this.gl;g.useProgram(p.p);if(this.textures[8]){this.bindTex(9,this.textures[8]);g.uniform1i(this.uniform(p,'uCaustic'),9);}g.uniformMatrix4fv(this.uniform(p,'uVP'),false,vp);g.uniformMatrix4fv(this.uniform(p,'uLightVP'),false,this.lightVP);g.uniformMatrix4fv(this.uniform(p,'uDynamicLightVP'),false,this.dynamicLightVP||this.lightVP);g.uniform1i(this.uniform(p,'uSamples'),this.msaaSamples||0);g.uniform3fv(this.uniform(p,'uCamera'),eye);g.uniform1f(this.uniform(p,'uTime'),t);g.uniform1f(this.uniform(p,'uSwim'),typeof player==='undefined'?.4:Math.min(1,Math.hypot(...player.velocity)/1.6));g.uniform1f(this.uniform(p,'uSun'),this.sun);g.uniform3fv(this.uniform(p,'uFog'),this.fog);g.uniform3fv(this.uniform(p,'uLightDir'),this.lightDir);g.uniform3fv(this.uniform(p,'uAirLightDir'),this.airLightDir||this.lightDir);g.uniform3fv(this.uniform(p,'uLightColor'),this.lightColor);}
+ common(p,eye,vp,t){let g=this.gl;g.useProgram(p.p);if(this.textures[8]){this.bindTex(9,this.textures[8]);g.uniform1i(this.uniform(p,'uCaustic'),9);}g.uniformMatrix4fv(this.uniform(p,'uVP'),false,vp);g.uniformMatrix4fv(this.uniform(p,'uLightVP'),false,this.lightVP);g.uniformMatrix4fv(this.uniform(p,'uDynamicLightVP'),false,this.dynamicLightVP||this.lightVP);g.uniform1i(this.uniform(p,'uSamples'),this.msaaSamples||0);g.uniform3fv(this.uniform(p,'uCamera'),eye);g.uniform1f(this.uniform(p,'uTorch'),this.lamp?1:0);g.uniform3fv(this.uniform(p,'uViewForward'),this.cameraForward||[0,0,-1]);g.uniform1f(this.uniform(p,'uTime'),t);g.uniform1f(this.uniform(p,'uSwim'),typeof player==='undefined'?.4:Math.min(1,Math.hypot(...player.velocity)/1.6));g.uniform1f(this.uniform(p,'uSun'),this.sun);g.uniform3fv(this.uniform(p,'uFog'),this.fog);g.uniform3fv(this.uniform(p,'uLightDir'),this.lightDir);g.uniform3fv(this.uniform(p,'uAirLightDir'),this.airLightDir||this.lightDir);g.uniform3fv(this.uniform(p,'uLightColor'),this.lightColor);}
  bindTex(unit,tex){let g=this.gl;g.activeTexture(g.TEXTURE0+unit);g.bindTexture(g.TEXTURE_2D,tex);}
  render(eye,target,t){
   this.dirty=false;const begin=performance.now(),g=this.gl;this.drawCalls=0;this.shadowDraws=0;
   const near=Number.isFinite(this.photoNear)?clamp(this.photoNear,.002,.16):.16;
-  this.view=lookAt(eye,target);this.vp=mm(perspective((this.photoFov||this.fov||(this.width<this.height?67:69))*Math.PI/180,this.width/this.height,near,950),this.view);const inv=inverse4(this.vp);
+  this.cameraForward=V.norm(V.sub(target,eye));this.view=lookAt(eye,target);this.vp=mm(perspective((this.photoFov||this.fov||(this.width<this.height?67:69))*Math.PI/180,this.width/this.height,near,950),this.view);const inv=inverse4(this.vp);
   const profile=this.lighting==='late'?{dir:[-.67,.57,-.33],color:[1.28,1.05,.86],sun:.95}:this.lighting==='blue'?{dir:[-.4,.3,-.6],color:[.52,.74,1.05],sun:.40}:{dir:[-.36,.86,-.34],color:[1.10,1.07,.96],sun:1.12};
   this.airLightDir=V.norm(profile.dir);
   const underwater=eye[1]<-.18;
@@ -769,7 +800,7 @@ class Renderer{
   this.dynamicLightVP=stableLightMatrix(mm(ortho(-17,17,-17,17,.1,150),lookAt(V.add(eye,V.mul(this.lightDir,65)),eye)),this.dynamicShadowSize);
   g.bindFramebuffer(g.FRAMEBUFFER,this.dynamicShadowFBO);g.viewport(0,0,this.dynamicShadowSize,this.dynamicShadowSize);g.clear(g.DEPTH_BUFFER_BIT);g.colorMask(false,false,false,false);this.common(this.shadowProgram,eye,this.dynamicLightVP,t);
   const lightPlanes=this.frustum(this.dynamicLightVP);
-  for(const b of this.batches){if(!b.visible||!b.dynamic||!b.shadow||![0,1,2,4,5,6,7,8,9].includes(b.kind)||(b.minDistance>0&&!b.shadowProxy))continue;this.updateBatch(b,eye,lightPlanes,true);if(!b.drawCount)continue;g.uniform1i(this.uniform(this.shadowProgram,'uKind'),b.kind);g.uniform1i(this.uniform(this.shadowProgram,'uMat'),b.material);g.uniform1i(this.uniform(this.shadowProgram,'uSpecies'),b.species);this.drawBatch(b);this.shadowDraws++;}
+  for(const b of this.batches){if(!b.visible||!b.dynamic||!b.shadow||![0,1,2,4,5,6,7,8,9,10].includes(b.kind)||(b.minDistance>0&&!b.shadowProxy))continue;this.updateBatch(b,eye,lightPlanes,true);if(!b.drawCount)continue;g.uniform1i(this.uniform(this.shadowProgram,'uKind'),b.kind);g.uniform1i(this.uniform(this.shadowProgram,'uMat'),b.material);g.uniform1i(this.uniform(this.shadowProgram,'uSpecies'),b.species);this.drawBatch(b);this.shadowDraws++;}
   g.colorMask(true,true,true,true);
   g.bindFramebuffer(g.FRAMEBUFFER,this.msaaFBO||this.sceneFBO);if(this.msaaSamples)g.enable(g.SAMPLE_ALPHA_TO_COVERAGE);g.viewport(0,0,this.canvas.width,this.canvas.height);g.clearColor(.002,.025,.045,1);g.clear(g.COLOR_BUFFER_BIT|g.DEPTH_BUFFER_BIT);
   g.depthFunc(g.LEQUAL);this.common(this.skyProgram,eye,this.vp,t);g.uniformMatrix4fv(this.uniform(this.skyProgram,'uInvVP'),false,inv);g.bindVertexArray(this.postVAO);g.drawArrays(g.TRIANGLES,0,3);g.depthFunc(g.LESS);this.drawCalls++;

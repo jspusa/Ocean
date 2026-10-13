@@ -22,11 +22,11 @@ function readVoyage(raw){
  for(const key of ['distance','whaleWatch','dives','totalSeconds'])if(Number.isFinite(raw[key]))s[key]=clamp(raw[key],0,1e8);
  for(const key of ['reading','ended','companion'])s[key]=raw[key]===true;
  s.finishedAt=typeof raw.finishedAt==='string'?raw.finishedAt.slice(0,50):null;
- s.waypoint=raw.waypoint==='boat'||(typeof raw.waypoint==='string'&&raw.waypoint.startsWith('habitat:')&&SPECIES.some(sp=>sp.fauna&&'habitat:'+sp.id===raw.waypoint))||LANDMARKS.some(l=>l.id===raw.waypoint)?raw.waypoint:'garden';
+ s.waypoint=raw.waypoint==='boat'||(typeof raw.waypoint==='string'&&raw.waypoint.startsWith('study:')&&typeof OceanRegions!=='undefined'&&Object.hasOwn(OceanRegions.points,raw.waypoint.slice(6)))||(typeof raw.waypoint==='string'&&raw.waypoint.startsWith('habitat:')&&SPECIES.some(sp=>sp.fauna&&'habitat:'+sp.id===raw.waypoint))||LANDMARKS.some(l=>l.id===raw.waypoint)?raw.waypoint:'garden';
  s.photoCredits=Array.isArray(raw.photoCredits)?[...new Set(raw.photoCredits.filter(n=>Number.isSafeInteger(n)&&n>0))].slice(-160):[];
  if(s.completed.length===ORDERS.length&&s.waypoint==='anchorage'&&!raw.features?.navigation)s.waypoint='boat';
  if(raw.bestPhotos&&typeof raw.bestPhotos==='object')for(const sp of SPECIES){let p=raw.bestPhotos[sp.id];if(p&&Number.isFinite(p.score))s.bestPhotos[sp.id]={score:Math.round(clamp(p.score,0,100)),individual:String(p.individual||'').slice(0,70),date:Number(p.date)||0};}
- const q=raw.resume;if(q&&Array.isArray(q.p)&&q.p.length===3&&q.p.every(Number.isFinite)&&Number.isFinite(q.yaw)&&Number.isFinite(q.pitch))s.resume={p:[clamp(q.p[0],-260,260),clamp(q.p[1],-91,-.65),clamp(q.p[2],-370,180)],yaw:q.yaw%TAU,pitch:clamp(q.pitch,-1.2,1.2),seconds:clamp(Number(q.seconds)||0,0,100000)};
+ const q=raw.resume;if(q&&Array.isArray(q.p)&&q.p.length===3&&q.p.every(Number.isFinite)&&Number.isFinite(q.yaw)&&Number.isFinite(q.pitch))s.resume={p:[clamp(q.p[0],-260,260),clamp(q.p[1],-120,-.65),clamp(q.p[2],-370,180)],yaw:q.yaw%TAU,pitch:clamp(q.pitch,-1.2,1.2),seconds:clamp(Number(q.seconds)||0,0,100000)};
  s.features=oceanFeatures.read(raw.features);
  return s;
 }
@@ -66,7 +66,7 @@ function renderShip(){
  $('shipCards').innerHTML=ORDERS.map((o,i)=>`<button class="ship-memory ${s.completed.includes(o.id)?'complete':''}" data-order="${o.id}" title="${o.title}"><span>${s.completed.includes(o.id)?'✓':String(i+1).padStart(2,'0')}</span><b>${o.title}</b></button>`).join('');
  $('shipCards').querySelectorAll('button').forEach(b=>b.onclick=()=>{voyage.state.waypoint=ORDERS.find(o=>o.id===b.dataset.order).place;openPanel('voyage');});
  $('saveStatus').textContent=(!storageOK||!voyage.storageOK)?'瀏覽器儲存受限 · 請匯出存檔':voyage.loaded?'航程已讀取 · 自動保存在此瀏覽器':'自動保存在此瀏覽器 · 可匯出備份';
- $('shipFinal').classList.toggle('hidden',!s.ended);
+ $('shipFinal').classList.toggle('hidden',!s.ended);oceanFeatures.call('shipRender');
 }
 function toggleCruise(){if(!active||modal)return;if(typeof oceanMicrocosm!=='undefined'&&oceanMicrocosm.isViewing())oceanMicrocosm.exit('cruise');voyage.state.cruise=!voyage.state.cruise;stopAuto();$('cruiseBtn').classList.toggle('active',voyage.state.cruise);toast(voyage.state.cruise?'巡航推進已開啟 · 移動速度提高，不自動駕駛':'已回到緩慢觀察速度');}
 function togglePhotoMode(){if(!active)return;if(typeof oceanMicrocosm!=='undefined'&&oceanMicrocosm.isViewing())oceanMicrocosm.exit('camera');voyage.photoMode=!voyage.photoMode;renderer.photoFov=voyage.photoMode?48:null;$('cameraFrame').classList.toggle('hidden',!voyage.photoMode);$('photoModeBtn').classList.toggle('active',voyage.photoMode);renderer.dirty=true;}
@@ -160,6 +160,7 @@ findSpecies=function(index,specific=null){
 };
 // Chart marks a real game-space destination, never teleports from a route button.
 function voyageDestination(id=voyage.state.waypoint){
+ if(typeof id==='string'&&id.startsWith('study:')&&typeof OceanRegions!=='undefined'){const a=OceanRegions.points[id.slice(6)];return a?{id,name:a.name,x:a.p[0],y:a.p[1],z:a.p[2],radius:4}:null;}
  if(typeof id==='string'&&id.startsWith('habitat:')){
   const sp=SPECIES.find(s=>s.fauna&&'habitat:'+s.id===id),f=sp&&life.find(f=>SPECIES[f.species]===sp);if(!f)return null;
   const p=f.home||f.center||f.p;return {id,name:sp.name+'棲地',x:p[0],y:p[1]+.6,z:p[2],radius:3};
@@ -252,7 +253,7 @@ function paintVoyageHUD(){
  const s=voyage.state,o=currentOrder(),name=s.mode==='free'?'自由重遊':o?o.title:'把海帶回去';$('objectiveName').textContent=name;$('objectiveCount').textContent=s.mode==='free'?'OPEN WATER':s.completed.length+' / 6';
  $('objectiveDetail').textContent=s.mode==='free'?'沒有任務倒數，去你想去的地方。':o?o.description:'返回研究船，整理這次航程。';
  $('waypointHUD').classList.toggle('hidden',!active||modal!==null||document.body.classList.contains('cinematic'));
- const l=voyageDestination();if(l){const pos=[l.x,Number.isFinite(l.y)?l.y:l.id==='boat'?0:groundHeight(l.x,l.z)+12,l.z],p=project(pos,renderer.vp);const dist=l.id.startsWith('habitat:')?V.dist(player.p,pos):Math.hypot(player.p[0]-l.x,player.p[2]-l.z);const back=p[2]<0;const px=clamp((back?-p[0]:p[0])*.5+.5,.10,.9),py=clamp((back?p[1]:-p[1])*.5+.5,.22,.72);const el=$('waypointHUD');el.style.left=px*100+'%';el.style.top=py*100+'%';$('waypointName').textContent=l.name;$('waypointDistance').textContent=Math.round(dist)+' m';el.classList.toggle('behind',back);el.classList.toggle('arrived',dist<(l.radius||12));}
+ const l=voyageDestination();if(l){const pos=[l.x,Number.isFinite(l.y)?l.y:l.id==='boat'?0:groundHeight(l.x,l.z)+12,l.z],p=project(pos,renderer.vp);const dist=Number.isFinite(l.y)?V.dist(player.p,pos):Math.hypot(player.p[0]-l.x,player.p[2]-l.z);const back=p[2]<0;const px=clamp((back?-p[0]:p[0])*.5+.5,.10,.9),py=clamp((back?p[1]:-p[1])*.5+.5,.22,.72);const el=$('waypointHUD');el.style.left=px*100+'%';el.style.top=py*100+'%';$('waypointName').textContent=l.name;$('waypointDistance').textContent=Math.round(dist)+' m';el.classList.toggle('behind',back);el.classList.toggle('arrived',dist<(l.radius||12));}
  const logger=[95,groundHeight(99,-166)+3,-147];$('interactBtn').classList.toggle('hidden',V.dist(player.p,logger)>8||s.reading);
  $('companionBtn').classList.toggle('hidden',!persistent.seen.includes('dolphin'));$('companionBtn').classList.toggle('active',s.companion);
 }
@@ -263,8 +264,8 @@ updateLife=function(time){legacyLifeUpdate(time);if(typeof voyage==='undefined'|
 };
 function voyageTick(dt){
  if(!active||modal||photoOpen)return;
- for(const l of LANDMARKS){const d=Math.hypot(player.p[0]-l.x,player.p[2]-l.z);if(d<(l.radius||12)&&!voyage.state.visited.includes(l.id)){voyage.state.visited.push(l.id);saveVoyage();}}
- observeWhale(dt);evaluateOrders();oceanFeatures.call('tick',dt);if(!active)return;paintVoyageHUD();
+ for(const l of LANDMARKS){const d=Number.isFinite(l.y)?V.dist(player.p,[l.x,l.y,l.z]):Math.hypot(player.p[0]-l.x,player.p[2]-l.z);if(d<(l.radius||12)&&!voyage.state.visited.includes(l.id)){voyage.state.visited.push(l.id);saveVoyage();}}
+ observeWhale(dt);evaluateOrders();oceanFeatures.call('tick',dt);if(!active)return;paintVoyageHUD();oceanFeatures.call('paintHUD');
  if(t-voyage.lastSave>8){voyage.lastSave=t;saveVoyage();}
 }
 function pollGamepad(){
@@ -281,7 +282,7 @@ function pollGamepad(){
 }
 function initVoyage(){
  loadVoyage();renderShip();
- $('voyageBtn').onclick=()=>openPanel('voyage');$('objectiveCard').onclick=()=>openPanel('voyage');$('pauseBtn').onclick=()=>openPanel('pause');$('cruiseBtn').onclick=toggleCruise;$('photoModeBtn').onclick=()=>togglePhotoMode();$('interactBtn').onclick=readLogger;
+ $('voyageBtn').onclick=()=>openPanel('voyage');$('objectiveCard').onclick=()=>openPanel(voyage.state.features.story?.started?'story':'voyage');$('pauseBtn').onclick=()=>openPanel('pause');$('cruiseBtn').onclick=toggleCruise;$('photoModeBtn').onclick=()=>togglePhotoMode();$('interactBtn').onclick=readLogger;
  $('shipModeJourney').onclick=()=>{voyage.state.mode='journey';saveVoyage();renderShip();};$('shipModeFree').onclick=()=>{voyage.state.mode='free';saveVoyage();renderShip();};
  $('shipContinue').onclick=()=>{voyage.awaitingResume=true;startDive(false);};$('shipLog').onclick=()=>openPanel('voyage');$('shipChart').onclick=()=>openPanel('map');$('shipGallery').onclick=()=>openPanel('journal');$('shipSettings').onclick=()=>openPanel('settings');
  $('debriefClose').onclick=()=>$('debrief').classList.add('hidden');$('debriefExport').onclick=exportSave;

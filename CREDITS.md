@@ -66,3 +66,11 @@
 `src/cetaceans.js` 的七種輪廓、鰭、斑紋與後備圖為原創程序幾何；生物學來源及物理尺度列於 [CETACEAN-REFERENCE](docs/parity/CETACEAN-REFERENCE.md)。`src/cetacean_world.js` 的棲地、數量與巡游座標為原創遊戲設定。圖鑑 JPG 使用這些實際 WebGL 模型生成，沒有把參考網站的照片或 Nintendo 影像納入素材。
 
 新增鳴唱音效由 Web Audio 合成，屬遊戲聲音，不是真實鯨豚錄音。六基本手勢與進階動作的來源界線列於 [WII-PARTNER-REFERENCE](docs/parity/WII-PARTNER-REFERENCE.md)，信任／熟練門檻及動作時序為本作設定。
+
+## 0.13 洞窟、遺跡與深海調查
+
+`src/regions.js` 的三處空間、實體雕刻與路線，以及 `src/story.js`《回聲潮譜》的角色對話、圖形線索與調查流程皆為原創。參考 Wii 第一代的探索語義，未複製原作地圖、程式、逐字故事或素材；可核對的來源界線见 [WII-WORLD-REFERENCE](docs/parity/WII-WORLD-REFERENCE.md)。
+
+`src/abyss_fauna.js` 五種生物、`src/abyss_world.js` 九個體及棲地是原創幾何與遊戲編排。形態、尺度與資料来源見 [ABYSS-FAUNA-REFERENCE](docs/parity/ABYSS-FAUNA-REFERENCE.md)。新圖鑑 JPEG 由實際模型的 WebGL 棚景製作，不是外部生物照片。9 cm 鮟鱇、8 m 含觸腕的巨型烏賊、3 m 步足展幅的蜘蛛蟹採各自明示尺度；深淵空間經微縮，不能作自然棲息深度的依據。
+
+頭燈為即時近似的世界座標光錐、表面法線照明及水色衰減，未作物理或生態測量認證。

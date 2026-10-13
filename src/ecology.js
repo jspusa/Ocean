@@ -92,7 +92,8 @@ const oceanEcology=(()=>{
  function discover(f){
   if(!playAllowed()||!f||fishByUID(f.uid)!==f||!inRange(f))return false;
   const encounter=runtime.encounter;
-  if(!encounter||encounter.uid!==f.uid||!encounter.fresh||encounter.seconds<1.2||encounter.discovered)return false;
+  // Revisit cooldown limits repeat awards, not the first earned discovery.
+  if(!encounter||encounter.uid!==f.uid||(!encounter.fresh&&knowledge(field(f))>=1)||encounter.seconds<1.2||encounter.discovered)return false;
   encounter.discovered=true;const points=Math.max(0,Math.min(4-field(f).points,7-encounter.points));
   if(points){encounter.points+=points;addKnowledge(f,points);}save();return true;
  }

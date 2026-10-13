@@ -18,7 +18,7 @@ const oceanExpedition=(()=>{
   for(const r of requests){const m=raw.mail?.[r.id];if(!m||typeof m!=='object')continue;const status=['accepted','ready','complete'].includes(m.status)?m.status:'accepted';s.mail[r.id]={status,acceptedAt:finite(m.acceptedAt,0,1e15,0),progress:finite(m.progress,0,r.seconds||1,0),visited:m.visited===true,photoDate:finite(m.photoDate,0,1e15,0),read:m.read===true};}
   s.outfit=palettes[raw.outfit]&&unlockedOutfit(s,raw.outfit)?raw.outfit:'blue';
   const c=raw.camera||{};s.camera={zoom:finite(c.zoom,25,75,48),aperture:finite(c.aperture,1.8,16,8),focus:finite(c.focus,.8,80,8),exposure:finite(c.exposure,-1.5,1.5,0)};
-  const g=raw.guest;if(g&&requests.some(r=>r.id===g.id&&r.kind==='guide')&&s.mail[g.id]?.status==='accepted'&&Array.isArray(g.p)&&g.p.length===3&&g.p.every(Number.isFinite))s.guest={id:g.id,p:[clamp(g.p[0],-270,270),clamp(g.p[1],-91,-.65),clamp(g.p[2],-385,205)]};
+  const g=raw.guest;if(g&&requests.some(r=>r.id===g.id&&r.kind==='guide')&&s.mail[g.id]?.status==='accepted'&&Array.isArray(g.p)&&g.p.length===3&&g.p.every(Number.isFinite))s.guest={id:g.id,p:[clamp(g.p[0],-270,270),clamp(g.p[1],-120,-.65),clamp(g.p[2],-385,205)]};
   return s;
  }
  const state=()=>oceanFeatures.state('expedition');

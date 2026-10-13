@@ -155,9 +155,42 @@ function cetaceanMotionPose(f,time,out=f.p,context=null){
  f.bank=clamp(turn*.45,-.24,.24);f.effort=clamp(speed/profile.cruiseSpeed,.20,1);
  f.cetaceanBeat=profile.beat*(.94+bioValue(seed,23)*.12);f.partnerFinPulse=0;f.faunaVisibility=1;f.faunaVisible=true;f.retreat=0;f.faunaTime=time;return out;
 }
+// New deep-water catalogue uses small, habitat-bounded paths, never the
+// cetaceans' surfacing cycle. Bounds include all tentacles/legs at metre scale.
+const abyssAhead=[0,0,0],abyssBehind=[0,0,0];
+function abyssEnvelope(f){const sp=SPECIES[f.species],b=sp.modelBounds,s=f.s[0],hx=Math.max(Math.abs(b.min[0]),Math.abs(b.max[0])),hz=Math.max(Math.abs(b.min[2]),Math.abs(b.max[2])),crawl=sp.traits.motion==='crawl',bend=crawl?0:s*(hx*.10+.018);return {horizontal:s*Math.hypot(hx,hz)+.025+s*.02,bottom:Math.max(0,-b.min[1]*s)+bend,top:b.max[1]*s+bend};}
+function abyssTrajectory(f,time,out,context=null){
+ const sp=SPECIES[f.species],profile=sp.motionProfile,home=f.home||f.center,phase=f.phase??f.bob??0,exhibit=!!context?.exhibit,hull=abyssEnvelope(f),crawl=sp.traits.motion==='crawl';
+ let radius=Math.max(0,Math.min(Number.isFinite(f.radius)?f.radius:profile.radius,profile.radius));
+ if(exhibit)radius=Math.min(radius,crawl?.30:1.15);
+ else{
+  const solids=context?.solids||(typeof OceanRegions!=='undefined'?OceanRegions.solids:[]);
+  // Reserve a circle around the home for every heading, including the entire
+  // eight-metre squid. Keeping a single safe radius avoids obstacle teleports.
+  for(const box of solids||[]){if(box.max[1]<=home[1]-hull.bottom-.04||box.min[1]>=home[1]+hull.top+profile.bob+.04)continue;const dx=Math.max(box.min[0]-home[0],0,home[0]-box.max[0]),dz=Math.max(box.min[2]-home[2],0,home[2]-box.max[2]);radius=Math.min(radius,Math.max(0,Math.hypot(dx,dz)-hull.horizontal-.04));}
+ }
+ const omega=profile.speed/Math.max(.2,radius)*(exhibit?.40:1),a=time*omega+phase,x=Math.sin(a)*radius,z=Math.sin(a*.73)*radius*.42,yaw=f.homeYaw||0,c=Math.cos(yaw),s=Math.sin(yaw);
+ out[0]=home[0]+c*x+s*z;out[2]=home[2]-s*x+c*z;
+ let y=home[1]+(crawl?0:Math.sin(a*.61+phase)*profile.bob*(exhibit?.45:1));
+ if(!exhibit){
+  const floorFn=context?.groundHeight||(typeof groundHeight==='function'?groundHeight:null),roofFn=context?.ceilingAt||(typeof OceanRegions!=='undefined'?OceanRegions.ceilingAt:null);
+  let floor=Number.isFinite(f.habitatFloor)?f.habitatFloor:-Infinity,roof=Number.isFinite(f.habitatCeiling)?f.habitatCeiling:0;
+  // Sample the full horizontal envelope. Root-supplied habitat limits are
+  // centre-height limits, already reduced by the authored model clearance.
+  for(let i=0;i<9;i++){const a=i*TAU/8,r=i===8?0:hull.horizontal,px=out[0]+Math.cos(a)*r,pz=out[2]+Math.sin(a)*r;if(floorFn)floor=Math.max(floor,floorFn(px,pz)+hull.bottom+(crawl?0:.025));if(roofFn)roof=Math.min(roof,roofFn(px,pz,home[1])-hull.top-.025);}
+  if(floor<=roof)y=clamp(y,floor,roof);else {out[0]=home[0];out[2]=home[2];y=home[1];}
+ }
+ out[1]=y;return out;
+}
+function abyssMotionPose(f,time,out=f.p,context=null){
+ const sp=SPECIES[f.species],profile=sp.motionProfile;abyssTrajectory(f,time,out,context);abyssTrajectory(f,time+.06,abyssAhead,context);abyssTrajectory(f,time-.06,abyssBehind,context);
+ const dx=abyssAhead[0]-abyssBehind[0],dy=abyssAhead[1]-abyssBehind[1],dz=abyssAhead[2]-abyssBehind[2],speed=Math.hypot(dx,dy,dz)/.12;
+ f.yaw=Math.hypot(dx,dz)>.00001?Math.atan2(-dz,dx):(f.homeYaw||0);f.pitch=sp.traits.motion==='crawl'?0:clamp(Math.atan2(dy,Math.hypot(dx,dz)),-.10,.10);f.bank=0;f.effort=clamp(speed/Math.max(.01,profile.speed),.08,1);f.abyssBeat=profile.beat;f.faunaVisibility=1;f.faunaVisible=true;f.retreat=0;f.faunaTime=time;return out;
+}
 // Public seam used by the world, aquarium and tests. It updates only pose/state;
 // home, uid and s are immutable. react:false is a deterministic exhibit playback.
 function faunaMotionPose(f,time,out=f.p,context=null){
+ if(SPECIES[f.species]?.abyss)return abyssMotionPose(f,time,out,context);
  if(SPECIES[f.species]?.cetacean||SPECIES[f.species]?.traits?.motion==='cetacean')return cetaceanMotionPose(f,time,out,context);
  const id=SPECIES[f.species]?.id,phase=f.phase??f.bob??0,home=f.home||f.center;
  faunaTrajectory(f,time,out);faunaTrajectory(f,time+.055,faunaAhead);faunaTrajectory(f,time-.055,faunaBehind);

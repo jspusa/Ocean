@@ -4,7 +4,7 @@ const fs=require('node:fs'),vm=require('node:vm'),zlib=require('node:zlib'),asse
 const raw=zlib.gunzipSync(fs.readFileSync('assets/reef.mesh.gz')),h=JSON.parse(raw.subarray(8,8+raw.readUInt32LE(4))),actors=h.life.map(i=>h.nodes[i]);
 const previous=JSON.parse(fs.readFileSync('tests/parity/fixtures/v010-actors.json')).actors;
 const context=vm.createContext({console});
-for(const name of ['engine','world','reef_detail','next_reef','open_world','fauna','cetaceans','fauna_world'])vm.runInContext(fs.readFileSync('src/'+name+'.js','utf8'),context);
+for(const name of ['engine','world','reef_detail','next_reef','open_world','fauna','cetaceans','abyss_fauna','fauna_world'])vm.runInContext(fs.readFileSync('src/'+name+'.js','utf8'),context);
 context.bakedSurface=(x,z)=>{
  const base=8+raw.readUInt32LE(4);
  for(const batch of h.batches.filter(b=>b.material===1&&b.maxDistance===100)){
@@ -24,14 +24,14 @@ check('Every legacy individual keeps its identity and original scale baseline',(
  for(const old of previous){const n=current.get(old.uid);assert(n,'missing '+old.uid);assert.equal(n.species??null,old.species);assert.equal(n.bioSeed,old.bioSeed);assert.equal(JSON.stringify(n.bioBaseScale??null),JSON.stringify(old.bioBaseScale));}
 });
 check('All eight new catalogue entries have actual metre-scaled distinct actors',()=>{
- assert.equal(FAUNA_SPECIES.length,8);assert.equal(actors.filter(f=>f.fauna&&!SPECIES[f.species]?.cetacean).length,31);
+ assert.equal(FAUNA_SPECIES.length,8);assert.equal(actors.filter(f=>f.fauna&&!SPECIES[f.species]?.cetacean&&!SPECIES[f.species]?.abyss).length,31);
  for(const sp of FAUNA_SPECIES){const found=actors.filter(f=>SPECIES[f.species].id===sp.id);assert(found.length>=3);for(const f of found){assert.equal(f.s[0],sp.size);assert(f.modelCenter.every(Number.isFinite));assert(f.home.every(Number.isFinite));assert.equal(f.uid.split('-')[0],sp.id);}}
 });
 check('Each new high and low mesh uses the same actual actor identities',()=>{
  for(const sp of FAUNA_SPECIES){const index=SPECIES.indexOf(sp),b=header.batches.filter(b=>b.species===index);assert.equal(b.length,2);assert(b.every(b=>b.kind===8&&b.dynamic));assert.equal(JSON.stringify(b[0].instanceIDs),JSON.stringify(b[1].instanceIDs));assert(b[0].maxDistance===b[1].minDistance);assert(b[1].maxDistance>b[1].minDistance);}
 });
 check('Micro habitats are outside reef collision volumes and within swimming reach',()=>{
- for(const f of actors.filter(f=>f.fauna&&speciesTraits(f.species).micro)){assert(FaunaWorldRules.clearSite(f.home[0],f.home[2]),f.uid);const ground=groundHeight(f.home[0],f.home[2]);assert(f.home[1]>=ground-.001);const point=animalFocusPoint(f),player=[f.home[0],ground+.83,f.home[2]];assert(V.dist(point,player)<=speciesTraits(f.species).observeDistance,f.uid+' not reachable');}
+ for(const f of actors.filter(f=>f.fauna&&!SPECIES[f.species]?.abyss&&speciesTraits(f.species).micro)){assert(FaunaWorldRules.clearSite(f.home[0],f.home[2]),f.uid);const ground=groundHeight(f.home[0],f.home[2]);assert(f.home[1]>=ground-.001);const point=animalFocusPoint(f),player=[f.home[0],ground+.83,f.home[2]];assert(V.dist(point,player)<=speciesTraits(f.species).observeDistance,f.uid+' not reachable');}
 });
 check('Crawling actors sit on the authored support rather than floating above it',()=>{
  for(const f of actors.filter(f=>f.fauna&&['cinderella_slug','frogfish'].includes(SPECIES[f.species].id))){const gap=f.home[1]-FaunaWorldRules.surfaceHeight(f.home[0],f.home[2])-.10;assert(gap>=0&&gap<.004,f.uid+' floor gap '+gap);}

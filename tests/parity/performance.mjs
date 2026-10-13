@@ -1,6 +1,6 @@
 // Real rendered requestAnimationFrame intervals on this machine, not promised FPS.
 // node tests/parity/performance.mjs [URL] [--touch]
-// Four consecutive 20 s scenes; the last two leave automatic resolution active.
+// Seven consecutive 20 s scenes; five leave automatic resolution active.
 import {createRequire} from 'node:module';
 import {homedir} from 'node:os';
 import {mkdir,writeFile} from 'node:fs/promises';
@@ -19,7 +19,7 @@ try{
  await page.waitForFunction(()=>document.getElementById('loading').classList.contains('hidden'));
  await page.evaluate(()=>$('welcomeAudio').checked=false);await page.locator('#startBtn').click();
  await page.evaluate(()=>{voyage.state.mode='free';settings.adaptive=false;settings.third=false;settings.lamp=false;renderer.quality=2;renderer.dynamicScale=1;renderer.resize();stopAuto();player.p=[0,-8,7];player.velocity=[0,0,0];player.yaw=0;player.pitch=-.05;resetInput();});
- for(const scene of ['reef','microcosm','cetacean-adaptive','reef-adaptive']){
+ for(const scene of ['reef','microcosm','cetacean-adaptive','reef-adaptive','cave-adaptive','ruins-adaptive','abyss-adaptive']){
   const adaptive=scene.endsWith('-adaptive');
   let fixture={};
   if(scene==='microcosm'){
@@ -29,6 +29,8 @@ try{
    fixture=await page.evaluate(scene=>{
     oceanMicrocosm.exit();closePanel();stopAuto();resetInput();settings.adaptive=true;
     if(window.__freeze||!active)throw Error('Adaptive measurement requires the active animation loop');
+    const regionViews={'cave-adaptive':{p:[-218,-26,-69],aim:[-218,-25,-47.5]},'ruins-adaptive':{p:[176,-49,-197],aim:[187,-51,-225]},'abyss-adaptive':{p:[-145,-78,-286],aim:[-151,-76,-310]}};
+    if(regionViews[scene]){const v=regionViews[scene];player.p=collide(v.p.slice());player.velocity=[0,0,0];const delta=V.sub(v.aim,player.p);player.yaw=Math.atan2(delta[0],-delta[2]);player.pitch=Math.atan2(delta[1],Math.hypot(delta[0],delta[2]));cameraCut=true;return {kind:scene,camera:player.p.slice(),aim:v.aim,allWorldBatchesPreserved:true};}
     if(scene==='cetacean-adaptive'){
      const actors=life.filter(f=>SPECIES[f.species].id==='orca');if(actors.length!==3)throw Error('Expected three real world orcas');
      const home=[0,1,2].map(i=>actors.reduce((sum,f)=>sum+f.home[i],0)/actors.length);
@@ -50,7 +52,7 @@ try{
    const originalRecord=oceanPerf.record,originalPause=oceanPerf.pause,frames=[],batchFlags=renderer.batches.map(b=>b.visible);
    const orcaIndex=SPECIES.findIndex(s=>s.id==='orca'),orcaBatches=renderer.batches.filter(b=>b.kind===9&&b.species===orcaIndex);
    const actors=life.filter(f=>f.species===orcaIndex),ext=renderer.gl.getExtension('WEBGL_debug_renderer_info');
-   const snapshot=()=>({adaptive:settings.adaptive,quality:renderer.quality,dynamicScale:renderer.dynamicScale,resolution:[renderer.canvas.width,renderer.canvas.height],msaaSamples:renderer.msaaSamples,drawCalls:renderer.drawCalls,submittedTriangles:renderer.submittedTriangles,shadowDraws:renderer.shadowDraws,simulationTime:t,position:player.p.slice(),renderer:ext?renderer.gl.getParameter(ext.UNMASKED_RENDERER_WEBGL):'not disclosed',glVersion:renderer.gl.getParameter(renderer.gl.VERSION)});
+   const snapshot=()=>({adaptive:settings.adaptive,quality:renderer.quality,dynamicScale:renderer.dynamicScale,resolution:[renderer.canvas.width,renderer.canvas.height],msaaSamples:renderer.msaaSamples,drawCalls:renderer.drawCalls,submittedTriangles:renderer.submittedTriangles,shadowDraws:renderer.shadowDraws,simulationTime:t,position:player.p.slice(),renderer:ext?renderer.gl.getParameter(ext.UNMASKED_RENDERER_WEBGL):'not disclosed',glVersion:renderer.gl.getParameter(renderer.gl.VERSION),contextLost:renderer.gl.isContextLost(),sceneLoad:{...renderer.sceneLoad}});
    let previous=0,elapsed=0,done=false,initial,timeout;
    const restore=()=>{oceanPerf.record=originalRecord;oceanPerf.pause=originalPause;clearTimeout(timeout);};
    const fail=error=>{if(done)return;done=true;restore();reject(error);};
@@ -83,7 +85,7 @@ try{
    timeout=setTimeout(()=>fail(Error('No complete 20 s rendered interval collection')),45000);
   }),{adaptive,scene});
   results.push({scene,fixture,...data});
-  if(!data.report||data.report.renderedFrames<2||data.final.simulationTime<=data.initial.simulationTime||!data.allBatchFlagsPreserved)throw Error('Incomplete live scene: '+scene);
+  if(data.final.contextLost||!data.final.sceneLoad.compiled||!data.report||data.report.renderedFrames<2||data.final.simulationTime<=data.initial.simulationTime||!data.allBatchFlagsPreserved)throw Error('Incomplete live scene: '+scene);
   console.log(scene+': '+data.report.averageFPS.toFixed(2)+' FPS, P95 '+data.report.p95FrameMs.toFixed(2)+' ms, GL '+data.gl+', adaptive '+data.adaptive+', quality '+data.initial.quality+' → '+data.final.quality+', scale '+data.initial.dynamicScale.toFixed(3)+' → '+data.final.dynamicScale.toFixed(3));
  }
  if(errors.length||results.some(r=>r.gl))throw Error('Runtime rendering errors: '+errors.join(';'));

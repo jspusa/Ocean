@@ -6,7 +6,7 @@ page.on('pageerror',e=>errors.push(e.message));const check=(name,pass,detail)=>{
 try{
  await page.goto(url);await page.waitForFunction(()=>window.__ocean?.ready,{timeout:90000});await page.evaluate(()=>{window.__freeze=true;$('welcomeAudio').checked=false});
  await eq('one actual named research vessel loads from compiled scene',()=>renderer.sceneLoad.compiled&&renderer.batches.filter(b=>b.sceneRole==='research-vessel').length===1);
- await page.locator('#shipResearch [data-feature="navigation"]').click();check('new journey offers home and three gated destinations',await page.locator('[data-mooring]').count()===4&&await page.locator('[data-mooring="east"]').isDisabled());
+ await page.locator('#shipResearch [data-feature="navigation"]').click();check('new journey offers home and six gated destinations',await page.locator('[data-mooring]').count()===7&&await page.locator('[data-mooring="east"]').isDisabled());
  await eq('locked mooring rejects direct request too',()=>!oceanNavigation.move('east')&&oceanNavigation.snapshot().mooring==='home');
  await page.evaluate(()=>{voyage.state.completed=['arrival'];oceanNavigation.feature.renderPanel('navigation')});await page.locator('[data-mooring="west"]').click();
  await eq('move updates actual original mesh, shared origin and stored selection',()=>{const s=oceanNavigation.snapshot();return s.mooring==='west'&&s.boat[0]===-94&&JSON.stringify(s.mesh)===JSON.stringify(s.boat)&&JSON.parse(localStorage.getItem(VOYAGE_KEY)).features.navigation.mooring==='west'});

@@ -32,3 +32,8 @@
 /* Focused observation occupies the mission region, preserving the touch controls. */
 @media(pointer:coarse){#hud:has(#individualCard:not(.hidden)) .objective-card{visibility:hidden;pointer-events:none}}
 @media(pointer:coarse) and (orientation:portrait){#individualCard{left:var(--edge);top:94px;bottom:auto;transform:none;max-width:calc(100vw - 145px);padding:10px 12px;flex-direction:column;align-items:flex-start;gap:7px}#individualCard b{font-size:11px;line-height:1.65}#nextIndividual{font-size:10px;min-height:40px;width:100%}}
+
+/* Research content grows with the voyage. Keep the footer in the scroll flow
+   so it never covers a research action or clips the start of a tall board. */
+.ship-screen{align-content:safe center;row-gap:32px}
+.welcome-bottom{position:static;grid-column:1/-1;align-self:end;width:100%;flex-shrink:0}

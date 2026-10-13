@@ -5,11 +5,14 @@ const NavigationRules=(()=>{
   {id:'home',name:'歸潮錨地',p:[-24,0,43],look:'garden',hint:'第一次下水的地方。淺礁與珊瑚花園就在船外。'},
   {id:'west',name:'西環礁泊位',p:[-94,0,-59],look:'gate',requires:'arrival',visited:'gate',hint:'完成「第一道光」，或親自抵達環礁之門後開放。'},
   {id:'east',name:'眠海東泊位',p:[98,0,-137],look:'wreck',requires:'passage',visited:'wreck',hint:'完成「熟悉之外」，或親自抵達眠海號後開放。'},
-  {id:'offshore',name:'遠洋觀測泊位',p:[-10,0,-208],look:'pelagic',requires:'archive',visited:'pelagic',hint:'讀取眠海號的信，或親自抵達遠洋迴廊後開放。'}
+  {id:'offshore',name:'遠洋觀測泊位',p:[-10,0,-208],look:'pelagic',requires:'archive',visited:'pelagic',hint:'讀取眠海號的信，或親自抵達遠洋迴廊後開放。'},
+  {id:'cave',name:'玄紋洞外泊位',p:[-211,0,-27],look:'cave',story:0,hint:'接下「回聲潮譜」調查後開放。洞口位於船南側的深處。'},
+  {id:'ruins',name:'沉潮遺跡泊位',p:[176,0,-182],look:'ruins',story:1,hint:'回船回報洞窟調查後開放。向南下潛可見遺跡門廊。'},
+  {id:'abyss',name:'西南深水泊位',p:[-154,0,-255],look:'abyss',story:3,hint:'完成刻文重讀與洞中核對，回船解讀後開放。'}
  ];
  const initial=()=>({schema:1,mooring:'home',moves:0});
  function sanitize(raw){return {schema:1,mooring:moorings.some(m=>m.id===raw?.mooring)?raw.mooring:'home',moves:Number.isFinite(raw?.moves)?Math.floor(Math.max(0,Math.min(1e7,raw.moves))):0};}
- function unlocked(m,v){return m.id==='home'||v.mode==='free'||v.completed.includes(m.requires)||v.visited.includes(m.visited);}
+ function unlocked(m,v){return m.id==='home'||v.mode==='free'||(m.story!==undefined?!!v.features?.story?.started&&v.features.story.reports>=m.story:v.completed.includes(m.requires)||v.visited.includes(m.visited));}
  function constrain(p,origin){const dx=p[0]-origin[0],dz=p[2]-origin[2],d=Math.hypot(dx,dz);return d>range?[origin[0]+dx/d*range,p[1],origin[2]+dz/d*range]:p.slice();}
  return {range,moorings,initial,sanitize,unlocked,constrain};
 })();

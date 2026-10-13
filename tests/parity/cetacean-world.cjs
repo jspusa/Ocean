@@ -2,7 +2,7 @@
 const fs=require('node:fs'),vm=require('node:vm'),zlib=require('node:zlib'),assert=require('node:assert/strict');
 const raw=zlib.gunzipSync(fs.readFileSync('assets/reef.mesh.gz')),h=JSON.parse(raw.subarray(8,8+raw.readUInt32LE(4))),context=vm.createContext({console,assert,header:h});
 context.previous=JSON.parse(fs.readFileSync('tests/parity/fixtures/v011-actors.json')).actors;
-for(const n of ['engine','world','reef_detail','next_reef','individuals','open_world','fauna','cetaceans','fauna_world','cetacean_world'])vm.runInContext(fs.readFileSync('src/'+n+'.js','utf8'),context,{filename:n});
+for(const n of ['engine','world','reef_detail','next_reef','individuals','open_world','fauna','cetaceans','abyss_fauna','fauna_world','cetacean_world'])vm.runInContext(fs.readFileSync('src/'+n+'.js','utf8'),context,{filename:n});
 vm.runInContext(`
 obstacles.push(...header.obstacles);life.push(...header.life.map(i=>header.nodes[i]));initializeIndividuals({batches:[]});let checks=0;const check=(name,fn)=>{fn();checks++;console.log('PASS '+name)};
 check('All 704 previous identities and physical baselines survive',()=>{const current=new Map([...header.life,...header.decorLife,...header.shoal].map(i=>{const f=header.nodes[i];return [f.uid,f]}));for(const old of previous){const f=current.get(old.uid);assert(f,old.uid);assert.equal(f.species??null,old.species);assert.equal(f.bioSeed,old.bioSeed);assert.equal(JSON.stringify(f.bioBaseScale??null),JSON.stringify(old.bioBaseScale));}});
