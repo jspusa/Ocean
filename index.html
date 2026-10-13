@@ -5,7 +5,7 @@
 <meta name="description" content="重返蔚藍：以綠島石朗為靈感的 3D 海底漫遊概念原型。自由潛水、拍照與觀察圖鑑。非實測潛點。">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 64 64%27%3E%3Crect width=%2764%27 height=%2764%27 rx=%2715%27 fill=%27%23082f3b%27/%3E%3Cpath d=%27M13 25c12-13 25 13 38 0M13 39c12-13 25 13 38 0%27 fill=%27none%27 stroke=%27%23d1e6cc%27 stroke-width=%274%27 stroke-linecap=%27round%27/%3E%3C/svg%3E">
 <title>重返蔚藍 · 光之海</title>
-<link rel="stylesheet" href="src/style.css?v=0.8.0">
+<link rel="stylesheet" href="src/style.css?v=0.9.0">
 </head>
 <body>
 <canvas id="ocean" tabindex="0" aria-label="可互動的三維海底場景" aria-describedby="playInstructions"></canvas>
@@ -13,7 +13,7 @@
 <button id="cinematicExit" aria-label="恢復介面">顯示介面</button><div id="vignette"></div><div id="flash"></div><div id="toast" role="status" aria-live="polite"></div>
 <div id="loading" role="status" aria-live="polite"><div class="loader-mark">≈</div><div>正在走進那片海</div><small id="loadDetail">讓光、潮汐與生命回到水裡</small><div class="loadtrack"><i></i></div></div>
 <section id="welcome" class="welcome ship-screen" aria-label="研究船與航程選單">
- <header class="welcome-top"><div class="brand"><span class="brandmark">≈</span><div>重返蔚藍<small>RETURN TO THE BLUE</small></div></div><span class="edition">LIVING OCEAN<span class="beta">LIGHT & TIDE · 0.8</span></span></header>
+ <header class="welcome-top"><div class="brand"><span class="brandmark">≈</span><div>重返蔚藍<small>RETURN TO THE BLUE</small></div></div><span class="edition">LIVING OCEAN<span class="beta">LIFE & DISCOVERY · 0.9</span></span></header>
  <div class="hero"><div class="eyebrow"><span class="tiny-dot"></span> 第一航程 / THE WATER REMEMBERS</div><h1>海，<br><span>沒有盡頭。</span></h1><p class="hero-copy">穿過搖曳的光，聽見自己的呼吸。<br>在每一次靠近，發現海的另一面。</p><div class="ship-mode" role="group" aria-label="選擇航程"><button id="shipModeJourney" class="selected">航程故事</button><button id="shipModeFree">自由重遊</button></div><div class="hero-actions"><button id="startBtn" class="primary" disabled>開始航程 <span>↗</span></button><button id="tourStart" class="textbtn" disabled><span class="circle-play">▷</span> 自動漫遊</button></div><button id="shipContinue" class="textbtn ship-continue hidden">繼續上次潛水</button><label class="welcome-audio"><input id="welcomeAudio" type="checkbox" checked><span class="sound-wave">♫</span>以原創配樂入海<span class="audio-small">建議戴耳機</span></label><p class="intro-controls" id="introControls">WASD 游動 · 拖曳環視 · C 巡航 · X 取景</p></div>
  <aside class="ship-board"><header><div class="eyebrow">YOUR EXPEDITION</div><b id="shipProgress">00 / 06</b></header><div class="ship-progress"><i id="shipProgressLine"></i></div><small class="ship-next">NEXT MEMORY</small><h2 id="shipOrderName">第一道光</h2><p id="shipOrderDescription"></p><div id="shipCards"></div><nav><button id="shipLog">航程冊 ↗</button><button id="shipChart">海域地圖 ↗</button><button id="shipGallery">圖鑑與照片 ↗</button><button id="shipSettings">畫面與聲音 ↗</button></nav><p id="shipStats"></p><p id="shipFinal" class="hidden">第一航程已完成 · 這片海隨時等你回來。</p></aside>
  <footer class="welcome-bottom"><span id="saveStatus">自動保存 · 無帳號、無追蹤</span><button id="welcomeAbout">原創海域試玩版 · 非實測潛點 ⓘ</button></footer>
@@ -42,16 +42,22 @@
 <div id="photoViewer" class="hidden" role="dialog" aria-modal="true" aria-label="照片預覽"><button id="closePhoto" class="icon-btn" aria-label="關閉照片">×</button><img id="photoImage" alt="你拍攝的遊戲海底畫面"><div><button id="savePhoto" class="primary">儲存照片 ↗</button><span>遊戲截圖 · 非實景照片</span></div></div>
 <div id="errorBox" class="hidden" role="alert"><h2>這個視窗無法啟動 3D</h2><p id="errorMessage">請使用支援 WebGL 2 的瀏覽器，並開啟硬體加速。</p><p>若正在 ChatGPT 或手機檔案預覽內，請改以一般瀏覽器開啟。GitHub Pages 可直接放入這個 HTML。</p><button onclick="location.reload()" class="primary">重新嘗試</button></div>
 <noscript>此海底漫遊需要 JavaScript。請使用允許執行 JavaScript 的瀏覽器開啟。</noscript>
-<script src="src/config.js?v=0.8.0"></script>
-<script src="src/engine.js?v=0.8.0"></script>
-<script src="src/world.js?v=0.8.0"></script>
-<script src="src/reef_detail.js?v=0.8.0"></script>
-<script src="src/next_reef.js?v=0.8.0"></script>
-<script src="src/individuals.js?v=0.8.0"></script>
-<script src="src/open_world.js?v=0.8.0"></script>
-<script src="src/scene_cache.js?v=0.8.0"></script>
-<script src="src/audio.js?v=0.8.0"></script>
-<script src="src/performance.js?v=0.8.0"></script>
-<script src="src/app.js?v=0.8.0"></script>
-<script src="src/voyage.js?v=0.8.0"></script>
+<script src="src/config.js?v=0.9.0"></script>
+<script src="src/engine.js?v=0.9.0"></script>
+<script src="src/world.js?v=0.9.0"></script>
+<script src="src/reef_detail.js?v=0.9.0"></script>
+<script src="src/next_reef.js?v=0.9.0"></script>
+<script src="src/individuals.js?v=0.9.0"></script>
+<script src="src/open_world.js?v=0.9.0"></script>
+<script src="src/scene_cache.js?v=0.9.0"></script>
+<script src="src/audio.js?v=0.9.0"></script>
+<script src="src/performance.js?v=0.9.0"></script>
+<script src="src/app.js?v=0.9.0"></script>
+<script src="src/voyage.js?v=0.9.0"></script>
+<script src="src/features.js?v=0.9.0"></script>
+<script src="src/ecology.js?v=0.9.0"></script>
+<script src="src/exploration.js?v=0.9.0"></script>
+<script src="src/expedition.js?v=0.9.0"></script>
+<script src="src/aquarium.js?v=0.9.0"></script>
+<script src="src/bootstrap.js?v=0.9.0"></script>
 </body></html>

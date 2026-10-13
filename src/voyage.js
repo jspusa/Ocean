@@ -13,7 +13,7 @@ const ORDERS=[
  {id:'song',title:'聽見遠方',en:'THE DISTANT SONG',description:'前往遠洋迴廊，在視野中觀察大翅鯨 4 秒；不必靠得很近。',place:'pelagic',reward:'遠洋回聲',test:s=>s.whaleWatch>=4}
 ];
 const LAYOUT_BOUNDS={left:-285,right:285,top:-395,bottom:215};
-const initialVoyage=()=>({schema:1,mode:'journey',completed:[],visited:[],distance:0,whaleWatch:0,reading:false,bestPhotos:{},waypoint:'garden',dives:0,totalSeconds:0,ended:false,finishedAt:null,companion:false,cruise:false,resume:null});
+const initialVoyage=()=>({schema:1,mode:'journey',completed:[],visited:[],distance:0,whaleWatch:0,reading:false,bestPhotos:{},waypoint:'garden',dives:0,totalSeconds:0,ended:false,finishedAt:null,companion:false,cruise:false,resume:null,features:{}});
 function readVoyage(raw){
  if(!raw||raw.schema!==1)throw new Error('存檔版本不相容');const s=initialVoyage();
  s.mode=raw.mode==='free'?'free':'journey';
@@ -25,6 +25,7 @@ function readVoyage(raw){
  s.waypoint=LANDMARKS.some(l=>l.id===raw.waypoint)?raw.waypoint:'garden';
  if(raw.bestPhotos&&typeof raw.bestPhotos==='object')for(const sp of SPECIES){let p=raw.bestPhotos[sp.id];if(p&&Number.isFinite(p.score))s.bestPhotos[sp.id]={score:Math.round(clamp(p.score,0,100)),individual:String(p.individual||'').slice(0,70),date:Number(p.date)||0};}
  const q=raw.resume;if(q&&Array.isArray(q.p)&&q.p.length===3&&q.p.every(Number.isFinite)&&Number.isFinite(q.yaw)&&Number.isFinite(q.pitch))s.resume={p:[clamp(q.p[0],-260,260),clamp(q.p[1],-91,-.65),clamp(q.p[2],-370,180)],yaw:q.yaw%TAU,pitch:clamp(q.pitch,-1.2,1.2),seconds:clamp(Number(q.seconds)||0,0,100000)};
+ s.features=oceanFeatures.read(raw.features);
  return s;
 }
 const voyage={state:initialVoyage(),storageOK:true,loaded:false,lastSave:0,lastTick:0,sessionDistance:0,sessionSeen:0,sessionStart:0,sessionFirst:true,hasFinished:false,previousPosition:null,awaitingResume:false,gamepadButtons:[],gamepadAttached:false,photoMode:false,radioTimer:null,lastWhale:0,goalFlash:0};
@@ -43,7 +44,7 @@ function evaluateOrders(){
  for(const o of ORDERS)if(!voyage.state.completed.includes(o.id)&&o.test(voyage.state)){
   voyage.state.completed.push(o.id);changed=true;if(active){toast('航程記憶 · '+o.title);oceanAudio.cue('found');}
  }
- if(changed){const o=currentOrder();if(o)voyage.state.waypoint=o.place;else {voyage.state.waypoint='anchorage';if(active)radio('你已把這一趟海記下來了。慢慢回船吧，沒有時間限制。');}saveVoyage();}
+ if(changed){const o=currentOrder();if(o)voyage.state.waypoint=o.place;else {voyage.state.waypoint='anchorage';if(active)radio('你已把這一趟海記下來了。慢慢回船吧，留意這一瓶的剩餘氣量。');}saveVoyage();}
  return changed;
 }
 function shipCamera(){
@@ -93,7 +94,7 @@ takePhoto=function(){
  const before=persistent.photos.at(-1);legacyPhoto();const photo=persistent.photos.at(-1);if(!photo||photo===before)return;const grade=gradePhoto();
  photo.grade=grade.score;photo.metrics=grade.metrics;photo.species=grade.subject?SPECIES[grade.subject.species].name:'海底風景';photo.individual=grade.subject?.uid||null;
  if(grade.subject){const id=SPECIES[grade.subject.species].id,old=voyage.state.bestPhotos[id];if(!old||grade.score>old.score)voyage.state.bestPhotos[id]={score:grade.score,individual:photo.individual,date:photo.date};}
- evaluateOrders();persist();saveVoyage();$('photoScore').textContent=grade.subject?String(grade.score).padStart(2,'0'):'—';$('photoSubject').textContent=photo.species;$('photoFeedback').textContent=grade.breakdown;$('photoResult').classList.remove('hidden');clearTimeout(voyage.photoTimer);voyage.photoTimer=setTimeout(()=>$('photoResult').classList.add('hidden'),6200);
+ oceanFeatures.call('onPhoto',photo);evaluateOrders();persist();saveVoyage();$('photoScore').textContent=grade.subject?String(grade.score).padStart(2,'0'):'—';$('photoSubject').textContent=photo.species;$('photoFeedback').textContent=grade.breakdown;$('photoResult').classList.remove('hidden');clearTimeout(voyage.photoTimer);voyage.photoTimer=setTimeout(()=>$('photoResult').classList.add('hidden'),6200);
 };
 const legacyStart=startDive;
 startDive=function(tour=false){
@@ -104,11 +105,12 @@ startDive=function(tour=false){
  $('cruiseBtn').classList.remove('active');$('photoResult').classList.add('hidden');$('debrief').classList.add('hidden');
  document.body.classList.toggle('free-voyage',voyage.state.mode==='free');
  if(!resume){voyage.state.dives++;radio(voyage.state.mode==='free'?'這次沒有工作。去你喜歡的地方，想回來時，船就在海面上。':'先看看前方那片光。你的航程冊已經翻到第一頁。');}
- renderer.forceShadow=true;saveVoyage();
+ oceanFeatures.call('startDive',{resume:!!resume,tour});renderer.forceShadow=true;saveVoyage();
 };
 const legacyHome=goHome;
 goHome=function(){
  if(!active){legacyHome();renderShip();return;}
+ oceanFeatures.call('endDive');
  const s=voyage.state;const duration=Math.max(0,diveSeconds-voyage.sessionStart);s.totalSeconds+=duration;const newlySeen=Math.max(0,persistent.seen.length-voyage.sessionSeen);
  const allDone=s.completed.length===ORDERS.length;
  if(allDone&&!s.ended){s.ended=true;s.finishedAt=new Date().toISOString();}
@@ -141,7 +143,7 @@ findSpecies=function(index,specific=null){
 function markPlace(id){const l=LANDMARKS.find(l=>l.id===id);if(!l)return;voyage.state.waypoint=id;saveVoyage();closePanel();toast('已標記：'+l.name+' · 跟隨方位前進');}
 renderMap=function(){
  panelTitle('YOUR EXPEDITION CHART','海，比眼前更遠');
- $('panelBody').innerHTML=`<p class="panel-note">連續海域 · ${voyage.state.visited.length}/${LANDMARKS.length} 個地標。點選地標標記航向，不會直接傳送。所有距離皆為遊戲尺度。</p><canvas id="mapCanvas" class="map-canvas" width="600" height="530" aria-label="可點選地標的遊戲海圖"></canvas><div class="chart-places">${LANDMARKS.map((l,i)=>`<button class="chart-place ${voyage.state.visited.includes(l.id)?'known':''}" data-mark="${l.id}"><small>${String(i+1).padStart(2,'0')}</small><span>${l.name}</span><em>${voyage.state.visited.includes(l.id)?'已發現':'待探索'}</em></button>`).join('')}</div><p class="panel-note">這是原創海域，沒有真實經緯度；不是現場路線圖。沒有潛水資格、氧氣或減壓模擬。</p><button id="chartHome" class="muted-btn">結束本次潛水 · 返回研究船</button>`;
+ $('panelBody').innerHTML=`<p class="panel-note">連續海域 · ${voyage.state.visited.length}/${LANDMARKS.length} 個地標。點選地標標記航向，不會直接傳送。所有距離皆為遊戲尺度。</p><canvas id="mapCanvas" class="map-canvas" width="600" height="530" aria-label="可點選地標的遊戲海圖"></canvas><div class="chart-places">${LANDMARKS.map((l,i)=>`<button class="chart-place ${voyage.state.visited.includes(l.id)?'known':''}" data-mark="${l.id}"><small>${String(i+1).padStart(2,'0')}</small><span>${l.name}</span><em>${voyage.state.visited.includes(l.id)?'已發現':'待探索'}</em></button>`).join('')}</div><p class="panel-note">這是原創海域，沒有真實經緯度；不是現場路線圖。氣量用完會回船；此遊戲不是潛水訓練或減壓模擬。</p><button id="chartHome" class="muted-btn">結束本次潛水 · 返回研究船</button>`;
  $('panelBody').querySelectorAll('[data-mark]').forEach(b=>b.onclick=()=>markPlace(b.dataset.mark));$('chartHome').onclick=()=>{closePanel();goHome();};
  $('mapCanvas').onclick=e=>{const rect=e.currentTarget.getBoundingClientRect();const x=(e.clientX-rect.left)/rect.width*600,y=(e.clientY-rect.top)/rect.height*530;for(const l of LANDMARKS){const p=chartPoint(l.x,l.z,600,530);if(Math.hypot(p[0]-x,p[1]-y)<24){markPlace(l.id);return;}}};drawMap();
 };
@@ -153,7 +155,7 @@ drawMap=function(){
   for(let j=0;j<106;j++)for(let i=0;i<120;i++){const gx=LAYOUT_BOUNDS.left+i/120*570,gz=LAYOUT_BOUNDS.top+j/106*610,d=groundHeight(gx,gz),a=clamp((d+86)/80,0,1);ctx.fillStyle=`rgba(112,185,177,${a*.21})`;ctx.fillRect(i*5,j*5,5,5);if(Math.floor(-d/6)!==Math.floor(-groundHeight(gx+4.8,gz)/6)){ctx.fillStyle='#7ab3ae4a';ctx.fillRect(i*5,j*5,1.2,5);}}
   ctx.strokeStyle='#b1d7d41c';for(let i=1;i<8;i++){ctx.beginPath();ctx.moveTo(i*75,0);ctx.lineTo(i*75,530);ctx.moveTo(0,i*66);ctx.lineTo(600,i*66);ctx.stroke();}
  }
- x.drawImage(chartTerrain,0,0,w,h);
+ x.drawImage(chartTerrain,0,0,w,h);oceanFeatures.drawMap(x,w,h);
  x.font='10px sans-serif';x.fillStyle='#9abfbd';x.fillText('N ↑',w-35,22);x.fillText('歸潮海域 / ORIGINAL CONCEPT',17,22);
  if(active){const p=chartPoint(player.p[0],player.p[2],w,h),to=LANDMARKS.find(l=>l.id===voyage.state.waypoint);if(to){const q=chartPoint(to.x,to.z,w,h);x.strokeStyle='#d6ca9e65';x.setLineDash([4,7]);x.beginPath();x.moveTo(...p);x.lineTo(...q);x.stroke();x.setLineDash([]);}x.save();x.translate(...p);x.rotate(player.yaw);x.fillStyle='#edf5e8';x.beginPath();x.moveTo(0,-8);x.lineTo(-5,6);x.lineTo(5,6);x.closePath();x.fill();x.restore();}
  LANDMARKS.forEach((l,i)=>{const p=chartPoint(l.x,l.z,w,h),known=voyage.state.visited.includes(l.id),sel=voyage.state.waypoint===l.id;x.strokeStyle=sel?'#e4cc91':known?'#a5d9d0':'#6b969e';x.fillStyle=known?'#a5d9d0':'#0d3040';x.beginPath();x.arc(...p,sel?8:5,0,TAU);x.fill();x.stroke();x.fillStyle=sel?'#e4cc91':known?'#d3e9e2':'#8babaf';x.font='11px sans-serif';x.fillText(String(i+1).padStart(2,'0')+' '+l.name,p[0]+12,p[1]+4);});
@@ -164,10 +166,19 @@ function renderVoyagePanel(){
  $('panelBody').querySelectorAll('[data-dest]').forEach(b=>b.onclick=()=>markPlace(b.dataset.dest));$('voyageHome').onclick=goHome;$('exportSave').onclick=exportSave;$('importSave').onchange=e=>importSaveFile(e.target.files[0]);
 }
 function exportSave(){saveVoyage();const data={format:'return-blue/save',version:1,exported:new Date().toISOString(),voyage:voyage.state,journal:persistent};const url=URL.createObjectURL(new Blob([JSON.stringify(data)],{type:'application/json'}));download(url,'Return-to-the-Blue-save.json');setTimeout(()=>URL.revokeObjectURL(url),10000);}
+function readPhotoMetadata(raw){
+ const result={};
+ if(raw.camera&&typeof raw.camera==='object'){
+  const c=raw.camera,finite=(v,a,b,f)=>Number.isFinite(v)?clamp(v,a,b):f;
+  result.camera={mode:c.mode==='lens'?'lens':'normal',zoom:finite(c.zoom,25,90,69),aperture:finite(c.aperture,0,16,0),focus:finite(c.focus,0,80,0),exposure:finite(c.exposure,-1.5,1.5,0)};
+ }
+ if(raw.metrics&&typeof raw.metrics==='object'){result.metrics={};for(const k of ['framing','scale','steady','light','distance'])if(Number.isFinite(raw.metrics[k]))result.metrics[k]=clamp(raw.metrics[k],0,k==='distance'?110:100);}
+ return result;
+}
 function validateImport(data){
  if(data?.format!=='return-blue/save'||data.version!==1)throw new Error('不是本遊戲支援的存檔');const state=readVoyage(data.voyage),j=data.journal||{};
  const seen=Array.isArray(j.seen)?[...new Set(j.seen.filter(id=>SPECIES.some(s=>s.id===id)))]:[];
- const photos=Array.isArray(j.photos)?j.photos.slice(-8).filter(p=>p&&typeof p.url==='string'&&p.url.length<1600000&&/^data:image\/jpeg;base64,[A-Za-z0-9+/=]+$/.test(p.url)).map(p=>({url:p.url,date:Number(p.date)||0,area:String(p.area||'海域').slice(0,70),species:String(p.species||'海底風景').slice(0,60),individual:String(p.individual||'').slice(0,70),grade:clamp(Number(p.grade)||0,0,100)})):[];
+ const photos=uniquePhotos(Array.isArray(j.photos)?j.photos.slice(-64).filter(p=>p&&typeof p.url==='string'&&p.url.length<1600000&&/^data:image\/jpeg;base64,[A-Za-z0-9+/=]+$/.test(p.url)).map(p=>({url:p.url,...readPhotoMetadata(p),date:Number.isFinite(p.date)?p.date:0,area:String(p.area||'海域').slice(0,70),species:String(p.species||'海底風景').slice(0,60),individual:String(p.individual||'').slice(0,70),grade:clamp(Number(p.grade)||0,0,100)})):[]).slice(-8);
  const importedSettings={...settings,sound:false};
  for(const key of ['quality','speed','sensitivity'])if(Number.isFinite(j.settings?.[key]))importedSettings[key]=key==='quality'?Math.round(clamp(j.settings[key],0,2)):clamp(j.settings[key],.4,2.4);
  for(const key of ['master','music','ambience','breath'])if(Number.isFinite(j.settings?.[key]))importedSettings[key]=clamp(j.settings[key],0,1);
@@ -181,7 +192,7 @@ function validateImport(data){
 async function importSaveFile(file){
  if(!file)return;if(file.size>16*1024*1024){toast('存檔超過 16 MB 上限。');return;}
  try{const checked=validateImport(JSON.parse(await file.text()));if(!confirm('匯入後會替換目前航程、圖鑑與照片。確定繼續？'))return;
-  if(active){closePanel();goHome();$('debrief').classList.add('hidden');}voyage.state=checked.state;persistent.seen=checked.seen;persistent.photos=checked.photos;persistent.log=checked.log;Object.assign(settings,checked.settings);renderer.quality=settings.quality;renderer.resize();applyVisualSettings();oceanAudio.tick();persist();saveVoyage();renderShip();setCount();toast('存檔已匯入。');
+  if(active){closePanel();goHome();$('debrief').classList.add('hidden');}voyage.state=checked.state;persistent.seen=checked.seen;persistent.photos=checked.photos;persistent.log=checked.log;Object.assign(settings,checked.settings);oceanFeatures.reset();renderer.quality=settings.quality;renderer.resize();applyVisualSettings();oceanAudio.tick();persist();saveVoyage();renderShip();setCount();toast('存檔已匯入。');
  }catch(e){toast('沒有更動進度：'+e.message);}
 }
 function renderPause(){panelTitle('PAUSE / CONTINUE','在海裡，休息一下');$('panelBody').innerHTML=`<div class="pause-actions"><button class="primary" id="resumeBtn">繼續潛水 ↗</button><button class="muted-btn" id="pauseChart">海域地圖</button><button class="muted-btn" id="pauseVoyage">航程與存檔</button><button class="muted-btn" id="pauseSettings">畫面與聲音</button><button class="muted-btn" id="pauseBoat">結束本次潛水 · 返回研究船</button></div><p class="panel-note">此時已暫停游動、動物與航程計時；音樂可以繼續播放。</p>`;$('resumeBtn').onclick=closePanel;$('pauseChart').onclick=()=>openPanel('map');$('pauseVoyage').onclick=()=>openPanel('voyage');$('pauseSettings').onclick=()=>openPanel('settings');$('pauseBoat').onclick=goHome;}
@@ -208,7 +219,7 @@ updateLife=function(time){legacyLifeUpdate(time);if(typeof voyage==='undefined'|
 function voyageTick(dt){
  if(!active||modal||photoOpen)return;
  for(const l of LANDMARKS){const d=Math.hypot(player.p[0]-l.x,player.p[2]-l.z);if(d<(l.radius||12)&&!voyage.state.visited.includes(l.id)){voyage.state.visited.push(l.id);saveVoyage();}}
- observeWhale(dt);evaluateOrders();paintVoyageHUD();
+ observeWhale(dt);evaluateOrders();oceanFeatures.call('tick',dt);if(!active)return;paintVoyageHUD();
  if(t-voyage.lastSave>8){voyage.lastSave=t;saveVoyage();}
 }
 function pollGamepad(){
@@ -225,13 +236,14 @@ function pollGamepad(){
 }
 function initVoyage(){
  loadVoyage();renderShip();
- $('voyageBtn').onclick=()=>openPanel('voyage');$('objectiveCard').onclick=()=>openPanel('voyage');$('pauseBtn').onclick=()=>openPanel('pause');$('cruiseBtn').onclick=toggleCruise;$('photoModeBtn').onclick=togglePhotoMode;$('interactBtn').onclick=readLogger;
+ $('voyageBtn').onclick=()=>openPanel('voyage');$('objectiveCard').onclick=()=>openPanel('voyage');$('pauseBtn').onclick=()=>openPanel('pause');$('cruiseBtn').onclick=toggleCruise;$('photoModeBtn').onclick=()=>togglePhotoMode();$('interactBtn').onclick=readLogger;
  $('shipModeJourney').onclick=()=>{voyage.state.mode='journey';saveVoyage();renderShip();};$('shipModeFree').onclick=()=>{voyage.state.mode='free';saveVoyage();renderShip();};
  $('shipContinue').onclick=()=>{voyage.awaitingResume=true;startDive(false);};$('shipLog').onclick=()=>openPanel('voyage');$('shipChart').onclick=()=>openPanel('map');$('shipGallery').onclick=()=>openPanel('journal');$('shipSettings').onclick=()=>openPanel('settings');
  $('debriefClose').onclick=()=>$('debrief').classList.add('hidden');$('debriefExport').onclick=exportSave;
  $('companionBtn').onclick=()=>{voyage.state.companion=!voyage.state.companion;saveVoyage();paintVoyageHUD();toast(voyage.state.companion?'海豚會保持距離，與你一起游動。':'海豚回到自己的航線。');};
  // Capture shortcuts before the old nearest-animal shortcut; no duplicate input actions.
  window.addEventListener('keydown',e=>{if(['INPUT','TEXTAREA','SELECT'].includes(document.activeElement?.tagName))return;
+  if(e.code==='Escape'&&oceanFeatures.some('escape')){e.preventDefault();e.stopImmediatePropagation();return;}
   if(e.code==='Escape'&&active&&!modal&&!photoOpen){e.preventDefault();e.stopImmediatePropagation();openPanel('pause');}
   if(active&&!modal&&!photoOpen&&!e.repeat){if(e.code==='KeyF'&&!$('interactBtn').classList.contains('hidden')){e.preventDefault();e.stopImmediatePropagation();readLogger();}if(e.code==='KeyC'){toggleCruise();}if(e.code==='KeyX'){togglePhotoMode();}if(e.code==='KeyB'){openPanel('voyage');}}
  },true);

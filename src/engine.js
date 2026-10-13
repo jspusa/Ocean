@@ -429,12 +429,26 @@ void main(){float center=distanceAt(uv),sum=0.;vec4 filtered=vec4(0.);
 const POST_FS=`#version 300 es
 precision highp float;in vec2 uv;out vec4 frag;
 uniform sampler2D uScene;uniform sampler2D uDepth;uniform sampler2D uVolume;
-uniform vec2 uResolution;uniform vec2 uVolumeResolution;uniform mat4 uInvVP;uniform vec3 uEye;uniform float uTime;uniform float uSun;uniform float uExposure;uniform float uClarity;uniform float uLamp;uniform int uQuality;
+uniform vec2 uResolution;uniform vec2 uVolumeResolution;uniform mat4 uInvVP;uniform vec3 uEye;uniform float uTime;uniform float uSun;uniform float uExposure;uniform float uPhotoAperture;uniform float uPhotoFocus;uniform float uClarity;uniform float uLamp;uniform int uQuality;
 ${WATER_OPTICS_GLSL}
 vec3 world(vec2 p,float d){vec4 h=uInvVP*vec4(p*2.-1.,d*2.-1.,1.);return h.xyz/h.w;}
 vec3 film(vec3 x){return clamp((x*(2.51*x+.03))/(x*(2.43*x+.59)+.14),0.,1.);}
 void main(){float d=texture(uDepth,uv).r;vec3 p=world(uv,min(d,.99999)),rd=normalize(p-uEye);float distanceTo=min(length(p-uEye),700.);
  vec3 col=texture(uScene,uv).rgb;
+ // Camera-only circle of confusion: actual scene depth drives foreground/background blur.
+ // Keep high-contrast foreground silhouettes from bleeding across the focused subject.
+ if(uPhotoAperture>0.){
+  float coc=clamp(abs(distanceTo-uPhotoFocus)/max(distanceTo,.5)*18./uPhotoAperture,0.,8.);
+  if(coc>.35){vec3 sum=col;float total=1.;
+   for(int k=0;k<12;k++){float a=float(k)*2.39996323;float r=sqrt((float(k)+.5)/12.)*coc;
+    vec2 q=clamp(uv+vec2(cos(a),sin(a))*r/uResolution,vec2(.0001),vec2(.9999));
+    float nd=length(world(q,min(texture(uDepth,q).r,.99999))-uEye);
+    float nc=clamp(abs(nd-uPhotoFocus)/max(nd,.5)*18./uPhotoAperture,0.,8.);
+    float weight=smoothstep(r-.7,r+.7,nc+.8)*exp(-max(0.,distanceTo-nd)*.20);
+    sum+=texture(uScene,q).rgb*weight;total+=weight;
+   }col=sum/total;
+  }
+ }
  // Four depth-aware reconstruction taps prevent light/occlusion halos around foreground fish.
  vec2 grid=uv*uVolumeResolution-.5,base=floor(grid),f=fract(grid);vec4 fog=vec4(0.);float weights=0.;
  for(int y=0;y<2;y++)for(int x=0;x<2;x++){vec2 q=(base+vec2(x,y)+.5)/uVolumeResolution;
@@ -658,7 +672,7 @@ class Renderer{
   const postUniforms=pp=>{g.useProgram(pp.p);this.bindTex(0,this.sceneColor);this.bindTex(1,this.sceneDepth);this.bindTex(2,this.shadowTexture);this.bindTex(3,this.volumeColor);
    g.uniform1i(this.uniform(pp,'uScene'),0);g.uniform1i(this.uniform(pp,'uDepth'),1);g.uniform1i(this.uniform(pp,'uVolumeShadow'),2);g.uniform1i(this.uniform(pp,'uVolume'),3);
    this.bindTex(9,this.textures[8]);g.uniform1i(this.uniform(pp,'uCaustic'),9);
-   g.uniform2f(this.uniform(pp,'uResolution'),this.canvas.width,this.canvas.height);g.uniform2f(this.uniform(pp,'uVolumeResolution'),this.volumeW,this.volumeH);g.uniform1f(this.uniform(pp,'uTime'),t);g.uniform1i(this.uniform(pp,'uQuality'),this.quality);g.uniform1f(this.uniform(pp,'uExposure'),this.exposure);
+   g.uniform2f(this.uniform(pp,'uResolution'),this.canvas.width,this.canvas.height);g.uniform2f(this.uniform(pp,'uVolumeResolution'),this.volumeW,this.volumeH);g.uniform1f(this.uniform(pp,'uTime'),t);g.uniform1i(this.uniform(pp,'uQuality'),this.quality);g.uniform1f(this.uniform(pp,'uExposure'),this.exposure);g.uniform1f(this.uniform(pp,'uPhotoAperture'),this.photoAperture||0);g.uniform1f(this.uniform(pp,'uPhotoFocus'),this.photoFocus||8);
    g.uniformMatrix4fv(this.uniform(pp,'uInvVP'),false,inv);g.uniformMatrix4fv(this.uniform(pp,'uLightVP'),false,this.lightVP);g.uniform3fv(this.uniform(pp,'uEye'),eye);g.uniform3fv(this.uniform(pp,'uLightDir'),this.lightDir);g.uniform3fv(this.uniform(pp,'uLightColor'),this.lightColor);g.uniform1f(this.uniform(pp,'uSun'),this.sun);g.uniform1f(this.uniform(pp,'uClarity'),this.clarity);g.uniform1f(this.uniform(pp,'uLamp'),this.lamp?1:0);g.bindVertexArray(this.postVAO);};
   g.bindFramebuffer(g.FRAMEBUFFER,this.volumeFBO);g.viewport(0,0,this.volumeW,this.volumeH);postUniforms(this.volumeProgram);this.bindTex(3,null);g.drawArrays(g.TRIANGLES,0,3);
   g.bindFramebuffer(g.FRAMEBUFFER,this.volumeFilteredFBO);postUniforms(this.volumeFilterProgram);g.drawArrays(g.TRIANGLES,0,3);
