@@ -37,11 +37,13 @@ class OceanAudio {
  }
  tick(){if(!this.ctx)return;const c=this.ctx,now=c.currentTime;
   if(document.hidden||!this.enabled||!settings.sound){this.master.gain.setTargetAtTime(0,now,.08);return;}
-  const available=active||(modal==='training'&&typeof oceanEcology!=='undefined'&&!!oceanEcology.snapshot().training);this.master.gain.setTargetAtTime(available?settings.master:0,now,.70);
+  const training=modal==='training'&&typeof oceanEcology!=='undefined'&&!!oceanEcology.snapshot().training;
+  const resting=modal==='shipRest'&&typeof oceanShip!=='undefined'&&oceanShip.snapshot().mode==='rest';
+  const available=active||training||resting;this.master.gain.setTargetAtTime(available?settings.master:0,now,.70);
   this.depth=Math.max(0,-player.p[1]);const blend=clamp((this.depth-12)/36,0,1);this.blend=blend;
   this.music.gain.setTargetAtTime(settings.music*((modal || photoOpen) ? .62 : 1),now,1.2);
   // Parentheses are explicit: opening a panel ducks music, it does not restart it.
-  this.environment.gain.setTargetAtTime(settings.ambience*((modal || photoOpen) ? .55 : 1),now,.35);
+  this.environment.gain.setTargetAtTime(resting?0:settings.ambience*((modal || photoOpen) ? .55 : 1),now,.35);
   this.stems[0].gain.setTargetAtTime(this.custom?0:Math.cos(blend*Math.PI/2),now,3.0);
   this.stems[1].gain.setTargetAtTime(this.custom?0:Math.sin(blend*Math.PI/2),now,3.0);
   this.waterFilter.frequency.setTargetAtTime(mix(720,320,blend),now,2);

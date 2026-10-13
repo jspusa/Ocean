@@ -1,5 +1,5 @@
 {
-  "version": "0.12.0",
+  "version": "0.12.1",
   "scope": "served game and build sources",
   "files": [
     {
@@ -14,13 +14,13 @@
     },
     {
       "path": "README.md",
-      "bytes": 9750,
-      "sha256": "4448cc1b0050c6781b1278f84552cbb152c2775451365b0b13956c98c994ac2f"
+      "bytes": 9946,
+      "sha256": "e8e44867a35ae3140e11f4f3991e84a7540ae541bd3eb64210eb1fe08016d794"
     },
     {
       "path": "VERSION",
       "bytes": 7,
-      "sha256": "8a932413d42f95082f8323447652379a4885e328329efca3a67ec9c793c09940"
+      "sha256": "f6ee69bf1c4b27a242266ccb5aeb4aa8c8306345b9ebe4ff7335b8c940452b81"
     },
     {
       "path": "assets/caustics.jpg",
@@ -179,8 +179,8 @@
     },
     {
       "path": "assets/reef.mesh.gz",
-      "bytes": 16250706,
-      "sha256": "099c7a1fcb0e52a8e4cfee4c2db18ee475f3f5d40f1c9d36e528abbcc5b1b622"
+      "bytes": 16250694,
+      "sha256": "46742a1ad5531acfeeb1c421f13b989ca4f23eb0d1854d298f869c5ac2626714"
     },
     {
       "path": "assets/rock_diff.jpg",
@@ -224,8 +224,8 @@
     },
     {
       "path": "index.html",
-      "bytes": 12716,
-      "sha256": "9a09615346c54ee6883d10bc640f536a42b62289d81573504025f3d2a76454bd"
+      "bytes": 12718,
+      "sha256": "5c2da01cfd48875faf25f6a51fb93ae858f7460783c3b37109f7a2d4fc9d3a26"
     },
     {
       "path": "music/blue_silence.mp3",
@@ -254,8 +254,8 @@
     },
     {
       "path": "src/audio.js",
-      "bytes": 10564,
-      "sha256": "f7a6c669b2bcb170312f415db10ed7e26eaf141598811cf617380ce6c8ca1088"
+      "bytes": 10712,
+      "sha256": "cce34910f60930d391d41d0994cd9c99f0f950c4822c9f0cd61890b50833e0d0"
     },
     {
       "path": "src/bootstrap.js",
@@ -275,7 +275,7 @@
     {
       "path": "src/config.js",
       "bytes": 2087,
-      "sha256": "f55c48cebf82a93ddfae2217f13be6ade8df49fabe1cdbdcf07f34ddfc7677ee"
+      "sha256": "17a968c15923f791cb762b168ffe7b5d6f3c4f3c31f0c0b563e5749043336ddb"
     },
     {
       "path": "src/ecology.js",
@@ -335,7 +335,7 @@
     {
       "path": "src/open_world.js",
       "bytes": 14354,
-      "sha256": "e4021b3fe08ac2fd5f6e1e016f43bf98561a09608023cfcec69cb3f7d7a7f12a"
+      "sha256": "1ad1d3f47f92005cd48b5a7c15a1ef90c83ccde11457498c7af0a38505678848"
     },
     {
       "path": "src/performance.js",
@@ -359,8 +359,8 @@
     },
     {
       "path": "src/shell.html",
-      "bytes": 11431,
-      "sha256": "060adc9e90d8ed935d0f4c982a9d34347ac42aa9b28cb9cb2a0c0d14a33b95e2"
+      "bytes": 11433,
+      "sha256": "4f624379f401fe51bd93e4245890325d4f1c77ed58e92c3e41dbc56d2b839560"
     },
     {
       "path": "src/ship.js",

@@ -1,4 +1,4 @@
-# 海上的朋友 0.12 — 驗證報告
+# 海上的朋友 0.12.1 — 驗證報告
 
 2026-10-13，macOS／Chrome／Apple M3 Max 原生 WebGL2 Metal。手機項目是 Chromium 觸控模擬，沒有實體 iPhone／Android 驗收。完整 Wii 第一代對等目標仍在進行，[功能追蹤](FEATURE_PARITY.md) 保留全部缺口；前版完整證據另存 [0.11 報告](docs/TEST_REPORT-v011.md)。
 
@@ -36,9 +36,21 @@
 
 圖鑑27張JPG皆為實際WebGL模型棚景，新增7張不是海洋照片。形態來源、原創藝術及尺度見 [CETACEAN-REFERENCE](docs/parity/CETACEAN-REFERENCE.md) 和 [CREDITS](CREDITS.md)。
 
+## 0.12.1 休憩音樂修正
+
+發布後交付複查發現原有休憩音樂只有解碼成功，因主輸出僅允許潛水／訓練而實際靜音。已讓 `shipRest` 且真實rest模式開啟音樂，包括閒置欣賞；原創和本機來源不需重建，離開休憩淡出。休憩環境匯流排為0，水下呼吸／泡泡仍只在潛水啟用。
+
+| 檢查 | 證據 | 狀態 |
+|---|---|:---:|
+| 真正音訊圖路由 | `ship-audio.cjs` 修正前4/12、修正後12/12；含原創／本機、idle、重入、離開、mute、hidden、音量0、訓練及潛水 | ★★★ CPU控制增益 |
+| MP3與船上完整流程 | `ship-browser.cjs` 桌面、觸控直向、觸控橫向各41/41；8個聲音狀態有實際AudioContext／master analyser資料 | ★★★ 瀏覽器 |
+| 實際音訊輸出 | 本機MP3、原創、恢復音量、idle均RMS>0.00001；音量0與離開後RMS<0.000001，環境匯流排為0 | ★★★ 限瀏覽器輸出 |
+| 靜音按鈕 | 真實AudioContext進入suspended，再啟用後同一首音樂恢復。暫停時analyser會保留最後樣本，沒有將其誤當仍播放 | ★★★ |
+| 物理喇叭／實機聆聽 | 未執行；以上不冒稱人耳聆聽或實體手機音訊驗收 | ☆☆☆ |
+
 ## 效能與交付
 
-效能為本機 Chrome／ANGLE Metal／Apple M3 Max 實際渲染，每場20秒的 requestAnimationFrame 間隔。礁區與微觀保留最高畫質基準；另外兩場保持自動畫質開啟，不鎖定控制器、不凍結動畫、不隱藏既有場景批次。
+以下效能於0.12.0圖形凍結版本量測。0.12.1重新編譯的解壓場景逐位元比對，除sourceVersion字串外完全相同，繪圖程式亦未改；本音訊修正後沒有重跑全部效能案例。效能為本機 Chrome／ANGLE Metal／Apple M3 Max 實際渲染，每場20秒的 requestAnimationFrame 間隔。礁區與微觀保留最高畫質基準；另外兩場保持自動畫質開啟，不鎖定控制器、不凍結動畫、不隱藏既有場景批次。
 
 | 場景 | 桌面1440×900：FPS／p95幀間隔 | 觸控模擬390×844：FPS／p95幀間隔 | 畫質模式與證據 |
 |---|---|---|:---:|
@@ -58,11 +70,11 @@
 | CPU回歸 | 既有fauna18、motion14、world8、photography17、microcosm18、exploration32、expedition16、navigation7、ship12、aquarium12；reef invariants37與3768動作樣本 | ★★★ |
 | 語法、場景結構與完整檔案清單 | `static_check.py` 43；76份檔案的本機雜湊一致 | ★★★ |
 | 完整離線版 | 桌面／觸控合計10項，file模式無網路請求 | ★★★ |
-| 公開發布與公開版一致性 | 公開版11項通過；76份程式、圖像、場景及音訊的長度與SHA-256全部一致 | ★★★ |
+| 公開發布與公開版一致性 | 0.12.0首次公開11項／76份檔案核對通過；0.12.1修正版待發布核對 | ★★★／☆☆☆ |
 
-遊戲提交 `4db79f8209e08d0d15084b708aea30ce5073556b` 已發布；GitHub Pages於2026-10-13 07:07:10 UTC回報該提交built。公開 [0.12](https://jspusa.github.io/Ocean/?v=0.12.0) 的電腦／觸控啟動、潛水、工具與門檻檢查通過，沒有未捕捉腳本錯誤；遠端MANIFEST與本機測試版逐字一致，76份檔案全部核對雜湊。證據在本機 `qa/parity/published-delivery.json`。
+0.12.0首次遊戲提交 `4db79f8209e08d0d15084b708aea30ce5073556b` 已發布；GitHub Pages於2026-10-13 07:07:10 UTC回報該提交built。公開 [0.12](https://jspusa.github.io/Ocean/?v=0.12.0) 的電腦／觸控啟動、潛水、工具與門檻檢查通過，沒有未捕捉腳本錯誤；遠端MANIFEST與本機測試版逐字一致，76份檔案全部核對雜湊。證據在本機 `qa/parity/published-delivery.json`。
 
-編譯場景341網格、3509共享節點；解壓38,883,708 bytes、gzip16,250,706 bytes。最終離線檔36,225,650 bytes；模組入口12,716 bytes。場景在既定24MB壓縮／80MB解碼／600網格預算內。
+編譯場景341網格、3509共享節點；解壓38,883,708 bytes、gzip16,250,694 bytes。0.12.1離線檔36,225,784 bytes；模組入口12,718 bytes。場景在既定24MB壓縮／80MB解碼／600網格預算內。
 
 ## 審查與尚存差距
 
