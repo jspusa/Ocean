@@ -14,10 +14,10 @@ try{
  for(const i of indices){
   const data=await page.evaluate(i=>{
    for(const a of guideOriginal){a.b.instances=a.instances;a.b.visible=false;}
-   const f=life.find(f=>f.species===i),sp=SPECIES[i],batch=renderer.batches.find(b=>b.kind===8&&b.species===i&&!(b.minDistance>0));
+   const f=life.find(f=>f.species===i),sp=SPECIES[i],batch=renderer.batches.find(b=>(b.kind===8||b.kind===9)&&b.species===i&&!(b.minDistance>0));
    batch.instances=[f];batch.visible=true;f.p=[0,-6,0];f.yaw=.08;f.pitch=0;f.bank=0;f.phase=0;f.faunaVisibility=1;f.retreat=0;
    const center=animalFocusPoint(f),span=sp.modelBounds.size,d=Math.max(span[1],span[0]/(640/360),span[2])*sp.size*1.8;
-   renderer.photoNear=.002;renderer.photoFov=40;renderer.photoAperture=0;renderer.forceShadow=true;
+   renderer.photoNear=sp.cetacean?.16:.002;renderer.photoFov=40;renderer.photoAperture=0;renderer.forceShadow=true;
    renderer.render([center[0]+d*.12,center[1]+d*.15,center[2]+d],center,0);
    return {id:sp.id,image:renderer.canvas.toDataURL('image/jpeg',.93),gl:renderer.gl.getError(),drawn:batch.drawCount};
   },i);

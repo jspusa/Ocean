@@ -60,3 +60,9 @@
 - Nintendo 原作資訊：https://www.nintendo.co.jp/wii/rfbj/index.html
 
 介面僅使用系統字型，未附字型檔。所有外部網站、商標及其內容保有各自權利。
+
+## 0.12 鯨豚夥伴
+
+`src/cetaceans.js` 的七種輪廓、鰭、斑紋與後備圖為原創程序幾何；生物學來源及物理尺度列於 [CETACEAN-REFERENCE](docs/parity/CETACEAN-REFERENCE.md)。`src/cetacean_world.js` 的棲地、數量與巡游座標為原創遊戲設定。圖鑑 JPG 使用這些實際 WebGL 模型生成，沒有把參考網站的照片或 Nintendo 影像納入素材。
+
+新增鳴唱音效由 Web Audio 合成，屬遊戲聲音，不是真實鯨豚錄音。六基本手勢與進階動作的來源界線列於 [WII-PARTNER-REFERENCE](docs/parity/WII-PARTNER-REFERENCE.md)，信任／熟練門檻及動作時序為本作設定。

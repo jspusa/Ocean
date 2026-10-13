@@ -4,7 +4,7 @@ const fs=require('node:fs'),vm=require('node:vm'),zlib=require('node:zlib'),asse
 const raw=zlib.gunzipSync(fs.readFileSync('assets/reef.mesh.gz')),h=JSON.parse(raw.subarray(8,8+raw.readUInt32LE(4))),actors=h.life.map(i=>h.nodes[i]);
 const previous=JSON.parse(fs.readFileSync('tests/parity/fixtures/v010-actors.json')).actors;
 const context=vm.createContext({console});
-for(const name of ['engine','world','reef_detail','next_reef','open_world','fauna','fauna_world'])vm.runInContext(fs.readFileSync('src/'+name+'.js','utf8'),context);
+for(const name of ['engine','world','reef_detail','next_reef','open_world','fauna','cetaceans','fauna_world'])vm.runInContext(fs.readFileSync('src/'+name+'.js','utf8'),context);
 context.bakedSurface=(x,z)=>{
  const base=8+raw.readUInt32LE(4);
  for(const batch of h.batches.filter(b=>b.material===1&&b.maxDistance===100)){
@@ -24,7 +24,7 @@ check('Every legacy individual keeps its identity and original scale baseline',(
  for(const old of previous){const n=current.get(old.uid);assert(n,'missing '+old.uid);assert.equal(n.species??null,old.species);assert.equal(n.bioSeed,old.bioSeed);assert.equal(JSON.stringify(n.bioBaseScale??null),JSON.stringify(old.bioBaseScale));}
 });
 check('All eight new catalogue entries have actual metre-scaled distinct actors',()=>{
- assert.equal(FAUNA_SPECIES.length,8);assert.equal(actors.filter(f=>f.fauna).length,31);
+ assert.equal(FAUNA_SPECIES.length,8);assert.equal(actors.filter(f=>f.fauna&&!SPECIES[f.species]?.cetacean).length,31);
  for(const sp of FAUNA_SPECIES){const found=actors.filter(f=>SPECIES[f.species].id===sp.id);assert(found.length>=3);for(const f of found){assert.equal(f.s[0],sp.size);assert(f.modelCenter.every(Number.isFinite));assert(f.home.every(Number.isFinite));assert.equal(f.uid.split('-')[0],sp.id);}}
 });
 check('Each new high and low mesh uses the same actual actor identities',()=>{
@@ -40,7 +40,7 @@ check('Burrow entries touch the rendered seabed, including triangle interpolatio
  for(const f of actors.filter(f=>f.fauna&&['garden_eel','pistol_shrimp'].includes(SPECIES[f.species].id))){const site=FaunaWorldRules.sites[SPECIES[f.species].id],surface=FaunaWorldRules.surfaceHeight(f.home[0],f.home[2]);assert(Math.abs(f.home[1]-surface-site.height)<1e-6,f.uid+' rendered floor gap');assert(surface>=groundHeight(f.home[0],f.home[2])-.001);}
 });
 check('Habitat heights agree with the actual compiled triangle vertices',()=>{
- for(const f of actors.filter(f=>f.fauna&&FaunaWorldRules.sites[SPECIES[f.species].id].support)){const expected=bakedSurface(f.home[0],f.home[2]);assert(Math.abs(expected-FaunaWorldRules.surfaceHeight(f.home[0],f.home[2]))<.00002,f.uid);}
+ for(const f of actors.filter(f=>f.fauna&&FaunaWorldRules.sites[SPECIES[f.species].id]?.support)){const expected=bakedSurface(f.home[0],f.home[2]);assert(Math.abs(expected-FaunaWorldRules.surfaceHeight(f.home[0],f.home[2]))<.00002,f.uid);}
 });
 check('Restoring the same authored habitat never consumes randomness',()=>{
  const before=seed,site=FaunaWorldRules.sites.pygmy_seahorse,a=FaunaWorldRules.place(site,1),b=FaunaWorldRules.place(site,1);assert.equal(JSON.stringify(a),JSON.stringify(b));assert.equal(seed,before);

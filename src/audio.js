@@ -37,7 +37,7 @@ class OceanAudio {
  }
  tick(){if(!this.ctx)return;const c=this.ctx,now=c.currentTime;
   if(document.hidden||!this.enabled||!settings.sound){this.master.gain.setTargetAtTime(0,now,.08);return;}
-  const available=active;this.master.gain.setTargetAtTime(available?settings.master:0,now,.70);
+  const available=active||(modal==='training'&&typeof oceanEcology!=='undefined'&&!!oceanEcology.snapshot().training);this.master.gain.setTargetAtTime(available?settings.master:0,now,.70);
   this.depth=Math.max(0,-player.p[1]);const blend=clamp((this.depth-12)/36,0,1);this.blend=blend;
   this.music.gain.setTargetAtTime(settings.music*((modal || photoOpen) ? .62 : 1),now,1.2);
   // Parentheses are explicit: opening a panel ducks music, it does not restart it.
@@ -48,8 +48,8 @@ class OceanAudio {
   const phase=((now-this.startedAt)%7.6)/7.6;
   const inhale=phase<.34?Math.sin(phase/.34*Math.PI):0;
   const exhale=phase>.44&&phase<.78?Math.sin((phase-.44)/.34*Math.PI):0;
-  this.breath.gain.setTargetAtTime((inhale*.033+exhale*.014)*settings.breath,now,.08);
-  if(available&&!modal&&!photoOpen&&settings.ambience>.02){
+  this.breath.gain.setTargetAtTime(active?(inhale*.033+exhale*.014)*settings.breath:0,now,.08);
+  if(active&&!modal&&!photoOpen&&settings.ambience>.02){
    if(exhale>.2&&now>this.nextBubble){this.bubble();this.nextBubble=now+.20+Math.random()*.24;}
    if(now-this.lastWhale>36+(1-blend)*20){this.lastWhale=now;this.whale(blend);}
    if(V.len(player.velocity)>.5&&now-this.lastKick>1.8){this.lastKick=now;this.fin();}
@@ -60,6 +60,11 @@ class OceanAudio {
  whale(blend){const c=this.ctx,now=c.currentTime;for(let h=1;h<=3;h++){const o=c.createOscillator(),g=c.createGain(),p=c.createStereoPanner();o.type='sine';o.frequency.setValueAtTime((88+blend*16)*h,now);o.frequency.exponentialRampToValueAtTime(143*h,now+2.6);o.frequency.exponentialRampToValueAtTime(74*h,now+5.7);g.gain.setValueAtTime(0,now);g.gain.linearRampToValueAtTime(.008/(h*h),now+1.7);g.gain.exponentialRampToValueAtTime(.00001,now+6);p.pan.setValueAtTime(-.64,now);p.pan.linearRampToValueAtTime(.6,now+6);o.connect(g);g.connect(p);p.connect(this.environment);o.start();o.stop(now+6.2);o.onended=()=>{o.disconnect();g.disconnect();p.disconnect();};}this.effectsEmitted++;}
  fin(){const c=this.ctx,s=c.createBufferSource(),f=c.createBiquadFilter(),g=c.createGain(),now=c.currentTime;s.buffer=this.noise;f.type='lowpass';f.frequency.value=480;g.gain.setValueAtTime(0,now);g.gain.linearRampToValueAtTime(.14,now+.16);g.gain.exponentialRampToValueAtTime(.0001,now+.8);s.connect(f);f.connect(g);g.connect(this.environment);s.start(now,Math.random());s.stop(now+.9);s.onended=()=>{s.disconnect();f.disconnect();g.disconnect();};this.effectsEmitted++;}
  cue(kind='photo'){if(!this.ctx||!this.enabled||!settings.sound)return;const c=this.ctx,now=c.currentTime;
+  if(kind==='partner-song'){
+   if(now-(this.lastPartnerSong??-100)<2)return;this.lastPartnerSong=now;
+   // Authored musical contour, not a recording or scientific species voice.
+   for(const [delay,start,end] of [[0,920,1480],[.38,1780,1200],[.9,1280,1960]]){const o=c.createOscillator(),g=c.createGain(),at=now+delay;o.type='sine';o.frequency.setValueAtTime(start,at);o.frequency.exponentialRampToValueAtTime(end,at+.34);g.gain.setValueAtTime(.00001,at);g.gain.exponentialRampToValueAtTime(.023,at+.08);g.gain.exponentialRampToValueAtTime(.00001,at+.40);o.connect(g);g.connect(this.environment);o.start(at);o.stop(at+.44);o.onended=()=>{o.disconnect();g.disconnect();};}this.effectsEmitted++;return;
+  }
   if(kind==='whistle'){
    if(now-(this.lastWhistle??-100)<.7)return;this.lastWhistle=now;
    for(const [delay,start,end]of [[0,1750,2300],[.24,2250,1850]]){const o=c.createOscillator(),g=c.createGain(),at=now+delay;o.type='sine';o.frequency.setValueAtTime(start,at);o.frequency.exponentialRampToValueAtTime(end,at+.22);g.gain.setValueAtTime(.00001,at);g.gain.exponentialRampToValueAtTime(.045,at+.035);g.gain.exponentialRampToValueAtTime(.00001,at+.23);o.connect(g);g.connect(this.environment);o.start(at);o.stop(at+.25);o.onended=()=>{o.disconnect();g.disconnect();};}this.effectsEmitted++;return;

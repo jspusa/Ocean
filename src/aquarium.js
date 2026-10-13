@@ -7,7 +7,7 @@ const oceanAquarium=(()=>{
  const limits=Object.freeze({cells:12,capacity:16,unlockSpecies:3,knowledge:2});
  // Isolation already hides every world batch. Keep this independent scene near
  // the origin so 24 mm models retain float precision in their close-up cameras.
- const costs={turtle:2,ray:2,dolphin:3,whale:8},ORIGIN=[0,0,0];
+ const costs={turtle:2,ray:2,dolphin:3,whale:8,common_dolphin:3,white_sided_dolphin:3,commerson_dolphin:3,orca:6,beluga:4,false_killer_whale:5,rissos_dolphin:4},ORIGIN=[0,0,0];
  const initial=()=>({schema:1,slots:[],camera:{azimuth:0,elevation:.12,distance:36,focus:-1}});
  const number=(v,min,max,fallback)=>Number.isFinite(v)?Math.max(min,Math.min(max,v)):fallback;
  const species=id=>SPECIES.find(sp=>sp.id===id);
@@ -59,7 +59,7 @@ const oceanAquarium=(()=>{
   const sp=species(slot.species),type=traits(slot.species),base=center(slot.cell,slot.level),home=base.slice(),size=sp?.size||1;
   const support=sp?.id==='pistol_shrimp'?'burrow':type.motion,supported=sp?.fauna&&['attached','crawl','burrow'].includes(support),pad=Math.max(.13,size*(support==='burrow'?1.6:3));
   if(support==='attached'){home[0]+=.009;home[1]+=.042;}
-  return {home,base,supported:!!supported,support,pad,scale:sp?.fauna?size:null,radius:support==='crawl'?size*.45:support==='burrow'?size*.35:size*1.6};
+  return {home,base,supported:!!supported,support,pad,scale:sp?.fauna?size:null,radius:sp?.cetacean?Math.min(2.4,size*.6):support==='crawl'?size*.45:support==='burrow'?size*.35:size*1.6};
  }
  function cloneMesh(source){
   const gl=renderer.gl,vao=gl.createVertexArray();gl.bindVertexArray(vao);gl.bindBuffer(gl.ARRAY_BUFFER,source.vb);
@@ -115,7 +115,7 @@ const oceanAquarium=(()=>{
   for(const batch of runtime.supports.values())batch.instances=[];
   for(const slot of state().slots){const pool=runtime.pools.get(slot.species);if(!pool||!eligible(slot.species))continue;const base=pool.representative;
    const sp=species(slot.species),layout=exhibitLayout(slot),displayRadius=cost(slot.species)>=8?2.6:cost(slot.species)>=2?1.4:.95,scale=layout.scale??displayRadius/Math.max(.05,pool.radius);
-   pool.batch.instances.push({p:layout.home.slice(),home:layout.home.slice(),center:layout.home.slice(),homeYaw:0,floorOffset:0,radius:layout.radius,fauna:!!sp.fauna,species:SPECIES.indexOf(sp),modelCenter:base.modelCenter?.slice(),s:[scale,scale,scale],yaw:0,pitch:0,phase:slot.cell*.71,effort:.4,bank:0,tint:(base.tint||[1,1,1]).slice(),bioMorph:(base.bioMorph||[1,1,1,1]).slice(),bioGenes:(base.bioGenes||[.5,.5,.5,.5]).slice(),finWear:base.finWear||0,exhibit:{...slot}});
+   pool.batch.instances.push({p:layout.home.slice(),home:layout.home.slice(),center:layout.home.slice(),homeYaw:0,floorOffset:0,radius:layout.radius,fauna:!!sp.fauna,cetacean:!!sp.cetacean,bioSeed:base.bioSeed,species:SPECIES.indexOf(sp),modelCenter:base.modelCenter?.slice(),s:[scale,scale,scale],yaw:0,pitch:0,phase:slot.cell*.71,effort:.4,bank:0,tint:(base.tint||[1,1,1]).slice(),bioMorph:(base.bioMorph||[1,1,1,1]).slice(),bioGenes:(base.bioGenes||[.5,.5,.5,.5]).slice(),finWear:base.finWear||0,exhibit:{...slot}});
    if(layout.supported){
     const put=(id,item)=>runtime.supports.get(id)?.instances.push(item);
     // Stop the pier inside the substrate, not coplanar with its visible top.
@@ -150,13 +150,16 @@ const oceanAquarium=(()=>{
   resetInput();releaseMouseLook();syncExhibits();isolateScene();document.body.classList.add('aquarium-view');node('aquariumViewer').classList.remove('hidden');runtime.lastTime=t;paintViewer();renderer.forceShadow=true;renderer.dirty=true;setTimeout(()=>{if(runtime.viewing)node('aquariumExit').focus()},60);
  }
  function focus(cell){const s=state(),slot=s.slots.find(slot=>slot.cell===cell);if(cell!==-1&&!slot)return false;s.camera.focus=cell;const sp=slot&&species(slot.species),weight=slot?cost(slot.species):0,span=sp?.modelBounds?Math.max(...sp.modelBounds.size):1;s.camera.distance=cell===-1?36:sp.fauna?Math.max(.065,sp.size*span*2.65):weight>=8?11:weight>=2?6:4.6;s.camera.azimuth=0;s.camera.elevation=.10;runtime.saveDue=true;runtime.saveClock=0;renderer.dirty=true;paintViewer();return true;}
+ function viewOptics(slot){const sp=slot&&species(slot.species);return {fov:sp?.fauna?46:56,near:sp?.fauna&&sp.size<.6?.003:.16};}
  function camera(){
   const c=state().camera,slot=state().slots.find(s=>s.cell===c.focus),fish=slot?runtime.pools.get(slot.species)?.batch.instances.find(f=>f.exhibit.cell===slot.cell):null,fauna=fish?.fauna,aim=fish?(fauna&&typeof animalFocusPoint==='function'?animalFocusPoint(fish):fish.p.slice()):slot?center(slot.cell,slot.level):[ORIGIN[0],-9,ORIGIN[2]],portrait=renderer.width<renderer.height,dist=c.distance*(portrait?(slot?1.16:1.48):1);
-  eye=[aim[0]+Math.sin(c.azimuth)*dist,Math.min(-.7,aim[1]+Math.sin(c.elevation)*dist),aim[2]+Math.cos(c.azimuth)*dist];target=aim;diverBatch.visible=false;cameraCut=true;renderer.photoFov=fauna?46:56;renderer.photoNear=fauna?.003:.16;renderer.photoAperture=0;renderer.exposure=1.14;
+  // Large-animal focus can place an orbit camera through the side/back walls.
+  // The front remains open, while these limits keep a dragged view inside glass.
+  const optics=viewOptics(slot);eye=[clamp(aim[0]+Math.sin(c.azimuth)*dist,-21.5,21.5),Math.min(-.7,aim[1]+Math.sin(c.elevation)*dist),Math.max(-16.5,aim[2]+Math.cos(c.azimuth)*dist)];target=aim;diverBatch.visible=false;cameraCut=true;renderer.photoFov=optics.fov;renderer.photoNear=optics.near;renderer.photoAperture=0;renderer.exposure=1.14;
  }
  function afterLife(time){
   if(!runtime.viewing)return;if(active||modal!=='aquariumView'){leaveViewer();return;}runtime.lastTime=time;
-  for(const pool of runtime.pools.values())for(const f of pool.batch.instances){if(f.fauna&&typeof faunaMotionPose==='function'){faunaMotionPose(f,time,f.p,{react:false});continue;}const s=f.exhibit,c=center(s.cell,s.level),a=time*(cost(s.species)>=2?.13:.22)+s.cell*.73,r=cost(s.species)>=8?.8:1.1;f.p=[c[0]+Math.cos(a)*r,c[1]+Math.sin(a*.7+s.cell)*.30,c[2]+Math.sin(a)*r*.55];f.yaw=Math.atan2(-Math.cos(a)*.55,-Math.sin(a));f.pitch=Math.cos(a*.7+s.cell)*.03;f.bank=Math.sin(a)*.025;f.effort=.37;}
+  for(const pool of runtime.pools.values())for(const f of pool.batch.instances){if(f.fauna&&typeof faunaMotionPose==='function'){faunaMotionPose(f,time,f.p,{react:false,exhibit:true});continue;}const s=f.exhibit,c=center(s.cell,s.level),a=time*(cost(s.species)>=2?.13:.22)+s.cell*.73,r=cost(s.species)>=8?.8:1.1;f.p=[c[0]+Math.cos(a)*r,c[1]+Math.sin(a*.7+s.cell)*.30,c[2]+Math.sin(a)*r*.55];f.yaw=Math.atan2(-Math.cos(a)*.55,-Math.sin(a));f.pitch=Math.cos(a*.7+s.cell)*.03;f.bank=Math.sin(a)*.025;f.effort=.37;}
   isolateScene();paintCaption();
  }
  function idleTick(dt){if(!runtime.viewing)return;if(active||modal!=='aquariumView'){leaveViewer();return;}if(runtime.saveDue){runtime.saveClock+=dt;if(runtime.saveClock>.5&&!runtime.pointers.size){runtime.saveDue=false;save();}}}
@@ -195,5 +198,5 @@ const oceanAquarium=(()=>{
  }
  const hooks={id:'aquarium',initial,sanitize,init,renderPanel,afterLife,idleTick,startDive:leaveViewer,panelChanged(type){if(type!=='aquariumView')leaveViewer();},panelClosed:leaveViewer,reset(){const wasViewing=runtime.viewing;leaveViewer();if(wasViewing&&modal==='aquariumView')closePanel();runtime.selected=null;runtime.cell=0;syncExhibits();},shouldAnimate:()=>runtime.viewing&&!active&&modal==='aquariumView',pointerCaptured:()=>runtime.viewing,escape(){if(!runtime.viewing)return false;oceanFeatures.open('aquarium');return true;}};
  oceanFeatures.register(hooks);
- return {initial,sanitize,limits,cost,capacity,planPlacement,arrange,exhibitLayout,state,unlocked,eligible,place,remove,clear,autoArrange,enterViewer,leaveViewer,focus,adjust,hooks,snapshot:()=>({viewing:runtime.viewing,batches:runtime.owned.size,instances:[...runtime.pools.values()].reduce((sum,p)=>sum+p.batch.instances.length,0),supports:[...runtime.supports.values()].reduce((sum,b)=>sum+b.instances.length,0),camera:{...state().camera},savedVisibilities:runtime.savedVisibility.size})};
+ return {initial,sanitize,limits,cost,capacity,planPlacement,arrange,exhibitLayout,viewOptics,state,unlocked,eligible,place,remove,clear,autoArrange,enterViewer,leaveViewer,focus,adjust,hooks,snapshot:()=>({viewing:runtime.viewing,batches:runtime.owned.size,instances:[...runtime.pools.values()].reduce((sum,p)=>sum+p.batch.instances.length,0),supports:[...runtime.supports.values()].reduce((sum,b)=>sum+b.instances.length,0),camera:{...state().camera},savedVisibilities:runtime.savedVisibility.size})};
 })();

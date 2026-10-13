@@ -99,9 +99,66 @@ function faunaTrajectory(f,time,out){
  const c=Math.cos(yaw),s=Math.sin(yaw);out[0]=home[0]+c*x+s*z;out[1]=home[1]+y;out[2]=home[2]-s*x+c*z;return out;
 }
 const faunaAhead=[0,0,0],faunaBehind=[0,0,0];
+// Authored cruising/cadence differences, not measurements of captive or wild
+// respiration. Anatomy remains metre-scaled; only the route and pose change.
+const CETACEAN_MOTION={
+ common_dolphin:{cruiseSpeed:2.5,beat:3.15,surfacePeriod:49,depthSwing:1.8},
+ white_sided_dolphin:{cruiseSpeed:2.3,beat:2.85,surfacePeriod:57,depthSwing:2.2},
+ commerson_dolphin:{cruiseSpeed:1.7,beat:3.45,surfacePeriod:43,depthSwing:1.2},
+ orca:{cruiseSpeed:2.7,beat:1.55,surfacePeriod:83,depthSwing:3.4},
+ beluga:{cruiseSpeed:1.35,beat:1.85,surfacePeriod:71,depthSwing:2.0},
+ false_killer_whale:{cruiseSpeed:2.6,beat:2.05,surfacePeriod:77,depthSwing:3.1},
+ rissos_dolphin:{cruiseSpeed:1.9,beat:2.35,surfacePeriod:67,depthSwing:2.7}
+};
+const cetaceanCandidates=new Set(),cetaceanAhead=[0,0,0],cetaceanBehind=[0,0,0];
+function cetaceanProfile(f){const sp=SPECIES[f.species];return sp.motionProfile||CETACEAN_MOTION[sp.id]||CETACEAN_MOTION.common_dolphin;}
+function cetaceanTrajectory(f,time,out,context){
+ const sp=SPECIES[f.species],profile=cetaceanProfile(f),home=f.home||f.center,size=f.s[0],seed=f.bioSeed||1,phase=f.phase??f.bob??0,exhibit=!!context?.exhibit;
+ const radius=exhibit?Math.max(.5,Math.min(2.4,f.radius||size*.6)):Math.max(size*1.8,f.radius||18);
+ const pace=profile.cruiseSpeed*(.92+bioValue(seed,21)*.16)*(exhibit?.24:1),omega=pace/radius;
+ const a=time*omega+phase+.10*Math.sin(time*.18+phase),aspect=.68+bioValue(seed,22)*.16;
+ let x=Math.cos(a)*radius,z=Math.sin(a)*radius*aspect;
+ const yaw=f.homeYaw||0,c=Math.cos(yaw),s=Math.sin(yaw);out[0]=home[0]+c*x+s*z;out[2]=home[2]-s*x+c*z;
+ const modelHeight=Math.max(.18,sp.modelBounds?.max[1]||0,Math.abs(sp.modelBounds?.min[1]||0)),hullY=size*(modelHeight+.17)+.15,ceiling=-hullY-.12;
+ let y=home[1]+Math.sin(time*(exhibit?.14:.061)+phase)*profile.depthSwing*(exhibit?.12:1);
+ if(!exhibit){
+  const surface=smooth01((Math.cos(time*6.283185/profile.surfacePeriod+phase)-.72)/.28);y=mix(y,ceiling,surface);
+  // Conservative whole-body horizontal envelope. Nearby tall structures cause a
+  // lateral detour; the broad influence fades before contact instead of teleporting.
+  let candidates=context?.obstacles;
+  if(!candidates){cetaceanCandidates.clear();const reach=Math.ceil((size*.55+3)/12)+1,cx=Math.floor(out[0]/12),cz=Math.floor(out[2]/12);for(let ix=cx-reach;ix<=cx+reach;ix++)for(let iz=cz-reach;iz<=cz+reach;iz++)for(const ob of fishObstacleBuckets.get(ix+','+iz)||NO_FISH_OBSTACLES)cetaceanCandidates.add(ob);candidates=cetaceanCandidates;}
+  for(let pass=0;pass<2;pass++)for(const ob of candidates){
+   if(ob.p[1]+ob.s[1]<y-hullY||ob.p[1]-ob.s[1]>y+hullY)continue;
+   const rx=ob.s[0]+size*.55+.45,rz=ob.s[2]+size*.55+.45,dx=(out[0]-ob.p[0])/rx,dz=(out[2]-ob.p[2])/rz,d=Math.hypot(dx,dz);
+   if(d>=1.9)continue;
+   // A fixed outward detour direction avoids flipping across the obstacle when
+   // the undeformed path happens to pass through its exact centre.
+   const ox=(ob.p[0]-home[0])/rx,oz=(ob.p[2]-home[2])/rz,angle=Math.hypot(ox,oz)>.001?Math.atan2(oz,ox):phase+bioValue(seed,24)*6.283185,nx=Math.cos(angle),nz=Math.sin(angle),along=dx*nx+dz*nz,across=dx*nz-dz*nx;
+   const edge=1.4*Math.exp(-.32*across*across),weight=1-smooth01((d-1.3)/.6),push=Math.max(0,edge-along)*weight;
+   out[0]+=nx*rx*push;out[2]+=nz*rz*push;
+  }
+  // Broad, smooth repulsion from a shallowing bank toward the authored deep-water
+  // home. Repeated bounded blends avoid a hard snap at the depth threshold.
+  for(let pass=0;pass<6;pass++){const floor=groundHeight(out[0],out[2])+hullY+.35,weight=.92*smooth01((floor-ceiling+1.5)/3);if(weight===0)break;out[0]=mix(out[0],home[0],weight);out[2]=mix(out[2],home[2],weight);}
+  y=Math.max(y,groundHeight(out[0],out[2])+hullY+.35);
+ }else y=Math.max(-15+hullY,y);
+ out[1]=Math.min(ceiling,y);return out;
+}
+// Public pose seam. context.exhibit isolates tank motion from world terrain and
+// avoidance; context.obstacles supports deterministic isolated behavior checks.
+function cetaceanMotionPose(f,time,out=f.p,context=null){
+ const profile=cetaceanProfile(f),phase=f.phase??f.bob??0,seed=f.bioSeed||1;
+ cetaceanTrajectory(f,time,out,context);cetaceanTrajectory(f,time+.08,cetaceanAhead,context);cetaceanTrajectory(f,time-.08,cetaceanBehind,context);
+ const dx=cetaceanAhead[0]-cetaceanBehind[0],dy=cetaceanAhead[1]-cetaceanBehind[1],dz=cetaceanAhead[2]-cetaceanBehind[2],speed=Math.hypot(dx,dy,dz)/.16;
+ f.yaw=Math.atan2(-dz,dx);f.pitch=clamp(Math.atan2(dy,Math.hypot(dx,dz)),-.34,.34);
+ const px=out[0]-cetaceanBehind[0],pz=out[2]-cetaceanBehind[2],nx=cetaceanAhead[0]-out[0],nz=cetaceanAhead[2]-out[2],turn=Math.atan2(px*nz-pz*nx,px*nx+pz*nz)/.08;
+ f.bank=clamp(turn*.45,-.24,.24);f.effort=clamp(speed/profile.cruiseSpeed,.20,1);
+ f.cetaceanBeat=profile.beat*(.94+bioValue(seed,23)*.12);f.partnerFinPulse=0;f.faunaVisibility=1;f.faunaVisible=true;f.retreat=0;f.faunaTime=time;return out;
+}
 // Public seam used by the world, aquarium and tests. It updates only pose/state;
 // home, uid and s are immutable. react:false is a deterministic exhibit playback.
 function faunaMotionPose(f,time,out=f.p,context=null){
+ if(SPECIES[f.species]?.cetacean||SPECIES[f.species]?.traits?.motion==='cetacean')return cetaceanMotionPose(f,time,out,context);
  const id=SPECIES[f.species]?.id,phase=f.phase??f.bob??0,home=f.home||f.center;
  faunaTrajectory(f,time,out);faunaTrajectory(f,time+.055,faunaAhead);faunaTrajectory(f,time-.055,faunaBehind);
  const dx=faunaAhead[0]-faunaBehind[0],dy=faunaAhead[1]-faunaBehind[1],dz=faunaAhead[2]-faunaBehind[2],speed=Math.hypot(dx,dy,dz)/.11;
@@ -131,6 +188,7 @@ function updateLife(t){
  updateReefSchool(t);
  for(const f of allLife){
   if(f.fauna){faunaMotionPose(f,t,f.p);continue;}
+  f.partnerFinPulse=0;
   animalTrajectory(f,t,f.p);animalTrajectory(f,t+.055,trajectoryTmp);animalTrajectory(f,t-.055,trajectoryPrev);
   const dx=trajectoryTmp[0]-f.p[0],dy=trajectoryTmp[1]-f.p[1],dz=trajectoryTmp[2]-f.p[2];
   f.yaw=Math.atan2(-dz,dx);f.pitch=clamp(Math.atan2(dy,Math.hypot(dx,dz)),-.29,.29);
