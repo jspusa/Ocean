@@ -41,3 +41,5 @@ CPU selection 14/14、ecology 39/39。證據：`qa/parity/selection-{desktop,por
 本輪未發現其他未修復的具體阻斷或資料損失問題。此結論保留上述瀏覽器與交付待驗範圍。
 
 主流程後續驗證：最終場景的深海瀏覽器三尺寸105/105，包含回收後 `deepseaStatus` 隱藏斷言；GL與頁面錯誤為0。此為root執行證據，並非reviewer重跑。
+
+主流程交付補記：root最終靜態53/53、離線12/12、公開13/13；94個manifest檔案大小與SHA-256一致，實際公開7,000m部署、觸控與潛航器提示均通過。已執行範圍與硬體界線見TEST_REPORT。
