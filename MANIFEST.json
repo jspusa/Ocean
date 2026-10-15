@@ -294,8 +294,8 @@
     },
     {
       "path": "src/bootstrap.js",
-      "bytes": 90,
-      "sha256": "bef3712dbfac96c54cf8971e408b64e0de5abfa3665dc5bd52cb211216af34fe"
+      "bytes": 17601,
+      "sha256": "bff1b1fc5cdd1607951ba14a0e9cf1c86b8e175e589babbce05c6eef1dadb508"
     },
     {
       "path": "src/cetacean_world.js",
