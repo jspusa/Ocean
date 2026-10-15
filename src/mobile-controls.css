@@ -1,0 +1,68 @@
+/* Permanent corner controls: keep the middle and right-hand camera surface clear. */
+body.mobile-controls-v1 #lookpad,
+body.mobile-controls-v1 #cruiseBtn { display: none !important; pointer-events: none !important; }
+body.mobile-controls-v1 .bottom-actions {
+  display: flex; align-items: center; gap: 8px;
+  left: auto; right: max(16px, calc(env(safe-area-inset-right) + 10px));
+  bottom: max(16px, calc(env(safe-area-inset-bottom) + 10px)); transform: none;
+}
+body.mobile-controls-v1 #boostBtn {
+  width: 52px; height: 52px; min-width: 44px; min-height: 44px;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 3px; padding: 4px; border: 1px solid #d0ddc54f; border-radius: 12px;
+  color: #ecf0df; background: #0b2e3899; font-size: 10px; line-height: 1.2;
+  touch-action: manipulation;
+}
+body.mobile-controls-v1 #boostBtn svg { width: 19px; height: 19px; }
+body.mobile-controls-v1 #boostBtn.active { color: #213d3d; background: #dce2c7; border-color: #e5ead1; }
+body.mobile-controls-v1 #fullscreenBtn {
+  display: grid; place-items: center; width: 44px; min-width: 44px;
+  height: 44px; padding: 10px;
+}
+body.mobile-controls-v1 #fullscreenBtn svg { width: 19px; height: 19px; }
+.quality-picker { display: flex; flex-direction: column; gap: 10px; font-size: 12px; }
+.quality-picker select {
+  display: block; width: 100%; min-height: 48px; padding: 10px 12px;
+  background: #15363b; color: #edf5f1; border: 1px solid #c5d7c466; border-radius: 7px;
+  font: inherit; font-size: 16px; touch-action: manipulation;
+}
+.quality-picker select:focus-visible { outline: 2px solid #e4efce; outline-offset: 3px; }
+#manualQualitySection #benchSettings { margin: 14px 0 0; }
+@media (pointer: coarse) {
+  body.mobile-controls-v1 #hud {
+    --hud-edge: max(12px, calc(env(safe-area-inset-left) + 10px));
+    --hud-top: max(10px, calc(env(safe-area-inset-top) + 6px));
+    --hud-bottom: max(14px, calc(env(safe-area-inset-bottom) + 10px));
+  }
+  body.mobile-controls-v1 .topbar { gap: 6px; right: max(12px, calc(env(safe-area-inset-right) + 10px)); }
+  body.mobile-controls-v1 .topbar nav { gap: 5px; flex-shrink: 0; }
+  body.mobile-controls-v1 .hud-button { min-width: 44px; padding: 9px; font-size: 11px; flex-shrink: 0; }
+  body.mobile-controls-v1 .current-area { min-width: 0; flex: 1; max-width: none; font-size: 10px; }
+  body.mobile-controls-v1 .bottom-actions {
+    left: auto; right: max(12px, calc(env(safe-area-inset-right) + 10px));
+    bottom: var(--hud-bottom); transform: none; gap: 7px;
+  }
+  body.mobile-controls-v1 #photoBtn,
+  body.mobile-controls-v1 #boostBtn {
+    width: 46px; height: 46px; min-width: 44px; min-height: 44px;
+    padding: 4px; gap: 2px; border-radius: 12px; font-size: 9px;
+    background: #0b2e3899; line-height: 1.2;
+  }
+  body.mobile-controls-v1 #boostBtn.active { background: #dce2c7; }
+  body.mobile-controls-v1 #photoBtn svg { width: 19px; height: 19px; }
+  body.mobile-controls-v1 #joystick { width: 88px; height: 88px; bottom: var(--hud-bottom); }
+  body.mobile-controls-v1 #vertical {
+    left: calc(var(--hud-edge) + 98px); right: auto;
+    bottom: var(--hud-bottom); gap: 4px;
+  }
+  body.mobile-controls-v1 #vertical button { width: 44px; height: 44px; }
+}
+@media (pointer: coarse) and (max-width: 340px) {
+  body.mobile-controls-v1 #vertical { left: calc(var(--hud-edge) + 94px); }
+  body.mobile-controls-v1 .topbar { gap: 4px; }
+  body.mobile-controls-v1 .topbar nav { gap: 4px; }
+}
+@media (pointer: coarse) and (orientation: landscape) and (max-height: 420px) {
+  body.mobile-controls-v1 #hud { --hud-top: max(6px, env(safe-area-inset-top)); }
+  body.mobile-controls-v1 #selectionPanel { top: 104px; }
+}
