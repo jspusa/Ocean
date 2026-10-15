@@ -1,7 +1,7 @@
 /* OPEN WATER 0.8 — original continuous-world art and landmarks.
    Game metres, NOT surveyed coordinates or a real dive plan.
    The old sculpted core is retained; new vistas are authored as linked destinations. */
-const OPEN_WORLD={bounds:{x:270,z:295,centerZ:-90},boat:[-24,0,43],version:'0.13.0'};
+const OPEN_WORLD={bounds:{x:270,z:295,centerZ:-90},boat:[-24,0,43],version:'0.14.0'};
 const coreGroundHeight=groundHeight;
 groundHeight=function(x,z){
  const core=coreGroundHeight(x,z);
@@ -30,9 +30,22 @@ addGroundTiles=function(r){
   const cx=(ix-4.5)*span,cz=(iz-4.5)*span-90;
   for(let lod=0;lod<2;lod++){
    const g=new Geometry();g.material=1;g.shadow=true;const N=lod?7:22;
-   function pt(i,j){let x=cx+(i/N-.5)*span,z=cz+(j/N-.5)*span;return [x-cx,groundHeight(x,z),z-cz];}
+   function pt(i,j,n=N){let x=cx+(i/n-.5)*span,z=cz+(j/n-.5)*span;return [x-cx,groundHeight(x,z),z-cz];}
    function norm(p){const x=p[0]+cx,z=p[2]+cz,e=.20;return V.norm([groundHeight(x-e,z)-groundHeight(x+e,z),2*e,groundHeight(x,z-e)-groundHeight(x,z+e)]);}
-   for(let j=0;j<N;j++)for(let i=0;i<N;i++){let p=[pt(i,j),pt(i+1,j),pt(i+1,j+1),pt(i,j+1)],n=p.map(norm);const col=[.90,.89,.83];g.tri(p[0],p[2],p[1],col,[n[0],n[2],n[1]]);g.tri(p[0],p[3],p[2],col,[n[0],n[3],n[2]]);}
+   const start=lod?1:0,end=lod?N-1:N;
+   for(let j=start;j<end;j++)for(let i=start;i<end;i++){let p=[pt(i,j),pt(i+1,j),pt(i+1,j+1),pt(i,j+1)],n=p.map(norm);const col=[.90,.89,.83];g.tri(p[0],p[2],p[1],col,[n[0],n[2],n[1]]);g.tri(p[0],p[3],p[2],col,[n[0],n[3],n[2]]);}
+   if(lod){
+    // Every tile/LOD shares the near mesh's exact 22-segment perimeter. A
+    // triangulated ring joins it to the coarse interior without vertical skirts
+    // or mismatched edge heights on steep terrain. The near mesh is unchanged.
+    const outer=22,inner=N-2;
+    const ring=(side,i,n,inset)=>{const a=i+inset,b=n+inset,k=inset,ij=[[a,k],[b,a],[b-a+k,b],[k,b-a+k]][side];return pt(ij[0],ij[1],n+2*inset);};
+    const put=(a,b,c)=>{if(V.cross(V.sub(b,a),V.sub(c,a))[1]<0)[b,c]=[c,b];g.tri(a,b,c,[.90,.89,.83],[norm(a),norm(b),norm(c)]);};
+    for(let side=0;side<4;side++){
+     const a=Array.from({length:outer+1},(_,i)=>ring(side,i,outer,0)),b=Array.from({length:inner+1},(_,i)=>ring(side,i,inner,1));let i=0,j=0;
+     while(i<outer||j<inner){if(j===inner||(i<outer&&(i+1)/outer<=(j+1)/inner)){put(a[i],a[i+1],b[j]);i++;}else{put(a[i],b[j+1],b[j]);j++;}}
+    }
+   }
    const b=r.batch(g,[{p:[cx,0,cz]}]);if(!lod){b.maxDistance=100;b.shadowProxy=true;}else {b.minDistance=100;b.maxDistance=520;b.shadow=false;}
   }
  }

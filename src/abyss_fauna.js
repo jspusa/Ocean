@@ -55,17 +55,36 @@ const abyssArt=(()=>{
   tagged(g,6,()=>ellipsoid(g,[-.506,-.014,0],[.006,.004,.004],[.48,.66,.52],low,.5));
  }
  function angler(g,low){
-  const charcoal=[.082,.071,.067],paint=p=>blend(charcoal,[.17,.13,.105],.12+.18*(1-soft(-.22,.15,p[1]))+.12*Math.sin(p[0]*83)*Math.sin(p[2]*109));
-  body(g,[[-.43,0,0,0],[-.31,-.025,.043,.047],[-.20,-.025,.158,.150],[-.08,-.015,.237,.218],[.06,-.018,.245,.222],[.19,-.019,.221,.204],[.29,-.035,.180,.169],[.30,-.035,.178,.169]],paint,low);
-  // Broad cheeks continue to an open ring just behind the lip. The old head
-  // closed before the mouth, leaving the exposed oral surface like a nozzle.
-  cetaceanArt.skin(g,(u,v)=>{const a=v*TAU;return [mix(.29,.421,u),mix(-.035,-.033,u)+Math.cos(a)*mix(.180,.167,u),Math.sin(a)*mix(.169,.170,u)];},low?5:10,low?16:32,paint);
-  // Mouth cavity starts ahead of the head shell so it stays genuinely open.
-  funnel(g,[.278,-.033,0],.153,.167,.170,charcoal,low,.82);const rim=Array.from({length:(low?24:40)+1},(_,i)=>{const a=i/(low?24:40)*TAU;return [.431,-.033+Math.cos(a)*.167,Math.sin(a)*.170];});tube(g,rim,.012,[.19,.14,.10],low?7:10);
-  for(const side of [-1,1]){eye(g,[.21,.143,side*.147],.024,low);tagged(g,3,()=>fin(g,[[.0,-.015,side*.205],[-.04,-.09,side*.197],[-.10,-.12,side*.18]],[[.005,-.07,side*.315],[-.055,-.145,side*.32],[-.15,-.18,side*.26]],[.16,.11,.078],.005));}
-  tagged(g,3,()=>{fin(g,[[-.31,-.021,0],[-.36,.01,0],[-.31,.047,0]],[[-.545,-.13,0],[-.57,.015,0],[-.535,.145,0]],[.19,.14,.092],.005);fin(g,[[-.25,.07,0],[-.14,.188,0],[-.04,.226,0]],[[-.31,.18,0],[-.19,.263,0],[-.04,.26,0]],charcoal,.004);});
-  for(const side of [-1,1])for(let i=0;i<(low?9:15);i++){const a=(i+.5)/(low?9:15)*Math.PI,z=Math.cos(a)*.158,y=-.033+side*Math.sin(a)*.154,len=.033+.055*Math.sin(a);tube(g,curve([[.438,y,z],[.435-len*.22,y-side*len*.50,z*.95],[.409,y-side*len,z*.85]],low?1:3),t=>.0055*(1-t*.93),ivory,low?4:6);}
-  const stalk=curve([[.075,.21,0],[.085,.38,0],[.21,.48,0],[.35,.47,0],[.404,.394,0]],low?2:4);tagged(g,5,()=>tube(g,stalk,t=>.009*(1-t*.35),[.25,.20,.15],low?6:9));tagged(g,6,()=>ellipsoid(g,[.405,.388,0],[.030,.039,.027],[.57,.76,.70],low,.75));
+  const charcoal=[.071,.063,.060],paint=p=>{const grain=Math.sin(p[0]*133+Math.sin(p[2]*91))*Math.sin(p[1]*157-p[2]*43);return blend(charcoal,[.135,.105,.087],.16+.12*(1-soft(-.22,.19,p[1]))+grain*.045);};
+  // The oral opening is a curved horseshoe: corners recede beneath the eyes,
+  // the lower jaw projects slightly farther than the upper jaw. Every mouth
+  // structure below samples this same boundary, rather than a separate nozzle.
+  const rim=a=>{const c=Math.cos(a),s=Math.sin(a);return [.175+.235*Math.pow(Math.abs(c),1.25)+.015*(1-c),-.042+.211*c,.193*s*(1-.18*c)];};
+  const rows=[[-.43,0,0,0],[-.31,-.018,.050,.055],[-.21,-.012,.159,.159],[-.10,-.009,.227,.222],[.035,-.008,.254,.235],[.13,-.025,.243,.223],[.175,-.042,.211,.193]];
+  const shell=(u,v)=>{const a=v*TAU,x=mix(-.43,.175,u),b=cetaceanArt.profileAt(rows,x),m=soft(.52,1,u),r=rim(a);return [x+m*(r[0]-.175),b[1]+Math.cos(a)*b[2],Math.sin(a)*b[3]*(1-.18*Math.cos(a)*m)];};
+  cetaceanArt.skin(g,shell,low?30:60,low?20:40,paint);
+  // Concave lining shares the shell's terminal edge. Its throat is well behind
+  // the face; no opaque head cap sits across the opening. Inward facing normals
+  // and winding preserve genuine depth in colour and shadow passes.
+  const begin=g.v.length,throat=[-.026,-.054,0];
+  cetaceanArt.skin(g,(u,v)=>{const r=rim(v*TAU),k=Math.sin(u*Math.PI*.5);return [mix(throat[0],r[0],Math.pow(u,1.65)),mix(throat[1],r[1],k),r[2]*k];},low?13:23,low?20:40,p=>blend([.024,.013,.018],[.084,.039,.039],soft(-.03,.36,p[0])*.72));
+  for(let i=begin;i<g.v.length;i+=36){const b=g.v.slice(i+12,i+24),c=g.v.slice(i+24,i+36);g.v.splice(i+12,24,...c,...b);for(const j of [0,12,24])for(let n=3;n<6;n++)g.v[i+j+n]*=-1;}
+  tube(g,Array.from({length:(low?40:72)+1},(_,i)=>rim(i/(low?40:72)*TAU)),t=>.0048+.0012*(1-Math.cos(t*TAU)),[.115,.083,.069],low?6:8);
+  // Small lateral eyes sit in the continuous cheek, without a protruding white
+  // button. Short lower creases follow the mouth commissure on either side.
+  for(const side of [-1,1]){const p=shell(.82,side*.145),out=side*.006;p[2]+=out;tagged(g,4,()=>{ellipsoid(g,p,[.019,.018,.010],[.125,.132,.120],low,.55);ellipsoid(g,[p[0]+.002,p[1],p[2]+side*.007],[.014,.014,.005],[.012,.019,.019],low,.5);});
+   tube(g,curve([V.add(p,[-.017,-.021,-side*.002]),[.15,.018,side*.202],[.174,-.045,side*.194]],low?2:4),.0015,[.045,.039,.037],low?4:6);
+  }
+  // Teeth originate just inside the corresponding gum, rather than lying as a
+  // flat circular grill over the rim. Unequal lengths leave a clear central gape.
+  for(const jaw of [0,1]){const count=jaw?13:11;for(let i=0;i<count;i++){const a=(jaw?Math.PI:0)+mix(-1.27,1.27,(i+.5)/count),r=rim(a),inward=V.norm([0,-(r[1]+.042),-r[2]*.72]),length=(jaw?.055:.045)+.050*(.5+.5*Math.cos(i*2.399+jaw))*(.55+.45*Math.abs(Math.cos(a))),base=[r[0]-.002,r[1]+inward[1]*.005,r[2]+inward[2]*.005],mid=V.add(base,[-.005,inward[1]*length*.53,inward[2]*length*.32]),tip=V.add(base,[-.034,inward[1]*length,inward[2]*length*.78]);tube(g,curve([base,mid,tip],low?2:4),t=>.0038*Math.pow(1-t,.72)+.00022,t=>blend([.49,.45,.33],[.70,.69,.54],t),low?4:6);}}
+  // Flexible, thin fin membranes have rounded edges and individual supporting
+  // rays. They remain double-sided geometry, not opaque solid paddles.
+  const fan=(roots,edges)=>{tagged(g,3,()=>{fin(g,roots,edges,(i,side)=>blend([.085,.070,.055],[.16,.125,.084],.22+.12*Math.sin(i*.8)),.0006);for(let i=0;i<roots.length;i+=low?3:2)tube(g,[roots[i],V.lerp(roots[i],edges[i],.97)],.0012,[.19,.155,.106],low?4:5);});};
+  const n=low?8:16,tailRoot=[],tailEdge=[],dorsalRoot=[],dorsalEdge=[];
+  for(let i=0;i<=n;i++){const u=i/n;tailRoot.push([-.405,mix(-.033,.04,u),0]);tailEdge.push([-.493-.077*Math.sin(Math.PI*u),mix(-.13,.145,u),.003*Math.sin(Math.PI*u)]);dorsalRoot.push([mix(-.27,-.07,u),mix(.08,.19,u),0]);dorsalEdge.push([mix(-.325,-.045,u),.09+.18*Math.sin(.12+u*Math.PI*.81),0]);}fan(tailRoot,tailEdge);fan(dorsalRoot,dorsalEdge);
+  for(const side of [-1,1]){const roots=[],edges=[];for(let i=0;i<=n;i++){const u=i/n;roots.push([mix(-.12,-.025,u),mix(-.065,-.11,u),side*mix(.180,.204,u)]);edges.push([mix(-.18,.005,u),-.145-.027*Math.sin(u*Math.PI),side*(.222+.092*Math.sin(u*Math.PI))]);}fan(roots,edges);}
+  const stalk=curve([[.075,.232,0],[.085,.38,0],[.21,.48,0],[.35,.47,0],[.404,.394,0]],low?2:4);tagged(g,5,()=>tube(g,stalk,t=>.0075*(1-t*.40),[.22,.18,.137],low?6:9));tagged(g,6,()=>ellipsoid(g,[.405,.388,0],[.030,.039,.027],[.57,.76,.70],low,.75));
  }
  function crab(g,low){
   const orange=[.70,.31,.17],cream=[.84,.73,.55],paint=p=>blend(orange,cream,.10+.35*soft(.10,.80,Math.sin(p[0]*213)*Math.sin(p[2]*191)));

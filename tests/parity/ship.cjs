@@ -2,6 +2,7 @@ const fs=require('node:fs'),path=require('node:path'),vm=require('node:vm'),asse
 const root=path.resolve(__dirname,'../..');let feature,stored,saves=0;
 const context=vm.createContext({console,active:false,modal:null,photoOpen:false,OPEN_WORLD:{boat:[-24,0,43]},voyage:{state:{dives:1,completed:[],features:{expedition:{day:1}}}},persistent:{seen:[]},saveVoyage:()=>{saves++;return true},toast:()=>{},renderer:{dirty:false},oceanFeatures:{register:f=>feature=f,state:()=>stored},document:{getElementById:()=>null,body:{classList:{remove(){},toggle(){}}}},settings:{},t:0});
 vm.runInContext(fs.readFileSync(path.join(root,'src/engine.js'),'utf8'),context);
+vm.runInContext(fs.readFileSync(path.join(root,'src/seasons.js'),'utf8'),context);
 vm.runInContext(fs.readFileSync(path.join(root,'src/ship.js'),'utf8'),context);
 const api=vm.runInContext('oceanShip',context),plain=x=>JSON.parse(JSON.stringify(x));stored=feature.initial();let count=0;
 function check(name,fn){fn();count++;console.log('PASS '+name)}
@@ -14,7 +15,7 @@ check('route connects aft and foredeck without crossing cabin or rail',()=>{cons
 check('unreachable and nonfinite destinations never create a route',()=>{assert.equal(api.planRoute([0,4.1],[0,0]),null);assert.equal(api.planRoute([0,4.1],[NaN,3]),null)});
 check('every physical station has a reachable approach point',()=>{for(const station of api.stations){assert(api.walkable(station.approach),station.id);assert(api.planRoute([0,4.1],station.approach),station.id)}});
 check('avatar appearance changes persist but locked accessories are rejected',()=>{assert(api.setAppearance('skin','deep'));assert.equal(stored.appearance.skin,'deep');assert(!api.setAppearance('accessory','cap'));context.persistent.seen=['a','b','c'];assert(api.setAppearance('accessory','cap'));assert.equal(stored.appearance.accessory,'cap');assert(!api.setAppearance('skin','unknown'));assert(saves>0)});
-check('visitor event alternates authored animals by day and keeps same-day trust',()=>{api.syncVisitor();assert.equal(stored.visitor.kind,'seal');stored.visitor.trust=2;api.syncVisitor();assert.equal(stored.visitor.trust,2);context.voyage.state.features.expedition.day=2;api.syncVisitor();assert.equal(stored.visitor.kind,'penguin');assert.equal(stored.visitor.trust,0)});
+check('visitor event follows the game season and keeps same-day trust',()=>{api.syncVisitor();assert.equal(stored.visitor.kind,'seal');stored.visitor.trust=2;api.syncVisitor();assert.equal(stored.visitor.trust,2);context.voyage.state.features.expedition.day=2;api.syncVisitor();assert.equal(stored.visitor.kind,'seal');context.voyage.state.features.expedition.day=93;api.syncVisitor();assert.equal(stored.visitor.kind,'penguin');assert.equal(stored.visitor.trust,0)});
 check('appearance and visitor state survive sanitize roundtrip',()=>{const s=api.sanitize(plain(stored));assert.deepEqual(plain(s),plain(stored));});
 check('reset and mode lifecycle do not erase collected ship history',()=>{stored.visited=['cabin','notice'];const before=plain(stored);feature.reset();feature.panelChanged('settings');feature.panelClosed();assert.deepEqual(plain(stored),before);assert.equal(api.snapshot().mode,null);assert.equal(feature.shouldAnimate(),false)});
 console.log(count+' ship behavior checks passed');

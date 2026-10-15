@@ -164,7 +164,8 @@ function abyssTrajectory(f,time,out,context=null){
  let radius=Math.max(0,Math.min(Number.isFinite(f.radius)?f.radius:profile.radius,profile.radius));
  if(exhibit)radius=Math.min(radius,crawl?.30:1.15);
  else{
-  const solids=context?.solids||(typeof OceanRegions!=='undefined'?OceanRegions.solids:[]);
+  const reach=Math.max(radius+hull.horizontal+.04,hull.bottom+.04,hull.top+profile.bob+.04);
+  const solids=context?.solids||(typeof OceanRegions!=='undefined'?(OceanRegions.nearbySolids?OceanRegions.nearbySolids(home,reach):OceanRegions.solids):[]);
   // Reserve a circle around the home for every heading, including the entire
   // eight-metre squid. Keeping a single safe radius avoids obstacle teleports.
   for(const box of solids||[]){if(box.max[1]<=home[1]-hull.bottom-.04||box.min[1]>=home[1]+hull.top+profile.bob+.04)continue;const dx=Math.max(box.min[0]-home[0],0,home[0]-box.max[0]),dz=Math.max(box.min[2]-home[2],0,home[2]-box.max[2]);radius=Math.min(radius,Math.max(0,Math.hypot(dx,dz)-hull.horizontal-.04));}
@@ -312,11 +313,11 @@ function tableCoral(type=0){
 // Runtime observation interface: inspect another real instance, no representative clone.
 function initIndividualUI(){
  const panel=document.createElement('div');panel.id='individualCard';panel.className='hidden';panel.innerHTML='<div><small>THIS ENCOUNTER</small><b id="individualLabel"></b><span id="individualTraits"></span></div><button id="nextIndividual" title="觀察同種下一隻">下一隻 ↗</button>';$('hud').appendChild(panel);
- $('nextIndividual').onclick=()=>{if(!follow)return;const set=life.filter(f=>f.species===follow.species);const i=set.indexOf(follow);findSpecies(follow.species,set[(i+1)%set.length]);paintIndividualUI();};
+ $('nextIndividual').onclick=()=>{if(!follow)return;const set=life.filter(f=>f.species===follow.species&&f.ecologyPresent!==false);const i=set.indexOf(follow);findSpecies(follow.species,set[(i+1)%set.length]);paintIndividualUI();};
 }
 function paintIndividualUI(){
  const panel=$('individualCard');if(!panel)return;panel.classList.toggle('hidden',!follow||!active||!!modal);
- if(!follow||!active)return;const set=life.filter(f=>f.species===follow.species),i=set.indexOf(follow)+1;
+ if(!follow||!active)return;const set=life.filter(f=>f.species===follow.species&&f.ecologyPresent!==false),i=set.indexOf(follow)+1;
  $('individualLabel').textContent=SPECIES[follow.species].name+' · '+String(i).padStart(2,'0')+' / '+String(set.length).padStart(2,'0');
  $('individualTraits').textContent='固定個體 '+follow.uid+' · 體型／花紋／泳姿各有差異';
  $('nextIndividual').disabled=set.length<2;

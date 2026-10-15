@@ -52,7 +52,7 @@ const oceanNavigation=(()=>{
   // reachable mooring before applying the new journey boundary.
   const s=state(),v=voyage.state;if(v.resume&&V.dist(v.resume.p,current().p)>R.range){const candidates=R.moorings.filter(m=>R.unlocked(m,v)).sort((a,b)=>V.dist(a.p,v.resume.p)-V.dist(b.p,v.resume.p));if(candidates.length)s.mooring=candidates[0].id;}
   apply();oceanFeatures.addMenu({id:'navigation',label:'航海圖與移船',panel:'navigation'});
-  const oldCollide=collide;collide=function(p){oldCollide(p);if(active&&voyage.state.mode==='journey'){
+  const oldCollide=collide;collide=function(p,from=null){oldCollide(p,from);if(active&&voyage.state.mode==='journey'){
     const next=R.constrain(p,OPEN_WORLD.boat),hit=next[0]!==p[0]||next[2]!==p[2];if(hit){p.splice(0,3,...next);oldCollide(p);const final=R.constrain(p,OPEN_WORLD.boat);p.splice(0,3,...final);stopAuto();if(t-lastWarning>8){lastWarning=t;toast('已到本泊位的探索邊界。回船移泊，可從另一側繼續探索。');}}
    }return p;};
   const oldJump=jumpTo;jumpTo=function(index){if(index===8&&active){player.p=entry();player.velocity=[0,0,0];resetInput();stopAuto();closePanel();cameraCut=true;toast('已回到研究船旁的入水處。');return;}oldJump(index);};

@@ -37,3 +37,5 @@
    so it never covers a research action or clips the start of a tall board. */
 .ship-screen{align-content:safe center;row-gap:32px}
 .welcome-bottom{position:static;grid-column:1/-1;align-self:end;width:100%;flex-shrink:0}
+
+.season-encounters{display:grid;gap:14px;margin-top:20px}.season-encounter{border-top:1px solid #b7cfbd22;padding-top:14px}.season-encounter strong{font-size:13px}.season-encounter p{font-size:12px}.season-encounter button{min-height:44px}

@@ -48,7 +48,7 @@ const oceanShip=(()=>{
  const save=()=>saveVoyage(),say=text=>{if(typeof toast==='function')toast(text)};
  function accessoryAllowed(id){return id==='none'||id==='cap'&&persistent.seen.length>=3||id==='badge'&&Object.values(voyage.state.features?.expedition?.mail||{}).some(m=>m.status==='complete');}
  function setAppearance(key,value){if(active)return false;const a=state().appearance;if(key==='name')a.name=name(value);else if(key==='skin'&&Object.hasOwn(skins,value)||key==='hair'&&Object.hasOwn(hairs,value)||key==='build'&&Object.hasOwn(builds,value)||key==='accessory'&&accessoryAllowed(value))a[key]=value;else return false;save();syncActors();return true;}
- function syncVisitor(){const s=state(),day=voyage.state.features?.expedition?.day||1,kind=voyage.state.dives>0?(day%2?'seal':'penguin'):null;if(s.visitor.day!==day||s.visitor.kind!==kind){s.visitor={day,kind,trust:0};save();}return s.visitor;}
+ function syncVisitor(){const s=state(),day=voyage.state.features?.expedition?.day||1,kind=OceanSeasonRules.visitor(day,voyage.state.dives);if(s.visitor.day!==day||s.visitor.kind!==kind){s.visitor={day,kind,trust:0};save();}return s.visitor;}
  const modeAllowed=()=>!active&&runtime.mode&&['deck','cabin','shipRest','shipAppearance','shipDialogue','shipNotice'].includes(modal);
  function leave(){
   const was=runtime.mode;runtime.mode=null;runtime.route=[];runtime.pending=null;runtime.gesture=null;runtime.restIdle=false;

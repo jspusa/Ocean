@@ -19,4 +19,22 @@ check('near-roof anchor does not place the camera above the legal diver clearanc
 check('smoothed orbit cannot cross a wall or roof between previously safe camera positions',()=>{place([-218,-24.8,-70]);for(let i=0;i<180;i++){context.player.yaw=-Math.PI+i*Math.PI*2/179;context.player.pitch=Math.sin(i*.09)*.4;context.cameraCut=false;camera(1/60);safe('orbit frame '+i);}});
 check('archive room camera uses the same obstruction rule as the cave',()=>{for(const yaw of [0,Math.PI/2,Math.PI,-Math.PI/2]){place([188,-48.1,-228],yaw,.15);safe('archive yaw '+yaw);}});
 check('safe open water retains the established six-metre third-person offset',()=>{place([0,-6,23],0,0);assert.deepEqual(clone(context.eye),[.4,-4.52,29.3]);assert.deepEqual(clone(context.target),[0,-6,16.4]);});
+// Exercise the production player movement entry points, not just resolve().
+vm.runInContext(app.slice(app.indexOf('function collide('),app.indexOf('function dir(')),context);
+vm.runInContext(app.slice(app.indexOf('function updatePlayer('),app.indexOf('function updateCamera(')),context);
+Object.assign(context,{oceanFeatures:{pointerCaptured:()=>false},keys:new Set(),lookStick:[0,0],verticalInput:0,collisionNotice:0,t:0,toast:()=>{},stopAuto:()=>{},viewingOffset:()=>[0,0,0],lerpAngle:(a,b,f)=>a+(b-a)*f});
+context.settings.speed=1;context.settings.sensitivity=1;
+check('production manual swim sweeps a fast ascent before the thin cave roof',()=>{context.auto=false;context.player.p=[-218,-26,-70];context.player.velocity=[0,300,0];context.keys.clear();const from=context.player.p.slice();context.updatePlayer(.1);assert(context.player.p[1]<R.ceilingAt(context.player.p[0],context.player.p[2],-26)-.399,'endpoint beyond roof must not tunnel');assert(!R.pointBlocked(context.player.p,.399));assert(context.player.p[1]>from[1],'valid ascent still advances');});
+check('production auto-follow carries the previous position into cave collision',()=>{context.auto=true;context.player.p=[-218,-26,-70];context.player.velocity=[0,0,0];context.follow={p:[-218,-5,-70]};context.updatePlayer(1);assert(context.player.p[1]<R.ceilingAt(context.player.p[0],context.player.p[2],-26)-.399,'follow must not cross the roof');assert(!R.pointBlocked(context.player.p,.399));context.auto=false;context.follow=null;});
+check('intentional location changes remain endpoint-only rather than sweeping through intervening land',()=>{const destination=[-218,-5,-70];assert.deepEqual(clone(context.collide(destination.slice())),destination);});
+// Boot the real navigation wrapper as the live app does; a direct app.collide
+// test alone cannot catch a wrapper dropping the previous-position argument.
+const navigationState={schema:1,mooring:'cave',moves:0};
+Object.assign(context,{voyage:{state:{mode:'free',completed:[],visited:[],features:{},resume:null}},renderer:{batches:[{sceneRole:'research-vessel',instances:[{p:[-24,0,43]}]}]},jumpTo:()=>{},oceanFeatures:{pointerCaptured:()=>false,state:()=>navigationState,register(){},addMenu(){}}});
+vm.runInContext(fs.readFileSync('src/navigation.js','utf8'),context,{filename:'navigation.js'});
+vm.runInContext('oceanNavigation.feature.init()',context);
+check('initialized navigation preserves movement sweep in free exploration and journey mode',()=>{
+ for(const mode of ['free','journey']){context.voyage.state.mode=mode;context.auto=false;context.player.p=[-218,-26,-70];context.player.velocity=[0,300,0];context.keys.clear();context.updatePlayer(.1);assert(context.player.p[1]<R.ceilingAt(context.player.p[0],context.player.p[2],-26)-.399,mode+' navigation wrapper must carry from through the real collide entry');assert(!R.pointBlocked(context.player.p,.399));assert(context.player.p[1]>-26,'legitimate ascent still advances');}
+ const destination=[-218,-5,-70];assert.deepEqual(clone(context.collide(destination.slice())),destination,'navigation keeps explicit location changes endpoint-only');
+});
 console.log(`${passed}/${passed+failed} regional camera checks passed`);if(failed)process.exitCode=1;

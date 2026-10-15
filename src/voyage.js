@@ -80,7 +80,7 @@ function observeWhale(dt){const f=life.find(f=>f.species===10);if(!f)return;cons
 }
 function gradePhoto(){
  let chosen=null,best=Infinity;const macro=typeof oceanMicrocosm!=='undefined'&&oceanMicrocosm.isViewing()?oceanMicrocosm.target():null;
- for(const fish of macro?[macro]:life){const aim=animalFocusPoint(fish),p=project(aim,renderer.vp),dist=V.dist(eye,aim);if(p[2]<=0||Math.abs(p[0])>.97||Math.abs(p[1])>.95||dist>110||fish.retreat>.8||fish.faunaVisibility<.8||blocked(eye,aim,fish.fauna?.001:.13))continue;
+ for(const fish of macro?[macro]:life){if(fish.ecologyPresent===false)continue;const aim=animalFocusPoint(fish),p=project(aim,renderer.vp),dist=V.dist(eye,aim);if(p[2]<=0||Math.abs(p[0])>.97||Math.abs(p[1])>.95||dist>110||fish.retreat>.8||fish.faunaVisibility<.8||blocked(eye,aim,fish.fauna?.001:.13))continue;
   if(fish.fauna&&dist>speciesTraits(fish.species).observeDistance*2)continue;
   const ctr=Math.hypot(p[0],p[1]);if(ctr<best){chosen={fish,p,dist};best=ctr;}}
  if(!chosen)return {score:0,subject:null,breakdown:'風景留念 · 畫面內沒有可評分的生物',metrics:{}};
@@ -149,8 +149,8 @@ updatePlayer=function(dt){
 };
 const legacyFind=findSpecies;
 findSpecies=function(index,specific=null){
- const candidates=life.filter(f=>f.species===index);let fish=specific||candidates.reduce((a,f)=>!a||V.dist(f.p,player.p)<V.dist(a.p,player.p)?f:a,null);
- if(!fish)return;
+ const candidates=life.filter(f=>f.species===index&&f.ecologyPresent!==false);let fish=specific||candidates.reduce((a,f)=>!a||V.dist(f.p,player.p)<V.dist(a.p,player.p)?f:a,null);
+ if(!fish||fish.ecologyPresent===false){const sp=SPECIES[index];if(sp.fauna)markPlace('habitat:'+sp.id);toast(oceanSeasons.hint(sp.id));return;}
  if(SPECIES[index].traits?.micro){closePanel();if(typeof oceanMicrocosm!=='undefined'&&V.dist(animalFocusPoint(fish),player.p)<=speciesTraits(index).observeDistance){oceanMicrocosm.enter(fish.uid);}else{markPlace('habitat:'+SPECIES[index].id);toast('已標記棲地；游近後開啟微觀探索，尋找細小的身影。');}return;}
  if(voyage.state.mode==='journey'&&V.dist(fish.p,player.p)>(index===10?85:20)){
   const sp=SPECIES[index],place=sp.fauna?'habitat:'+sp.id:LANDMARKS[sp.zone].id;markPlace(place);toast('已標記棲地。先親自游近，再觀察這位訪客。');return;}

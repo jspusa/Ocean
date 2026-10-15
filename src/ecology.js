@@ -35,7 +35,7 @@ const oceanEcology=(()=>{
  function addKnowledge(f,points){const r=field(f),old=knowledge(r);r.points=Math.min(999,r.points+points);const level=knowledge(r);if(level>old){say(SPECIES[f.species].name+' · 觀察筆記第 '+level+' 層');if(!persistent.seen.includes(SPECIES[f.species].id)){persistent.seen.push(SPECIES[f.species].id);if(typeof setCount==='function')setCount();}}}
  const playAllowed=()=>active&&!modal&&!photoOpen&&!voyage.photoMode&&!document.body.classList.contains?.('cinematic');
  function inRange(f,contact=false){
-  if(!f||!f.uid||f.species<0||!SPECIES[f.species])return false;
+  if(!f||f.ecologyPresent===false||!f.uid||f.species<0||!SPECIES[f.species])return false;
   const point=animalFocusPoint(f);const traits=speciesTraits(f.species),limit=contact?traits.contactDistance:traits.observeDistance;if(f.retreat>.8||f.faunaVisibility<.8)return false;
   if(V.dist(player.p,point)>limit||V.dist(eye,point)>limit+V.dist(eye,player.p)+2||blocked(eye,point,SPECIES[f.species].fauna?.001:.13)||blocked(player.p,point,SPECIES[f.species].fauna?.001:.13))return false;
   const p=project(point,renderer.vp);return p.every(Number.isFinite)&&p[2]>0&&Math.abs(p[0])<.96&&Math.abs(p[1])<.92;

@@ -6,3 +6,4 @@ qa/parity/*.json
 qa/parity/*.jpg
 .DS_Store
 __pycache__/
+qa/parity/*.log

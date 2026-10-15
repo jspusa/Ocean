@@ -676,11 +676,14 @@ class Renderer{
  }
  updateBatch(b,eye=null,planes=null,shadowPass=false){
   let j=0;const a=b.data;const lodScale=this.mobile?(this.quality===0?.64:.82):(this.quality===0?.75:1);
-  const max=(b.maxDistance||220)*lodScale,min=(b.minDistance||0)*lodScale,max2=(max+.6)*(max+.6),min2=Math.max(0,min-.6)**2;
+  // Terrain LODs have matching edges but different interior heights. Submit
+  // exactly one opaque surface; overlapping dithered surfaces fight in depth.
+  const atomicGround=!shadowPass&&b.material===1,margin=atomicGround?0:.6;
+  const max=(b.maxDistance||220)*lodScale,min=(b.minDistance||0)*lodScale,max2=(max+margin)*(max+margin),min2=Math.max(0,min-margin)**2;
   for(let k=0;k<b.instances.length;k++){
-   const i=b.instances[k],p=i.p,sc=i.s||UNIT3,tint=i.tint||UNIT3;
+   const i=b.instances[k];if(i.ecologyPresent===false)continue;const p=i.p,sc=i.s||UNIT3,tint=i.tint||UNIT3;
    if(eye&&planes){const dx=p[0]-eye[0],dy=p[1]-eye[1],dz=p[2]-eye[2],d2=dx*dx+dy*dy+dz*dz;
-    if(d2>max2||d2<min2)continue;
+    if((atomicGround?d2>=max2:d2>max2)||d2<min2)continue;
     const r=b.radius*Math.max(sc[0],sc[1],sc[2])*((b.kind===8||b.kind===9||b.kind===10)?1.15:1);let outside=false;
     for(let n=0;n<6;n++){const pl=planes[n];if(pl[0]*p[0]+pl[1]*p[1]+pl[2]*p[2]+pl[3]<-r){outside=true;break;}}
     if(outside)continue;
@@ -809,7 +812,7 @@ class Renderer{
   this.submittedTriangles=0;this.submittedVertices=0;const planes=this.frustum(this.vp);
   for(const b of this.batches){if(!b.visible)continue;this.updateBatch(b,eye,planes);if(!b.drawCount)continue;
    this.submittedTriangles+=b.count/3*b.drawCount;this.submittedVertices+=b.vertexCount*b.drawCount;
-   const ls=this.mobile?(this.quality===0?.64:.82):(this.quality===0?.75:1);g.uniform3f(this.uniform(p,'uLODBounds'),(b.minDistance||0)*ls,(b.maxDistance||220)*ls,b.maxDistance&&b.maxDistance<180?.60:0);g.uniform1i(this.uniform(p,'uKind'),b.kind);g.uniform1i(this.uniform(p,'uMat'),b.material);g.uniform1i(this.uniform(p,'uSpecies'),b.species);this.drawBatch(b);}
+   const ls=this.mobile?(this.quality===0?.64:.82):(this.quality===0?.75:1);g.uniform3f(this.uniform(p,'uLODBounds'),(b.minDistance||0)*ls,(b.maxDistance||220)*ls,b.material!==1&&b.maxDistance&&b.maxDistance<180?.60:0);g.uniform1i(this.uniform(p,'uKind'),b.kind);g.uniform1i(this.uniform(p,'uMat'),b.material);g.uniform1i(this.uniform(p,'uSpecies'),b.species);this.drawBatch(b);}
   g.disable(g.SAMPLE_ALPHA_TO_COVERAGE);this.common(this.waterProgram,eye,this.vp,t);g.bindVertexArray(this.waterVAO);g.drawArrays(g.TRIANGLES,0,this.waterCount);this.submittedTriangles+=this.waterCount/3;this.submittedVertices+=this.waterCount;this.drawCalls++;
   g.enable(g.BLEND);g.blendFunc(g.SRC_ALPHA,g.ONE_MINUS_SRC_ALPHA);g.depthMask(false);
   this.common(this.pointProgram,eye,this.vp,t);g.uniform1f(this.uniform(this.pointProgram,'uScale'),this.canvas.height*.044);g.bindVertexArray(this.particleVAO);if(eye[1]<-.18){g.drawArrays(g.POINTS,0,this.quality===0?240:520);this.renderBubbles(eye,t);}g.depthMask(true);g.disable(g.BLEND);g.disable(g.DEPTH_TEST);

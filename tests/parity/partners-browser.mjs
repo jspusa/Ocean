@@ -6,7 +6,7 @@ import {mkdir,writeFile} from 'node:fs/promises';
 import {projectedPartnerBounds} from './projected-partner.mjs';
 const require=createRequire(import.meta.url),{chromium}=require(process.env.PLAYWRIGHT_PATH||'/Users/jasper/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright');
 const touch=process.argv.includes('--touch'),landscape=process.argv.includes('--landscape'),mode=touch?(landscape?'landscape':'touch'):'desktop',viewport=touch?(landscape?{width:844,height:390}:{width:390,height:844}):{width:1440,height:900};
-const url=process.argv.find(a=>a.startsWith('http'))||'http://127.0.0.1:8765/?v=0.12.0';
+const url=process.argv.find(a=>a.startsWith('http'))||'http://127.0.0.1:8765/';
 const browser=await chromium.launch({channel:'chrome',headless:true});let count=0;const errors=[],captures=[];
 try{
  const c=await browser.newContext({viewport,isMobile:touch,hasTouch:touch}),page=await c.newPage();page.on('pageerror',e=>errors.push(e.message));
@@ -21,8 +21,10 @@ try{
  await page.goto(url);await page.waitForFunction(()=>window.__ocean?.ready,{timeout:90000});
  await page.evaluate(()=>{window.__freeze=true;settings.sound=false;settings.third=false;settings.reduced=true;settings.lookLock=false;window.partnerFixture={};startDive(false);$('welcome').classList.add('hidden');});
  const ids=await page.evaluate(()=>CETACEAN_SPECIES.map(s=>s.id));check('All seven new species actually loaded',ids.length===7);
+ // Explicit encounter-calendar fixture isolates existing invite/training controls.
+ // The real calendar UI and unavailable invitation gates have separate seasons QA.
  for(const id of ids){
-  await page.evaluate(id=>{if(modal)closePanel();active=true;const s=oceanFeatures.state('ecology');s.partners=[];s.selected=null;s.released=[];s.accompany=false;oceanEcology.hooks.reset();const f=life.find(f=>SPECIES[f.species]?.id===id);window.partnerFixture.actor=f;player.p=[-215,-12,100];player.yaw=0;player.pitch=0;f.p=[-215,-12,97];f.yaw=.15;f.pitch=0;f.bank=0;s.individuals[f.uid]={trust:24,seconds:6,strokes:4,feeds:0};cameraCut=true;updateCamera();renderer.render(eye,target,t);oceanFeatures.call('tick',.2);},id);
+  await page.evaluate(id=>{if(modal)closePanel();active=true;const s=oceanFeatures.state('ecology');s.partners=[];s.selected=null;s.released=[];s.accompany=false;oceanEcology.hooks.reset();const clock=oceanFeatures.state('expedition'),encounterWindow=OceanSeasonRules.nextWindow(id,clock.day,clock.minute);clock.day=encounterWindow.day;clock.minute=encounterWindow.minute;oceanSeasons.sync(true);const f=life.find(f=>SPECIES[f.species]?.id===id);window.partnerFixture.actor=f;player.p=[-215,-12,100];player.yaw=0;player.pitch=0;f.p=[-215,-12,97];f.yaw=.15;f.pitch=0;f.bank=0;s.individuals[f.uid]={trust:24,seconds:6,strokes:4,feeds:0};cameraCut=true;updateCamera();renderer.render(eye,target,t);oceanFeatures.call('tick',.2);},id);
   await press('#ecologyBefriend');
   check(id+' can be invited with the visible interaction control',await page.evaluate(()=>oceanFeatures.state('ecology').selected===partnerFixture.actor.uid));
   await page.evaluate(()=>{goHome();$('debrief').classList.add('hidden');$('welcome').classList.add('hidden');const f=partnerFixture.actor;f.p=[OPEN_WORLD.boat[0]+9,.30,OPEN_WORLD.boat[2]+6];oceanEcology.selectPartner(f.uid);oceanFeatures.open('training');t+=.1;oceanEcology.afterLife(t);updateCamera();renderer.render(eye,target,t);oceanFeatures.call('idleTick',.1);});

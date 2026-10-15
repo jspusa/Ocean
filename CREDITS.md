@@ -74,3 +74,7 @@
 `src/abyss_fauna.js` 五種生物、`src/abyss_world.js` 九個體及棲地是原創幾何與遊戲編排。形態、尺度與資料来源見 [ABYSS-FAUNA-REFERENCE](docs/parity/ABYSS-FAUNA-REFERENCE.md)。新圖鑑 JPEG 由實際模型的 WebGL 棚景製作，不是外部生物照片。9 cm 鮟鱇、8 m 含觸腕的巨型烏賊、3 m 步足展幅的蜘蛛蟹採各自明示尺度；深淵空間經微縮，不能作自然棲息深度的依據。
 
 頭燈為即時近似的世界座標光錐、表面法線照明及水色衰減，未作物理或生態測量認證。
+
+## 0.14 季節與自然曲面
+
+航程日曆、三種生物時段及季節安排、船上訪客月份為本作原創遊戲設計。季節機制的原作依據與生態方向見 [SEASONS-REFERENCE](docs/parity/SEASONS-REFERENCE.md)，不把本作日期、精確月份或鐘點歸給 Nintendo 或實際海域。洞腔、岩肩與鮟鱇更新均為原創程序幾何；沒有使用原作模型、貼圖或音樂。

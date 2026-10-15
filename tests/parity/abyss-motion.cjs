@@ -25,4 +25,13 @@ check('all real spawn paths keep their full model above the actual seabed and ou
   for(let t=0;t<180;t+=2.71){pose(f,t,f.p);const c=Math.cos(f.yaw),s=Math.sin(f.yaw),cp=Math.cos(f.pitch),sn=Math.sin(f.pitch);for(const point of unique.values()){const x=(point[0]*cp-point[1]*sn)*sp.size,y=(point[0]*sn+point[1]*cp)*sp.size,z=point[2]*sp.size,p=[f.p[0]+c*x+s*z,f.p[1]+y,f.p[2]-s*x+c*z];assert(p[1]>=ground(p[0],p[2])-.008,sp.id+' real floor at t='+t+' '+p);assert(!regions.pointBlocked(p,.001),sp.id+' real solid at t='+t+' '+p);}}
  }
 });
+check('indexed real-region candidates preserve every trajectory and explicit context solids',()=>{
+ const allSolids=regions.solids;assert(allSolids.length>1000,'exercise the curved region catalogue');let candidates=0;
+ for(const sp of species)for(const [i,home]of world.sites[sp.id].homes.entries()){
+  const f=actor(sp);f.home=home.slice();f.p=home.slice();f.radius=world.sites[sp.id].radius;f.phase=i*2.1;const hull=vm.runInContext('abyssEnvelope',ctx)(f),reach=Math.max(f.radius+hull.horizontal+.04,hull.bottom+.04,hull.top+sp.motionProfile.bob+.04);candidates+=regions.nearbySolids(home,reach).length;
+  for(let time=0;time<180;time+=3.17){const indexed=clone(f),full=clone(f);pose(indexed,time,indexed.p);pose(full,time,full.p,{solids:allSolids});for(const key of ['p','yaw','pitch','bank','effort','abyssBeat'])assert.deepEqual(indexed[key],full[key],sp.id+' indexed pose '+key);}
+ }
+ assert(candidates<allSolids.length*.05,'bounded habitats query a local candidate set, not the entire regional mesh');
+ const sp=species.find(s=>s.id==='coelacanth'),f=actor(sp),wall=allSolids.find(s=>s.region==='abyss'&&s.max[1]-s.min[1]>2);f.home=wall.min.map((v,i)=>(v+wall.max[i])*.5);f.p=f.home.slice();f.habitatFloor=f.home[1]-5;f.habitatCeiling=f.home[1]+5;const a=clone(f),b=clone(f),floorOnly={groundHeight:()=>-200,ceilingAt:()=>0};pose(a,14,a.p,floorOnly);pose(b,14,b.p,{...floorOnly,solids:[]});assert.equal(a.p[0],f.home[0]);assert.equal(a.p[2],f.home[2]);assert(Math.hypot(b.p[0]-f.home[0],b.p[2]-f.home[2])>.1,'explicit empty fixture overrides real-region obstacles');
+});
 console.log(checks+' abyss motion checks passed');

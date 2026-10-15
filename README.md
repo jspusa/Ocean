@@ -1,10 +1,20 @@
-# 重返蔚藍 · 相遇之海 — LIVING OCEAN 0.13.0
+# 重返蔚藍 · 相遇之海 — LIVING OCEAN 0.14.0
 
 一個可以直接在電腦與手機瀏覽器遊玩的原創海洋探索遊戲。
 
 **[開始潛水](https://jspusa.github.io/Ocean/)**
 
 從研究船下水，在珊瑚花園與遠洋之間游動，觀察三十二類生物、拍照、相遇和收藏。本版延續 0.8 的水下光影、原創模型與自動畫質，加入生物互動、探索工具、研究委託及水族館，並補上沖印、甲板生活與移船。Wii 第一代《Endless Ocean》的完整功能對等仍在進行，缺口列於 [功能追蹤](FEATURE_PARITY.md)。
+
+## 0.14 潮汐與季節
+
+- 研究桌新增航程日曆，可休息一天、七天或等到下一季。從航程第 1 年 6 月 1 日出發，月份、跨年與閏日沿用同一份航程存檔；失焦、暫停及檢視照片會停住時間與耗氣。
+- 鸚鵡螺在夜間出現，白鯨在冬季到訪，太平洋白側海豚在春秋出現。圖鑑列出下一次時段與棲地；牠們會等離開視野後才退場，不會在眼前突然消失。已結識的夥伴和獨立水族館展示會保留。
+- 春夏可遇到船上海豹，秋冬可遇到企鵝。這些月份、時間、來訪安排是本作原創遊戲規則；不代表原作逐物種曆表或真實海域的精確觀察預測。[季節來源與界線](docs/parity/SEASONS-REFERENCE.md)。
+- 海蝕洞改為沿長度起伏的拱形洞腔，深海裂谷改為連續不規則岩肩；可見曲面與碰撞共用幾何。游動會沿岩面滑行，避免快速移動穿過薄洞頂。
+- 駝背鮟鱇重做頭顎、深入口腔、彎曲牙齒及薄鰭膜，保留 9 cm 個體尺度。所有生物身分、航程進度、照片與收藏延續既有存檔。
+
+本版仍未完成完整功能對等與攝影級擬真；季節內容先涵蓋三種生物，其他常駐內容及完整原作圖鑑仍待擴充。
 
 ## 0.13 回聲潮譜
 
@@ -81,13 +91,15 @@ python3 build.py --pack-only
 python3 -m http.server 8000
 ```
 
-幾何改動需執行完整 `python3 build.py`。本版重新烘焙 0.13 場景，包含新增模型、實際尺度、固定個體與棲地支撐；船的定位標記繼續支援移船。編譯也產生可離線開啟的 `standalone.html`；它不列入 Git，網站沒有 Service Worker。
+幾何改動需執行完整 `python3 build.py`。本版重新烘焙 0.14 場景，包含新增模型、實際尺度、固定個體與棲地支撐；船的定位標記繼續支援移船。編譯也產生可離線開啟的 `standalone.html`；它不列入 Git，網站沒有 Service Worker。
 
 驗證：
 
 ```sh
 python3 tests/parity/static_check.py
 node tests/v08/reef_invariants.cjs
+node tests/parity/seasons.cjs
+node tests/parity/seasons-browser.mjs
 node tests/parity/expedition.cjs
 node tests/parity/cetaceans.cjs
 node tests/parity/cetacean-motion.cjs

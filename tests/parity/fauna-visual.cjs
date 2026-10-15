@@ -14,6 +14,9 @@ const check=(name,pass,detail)=>{results.push({name,pass:!!pass,detail});console
  const context=await browser.newContext({viewport:mobile?{width:390,height:844}:{width:1440,height:900},hasTouch:mobile,isMobile:mobile,deviceScaleFactor:1}),page=await context.newPage();page.on('pageerror',e=>errors.push(e.stack));
  await page.goto(targetURL.href);await page.waitForFunction(()=>window.__ocean?.ready,{timeout:90000});await page.waitForFunction(()=>document.getElementById('loading').classList.contains('hidden'));
  const initial=await page.evaluate(()=>({gl:renderer.gl.getError(),catalogue:SPECIES.length,actors:life.filter(f=>f.fauna).length,compiled:renderer.sceneLoad,renderer:renderer.gl.getParameter(renderer.gl.getExtension('WEBGL_debug_renderer_info').UNMASKED_RENDERER_WEBGL)}));check('native WebGL shader programs and compiled habitat scene load',initial.gl===0&&initial.catalogue===32&&initial.actors>20,initial);
+ // An authored night voyage makes the nocturnal nautilus eligible; the
+ // manual daylight preset isolates anatomical regression from night lighting.
+ await page.evaluate(()=>{oceanExpedition.rest(1290);voyage.state.features.expedition.clockAuto=false;settings.lighting='day';applyVisualSettings();});
  await page.locator('#startBtn').click();await page.waitForTimeout(850);await page.evaluate(()=>{stopAuto();settings.third=false;settings.lamp=false;document.body.classList.add('cinematic');});
  const ids=await page.evaluate(()=>FAUNA_SPECIES.map(sp=>sp.id));
  for(const id of ids){
