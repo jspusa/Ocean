@@ -1,5 +1,5 @@
 {
-  "version": "0.14.0",
+  "version": "0.15.0",
   "scope": "served game and build sources",
   "files": [
     {
@@ -9,18 +9,18 @@
     },
     {
       "path": "CREDITS.md",
-      "bytes": 7473,
-      "sha256": "5c9bb8b205e8e894525f1bdf2bf8fd9bd046e609cfbd1b430d52297a9a49fd50"
+      "bytes": 7982,
+      "sha256": "106c2c496cd1b6c8cea50786d62b59aa0ee71c66ba948fcc5898f026a210d2d3"
     },
     {
       "path": "README.md",
-      "bytes": 12849,
-      "sha256": "cf2e136f6b1cbefd3998ebf8b4776b27269fbfb3dcf8219ed72abfef83e1b7b8"
+      "bytes": 14661,
+      "sha256": "1cd43a88debcd70b9480cd0d5a1a4c6c4a2066525b74889ca7ae4dcdae0772d3"
     },
     {
       "path": "VERSION",
       "bytes": 7,
-      "sha256": "065582655aacd6fc83ff742a5715c04bb4a57395bf3ee4559798fa42c2ce4589"
+      "sha256": "f8405a7330c287028d470c3ee3506f878f1ad85ed79c1d1adc19df2ff7398915"
     },
     {
       "path": "assets/caustics.jpg",
@@ -44,8 +44,8 @@
     },
     {
       "path": "assets/guide_beluga.jpg",
-      "bytes": 17946,
-      "sha256": "d0053f4ef669d156f4f4f1eae30c3f5119a2314fd9479458b9cb8647af47dfc4"
+      "bytes": 17925,
+      "sha256": "08eccd72bd5c9877bf971a3c23449ede8c55464461d1700d6b64e5cc71557cd4"
     },
     {
       "path": "assets/guide_butterfly.jpg",
@@ -59,8 +59,8 @@
     },
     {
       "path": "assets/guide_cinderella_slug.jpg",
-      "bytes": 24994,
-      "sha256": "3d77fa62207b61157cce6c91e90357d7d41ef60c4f378f625a4c104342e3afed"
+      "bytes": 24952,
+      "sha256": "8ee5368bf12cc5761e00e76eebda0fce98176be47cea7dd795f05c90ed799a6e"
     },
     {
       "path": "assets/guide_clown.jpg",
@@ -69,23 +69,23 @@
     },
     {
       "path": "assets/guide_coelacanth.jpg",
-      "bytes": 18707,
-      "sha256": "617e7207f2cdf47990881247a80765900308f36c9d94dcb0cb93ca3ff857a007"
+      "bytes": 18690,
+      "sha256": "b5fd02d814619aba4408f5c8839a08601e9a234583c8afde6f97d7bf57f0f6e1"
     },
     {
       "path": "assets/guide_commerson_dolphin.jpg",
-      "bytes": 14871,
-      "sha256": "1d83a7c8eaaeebceced8d9914f3f3854ed48bc7187fdeaf3b1c12124c5a26724"
+      "bytes": 14866,
+      "sha256": "f375a9d39377f0d2235edffb65994feb7c6c129c511f682cf08550942ad325ad"
     },
     {
       "path": "assets/guide_common_dolphin.jpg",
-      "bytes": 14972,
-      "sha256": "0434924077d5410b4f1e7b7ec133db0b11aed96c0f75529c724cc61c1e5ee7c5"
+      "bytes": 14960,
+      "sha256": "5842375cb6d701d5296267992008d2c7499d163e721f44127570e0d426af983c"
     },
     {
       "path": "assets/guide_cuttlefish.jpg",
-      "bytes": 20156,
-      "sha256": "93b5001b7a65b79016d063e5cf9515f7f0301a1bbfbeba56fbf3f1db32be533f"
+      "bytes": 20152,
+      "sha256": "37e4e34a7fd061dfb2f04b105c044683fa45ae6ac6449c64b68f97d294a07583"
     },
     {
       "path": "assets/guide_dolphin.jpg",
@@ -94,28 +94,28 @@
     },
     {
       "path": "assets/guide_false_killer_whale.jpg",
-      "bytes": 13129,
-      "sha256": "230e328e7e2e902d64019eef51072882693d3dd6004c676019c4f525f700e9c2"
+      "bytes": 13149,
+      "sha256": "284573162933e88db0a86624d334b5e2090bcd4f8488687351b1bfd8e5d838c4"
     },
     {
       "path": "assets/guide_frogfish.jpg",
-      "bytes": 20264,
-      "sha256": "f4b17a2061d514654646074c9c3f43ea934004cc088edbadf6dc3db813f83348"
+      "bytes": 17391,
+      "sha256": "45bd35e20fcd5afd9c69fecb28f70726818ccbe35eba8152492f9fce6379ac9f"
     },
     {
       "path": "assets/guide_garden_eel.jpg",
-      "bytes": 11314,
-      "sha256": "1f00eaafab6b24adfee4cfce4563b278f829aa951a5313bbada2d403eb8cdea9"
+      "bytes": 11320,
+      "sha256": "3ac29e28f2317e27ed6e3a79f9970c47a8e3b27c654f48611e81f579cd96ff45"
     },
     {
       "path": "assets/guide_giant_squid.jpg",
-      "bytes": 15686,
-      "sha256": "dcf0bd3a32be7ddd5035c25472fabd33d8966528dee84c88eb17b87fc90b8737"
+      "bytes": 15642,
+      "sha256": "f25ef276131143118072c20f20727cd89e45f9827601565d98bc0266b47d6b02"
     },
     {
       "path": "assets/guide_humpback_anglerfish.jpg",
-      "bytes": 17918,
-      "sha256": "3b08eabecfca545323b00976043cf523179f2aca79e0c6da04d050a37783831d"
+      "bytes": 17707,
+      "sha256": "ef41d8e21b4be3e5629675b6930c48fc576c2e02627500862d98812f197c87bf"
     },
     {
       "path": "assets/guide_idol.jpg",
@@ -124,23 +124,28 @@
     },
     {
       "path": "assets/guide_japanese_spider_crab.jpg",
-      "bytes": 21314,
-      "sha256": "9a7cab90cd400f7f5312c087f0b59458201b6abf8baae3f02f1e741292d91ba2"
+      "bytes": 21304,
+      "sha256": "079f03cd960eb506d936d35bd32d738a8f245a4e063ec1a00ab960569c2027b3"
     },
     {
       "path": "assets/guide_lionfish.jpg",
-      "bytes": 21933,
-      "sha256": "988aea5792c48e4c8ce1403af093ccbe54d15a63f7438d65b107f938580b66a7"
+      "bytes": 21968,
+      "sha256": "c8357744c166953e08ab53701599b2f45f492eb3c83a3c19a24e933c3be7a392"
+    },
+    {
+      "path": "assets/guide_mariana_snailfish.jpg",
+      "bytes": 18738,
+      "sha256": "a7c0d9fb42acaf7c68e5d780d45dbd6e625e63fe74607fcdfd966e833dd73c18"
     },
     {
       "path": "assets/guide_nautilus.jpg",
-      "bytes": 32373,
-      "sha256": "41fd4518b40f689d2ad4bb56b061f7939d612420cbb48400c403d575d268ef1c"
+      "bytes": 26102,
+      "sha256": "44f569b57465b334c5ac04063cececbc9b69530d846ee645d8691b56b9b17fcc"
     },
     {
       "path": "assets/guide_orca.jpg",
-      "bytes": 14697,
-      "sha256": "c9552a848cb712fcb2568cddeb177f5eda7de4c8bf8492ee7b0d85dc8880c770"
+      "bytes": 14693,
+      "sha256": "00e170f4783e5ef6e0f36732ac4746ed963e2b9be960731d85dba081784c2eec"
     },
     {
       "path": "assets/guide_parrot.jpg",
@@ -149,18 +154,18 @@
     },
     {
       "path": "assets/guide_pelican_eel.jpg",
-      "bytes": 14024,
-      "sha256": "39bc32ec7fea8799bbf7a5e5dad4dd1d37d55e74fdff3502464eb030fd1be1e1"
+      "bytes": 13858,
+      "sha256": "09cf516aeb70e8bacc254301422bd43a43602fbb51db9637f1d8b1142ed2a64a"
     },
     {
       "path": "assets/guide_pistol_shrimp.jpg",
-      "bytes": 22522,
-      "sha256": "d66dff67fc85e02deaa5cc825018faa20ce2d13a7247911a16676bbf5b4deb86"
+      "bytes": 19187,
+      "sha256": "9e4deb9b9424a4b43d4e5b9860a8443e28db2a97d76ae31d15b7dae3202e16d3"
     },
     {
       "path": "assets/guide_pygmy_seahorse.jpg",
-      "bytes": 15445,
-      "sha256": "bfe15b6e96f7e6c1459e5989ffe185fa27f114a6538e53596e6f3c5ca4a53e9e"
+      "bytes": 15471,
+      "sha256": "c9f2ab9f0bd4e955e5659474b61729a11481b21eb5c289311cc19afc0f9d910d"
     },
     {
       "path": "assets/guide_ray.jpg",
@@ -169,8 +174,13 @@
     },
     {
       "path": "assets/guide_rissos_dolphin.jpg",
-      "bytes": 17602,
-      "sha256": "03e6ad2268f7112b2bd14e3f1a9054b96ba5e193e11aa62a4a275677d7ca0949"
+      "bytes": 17583,
+      "sha256": "e1c5bff7517770f9d20db5c8adbf5cdaafa277277397c48da5c9e37241f38cce"
+    },
+    {
+      "path": "assets/guide_sea_pig.jpg",
+      "bytes": 21618,
+      "sha256": "86169a43461fbc578f248eb78953345a6c561951370123a7cc35aea5787551d1"
     },
     {
       "path": "assets/guide_sergeant.jpg",
@@ -188,6 +198,11 @@
       "sha256": "9a508d1a69ce637945f7b6018265c39d4852db298b29cb2267c296b84b831fca"
     },
     {
+      "path": "assets/guide_vampire_squid.jpg",
+      "bytes": 17191,
+      "sha256": "37bcb489dfb7115489160a758c7c764020f04703bc959b23a0af71c9ae70936c"
+    },
+    {
       "path": "assets/guide_whale.jpg",
       "bytes": 10622,
       "sha256": "56f53f03084aad8f80fbcbdc952c9ee5bf4e8e71ccc3edfca25212d951b35339"
@@ -195,7 +210,7 @@
     {
       "path": "assets/guide_white_sided_dolphin.jpg",
       "bytes": 15907,
-      "sha256": "70eea597f5e07e023345254953fb0331e15dd308d9d9836f385c946fb648dfdd"
+      "sha256": "1dfa57bbdd1ad8cb73c56381074bd4f43e2300777280bd0603085d6b170755e2"
     },
     {
       "path": "assets/guide_wrasse.jpg",
@@ -204,8 +219,8 @@
     },
     {
       "path": "assets/reef.mesh.gz",
-      "bytes": 17489769,
-      "sha256": "812cea5acfc83e8d2e71dc719404feff4005dafac7094161f1477ffd0de8a1a3"
+      "bytes": 19539355,
+      "sha256": "fbb343902f6a9690ed1dfa2f7cd4c5354d37f9fda273f8e6fe2694ef7f962626"
     },
     {
       "path": "assets/rock_diff.jpg",
@@ -239,18 +254,18 @@
     },
     {
       "path": "bake_scene.cjs",
-      "bytes": 3069,
-      "sha256": "70287758d890983532f905efc4066cba42481758cd7400de5462a0d8826164a5"
+      "bytes": 3117,
+      "sha256": "8646af1a36d3ad0edd1a83f3fe59852bb4662f12b7988f1c4733c3eac2a58c4b"
     },
     {
       "path": "build.py",
-      "bytes": 3380,
-      "sha256": "1500a4a6202906607bf753c1fdcff24d0ac3c27ceb457c7db5af06ba9fae433f"
+      "bytes": 3456,
+      "sha256": "91f6ec1361cea1bae0810739a279eae76f5ba9b5b3f7fc9f9b2352ae8b9b16bf"
     },
     {
       "path": "index.html",
-      "bytes": 13003,
-      "sha256": "da61b6290955629d9568520e207f6cf8d61c4926349a7a655fd7ae556fef5c4f"
+      "bytes": 12209,
+      "sha256": "c7491600cc1761c23253b03aeee61d7aefbcde7e616d4f6b613ba120c5fd41b2"
     },
     {
       "path": "music/blue_silence.mp3",
@@ -269,8 +284,8 @@
     },
     {
       "path": "src/abyss_fauna.js",
-      "bytes": 21226,
-      "sha256": "394e8935e7f00a6de8679ad306026ae0b3f815e507440d7df3e8f8b6fa45c9db"
+      "bytes": 21770,
+      "sha256": "ff6b1e82a83e2f9e5f5245489ee4b1dc5c3994e3469ec885e2cd187a86ebaca4"
     },
     {
       "path": "src/abyss_world.js",
@@ -279,8 +294,8 @@
     },
     {
       "path": "src/app.js",
-      "bytes": 57275,
-      "sha256": "a9299a1e9f2b2f2812ff9e8c9ccaf6f5114d89b1e3ef1ca571bca37beb4dfb10"
+      "bytes": 64076,
+      "sha256": "eb3d530b4940bcdb012bea77cb9b6260a3e7145e0f6ddae5f0fc7c549c74dc3d"
     },
     {
       "path": "src/aquarium.js",
@@ -289,13 +304,13 @@
     },
     {
       "path": "src/audio.js",
-      "bytes": 10712,
-      "sha256": "cce34910f60930d391d41d0994cd9c99f0f950c4822c9f0cd61890b50833e0d0"
+      "bytes": 10820,
+      "sha256": "8eb596ccee0d2d4483a77be5decb9d9fc8499f89774258b09026b6ac1c76a8d9"
     },
     {
       "path": "src/bootstrap.js",
-      "bytes": 17601,
-      "sha256": "bff1b1fc5cdd1607951ba14a0e9cf1c86b8e175e589babbce05c6eef1dadb508"
+      "bytes": 70,
+      "sha256": "602fc043b81dbfa67ff43bac0e6f0e14d9d102b3ff3b8836b72f183e151a8e20"
     },
     {
       "path": "src/cetacean_world.js",
@@ -309,48 +324,53 @@
     },
     {
       "path": "src/config.js",
-      "bytes": 2419,
-      "sha256": "a76b3eede2c91d1ff26c811cc02abe9fff28a652295d02072b4a3ded59eb617d"
+      "bytes": 2607,
+      "sha256": "aafa22a25ea93315cc2af81abab045b415005fb8b7af41de76698df800d22a75"
+    },
+    {
+      "path": "src/deepsea.js",
+      "bytes": 12555,
+      "sha256": "0753df0e149c37a38b9363e4308f81e627a0f6b9ccc6ad2e6197f2281c5ed766"
     },
     {
       "path": "src/ecology.js",
-      "bytes": 49934,
-      "sha256": "f77e0ec7074f925c6d5c4357732feb370ceb6216ed380d4e776798f1d8959cbd"
+      "bytes": 46809,
+      "sha256": "a27bcd256bc51275dd734582ce6d2ff7559b120ad6867d1f5e0991bd6d3c8043"
     },
     {
       "path": "src/engine.js",
-      "bytes": 74485,
-      "sha256": "cef5c2d9a2f843d36dc25da0a43f6a65d354317e26923047381bde86ca52260b"
+      "bytes": 82024,
+      "sha256": "0c408f0a9e1e9c8efa1bdbf0589da24043be648dc68c8a336334b975a4645a98"
     },
     {
       "path": "src/expedition.js",
-      "bytes": 18616,
-      "sha256": "0801687ce4ce73bfedd97208b592e6805a3ef8a4357fb2f9c40a844ece265873"
+      "bytes": 18816,
+      "sha256": "522c7b986690742b8c08aa8a99d301652ccca90627e4bce662737de138a75330"
     },
     {
       "path": "src/exploration.js",
-      "bytes": 40643,
-      "sha256": "e9c8fa189aaf4f9177bb10203568f90a1c70be0d6194db80e1ba0c6e7ca9519f"
+      "bytes": 41249,
+      "sha256": "468d09d3c52d0078c732b552aff55e7553a2a31cadeb8c55d162bce1e49515c8"
     },
     {
       "path": "src/fauna.js",
-      "bytes": 29360,
-      "sha256": "dfc23ef97dcd1dd1466c85772b246e71e85d37e8b61a8f63f5d1d9f402930469"
+      "bytes": 32618,
+      "sha256": "f5208471552c20b7fa000a4d69ef20d1a07c07186379251e7a7edfd413ac8d12"
     },
     {
       "path": "src/fauna_world.js",
-      "bytes": 6377,
-      "sha256": "221f586881bab021887e973f1b93daf0ff98672c4a7197cd014fe69ff3203270"
+      "bytes": 6558,
+      "sha256": "3c079a49244d24e77e211cc487b458546f601a110d974fdbbd87dea766a922ad"
     },
     {
       "path": "src/features.js",
-      "bytes": 4653,
-      "sha256": "4147e3d9fa23b9cb8f1c8a89b817da159b2a1276fe79c785454de8a4f4020198"
+      "bytes": 2783,
+      "sha256": "1880715c1485acd411ab5decca74328159df420f7d630cb0b6a9fd5617082c42"
     },
     {
       "path": "src/individuals.js",
-      "bytes": 29070,
-      "sha256": "643b515560fc8ad831be4a0a5f3e1e2dfef5850ad8f6cb3b7c77499c4d68ca35"
+      "bytes": 32766,
+      "sha256": "7840869333f167a6610720a0da9e781d94aba030037e020897504e798e78e0f0"
     },
     {
       "path": "src/microcosm.js",
@@ -359,8 +379,8 @@
     },
     {
       "path": "src/navigation.js",
-      "bytes": 6945,
-      "sha256": "44a03c4ea87ab2563ed840d3c7a2dd88b0f14101390a20359a5d45ce9ebf2ef0"
+      "bytes": 7141,
+      "sha256": "50494795d89b32d38349c99a83335c0ea896bb7f8b192e1de9db9dd01a11dc26"
     },
     {
       "path": "src/next_reef.js",
@@ -370,7 +390,7 @@
     {
       "path": "src/open_world.js",
       "bytes": 15293,
-      "sha256": "5567d3836ce556b0f8aa6026fcdd2bd93d80e9bbcca7fa731bdc9cc1b72f5573"
+      "sha256": "a99091dbbfdd1d4ad454a9c1d79763e443ee7332ecf0ab0defbd68082a1e9d93"
     },
     {
       "path": "src/performance.js",
@@ -389,8 +409,8 @@
     },
     {
       "path": "src/regions.js",
-      "bytes": 26087,
-      "sha256": "a5c7d2321dd7f7486d38d2cad827c96a6a3236f92d0db5ec5bfcf36445337d81"
+      "bytes": 26509,
+      "sha256": "34be2ac07da68eb11f98e52bc23707d94a423f4355fc73d2c26ff54fcace70be"
     },
     {
       "path": "src/scene_cache.js",
@@ -403,9 +423,14 @@
       "sha256": "ae76957dd3761ef7bf4bfb8fec285b62753973d76f4abcb622865bc83cf76034"
     },
     {
+      "path": "src/selection.js",
+      "bytes": 4600,
+      "sha256": "e5550e4ec5775bd2c0a962890b94e6e468ba099b307dbe12a29e251681d6906f"
+    },
+    {
       "path": "src/shell.html",
-      "bytes": 11472,
-      "sha256": "cc6323533d4af6b1734d73f89178f9ee9675362b9bfb4bb807803ee49c6f4c9e"
+      "bytes": 10427,
+      "sha256": "d4ab4a1a29ded81c04a84c71a27ed9533361c6d2918e0a40ccc4f1605fa22847"
     },
     {
       "path": "src/ship.js",
@@ -419,13 +444,28 @@
     },
     {
       "path": "src/style.css",
-      "bytes": 47590,
-      "sha256": "54ba6ed3a787e0e691a292f119f99c02f4d59643347b0117f773abe398aa7b63"
+      "bytes": 44547,
+      "sha256": "a320b169824d8f89c8640e694ec406f903fb6ae9b0ee4b22aa25d89985163ba0"
+    },
+    {
+      "path": "src/trench.js",
+      "bytes": 11757,
+      "sha256": "df6fbf409a551e3b7e511aafbd83d374000f54437c122560b22e6e266c7c3e54"
+    },
+    {
+      "path": "src/trench_fauna.js",
+      "bytes": 12631,
+      "sha256": "271cc421f3d74c669094ecce0cd41ebcd9dc646372cf153a403ecf9363ab551d"
+    },
+    {
+      "path": "src/trench_world.js",
+      "bytes": 1443,
+      "sha256": "d3fec2cb631fbc891825244ef88d3dca86c0740b20c02b4002b595f36cd45721"
     },
     {
       "path": "src/voyage.js",
-      "bytes": 36810,
-      "sha256": "a6cbb1268a7fe6add3be769b6a713a350a419956c45bfcef986b81b786918726"
+      "bytes": 37842,
+      "sha256": "36fe3a0a746e3f8d1a5e2e59e6bce211f6e21ef974de871480e5fd17cdeebc24"
     },
     {
       "path": "src/world.js",

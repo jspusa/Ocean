@@ -1,7 +1,7 @@
 /* Original, metre-scaled fauna. Museum/research references and measurement
  * definitions live in docs/parity/FAUNA-REFERENCE.md. Interaction distances,
  * population, placement and close-view eligibility are authored game rules.
- * New geometry: kind 8, +X anterior, +Y up; tags 1 body / 3 fin / 4 eye / 5 appendage. */
+ * New geometry: kind 8, +X anterior, +Y up; tags 1 body / 3 fin / 4 eye / 5 appendage / 7 nautilus shell. */
 const FAUNA_SPECIES=[];
 function speciesTraits(indexOrId){
  const sp=typeof indexOrId==='number'?SPECIES[indexOrId]:typeof indexOrId==='string'?SPECIES.find(s=>s.id===indexOrId):indexOrId;
@@ -125,19 +125,28 @@ const faunaArt=(()=>{
   for(const side of [-1,1]){tube(g,[[.41,-.02,side*.04],[.54,-.06,side*.08],[.64,-.01,side*.04],[.69,.035,side*.025]],t=>.014*(1-t*.3),pale,low?6:9);ellipsoid(g,[.70,.045,side*.026],[.065,.018,.025],tan,low?8:14,low?5:8);}
  }
  function nautilus(g,low){
-  const ivory=[.86,.81,.65],rust=[.51,.24,.12],shell=p=>{const a=Math.atan2(p[1]-.045,p[0]+.13),r=Math.hypot(p[0]+.13,p[1]-.045),stripe=Math.sin(a*15+r*20);return stripe>.45?rust:ivory;};
-  ellipsoid(g,[-.13,.045,0],[.465,.50,.24],shell,low?28:56,low?18:32);
-  for(const side of [-1,1]){
-   const pts=Array.from({length:low?32:72},(_,i)=>{const u=i/(low?31:71),a=.25+u*TAU*1.30,r=.33*Math.exp(-u*2.9);return [-.13+Math.cos(a)*r,.045+Math.sin(a)*r,side*(.240+.004*(1-u))];});tube(g,pts,.005,[.52,.41,.28],low?4:6);
-   ellipsoid(g,[-.13,.045,side*.244],[.031,.037,.004],[.13,.09,.06],low?8:14,low?5:8);
-  }
-  // Aperture is ventral/anterior; the hood sits above a cloud of suckerless tentacles.
-  ellipsoid(g,[.288,-.23,0],[.116,.203,.145],[.14,.10,.063],low?18:28,low?12:18);
-  ellipsoid(g,[.315,-.038,0],[.18,.095,.159],p=>Math.sin(p[0]*70+p[2]*90)>.5?rust:[.60,.50,.33],low?16:28,low?9:16);
-  g.tag=4;for(const side of [-1,1]){ellipsoid(g,[.365,-.16,side*.117],[.056,.07,.039],ivory,low?10:18,low?7:10);ellipsoid(g,[.396,-.157,side*.146],[.012,.016,.006],dark,low?7:12,low?5:8);}
-  g.tag=5;const tentacles=low?18:36;for(let i=0;i<tentacles;i++){const a=i/tentacles*TAU,r=.07+.06*(i%3)/2,len=.26+.18*(.5+.5*Math.sin(i*2.399)),y=-.19+Math.cos(a)*r,z=Math.sin(a)*r;tube(g,[[.366,y,z],[.47,y+Math.cos(a)*.022,z*1.3],[.52+len*.6,y+.07*Math.sin(i),z*1.9],[.50+len,y+.05*Math.sin(i+.5),z*1.65]],t=>.012*(1-t*.9),i%3?ivory:[.68,.51,.31],low?5:7);}
-  g.tag=1;tube(g,[[.30,-.30,0],[.43,-.35,0],[.48,-.33,0]],t=>.030-t*.005,ivory,low?8:12);ellipsoid(g,[.49,-.33,0],[.008,.018,.018],dark,low?7:10,low?5:7);
+  const ivory=[.83,.78,.65],rust=[.43,.21,.11],flesh=[.66,.54,.37],darkFlesh=[.23,.18,.12],smooth=t=>{t=clamp(t,0,1);return t*t*(3-2*t);};
+  // The final, swollen whorl ends at a genuinely open aperture. Shell and hood
+  // have independent material tags; the shell is not a spiral stuck on a disk.
+  const rows=[[-.59,.045,0,0],[-.51,.045,.29,.15],[-.34,.045,.455,.225],[-.13,.045,.50,.247],[.06,.015,.43,.234],[.22,-.075,.31,.209],[.34,-.18,.20,.177]];
+  const section=x=>{let i=0;while(i<rows.length-2&&x>rows[i+1][0])i++;const a=rows[i],b=rows[i+1],p=rows[Math.max(0,i-1)],n=rows[Math.min(rows.length-1,i+2)],h=b[0]-a[0],t=clamp((x-a[0])/h,0,1);return [x,...[1,2,3].map(k=>{const m0=(b[k]-p[k])/(b[0]-p[0])*h,m1=(n[k]-a[k])/(n[0]-a[0])*h;return (2*t*t*t-3*t*t+1)*a[k]+(t*t*t-2*t*t+t)*m0+(-2*t*t*t+3*t*t)*b[k]+(t*t*t-t*t)*m1;})];};
+  const surface=(point,nu,nv,color,inward=false)=>{const sample=(u,v)=>{const p=point(u,v),du=V.sub(point(Math.min(1,u+.0001),v),point(Math.max(0,u-.0001),v)),dv=V.sub(point(u,v+.0001),point(u,v-.0001)),radial=V.sub(p,point(u,v+.5));let n=V.cross(dv,du);if(V.len(n)<1e-10)n=V.mul(du,u<.5?-1:1);else if(V.dot(n,radial)<0)n=V.mul(n,-1);return {p,n:V.mul(V.norm(n),inward?-1:1),c:typeof color==='function'?color(p):color};};const rr=Array.from({length:nu+1},(_,i)=>Array.from({length:nv+1},(_,j)=>sample(i/nu,j/nv)));const put=(a,b,c)=>{if(V.len(V.cross(V.sub(b.p,a.p),V.sub(c.p,a.p)))<1e-11)return;if(V.dot(V.cross(V.sub(b.p,a.p),V.sub(c.p,a.p)),V.add(V.add(a.n,b.n),c.n))<0)[b,c]=[c,b];g.tri(a.p,b.p,c.p,a.c,[a.n,b.n,c.n],[a.c,b.c,c.c]);};for(let i=0;i<nu;i++)for(let j=0;j<nv;j++){const a=rr[i][j],b=rr[i+1][j],c=rr[i+1][j+1],d=rr[i][j+1];put(a,b,c);put(a,c,d);}};
+  const shellColor=p=>{const a=Math.atan2(p[1]-.045,p[0]+.13),r=Math.hypot(p[0]+.13,p[1]-.045),band=Math.sin(a*11.8+r*7+Math.sin(a*4)*.42),width=.38+.12*Math.sin(a*3),pigment=smooth((band-width)/.28)*smooth((r-.11)/.17);return ivory.map((c,i)=>mix(c,rust[i],pigment));};
+  g.tag=7;surface((u,v)=>{const x=mix(-.59,.34,u),p=section(x),a=v*TAU;return [x,p[1]+Math.cos(a)*Math.max(0,p[2]),Math.sin(a)*Math.max(0,p[3])];},low?26:48,low?18:32,shellColor);
+  const rim=a=>[.34,-.18+Math.cos(a)*.20,Math.sin(a)*.177];
+  surface((u,v)=>{const a=v*TAU,k=Math.sin(u*Math.PI*.5);return [mix(-.19,.34,u),-.18+Math.cos(a)*.191*k,Math.sin(a)*.168*k];},low?12:22,low?18:28,p=>[.58+.12*(p[0]+.19),.54+.10*(p[0]+.19),.43+.09*(p[0]+.19)],true);
+  surface((u,v)=>{const a=v*TAU;return [.34,-.18+Math.cos(a)*mix(.191,.20,u),Math.sin(a)*mix(.168,.177,u)];},1,low?24:48,[.81,.75,.61]);
+  // A low umbilical depression belongs to the whorl surface, not a black hole.
+  for(const side of [-1,1])ellipsoid(g,[-.12,.055,side*.243],[.049,.056,.007],[.70,.65,.53],low?10:18,low?6:9);
+  g.tag=1;ellipsoid(g,[.32,-.19,0],[.112,.119,.143],flesh,low?16:28,low?10:16);
+  // Sample pigments at shared vertices; face-midpoint colours made a checkerboard.
+  surface((u,v)=>{const a=u*Math.PI,b=v*TAU;return [.31+Math.sin(a)*Math.cos(b)*.205,-.019+Math.cos(a)*.085,Math.sin(a)*Math.sin(b)*.177];},low?10:17,low?18:30,p=>{const q=.5+.24*Math.sin(p[0]*31+p[2]*21)*Math.sin(p[2]*37-p[0]*14);return flesh.map((c,i)=>mix(c,darkFlesh[i],q*.28));});
+  // Pinhole eyes are set into fleshy side lobes, without a glassy fish eyeball.
+  g.tag=4;for(const side of [-1,1]){ellipsoid(g,[.390,-.155,side*.132],[.042,.045,.027],cream,low?10:16,low?7:10);ellipsoid(g,[.412,-.156,side*.153],[.009,.014,.0045],dark,low?7:10,low?5:7);}
+  g.tag=5;const count=low?20:44;for(let i=0;i<count;i++){const a=i*2.399963,r=.035+.09*((i*.618034)%1),cy=Math.cos(a),sz=Math.sin(a),len=.18+.21*((i*.381966)%1),root=[.398,-.19+cy*r,sz*r],curl=Math.sin(i*.83),points=curvePoints([root,[.455,-.19+cy*r*.94,sz*r*1.14],[.50+len*.39,-.19+cy*(r+.018)+curl*.025,sz*(r+.04)],[.50+len*.81,-.19+cy*(r+.043)+curl*.035,sz*(r+.075)],[.50+len,-.19+cy*(r+.025)+curl*.055,sz*(r+.058)]],low?1:2);tube(g,points,t=>.0067*Math.pow(1-t,.8)+.0007,t=>flesh.map((c,k)=>mix(c,ivory[k],.20+t*.35)),low?4:5);}
+  g.tag=1;tube(g,curvePoints([[.31,-.28,0],[.40,-.30,0],[.45,-.29,0],[.48,-.276,0]],low?1:2),t=>.027-t*.009,flesh,low?8:12);ellipsoid(g,[.485,-.274,0],[.004,.012,.013],dark,low?8:12,low?5:7);
  }
+
  const builders={pygmy_seahorse:seahorse,cinderella_slug:slug,garden_eel:eel,pistol_shrimp:shrimp,frogfish,lionfish,cuttlefish,nautilus};
  function build(sp,low){const key=sp.id+':'+!!low;if(cache.has(key))return cache.get(key);const g=new Geometry();g.material=0;g.species=SPECIES.findIndex(s=>s.id===sp.id);g.tag=1;g.shadow=!low;builders[sp.id](g,!!low);
   // Height normalization is intentional for upright seahorses and eels. Others
@@ -160,6 +169,16 @@ registerFauna({id:'frogfish',name:'彩繪躄魚',latin:'Antennarius pictus',en:'
 registerFauna({id:'lionfish',name:'月斑蓑鮋',latin:'Pterois lunulata',en:'LUNA LIONFISH',color:0xa9533b,zone:1,size:.28,bodyLength:1,naturalSize:'全長可達約 35 cm；模型全長 28 cm',hint:'長背鰭棘、向兩側展開的胸鰭，以及褐紅與淺色相間的條紋。',detail:'月斑蓑鮋的成魚鰭部帶有斑點，胸鰭鰭條可見 V 形斑紋。本模型參考該種的輪廓與體色，採緩慢懸游；遊戲不開放抓握。',source:'https://fishesofaustralia.net.au/Home/species/3649',traits:{motion:'hover',micro:false,feedable:true,contactDistance:2.2,observeDistance:9,targetRadius:.20,viewDistance:2},spawn:[{x:17,z:-23,yOffset:1.3}]});
 registerFauna({id:'cuttlefish',name:'寬腕烏賊',latin:'Ascarosepion latimanus · 同物異名 Sepia latimanus',en:'BROADCLUB CUTTLEFISH',color:0x98835a,zone:0,size:.45,bodyLength:1,naturalSize:'模型含自然收攏腕冠的全長 45 cm；非最大外套長',hint:'扁寬外套膜、環身波動的鰭裙，眼前展開八腕與兩條捕食觸腕。',detail:'寬腕烏賊以連續鰭緣波動懸游，也能噴水快速移動。體表可迅速改變花紋；模型保留八腕、兩條收攏觸腕與 W 形瞳孔，色彩變化為簡化動畫。',source:'https://www.montereybayaquarium.org/animals-the-ocean/animals-a-to-z/broadclub-cuttlefish',traits:{motion:'hover',micro:false,feedable:true,contactDistance:2.2,observeDistance:10,targetRadius:.25,viewDistance:2.2},spawn:[{x:-15,z:-12,yOffset:1.5}]});
 registerFauna({id:'nautilus',name:'鸚鵡螺',latin:'Nautilus pompilius',en:'CHAMBERED NAUTILUS',color:0xd7c7a2,zone:3,size:.22,modelUnitLength:1,measureAxis:1,bodyLength:1,naturalSize:'成體殼徑約 20–25 cm；模型殼徑 22 cm',hint:'褐白相間的盤捲外殼，殼口前方伸出一束細觸手。',detail:'鸚鵡螺以外殼保護身體，透過漏斗噴水移動，觸手沒有章魚式的吸盤。本遊戲的深谷配置與晝夜活動是縮小的原創場景，不等於自然界的活動深度。',source:'https://www.aquariumofpacific.org/onlinelearningcenter/species/chambered_nautilus',traits:{motion:'hover',micro:false,feedable:true,contactDistance:1.8,observeDistance:7,targetRadius:.17,viewDistance:1.8},spawn:[{x:-4,z:-77,yOffset:1.4}]});
+// Authored optical approximations, not measured animal skin coefficients.
+// The renderer treats nautilus tag7 as shell and its other tags as soft tissue.
+const faunaMaterials={
+ pygmy_seahorse:['fish',.72,.09,35],cinderella_slug:['gelatinous',.66,.30,18],
+ garden_eel:['fish',.58,.08,35],pistol_shrimp:['crustacean',.61,.08,32],
+ frogfish:['fish',.76,.10,45],lionfish:['fish',.54,.10,48],
+ cuttlefish:['cephalopod',.59,.30,40],nautilus:['cephalopod',.70,.16,36]
+};
+for(const sp of FAUNA_SPECIES){const [skin,roughness,subsurface,patternScale]=faunaMaterials[sp.id];sp.materialProfile={skin,roughness,subsurface,patternScale};}
+
 // Original compact vector field-guide drawings. These are schematic thumbnails,
 // not copied photographs, scientific plates, or replacements for the 3D meshes.
 (()=>{

@@ -188,9 +188,37 @@ function abyssMotionPose(f,time,out=f.p,context=null){
  const dx=abyssAhead[0]-abyssBehind[0],dy=abyssAhead[1]-abyssBehind[1],dz=abyssAhead[2]-abyssBehind[2],speed=Math.hypot(dx,dy,dz)/.12;
  f.yaw=Math.hypot(dx,dz)>.00001?Math.atan2(-dz,dx):(f.homeYaw||0);f.pitch=sp.traits.motion==='crawl'?0:clamp(Math.atan2(dy,Math.hypot(dx,dz)),-.10,.10);f.bank=0;f.effort=clamp(speed/Math.max(.01,profile.speed),.08,1);f.abyssBeat=profile.beat;f.faunaVisibility=1;f.faunaVisible=true;f.retreat=0;f.faunaTime=time;return out;
 }
+// A deep-station animal stays in its real vertical layer. The 1400 m terrace
+// is not the bottom returned by global groundHeight, and exhibits use their
+// own support plane rather than any geographic floor.
+const trenchPathCache=new WeakMap();
+function trenchPath(f,context=null){
+ const sp=SPECIES[f.species],profile=sp.motionProfile,home=f.home||f.center,scale=f.s[0],requested=Number.isFinite(f.radius)?f.radius:profile.radius,exhibit=!!context?.exhibit;
+ const cached=!context&&trenchPathCache.get(f);if(cached&&cached.home.every((v,i)=>v===home[i])&&cached.scale===scale&&cached.requested===requested)return cached;
+ const b=sp.modelBounds,crawl=sp.traits.motion==='crawl',hx=Math.max(Math.abs(b.min[0]),Math.abs(b.max[0])),hz=Math.max(Math.abs(b.min[2]),Math.abs(b.max[2])),margin=crawl?0:scale*.045;
+ const hull={horizontal:scale*(Math.hypot(hx,hz)+.065)+.006,bottom:Math.max(0,-b.min[1]*scale)+margin,top:b.max[1]*scale+margin};let radius=clamp(requested,0,profile.radius);
+ if(exhibit)radius=Math.min(radius,crawl?.065:.55);
+ else{
+  const reach=Math.max(radius+hull.horizontal+.025,hull.bottom+.025,hull.top+profile.bob+.025),world=typeof OceanTrench!=='undefined'?OceanTrench:null,solids=context?.solids??(world?.nearbySolids?world.nearbySolids(home,reach):world?.solids)??[];
+  for(const box of solids){if(box.max[1]<=home[1]-hull.bottom+.003||box.min[1]>=home[1]+hull.top+profile.bob+.025)continue;const dx=Math.max(box.min[0]-home[0],0,home[0]-box.max[0]),dz=Math.max(box.min[2]-home[2],0,home[2]-box.max[2]);radius=Math.min(radius,Math.max(0,Math.hypot(dx,dz)-hull.horizontal-.025));}
+ }
+ const result={home:home.slice(),scale,requested,radius,hull};if(!context)trenchPathCache.set(f,result);return result;
+}
+function trenchMotionPose(f,time,out=f.p,context=null){
+ const sp=SPECIES[f.species],profile=sp.motionProfile,home=f.home||f.center,phase=f.phase||0,crawl=sp.traits.motion==='crawl',exhibit=!!context?.exhibit,{radius,hull}=trenchPath(f,context),omega=profile.speed/Math.max(.08,radius)*(exhibit?.65:1),a=time*omega+phase,yaw=f.homeYaw||0,c=Math.cos(yaw),s=Math.sin(yaw),x=Math.sin(a)*radius,z=Math.sin(a*.73)*radius*.42;
+ out[0]=home[0]+c*x+s*z;out[2]=home[2]-s*x+c*z;out[1]=home[1]+(crawl?0:Math.sin(a*.61+phase)*profile.bob);
+ let floor=Number.isFinite(f.habitatFloor)?f.habitatFloor:-Infinity,ceiling=Number.isFinite(f.habitatCeiling)?f.habitatCeiling:0;
+ if(!exhibit){const world=typeof OceanTrench!=='undefined'?OceanTrench:null,floorAt=context?.floorAt||(context?.groundHeight?((x,z)=>context.groundHeight(x,z)):world?.floorAt),roofAt=context?.ceilingAt;
+  if(floorAt)for(let i=0;i<9;i++){const angle=i*TAU/8,r=i===8?0:hull.horizontal,px=out[0]+Math.cos(angle)*r,pz=out[2]+Math.sin(angle)*r,h=floorAt(px,pz,home[1]+hull.top+.1);if(Number.isFinite(h))floor=Math.max(floor,h+hull.bottom+(crawl?0:.015));if(roofAt){const roof=roofAt(px,pz,home[1]);if(Number.isFinite(roof))ceiling=Math.min(ceiling,roof-hull.top-.015);}}
+  if(floor<=ceiling)out[1]=crawl&&Number.isFinite(floor)?floor:clamp(out[1],floor,ceiling);else {out[0]=home[0];out[1]=home[1];out[2]=home[2];}
+ }
+ const vx=Math.cos(a)*radius*omega,vz=Math.cos(a*.73)*radius*.42*.73*omega,dx=c*vx+s*vz,dz=-s*vx+c*vz,dy=crawl?0:Math.cos(a*.61+phase)*profile.bob*.61*omega;
+ f.yaw=Math.hypot(dx,dz)>.000001?Math.atan2(-dz,dx):yaw;f.pitch=crawl?0:clamp(Math.atan2(dy,Math.hypot(dx,dz)),-.04,.04);f.bank=0;f.effort=clamp(Math.hypot(dx,dy,dz)/Math.max(.001,profile.speed),.08,1);f.trenchBeat=profile.beat;f.feedingPhase=((time*(crawl?.06:.045)+phase)%1+1)%1;f.faunaVisibility=1;f.faunaVisible=true;f.retreat=0;f.faunaTime=time;return out;
+}
 // Public seam used by the world, aquarium and tests. It updates only pose/state;
 // home, uid and s are immutable. react:false is a deterministic exhibit playback.
 function faunaMotionPose(f,time,out=f.p,context=null){
+ if(SPECIES[f.species]?.trench)return trenchMotionPose(f,time,out,context);
  if(SPECIES[f.species]?.abyss)return abyssMotionPose(f,time,out,context);
  if(SPECIES[f.species]?.cetacean||SPECIES[f.species]?.traits?.motion==='cetacean')return cetaceanMotionPose(f,time,out,context);
  const id=SPECIES[f.species]?.id,phase=f.phase??f.bob??0,home=f.home||f.center;

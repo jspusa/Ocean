@@ -18,6 +18,7 @@ const ExplorationRules=(()=>{
   {id:'blue_capsule',name:'海流研究筒',place:'pelagic',offset:[12,10],shape:'capsule',description:'封閉的金屬研究筒，上面刻著手寫水流箭頭。遊戲裡的船員可把它放回收藏桌，接著記錄新的海。'}
  ];
  const ids=new Set(artifacts.map(a=>a.id)),finitePoint=p=>Array.isArray(p)&&p.length===3&&p.every(Number.isFinite);
+ const pointRegion=p=>!finitePoint(p)?null:typeof OceanTrench!=='undefined'&&OceanTrench.containsPosition(p)?'trench':p[0]>=-285&&p[0]<=285&&p[1]>=-120&&p[1]<=-.18&&p[2]>=-395&&p[2]<=215?'reef':null;
  const dist=(a,b)=>Math.hypot(a[0]-b[0],a[1]-b[1],a[2]-b[2]);
  const center=i=>[bounds.left+(i%cols+.5)/cols*(bounds.right-bounds.left),bounds.top+(Math.floor(i/cols)+.5)/rows*(bounds.bottom-bounds.top)];
  const eligible=i=>{const [x,z]=center(i);return (x/268)**2+((z+90)/293)**2<=1;};
@@ -29,7 +30,7 @@ const ExplorationRules=(()=>{
   for(const key of ['found','collected'])if(Array.isArray(raw[key]))s[key]=[...new Set(raw[key].slice(0,64).filter(id=>ids.has(id)))];
   s.found=[...new Set([...s.found,...s.collected])];
   if(Array.isArray(raw.trail))for(const node of raw.trail.slice(-limits.trail)){
-   if(!node||!finitePoint(node.p)||node.p[0]<-285||node.p[0]>285||node.p[1]<-96||node.p[1]>=0||node.p[2]<-395||node.p[2]>215)continue;
+   if(!node||!pointRegion(node.p))continue;
    s.trail.push({p:node.p.map(n=>Math.round(n*10)/10),start:node.start===true||s.trail.length===0});
   }
 
@@ -39,7 +40,7 @@ const ExplorationRules=(()=>{
   if(Array.isArray(raw.strokes))for(const stroke of raw.strokes.slice(-limits.strokes)){
    if(!stroke||!Number.isInteger(stroke.id)||stroke.id<1||stroke.id>1e9||used.has(stroke.id)||!Object.hasOwn(colors,stroke.color)||!Array.isArray(stroke.points))continue;
    const points=[];
-   for(const p of stroke.points.slice(0,limits.points))if(finitePoint(p)&&p[0]>=-285&&p[0]<=285&&p[1]>=-96&&p[1]<=-.18&&p[2]>=-395&&p[2]<=215&&(!points.length||dist(p,points.at(-1))>=.025))points.push(p.map(n=>Math.round(n*1000)/1000));
+   for(const p of stroke.points.slice(0,limits.points))if(pointRegion(p)&&(!points.length||pointRegion(p)===pointRegion(points[0])&&dist(p,points.at(-1))>=.025))points.push(p.map(n=>Math.round(n*1000)/1000));
    if(points.length<2)continue;used.add(stroke.id);s.strokes.push({id:stroke.id,color:stroke.color,points});s.sequence=Math.max(s.sequence,stroke.id);
   }
   const target=raw.target;
@@ -54,7 +55,7 @@ const ExplorationRules=(()=>{
   if(known.size>before)s.survey=[...known];return known.size-before;
  }
  function recordTrail(s,p,start=false){
-  if(!finitePoint(p)||p[1]>=0||p[0]<-285||p[0]>285||p[2]<-395||p[2]>215)return false;
+  if(!pointRegion(p))return false;
   const last=s.trail.at(-1),distance=last?dist(last.p,p):Infinity;
   if(last&&!start&&distance<4)return false;
   s.trail.push({p:p.map(n=>Math.round(n*10)/10),start:!last||start||distance>35});
@@ -85,7 +86,7 @@ const ExplorationRules=(()=>{
  }
  function intersectPlane(ray,plane){if(!ray||!plane)return null;const dot=(a,b)=>a.reduce((sum,n,i)=>sum+n*b[i],0),den=dot(ray.direction,plane.normal);if(Math.abs(den)<.05)return null;const length=dot(plane.point.map((n,i)=>n-ray.origin[i]),plane.normal)/den;if(length<.2||length>12)return null;return ray.origin.map((n,i)=>n+ray.direction[i]*length);}
  function segmentDistance(point,a,b){const dx=b[0]-a[0],dy=b[1]-a[1],l=dx*dx+dy*dy,u=l?Math.max(0,Math.min(1,((point[0]-a[0])*dx+(point[1]-a[1])*dy)/l)):0;return Math.hypot(point[0]-a[0]-u*dx,point[1]-a[1]-u*dy);}
- return {bounds,cols,rows,limits,colors,artifacts,initial,sanitize,reveal,recordTrail,surveyStats,canPickup,collect,appendStroke,segments,screenRay,intersectPlane,segmentDistance,center,eligible,cells,finitePoint};
+ return {bounds,cols,rows,limits,colors,artifacts,initial,sanitize,reveal,recordTrail,surveyStats,canPickup,collect,appendStroke,segments,screenRay,intersectPlane,segmentDistance,center,eligible,cells,finitePoint,pointRegion};
 })();
 
 const oceanExploration=(()=>{
@@ -151,7 +152,7 @@ const oceanExploration=(()=>{
  }
  function paintHUD(){
   const pickup=$('explorationPickup');if(!pickup)return;currentPickup=active&&!modal&&!photoOpen&&!penMode?nearestPickup():null;pickup.classList.toggle('hidden',!currentPickup);if(currentPickup){pickup.textContent='打撈 '+currentPickup.name+' · R';pickup.setAttribute('aria-label','打撈'+currentPickup.name);}
-  const badge=$('explorationTarget'),p=targetPosition();badge.classList.toggle('hidden',!active||!!modal||photoOpen||!p||!!penMode);if(p&&active&&!modal){const q=project(p,renderer.vp),behind=q[2]<=0;badge.style.left=clamp((behind?-q[0]:q[0])*.5+.5,.12,.88)*100+'%';badge.style.top=clamp((behind?q[1]:-q[1])*.5+.5,.28,.70)*100+'%';badge.textContent=(behind?'↶ ':'◇ ')+targetLabel()+' · '+Math.round(V.dist(player.p,p))+' m';}
+  const badge=$('explorationTarget'),p=targetPosition();badge.classList.toggle('hidden',!active||!!modal||photoOpen||!p||!!penMode||R.pointRegion(p)!==R.pointRegion(player.p));if(p&&active&&!modal){const q=project(p,renderer.vp),behind=q[2]<=0;badge.style.left=clamp((behind?-q[0]:q[0])*.5+.5,.12,.88)*100+'%';badge.style.top=clamp((behind?q[1]:-q[1])*.5+.5,.28,.70)*100+'%';badge.textContent=(behind?'↶ ':'◇ ')+targetLabel()+' · '+Math.round(V.dist(player.p,p))+' m';}
  }
  function tick(dt){
   if(penMode&&!penAllowed())setPen(null);
@@ -238,19 +239,19 @@ const oceanExploration=(()=>{
  }
  function markTarget(kind,id){const s=state();if(!['artifact','ink'].includes(kind)||kind==='artifact'&&(!s.found.includes(id)||s.collected.includes(id))||kind==='ink'&&!s.strokes.some(stroke=>stroke.id===id))return;s.target={kind,id};persistNow();closePanel();paintHUD();toast('已標記 '+targetLabel()+' · 游向海中的菱形標誌');}
  function drawMap(ctx,w,h){
-  const s=state(),known=new Set(s.survey),cellWidth=w/R.cols,cellHeight=h/R.rows;ctx.save();
-  for(let i=0;i<R.cols*R.rows;i++){if(known.has(i))continue;ctx.fillStyle=R.eligible(i)?'rgba(1,14,25,.89)':'rgba(1,12,21,.96)';ctx.fillRect(i%R.cols*cellWidth,Math.floor(i/R.cols)*cellHeight,cellWidth+.5,cellHeight+.5);}
+  const s=state(),deep=typeof oceanDeepsea!=='undefined'&&oceanDeepsea.isActive(),region=deep?'trench':'reef',known=new Set(s.survey),cellWidth=w/R.cols,cellHeight=h/R.rows;ctx.save();
+  for(let i=0;!deep&&i<R.cols*R.rows;i++){if(known.has(i))continue;ctx.fillStyle=R.eligible(i)?'rgba(1,14,25,.89)':'rgba(1,12,21,.96)';ctx.fillRect(i%R.cols*cellWidth,Math.floor(i/R.cols)*cellHeight,cellWidth+.5,cellHeight+.5);}
   ctx.strokeStyle='rgba(193,225,212,.72)';ctx.lineWidth=1.4;ctx.beginPath();
-  for(const node of s.trail){const p=chartPoint(node.p[0],node.p[2],w,h);if(node.start)ctx.moveTo(...p);else ctx.lineTo(...p);}ctx.stroke();
-  for(const stroke of s.strokes){ctx.strokeStyle=R.colors[stroke.color].hex;ctx.lineWidth=2;ctx.beginPath();stroke.points.forEach((p,i)=>{const q=chartPoint(p[0],p[2],w,h);i?ctx.lineTo(...q):ctx.moveTo(...q)});ctx.stroke();}
-  for(const item of items)if(s.found.includes(item.id)&&!s.collected.includes(item.id)){const p=chartPoint(item.p[0],item.p[2],w,h);ctx.strokeStyle='#eed299';ctx.lineWidth=1.4;ctx.beginPath();ctx.moveTo(p[0],p[1]-5);ctx.lineTo(p[0]+5,p[1]);ctx.lineTo(p[0],p[1]+5);ctx.lineTo(p[0]-5,p[1]);ctx.closePath();ctx.stroke();}
-  const destination=targetPosition();if(destination){const end=chartPoint(destination[0],destination[2],w,h),origin=active?player.p:voyage.state.resume?.p;if(origin){const start=chartPoint(origin[0],origin[2],w,h);ctx.strokeStyle='#f2d990';ctx.setLineDash([4,5]);ctx.beginPath();ctx.moveTo(...start);ctx.lineTo(...end);ctx.stroke();ctx.setLineDash([]);}ctx.strokeStyle='#f4e0a9';ctx.beginPath();ctx.arc(...end,9,0,TAU);ctx.stroke();}
+  for(const node of s.trail){if(R.pointRegion(node.p)!==region||deep&&Math.abs(node.p[1]-player.p[1])>90)continue;const p=chartPoint(node.p[0],node.p[2],w,h);if(node.start)ctx.moveTo(...p);else ctx.lineTo(...p);}ctx.stroke();
+  for(const stroke of s.strokes){if(R.pointRegion(stroke.points[0])!==region||deep&&Math.abs(stroke.points[0][1]-player.p[1])>90)continue;ctx.strokeStyle=R.colors[stroke.color].hex;ctx.lineWidth=2;ctx.beginPath();stroke.points.forEach((p,i)=>{const q=chartPoint(p[0],p[2],w,h);i?ctx.lineTo(...q):ctx.moveTo(...q)});ctx.stroke();}
+  for(const item of items)if(!deep&&s.found.includes(item.id)&&!s.collected.includes(item.id)){const p=chartPoint(item.p[0],item.p[2],w,h);ctx.strokeStyle='#eed299';ctx.lineWidth=1.4;ctx.beginPath();ctx.moveTo(p[0],p[1]-5);ctx.lineTo(p[0]+5,p[1]);ctx.lineTo(p[0],p[1]+5);ctx.lineTo(p[0]-5,p[1]);ctx.closePath();ctx.stroke();}
+  const destination=targetPosition();if(destination&&R.pointRegion(destination)===region){const end=chartPoint(destination[0],destination[2],w,h),origin=active?player.p:voyage.state.resume?.p;if(origin){const start=chartPoint(origin[0],origin[2],w,h);ctx.strokeStyle='#f2d990';ctx.setLineDash([4,5]);ctx.beginPath();ctx.moveTo(...start);ctx.lineTo(...end);ctx.stroke();ctx.setLineDash([]);}ctx.strokeStyle='#f4e0a9';ctx.beginPath();ctx.arc(...end,9,0,TAU);ctx.stroke();}
   ctx.restore();
  }
  function drawPreview(canvas){
   const ctx=canvas.getContext('2d'),w=canvas.width,h=canvas.height;ctx.save();ctx.clearRect(0,0,w,h);ctx.translate(chartView.x,chartView.y);ctx.scale(chartView.scale,chartView.scale);ctx.fillStyle='#153c45';ctx.fillRect(0,0,w,h);ctx.strokeStyle='#c5dac024';for(let i=1;i<8;i++){ctx.beginPath();ctx.moveTo(i*w/8,0);ctx.lineTo(i*w/8,h);ctx.moveTo(0,i*h/8);ctx.lineTo(w,i*h/8);ctx.stroke();}drawMap(ctx,w,h);
-  oceanNavigation.feature.drawMap(ctx,w,h);ctx.font='11px sans-serif';for(const l of LANDMARKS){const p=chartPoint(l.x,l.z,w,h);ctx.fillStyle=voyage.state.visited.includes(l.id)?'#d4e9d0':'#90acae';ctx.beginPath();ctx.arc(...p,3.5,0,TAU);ctx.fill();ctx.fillText(l.name,p[0]+7,p[1]+3);}
-  if(active){const p=chartPoint(player.p[0],player.p[2],w,h);ctx.save();ctx.translate(...p);ctx.rotate(player.yaw);ctx.fillStyle='#eef6e1';ctx.beginPath();ctx.moveTo(0,-8);ctx.lineTo(-5,6);ctx.lineTo(5,6);ctx.closePath();ctx.fill();ctx.restore();}ctx.fillStyle='#b9d5c6';ctx.fillText('N ↑',w-35,20);ctx.restore();if($('explorationZoomValue'))$('explorationZoomValue').textContent=Math.round(chartView.scale*100)+'%';
+  const deep=typeof oceanDeepsea!=='undefined'&&oceanDeepsea.isActive();if(!deep)oceanNavigation.feature.drawMap(ctx,w,h);ctx.font='11px sans-serif';for(const l of deep?[]:LANDMARKS){const p=chartPoint(l.x,l.z,w,h);ctx.fillStyle=voyage.state.visited.includes(l.id)?'#d4e9d0':'#90acae';ctx.beginPath();ctx.arc(...p,3.5,0,TAU);ctx.fill();ctx.fillText(l.name,p[0]+7,p[1]+3);}
+  if(deep){ctx.fillStyle='#b9d5c6';ctx.fillText('研究站平面圖 · 目前深度上下90m',12,20);}if(active){const p=chartPoint(player.p[0],player.p[2],w,h);ctx.save();ctx.translate(...p);ctx.rotate(player.yaw);ctx.fillStyle='#eef6e1';ctx.beginPath();ctx.moveTo(0,-8);ctx.lineTo(-5,6);ctx.lineTo(5,6);ctx.closePath();ctx.fill();ctx.restore();}ctx.fillStyle='#b9d5c6';ctx.fillText('N ↑',w-35,20);ctx.restore();if($('explorationZoomValue'))$('explorationZoomValue').textContent=Math.round(chartView.scale*100)+'%';
  }
  function bindChart(canvas){
   const pointers=new Map();let drag=null,pinch=null,moved=false;

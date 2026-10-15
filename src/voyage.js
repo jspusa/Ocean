@@ -26,7 +26,7 @@ function readVoyage(raw){
  s.photoCredits=Array.isArray(raw.photoCredits)?[...new Set(raw.photoCredits.filter(n=>Number.isSafeInteger(n)&&n>0))].slice(-160):[];
  if(s.completed.length===ORDERS.length&&s.waypoint==='anchorage'&&!raw.features?.navigation)s.waypoint='boat';
  if(raw.bestPhotos&&typeof raw.bestPhotos==='object')for(const sp of SPECIES){let p=raw.bestPhotos[sp.id];if(p&&Number.isFinite(p.score))s.bestPhotos[sp.id]={score:Math.round(clamp(p.score,0,100)),individual:String(p.individual||'').slice(0,70),date:Number(p.date)||0};}
- const q=raw.resume;if(q&&Array.isArray(q.p)&&q.p.length===3&&q.p.every(Number.isFinite)&&Number.isFinite(q.yaw)&&Number.isFinite(q.pitch))s.resume={p:[clamp(q.p[0],-260,260),clamp(q.p[1],-120,-.65),clamp(q.p[2],-370,180)],yaw:q.yaw%TAU,pitch:clamp(q.pitch,-1.2,1.2),seconds:clamp(Number(q.seconds)||0,0,100000)};
+ const q=raw.resume;if(q&&Array.isArray(q.p)&&q.p.length===3&&q.p.every(Number.isFinite)&&Number.isFinite(q.yaw)&&Number.isFinite(q.pitch))s.resume={p:typeof DeepseaRules!=='undefined'&&DeepseaRules.canResume(raw.features?.deepsea,q.p)?q.p.slice():[clamp(q.p[0],-260,260),clamp(q.p[1],-120,-.65),clamp(q.p[2],-370,180)],yaw:q.yaw%TAU,pitch:clamp(q.pitch,-1.2,1.2),seconds:clamp(Number(q.seconds)||0,0,100000)};
  s.features=oceanFeatures.read(raw.features);
  return s;
 }
@@ -85,7 +85,8 @@ function gradePhoto(){
   const ctr=Math.hypot(p[0],p[1]);if(ctr<best){chosen={fish,p,dist};best=ctr;}}
  if(!chosen)return {score:0,subject:null,breakdown:'風景留念 · 畫面內沒有可評分的生物',metrics:{}};
  const {fish,p,dist}=chosen;const size=Math.max(...fish.s)*(fish.fauna?(SPECIES[fish.species].bodyLength||1):fish.species===10?9.5:fish.species===11?4.0:fish.species>=8?2.7:1.2),coverage=size/(Math.max(fish.fauna?.004:.3,dist)*Math.tan((renderer.photoFov||renderer.fov||69)*Math.PI/360));
- const framing=Math.max(0,1-best*.60)*30,scale=clamp(coverage/.24,0,1)*30,steady=(1-clamp(Math.hypot(...player.velocity)/6,0,1))*20,light=clamp(1+eye[1]/85,.3,1)*20;
+ const ambient=eye[1]<-200?0:clamp(1+eye[1]/85,.3,1),lamp=renderer.lamp?torchIllumination(animalFocusPoint(fish),eye,renderer.cameraForward||V.sub(target,eye)):0;
+ const framing=Math.max(0,1-best*.60)*30,scale=clamp(coverage/.24,0,1)*30,steady=(1-clamp(Math.hypot(...player.velocity)/6,0,1))*20,light=Math.max(ambient,lamp)*20;
  const safeDistance=fish.fauna?Math.max(.01,size*.8):fish.species===10?12:fish.species>=8?2.5:1;
  let score=Math.round(framing+scale+steady+light);if(dist<safeDistance)score=Math.min(score,49);if(coverage>1.4)score=Math.min(score,49);
  return {score,subject:fish,breakdown:dist<safeDistance?'再退開一些，給生物留出空間。':coverage>1.4?'輪廓超出畫面，退後一點再取景。':score>=80?'輪廓清楚、取景穩定，留下了一次完整相遇。':score>=60?'已取得清晰紀錄。放慢移動，可讓下一張更好。':'把生物放進畫面中央，等牠自然游近。',metrics:{framing:Math.round(framing),scale:Math.round(scale),steady:Math.round(steady),light:Math.round(light),distance:+dist.toFixed(2)}};
@@ -149,8 +150,12 @@ updatePlayer=function(dt){
 };
 const legacyFind=findSpecies;
 findSpecies=function(index,specific=null){
+ const deep=typeof oceanDeepsea!=='undefined'&&oceanDeepsea.isActive();
+ if(SPECIES[index]?.trench&&!deep){oceanFeatures.open('deepsea');toast('這位生物在深海研究站；回船後部署潛航器前往。');return;}
+ if(deep&&!SPECIES[index]?.trench){toast('這位生物生活在淺海；回收潛航器後，再從研究船下水尋找。');return;}
  const candidates=life.filter(f=>f.species===index&&f.ecologyPresent!==false);let fish=specific||candidates.reduce((a,f)=>!a||V.dist(f.p,player.p)<V.dist(a.p,player.p)?f:a,null);
  if(!fish||fish.ecologyPresent===false){const sp=SPECIES[index];if(sp.fauna)markPlace('habitat:'+sp.id);toast(oceanSeasons.hint(sp.id));return;}
+ if(deep&&V.dist(animalFocusPoint(fish),player.p)>speciesTraits(index).observeDistance){const sp=SPECIES[index];markPlace('habitat:'+sp.id);if(OceanTrench.habitats[sp.id]?.station!==oceanDeepsea.current().id)oceanFeatures.open('deepsea');toast('已標記深海棲地。前往對應研究站，靠近後再觀察。');return;}
  if(SPECIES[index].traits?.micro){closePanel();if(typeof oceanMicrocosm!=='undefined'&&V.dist(animalFocusPoint(fish),player.p)<=speciesTraits(index).observeDistance){oceanMicrocosm.enter(fish.uid);}else{markPlace('habitat:'+SPECIES[index].id);toast('已標記棲地；游近後開啟微觀探索，尋找細小的身影。');}return;}
  if(voyage.state.mode==='journey'&&V.dist(fish.p,player.p)>(index===10?85:20)){
   const sp=SPECIES[index],place=sp.fauna?'habitat:'+sp.id:LANDMARKS[sp.zone].id;markPlace(place);toast('已標記棲地。先親自游近，再觀察這位訪客。');return;}
@@ -173,7 +178,7 @@ renderMap=function(){
  $('panelBody').querySelectorAll('[data-mark]').forEach(b=>b.onclick=()=>markPlace(b.dataset.mark));$('chartHome').onclick=()=>{closePanel();goHome();};
  $('mapCanvas').onclick=e=>{const rect=e.currentTarget.getBoundingClientRect();const x=(e.clientX-rect.left)/rect.width*600,y=(e.clientY-rect.top)/rect.height*530;for(const l of LANDMARKS){const p=chartPoint(l.x,l.z,600,530);if(Math.hypot(p[0]-x,p[1]-y)<24){markPlace(l.id);return;}}};drawMap();
 };
-function chartPoint(x,z,w,h){return [(x-LAYOUT_BOUNDS.left)/(LAYOUT_BOUNDS.right-LAYOUT_BOUNDS.left)*w,(z-LAYOUT_BOUNDS.top)/(LAYOUT_BOUNDS.bottom-LAYOUT_BOUNDS.top)*h];}
+function chartPoint(x,z,w,h){const b=typeof oceanDeepsea!=='undefined'&&oceanDeepsea.isActive()?OceanTrench.bounds:LAYOUT_BOUNDS;return [(x-b.left)/(b.right-b.left)*w,(z-b.top)/(b.bottom-b.top)*h];}
 let chartTerrain=null;
 drawMap=function(){
  const c=$('mapCanvas');if(!c)return;const x=c.getContext('2d'),w=c.width,h=c.height;
@@ -258,7 +263,7 @@ function paintVoyageHUD(){
  $('companionBtn').classList.toggle('hidden',!persistent.seen.includes('dolphin'));$('companionBtn').classList.toggle('active',s.companion);
 }
 const legacyLifeUpdate=updateLife;
-updateLife=function(time){legacyLifeUpdate(time);if(typeof voyage==='undefined'||!voyage.state.companion||!active)return;const f=life.find(f=>f.species===11);if(!f)return;
+updateLife=function(time){legacyLifeUpdate(time);if(typeof voyage==='undefined'||!voyage.state.companion||!active||(typeof oceanDeepsea!=='undefined'&&oceanDeepsea.isActive()))return;const f=life.find(f=>f.species===11);if(!f)return;
  const step=clamp(time-(f._followTime??time-1/60),0,.1);f._followTime=time;const d=dir(),right=[Math.cos(player.yaw),0,Math.sin(player.yaw)];const target=V.add(player.p,V.add(V.mul(d,6),V.add(V.mul(right,4.4),[0,.8+Math.sin(time*.7)*.4,0])));target[1]=Math.min(-2,Math.max(groundHeight(target[0],target[2])+2,target[1]));
  f._followPoint=f._followPoint||f.p.slice();const old=f._followPoint.slice();f._followPoint=V.lerp(old,target,1-Math.exp(-step*1.34));f.p=f._followPoint.slice();const delta=V.sub(f.p,old);f.yaw=Math.atan2(-delta[2],delta[0]);f.pitch=Math.atan2(delta[1],Math.hypot(delta[0],delta[2]));
 };

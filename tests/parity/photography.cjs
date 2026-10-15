@@ -19,4 +19,21 @@ check('unsubmitted album and unselected film can be removed independently',()=>{
 check('film, album and metadata survive sanitized JSON roundtrip',()=>{const s=R.sanitize({film:[photo(1)],album:[photo(2)],revision:7});assert.deepEqual(plain(R.sanitize(plain(s))),plain(s))});
 check('durable album pins survive normalization and defeat stale mail deletion',()=>{const s=R.sanitize({film:[{...photo(1),pinned:true}],album:[{...photo(2),pinned:true}]});assert(!s.film[0].pinned);assert(s.album[0].pinned);assert.equal(R.removed(s,2,new Set()),null)});
 check('capture-time knowledge eligibility survives recovery metadata',()=>{for(const eligible of [true,false])assert.equal(R.metadata({...photo(1),knowledgeEligible:eligible}).knowledgeEligible,eligible);assert(!('knowledgeEligible'in R.metadata({...photo(1),knowledgeEligible:'true'})))});
+// Evaluate the production grader with a minimal optical scene, not a duplicate
+// score formula. Deep illumination must follow the actual renderer lamp cone.
+const lightContext=vm.createContext({console});
+vm.runInContext(fs.readFileSync('src/engine.js','utf8'),lightContext);
+const voyageSource=fs.readFileSync('src/voyage.js','utf8');
+vm.runInContext(voyageSource.slice(voyageSource.indexOf('function gradePhoto(){'),voyageSource.indexOf('function recordPhotoProgress(')),lightContext);
+vm.runInContext(`
+const animal={uid:'test-hadal',species:0,fauna:true,p:[0,-7000,-2],s:[.2,.2,.2]};
+const life=[animal],SPECIES=[{bodyLength:1}],player={velocity:[0,0,0]},eye=[0,-7000,0],target=[0,-7000,-1];
+const renderer={lamp:true,fov:69,cameraForward:[0,0,-1],vp:mm(perspective(69*Math.PI/180,1,.002,950),lookAt(eye,target))};
+function animalFocusPoint(f){return f.p;}function speciesTraits(){return {observeDistance:8};}function blocked(){return false;}
+`,lightContext);
+check('production photo grader rewards illuminated hadal animals and rejects absent or misdirected light',()=>{
+ const on=vm.runInContext('gradePhoto()',lightContext);assert(on.metrics.light>=18);
+ vm.runInContext('renderer.lamp=false',lightContext);const off=vm.runInContext('gradePhoto()',lightContext);assert.equal(off.metrics.light,0);
+ vm.runInContext('renderer.lamp=true;renderer.cameraForward=[1,0,0]',lightContext);const away=vm.runInContext('gradePhoto()',lightContext);assert.equal(away.metrics.light,0);assert(on.score>off.score);
+});
 console.log(checks+' photography rules checks passed');

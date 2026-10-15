@@ -15,6 +15,7 @@ const OceanRegions=(()=>{
  const canyonBed=z=>-66-28*ease((-z-253)/70);
  const padLocations=[[-156,-265],[-154.4,-293],[-143,-321]];
  function ground(x,z){
+  if(typeof OceanTrench!=='undefined'&&OceanTrench.containsXZ(x,z))return OceanTrench.groundHeight(x,z);
   let y=originalGround(x,z);
   const cave=boxWeight(x,z,-236,-212,-85,-38,10);
   if(cave)y=mixRegion(y,-29,cave);
@@ -147,17 +148,16 @@ const OceanRegions=(()=>{
   {id:'abyss',name:'無光裂谷',landmark:'abyss',entrance:routes.abyss[0].slice(),interior:points['abyss-lower'].stance.slice(),floor:-94,origin:[-151,-81,-289],mooring:'offshore',points:['abyss-upper','abyss-middle','abyss-lower']}
  ];
  const landmarks=definitions.map(d=>({id:d.landmark,name:d.name,en:{cave:'BASALT GROTTO',ruins:'DROWNED OBSERVATORY',abyss:'THE UNLIT CANYON'}[d.id],x:d.entrance[0],y:d.entrance[1],z:d.entrance[2],spawn:d.entrance.slice(),yaw:0,pitch:-.12,radius:12,text:{cave:'穿過光井，沿礦脈尋找另一側的出口。',ruins:'斷柱圍著潮汐盤，石刻仍留在有頂的檔案室。',abyss:'三座觀測台沿裂谷下降，記下光消失的位置。'}[d.id],note:'原創空間與路線；遊戲位置，不是真實潛水路線。'}));
- // Small x/z buckets bound all normal camera/contact queries. min/max stays
- // public for conservative animal hull planning; it is never the final collision
- // shape for the curved geology.
- const tileSize=6,tiles=new Map();
- for(const s of solids)for(let x=Math.floor(s.min[0]/tileSize);x<=Math.floor(s.max[0]/tileSize);x++)for(let z=Math.floor(s.min[2]/tileSize);z<=Math.floor(s.max[2]/tileSize);z++){
-  const key=x+','+z;if(!tiles.has(key))tiles.set(key,[]);tiles.get(key).push(s);
+ if(typeof OceanTrench!=='undefined')solids.push(...OceanTrench.solids);
+ // Three-dimensional buckets exclude distant depth slices from local queries.
+ const tileSize=6,verticalSize=32,tiles=new Map();
+ for(const s of solids)for(let x=Math.floor(s.min[0]/tileSize);x<=Math.floor(s.max[0]/tileSize);x++)for(let y=Math.floor(s.min[1]/verticalSize);y<=Math.floor(s.max[1]/verticalSize);y++)for(let z=Math.floor(s.min[2]/tileSize);z<=Math.floor(s.max[2]/tileSize);z++){
+  const key=x+','+y+','+z;if(!tiles.has(key))tiles.set(key,[]);tiles.get(key).push(s);
  }
  function candidates(a,b=a,r=0){
-  const x0=Math.floor((Math.min(a[0],b[0])-r)/tileSize),x1=Math.floor((Math.max(a[0],b[0])+r)/tileSize),z0=Math.floor((Math.min(a[2],b[2])-r)/tileSize),z1=Math.floor((Math.max(a[2],b[2])+r)/tileSize),out=new Set();
-  if((x1-x0+1)*(z1-z0+1)>160){for(const [key,list]of tiles){const [x,z]=key.split(',').map(Number);if(x>=x0&&x<=x1&&z>=z0&&z<=z1)for(const s of list)out.add(s);}}
-  else for(let x=x0;x<=x1;x++)for(let z=z0;z<=z1;z++)for(const s of tiles.get(x+','+z)||[])out.add(s);
+  const lo=a.map((n,i)=>Math.min(n,b[i])-r),hi=a.map((n,i)=>Math.max(n,b[i])+r),sizes=[tileSize,verticalSize,tileSize],start=lo.map((n,i)=>Math.floor(n/sizes[i])),end=hi.map((n,i)=>Math.floor(n/sizes[i])),out=new Set();
+  if((end[0]-start[0]+1)*(end[1]-start[1]+1)*(end[2]-start[2]+1)>1200){for(const s of solids)if(s.min.every((n,i)=>n<=hi[i]&&s.max[i]>=lo[i]))out.add(s);}
+  else for(let x=start[0];x<=end[0];x++)for(let y=start[1];y<=end[1];y++)for(let z=start[2];z<=end[2];z++)for(const s of tiles.get(x+','+y+','+z)||[])out.add(s);
   return out;
  }
  const boxPlanes=s=>[[1,0,0,s.max[0]],[-1,0,0,-s.min[0]],[0,1,0,s.max[1]],[0,-1,0,-s.min[1]],[0,0,1,s.max[2]],[0,0,-1,-s.min[2]]];
@@ -268,7 +268,7 @@ const OceanRegions=(()=>{
  }
  function ceilingAt(x,z,fromY=-Infinity){
   const a=[x,Number.isFinite(fromY)?fromY:-150,z],d=[0,150-a[1],0];let y=0;
-  for(const s of candidates(a))if(s.role==='roof'){const hit=interval(s,a,d);if(hit&&hit[1]>0&&hit[0]>=0)y=Math.min(y,a[1]+hit[0]*d[1]);}return y;
+  for(const s of candidates(a,[x,150,z]))if(s.role==='roof'){const hit=interval(s,a,d);if(hit&&hit[1]>0&&hit[0]>=0)y=Math.min(y,a[1]+hit[0]*d[1]);}return y;
  }
  function coverage(p){return ceilingAt(p[0],p[2],p[1])<0?1:0;}
  // Chisel-cut stone with true bevels. Plane faces stay aligned with collision
@@ -287,16 +287,16 @@ const OceanRegions=(()=>{
  function geologicalMesh(geometry){
   const normals=new Map(),key=(f,p)=>f.region+':'+f.layer+':'+p.join(',');
   for(const f of rockFaces)for(const p of f.p){const k=key(f,p),n=normals.get(k)||[0,0,0];for(let i=0;i<3;i++)n[i]+=f.normal[i];normals.set(k,n);}
-  for(const f of rockFaces){const g=geometry(f.region,f.role),color=f.region==='cave'?[.55,.62,.59]:[.44,.52,.57];
+  for(const f of rockFaces){const g=geometry(f.region,f.role,16),color=f.region==='cave'?[.55,.62,.59]:[.44,.52,.57];
    const ns=f.p.map(p=>V.norm(normals.get(key(f,p)))),colors=f.p.map(p=>{const bed=p[1]+.16*p[0]+.055*p[2],strata=.94+.065*Math.sin(bed*2.0)+.035*Math.sin(bed*5.1),mineral=.98+.025*Math.sin(p[0]*.71+p[2]*.43);return color.map(c=>c*strata*mineral);});
-   for(let i=1;i<f.p.length-1;i++){const ids=[0,i,i+1],cross=V.cross(V.sub(f.p[i],f.p[0]),V.sub(f.p[i+1],f.p[0]));if(V.dot(cross,f.normal)<0)ids.reverse();g.tri(...ids.map(n=>f.p[n]),color,ids.map(n=>ns[n]),ids.map(n=>colors[n]));}
+   for(let i=1;i<f.p.length-1;i++){const ids=[0,i,i+1],cross=V.cross(V.sub(f.p[i],f.p[0]),V.sub(f.p[i+1],f.p[0]));if(V.dot(cross,f.normal)<0)ids.reverse();for(const n of ids){const p=f.p[n],exposure=f.layer==='inner'?.34:f.layer==='edge'?.60:.88,bed=p[1]+.16*p[0]+.055*p[2];g.tag=30;g.vertex(p,ns[n],colors[n],[exposure,bed]);}}
   }
  }
  function build(renderer){
   const groups=new Map();
   const geometry=(region,role,material=2)=>{const key=region+':'+role;if(!groups.has(key)){const g=new Geometry();g.material=material;g.shadow=true;groups.set(key,{g,region,role});}return groups.get(key).g;};
   geologicalMesh(geometry);
-  for(const s of solids){if(s.id.startsWith('cave-vault-')||s.id.startsWith('cave-remnant-')||s.id.startsWith('cave-chamber-remnant-')||s.id.startsWith('abyss-shoulder-'))continue;const color=s.region==='cave'?[.63,.69,.67]:s.region==='ruins'?[.70,.72,.60]:[.49,.56,.60];masonry(geometry(s.region,s.role),s,color,s.role==='column'?.06:.12);}
+  for(const s of solids){if(s.region==='trench'||s.id.startsWith('cave-vault-')||s.id.startsWith('cave-remnant-')||s.id.startsWith('cave-chamber-remnant-')||s.id.startsWith('abyss-shoulder-'))continue;const color=s.region==='cave'?[.63,.69,.67]:s.region==='ruins'?[.70,.72,.60]:[.49,.56,.60];masonry(geometry(s.region,s.role),s,color,s.role==='column'?.06:.12);}
   const cave=geometry('cave','strata',0);
   // Actual layered mineral face attached to the west wall; not a hovering icon.
   cave.box([-233.94,-26.1,-58],[.36,2.0,3.0],[.42,.46,.43]);
@@ -332,5 +332,5 @@ const OceanRegions=(()=>{
  return Object.freeze({definitions,landmarks,points,solids,groundHeight:ground,ceilingAt,coverage,resolve,pointBlocked,segmentBlocked,pathClear,nearbySolids,route:id=>(routes[id]||[]).map(p=>p.slice()),build});
 })();
 const buildBeforeRegions=buildReef;
-buildReef=function(renderer){buildBeforeRegions(renderer);OceanRegions.build(renderer);};
+buildReef=function(renderer){buildBeforeRegions(renderer);OceanRegions.build(renderer);if(typeof OceanTrench!=='undefined')OceanTrench.build(renderer);};
 groundHeight=OceanRegions.groundHeight;

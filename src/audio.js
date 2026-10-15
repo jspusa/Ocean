@@ -50,8 +50,9 @@ class OceanAudio {
   const phase=((now-this.startedAt)%7.6)/7.6;
   const inhale=phase<.34?Math.sin(phase/.34*Math.PI):0;
   const exhale=phase>.44&&phase<.78?Math.sin((phase-.44)/.34*Math.PI):0;
-  this.breath.gain.setTargetAtTime(active?(inhale*.033+exhale*.014)*settings.breath:0,now,.08);
-  if(active&&!modal&&!photoOpen&&settings.ambience>.02){
+  const submersible=typeof oceanDeepsea!=='undefined'&&oceanDeepsea.isActive();
+  this.breath.gain.setTargetAtTime(active&&!submersible?(inhale*.033+exhale*.014)*settings.breath:0,now,.08);
+  if(active&&!submersible&&!modal&&!photoOpen&&settings.ambience>.02){
    if(exhale>.2&&now>this.nextBubble){this.bubble();this.nextBubble=now+.20+Math.random()*.24;}
    if(now-this.lastWhale>36+(1-blend)*20){this.lastWhale=now;this.whale(blend);}
    if(V.len(player.velocity)>.5&&now-this.lastKick>1.8){this.lastKick=now;this.fin();}

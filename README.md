@@ -1,10 +1,19 @@
-# 重返蔚藍 · 相遇之海 — LIVING OCEAN 0.14.0
+# 重返蔚藍 · 相遇之海 — LIVING OCEAN 0.15.0
 
 一個可以直接在電腦與手機瀏覽器遊玩的原創海洋探索遊戲。
 
 **[開始潛水](https://jspusa.github.io/Ocean/)**
 
-從研究船下水，在珊瑚花園與遠洋之間游動，觀察三十二類生物、拍照、相遇和收藏。本版延續 0.8 的水下光影、原創模型與自動畫質，加入生物互動、探索工具、研究委託及水族館，並補上沖印、甲板生活與移船。Wii 第一代《Endless Ocean》的完整功能對等仍在進行，缺口列於 [功能追蹤](FEATURE_PARITY.md)。
+從研究船下水，在珊瑚花園與遠洋之間游動，觀察三十五類生物、拍照、相遇和收藏。本版延續 0.8 的水下光影、原創模型與自動畫質，加入生物互動、探索工具、研究委託及水族館，並補上沖印、甲板生活與移船。Wii 第一代《Endless Ocean》的完整功能對等仍在進行，缺口列於 [功能追蹤](FEATURE_PARITY.md)。
+
+## 0.15 深海潛航與新的操作介面
+
+- 回研究船，選「深海與海溝 · 研究潛航」，即可部署到 700m 微光中層、1,400m 深海泥底或 7,000m 海溝底。三站採實際公尺座標；站間有連續航路，移動或拖曳可立即接手。
+- 深海使用研究潛航器，探照燈自動開啟，不消耗淺海氣瓶；可自由移動、觀察、拍照及回收返船。重新整理、匯出及匯入會保留實際深度，淺海泊位、圖鑑與照片延續。
+- 新增吸血烏賊、海豬及馬里亞納獅子魚，共35類／740個體。模型維持真尺度，具有分別的腕蹼、管足及薄鰭動作；棲地深度參考自然範圍，地形與研究站為原創。馬里亞納獅子魚是本作追加，非Wii原作逐物種復刻。[來源與量測](docs/parity/TRENCH-FAUNA-REFERENCE.md)。
+- 滑鼠指向提供輕提示，點一下或手機短點選取生物；一般環視不再自動在中央顯示名稱。選取資訊放在側邊，點空白處或關閉即可取消。拍照仍可直接取景。
+- 主畫面保留回船、深度、拍照、工具、暫停。工具內集中地圖、圖鑑、視角與設定，手機保留雙搖桿及升降按鈕；字幕及導航提示可切換。
+- 鸚鵡螺重建殼口與軟體部位；生物皮膚、殼、眼與薄膜分開材質。海溝新增斷層、泥底與實際碰撞，深處坐標採相機附近原點保持小型生物穩定。電腦和手機仍預設自動畫質。
 
 ## 0.14 潮汐與季節
 
@@ -70,7 +79,7 @@
 
 水下色彩衰減、方向散射、受遮擋的光束、沙地流動光紋、海面波浪與 Snell 折射視窗延續 0.8；珊瑚、海草、魚群與大型生物使用原創程序模型。這不是攝影掃描或實測海域，未宣稱全面超越 Wii。
 
-電腦使用 WASD／方向鍵游動、拖曳環視、E 上浮／Q 下潛、Shift 加速。V 切換第一／第三人稱，F 觀察，X 取景，空白鍵拍照。M 海圖、J 圖鑑、B 航程冊、T 潛水工具、Esc 退出工具／暫停、H 只看風景。設定內可開啟滑鼠自由環視。
+電腦使用 WASD／方向鍵游動、拖曳環視、E 上浮／Q 下潛、Shift 加速。V 切換第一／第三人稱，F 選取指標下生物，X 取景，空白鍵拍照。M 海圖、J 圖鑑、B 航程冊、T 潛水工具、Esc 退出工具／暫停、H 只看風景。設定內可開啟滑鼠自由環視。
 
 手機使用左搖桿移動、右搖桿環視，↑／↓ 調整深度；支援多點觸控、直向與橫向。點「工具」可使用新系統。標準手把保留雙搖桿及扳機輸入；新增工具的完整手把操作尚未實作，實體手機和手把全面驗證仍待完成。
 
@@ -91,13 +100,22 @@ python3 build.py --pack-only
 python3 -m http.server 8000
 ```
 
-幾何改動需執行完整 `python3 build.py`。本版重新烘焙 0.14 場景，包含新增模型、實際尺度、固定個體與棲地支撐；船的定位標記繼續支援移船。編譯也產生可離線開啟的 `standalone.html`；它不列入 Git，網站沒有 Service Worker。
+幾何改動需執行完整 `python3 build.py`。本版重新烘焙 0.15 場景，包含新增模型、實際尺度、固定個體與棲地支撐；船的定位標記繼續支援移船。編譯也產生可離線開啟的 `standalone.html`；它不列入 Git，網站沒有 Service Worker。
 
 驗證：
 
 ```sh
 python3 tests/parity/static_check.py
 node tests/v08/reef_invariants.cjs
+node tests/parity/selection.cjs
+node tests/parity/deepsea.cjs
+node tests/parity/trench-geometry.cjs
+node tests/parity/trench-lighting.cjs
+node tests/parity/trench-fauna.cjs
+node tests/parity/trench-motion.cjs
+node tests/parity/selection-browser.mjs
+node tests/parity/deepsea-browser.mjs
+node tests/parity/deepsea-performance.mjs
 node tests/parity/seasons.cjs
 node tests/parity/seasons-browser.mjs
 node tests/parity/expedition.cjs

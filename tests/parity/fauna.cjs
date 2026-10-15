@@ -25,7 +25,7 @@ check('a seahorse fin remains drawable from both sides of the animal',()=>{
 for(const sp of species.filter(s=>s.fauna))check(sp.id+' has finite indexed detail, bounded LOD and a stable ground reference',()=>{
  const high=build(sp.id),low=build(sp,true);assert.equal(high.material,0);assert.equal(high.species,species.indexOf(sp));assert.equal(low.species,high.species);
  assert(high.v.length/36<12000&&low.v.length<high.v.length*.65,'mobile LOD must actually reduce geometry');
- for(const g of [high,low]){assert(g.v.every(Number.isFinite));for(let k=0;k<g.v.length;k+=12){const n=Math.hypot(...g.v.slice(k+3,k+6));assert(n>.98&&n<1.02,'lighting normal');assert(g.v.slice(k+6,k+9).every(c=>c>=0&&c<=1));assert([1,3,4,5].includes(g.v[k+11]));}
+ for(const g of [high,low]){assert(g.v.every(Number.isFinite));for(let k=0;k<g.v.length;k+=12){const n=Math.hypot(...g.v.slice(k+3,k+6));assert(n>.98&&n<1.02,'lighting normal');assert(g.v.slice(k+6,k+9).every(c=>c>=0&&c<=1));assert([1,3,4,5,...(sp.id==='nautilus'?[7]:[])].includes(g.v[k+11]));}
   const m=index(g.v);assert(m.indices.every(i=>i<m.vertices.length/12));let visible=0;for(let k=0;k<m.indices.length;k+=3){const a=m.indices[k]*12,b=m.indices[k+1]*12,c=m.indices[k+2]*12;const ab=[0,1,2].map(j=>m.vertices[b+j]-m.vertices[a+j]),ac=[0,1,2].map(j=>m.vertices[c+j]-m.vertices[a+j]);if(Math.hypot(ab[1]*ac[2]-ab[2]*ac[1],ab[2]*ac[0]-ab[0]*ac[2],ab[0]*ac[1]-ab[1]*ac[0])>1e-10)visible++;}assert(visible>m.indices.length/3*.999,'indexed mesh does not collapse triangles');
  }
  const a=high.modelBounds,b=low.modelBounds;for(let i=0;i<3;i++)assert(Math.abs(a.size[i]-b.size[i])<.055,'LOD does not change silhouette scale');

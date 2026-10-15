@@ -4,7 +4,7 @@
 'use strict';
 const fs=require('node:fs'),path=require('node:path'),vm=require('node:vm'),zlib=require('node:zlib');
 const R=__dirname,ctx=vm.createContext({console,Float32Array,Uint32Array,Math,Map,Set,Date,SCULPTED_CORAL:JSON.parse(fs.readFileSync(path.join(R,'assets/coral_forms.json'),'utf8'))});
-for(const n of ['engine.js','world.js','reef_detail.js','next_reef.js','individuals.js','open_world.js','fauna.js','cetaceans.js','abyss_fauna.js','fauna_world.js','cetacean_world.js','regions.js','abyss_world.js'])vm.runInContext(fs.readFileSync(path.join(R,'src',n),'utf8'),ctx,{filename:n});
+for(const n of ['engine.js','world.js','reef_detail.js','next_reef.js','individuals.js','open_world.js','trench.js','fauna.js','cetaceans.js','abyss_fauna.js','trench_fauna.js','fauna_world.js','cetacean_world.js','regions.js','abyss_world.js','trench_world.js'])vm.runInContext(fs.readFileSync(path.join(R,'src',n),'utf8'),ctx,{filename:n});
 vm.runInContext(`
 const recorder={batches:[],batch(geo,instances,kind=0,dynamic=false){const b={mesh:indexGeometry(geo.v),instances,kind,dynamic,material:geo.material||0,species:geo.species??-1,visible:true,shadow:geo.shadow!==false};this.batches.push(b);if(this.batches.length%20===0)console.log("baked",this.batches.length);return b;}};
 buildReef(recorder);addLife(recorder);initializeIndividuals(recorder);updateLife(0);

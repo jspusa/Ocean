@@ -9,7 +9,9 @@ const FaunaWorldRules=(()=>{
   frogfish:{count:3,anchor:[-11,-20],height:.101,support:'rock',radius:.07},
   lionfish:{count:3,anchor:[-98,-64],height:2.4,support:null,radius:1.4},
   cuttlefish:{count:3,anchor:[104,-82],height:1.2,support:null,radius:.8},
-  nautilus:{count:3,anchor:[-2,-82],height:2.6,support:null,radius:.6}
+  // Keep the published home origin stable when the shell anatomy changes.
+  // Collision/focus still use the current model's measured bounds.
+  nautilus:{count:3,anchor:[-2,-82],height:2.6,originOffset:.455,support:null,radius:.6}
  };
  // Match the actual near-ground triangle grid, rather than its analytic height
  // function. A few centimetres of interpolation error is visible at macro scale.
@@ -75,7 +77,7 @@ addLife=function(r){
   const def=FaunaWorldRules.sites[sp.id];if(!def)continue;
   const index=SPECIES.indexOf(sp),high=faunaGeometry(sp),low=faunaGeometry(sp,true),actors=[];
   for(let k=0;k<def.count;k++){
-   const base=FaunaWorldRules.place(def,k),home=[base[0],base[1]+def.height+speciesTraits(sp).floorOffset*sp.size,base[2]],yaw=k*.63;
+   const base=FaunaWorldRules.place(def,k),home=[base[0],base[1]+def.height+(def.originOffset??speciesTraits(sp).floorOffset)*sp.size,base[2]],yaw=k*.63;
    const modelCenter=high.modelBounds.min.map((n,i)=>(n+high.modelBounds.max[i])*.5);
    const f={fauna:true,species:index,p:home.slice(),home:home.slice(),homeYaw:yaw,floorOffset:speciesTraits(sp).floorOffset,modelCenter,center:home.slice(),s:[sp.size,sp.size,sp.size],yaw,pitch:0,phase:k*2.1,orbit:k*2.1,radius:def.radius,height:def.height,speed:.04,bob:k*1.7,retreat:0,faunaVisibility:1,tint:[1,1,1]};
    actors.push(f);life.push(f);

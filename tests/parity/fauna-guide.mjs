@@ -18,14 +18,17 @@ try{
  for(const i of indices){
   const data=await page.evaluate(i=>{
    for(const a of guideOriginal){a.b.instances=a.instances;a.b.visible=false;}
-   const f=life.find(f=>f.species===i),sp=SPECIES[i],batch=renderer.batches.find(b=>(b.kind===8||b.kind===9||b.kind===10)&&b.species===i&&!(b.minDistance>0));
+   const f=life.find(f=>f.species===i),sp=SPECIES[i],batch=renderer.batches.find(b=>(b.kind===8||b.kind===9||b.kind===10||b.kind===11)&&b.species===i&&!(b.minDistance>0));
    batch.instances=[f];batch.visible=true;f.ecologyPresent=true;f.p=[0,-6,0];f.yaw=.08;f.pitch=0;f.bank=0;f.phase=0;f.faunaVisibility=1;f.retreat=0;
    const center=animalFocusPoint(f),span=sp.modelBounds.size,d=Math.max(span[1],span[0]/(640/360),span[2])*sp.size*1.8;
    renderer.photoNear=sp.cetacean?.16:.002;renderer.photoFov=40;renderer.photoAperture=0;renderer.forceShadow=true;
    // The crab's three-metre measure is its lateral leg span. A raised oblique
    // camera separates those limbs; a side-on portrait hid half of the anatomy.
    const offset=sp.id==='japanese_spider_crab'?V.mul(V.norm([.70,.48,.70]),sp.size*1.27):sp.id==='humpback_anglerfish'?[d*.62,d*.20,d*.85]:[d*.12,d*.15,d];
-   renderer.render(V.add(center,offset),center,0);
+   // Narrow framing repair: these old meshes have thin animated extremities
+   // close to the static crop; retain their full silhouette at the same metres.
+   const margin=['pistol_shrimp','frogfish','vampire_squid','sea_pig'].includes(sp.id)?1.26:1;
+   renderer.render(V.add(center,V.mul(offset,margin)),center,0);
    return {id:sp.id,image:renderer.canvas.toDataURL('image/jpeg',.93),gl:renderer.gl.getError(),drawn:batch.drawCount};
   },i);
   if(data.gl||data.drawn!==1)throw Error('Guide render failed: '+data.id);

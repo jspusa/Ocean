@@ -33,6 +33,7 @@ const oceanEcology=(()=>{
  const partner=()=>state().partners.find(p=>p.uid===state().selected)||null;
  const knowledge=r=>!r||r.points<4?0:r.points>=30&&r.encounters>=3?3:r.points>=14&&r.encounters>=2?2:1;
  function addKnowledge(f,points){const r=field(f),old=knowledge(r);r.points=Math.min(999,r.points+points);const level=knowledge(r);if(level>old){say(SPECIES[f.species].name+' · 觀察筆記第 '+level+' 層');if(!persistent.seen.includes(SPECIES[f.species].id)){persistent.seen.push(SPECIES[f.species].id);if(typeof setCount==='function')setCount();}}}
+ const inResearchVehicle=()=>typeof oceanDeepsea!=='undefined'&&oceanDeepsea.isActive();
  const playAllowed=()=>active&&!modal&&!photoOpen&&!voyage.photoMode&&!document.body.classList.contains?.('cinematic');
  function inRange(f,contact=false){
   if(!f||f.ecologyPresent===false||!f.uid||f.species<0||!SPECIES[f.species])return false;
@@ -41,9 +42,8 @@ const oceanEcology=(()=>{
   const p=project(point,renderer.vp);return p.every(Number.isFinite)&&p[2]>0&&Math.abs(p[0])<.96&&Math.abs(p[1])<.92;
  }
  function chooseTarget(){
-  if(!playAllowed())return null;let target=null,best=Infinity;
-  for(const f of life){if(!inRange(f,true))continue;const p=project(animalFocusPoint(f),renderer.vp),score=Math.hypot(p[0],p[1])+.01*V.dist(player.p,f.p);if(score<best){target=f;best=score;}}
-  return target;
+  if(!playAllowed()||inResearchVehicle())return null;const f=typeof oceanSelection!=='undefined'?oceanSelection.target():focusFish;
+  return f&&inRange(f,true)?f:null;
  }
  function targetDisc(f){const c=renderer.canvas.getBoundingClientRect(),p=project(animalFocusPoint(f),renderer.vp),distance=V.dist(eye,animalFocusPoint(f)),size=speciesTraits(f.species).targetRadius;
   return {x:c.left+(p[0]*.5+.5)*c.width,y:c.top+(.5-p[1]*.5)*c.height,r:clamp(c.height*size/(Math.max(.006,distance)*Math.tan((renderer.photoFov||renderer.fov||69)*Math.PI/360)),34,140)};
@@ -121,7 +121,7 @@ const oceanEcology=(()=>{
  function setName(uid,name){const p=state().partners.find(p=>p.uid===uid);if(!p)return false;p.name=cleanName(name);save();return true;}
  function releaseGrab(){runtime.riding=false;runtime.grabbedUID=null;}
  function grabAnimal(uid){
-  const f=fishByUID(uid);if(!playAllowed()||!f||!speciesTraits(f.species).grabbable||!inRange(f,true))return false;
+  const f=fishByUID(uid);if(!playAllowed()||inResearchVehicle()||!f||!speciesTraits(f.species).grabbable||!inRange(f,true))return false;
   const isPartner=partner()?.uid===uid&&state().accompany;
   if(isPartner&&individual(f).trust<24){say('同行夥伴需要 24% 信任，才願意帶你游泳。');return false;}
   stopAuto();runtime.grabbedUID=uid;runtime.riding=!!isPartner;runtime.tool=null;runtime.gesture=null;
@@ -131,10 +131,10 @@ const oceanEcology=(()=>{
  function toggleRide(){
   if(runtime.grabbedUID||runtime.riding){releaseGrab();say('已鬆手，繼續自由探索。');return true;}
   const f=chooseTarget();if(f&&speciesTraits(f.species).grabbable)return grabAnimal(f.uid);
-  const p=partner();if(p&&grabAnimal(p.uid))return true;
   say('靠近畫面中的大型生物，再抓握同行。');return false;
  }
  function whistle(){
+  if(inResearchVehicle()){say('夥伴留在淺海等你，研究潛航結束後再一起游泳。');return false;}
   const p=partner(),f=p&&fishByUID(p.uid);if(!playAllowed()||!f){say('先選定一位已結識的夥伴，再在海中吹哨。');return false;}
   state().accompany=true;if(runtime.partnerUID!==p.uid||!runtime.partnerPos){runtime.partnerUID=p.uid;runtime.partnerPos=f.p.slice();runtime.partnerYaw=f.yaw;runtime.detour=null;}if(typeof oceanAudio!=='undefined')oceanAudio.cue('whistle');save();say(p.name+'聽見了呼喚，正在游向你。');return true;
  }
@@ -223,6 +223,7 @@ const oceanEcology=(()=>{
   return next;
  }
  function movePartner(time,dt){
+  if(inResearchVehicle()){releaseGrab();runtime.partnerPos=null;runtime.partnerUID=null;runtime.partnerYaw=null;runtime.detour=null;return;}
   const p=partner(),f=p&&fishByUID(p.uid);if(!f)return;
   const training=runtime.training&&runtime.training.uid===p.uid&&!active&&modal==='training';
   if(!training&&!state().accompany&&!runtime.partnerPos)return;
@@ -273,11 +274,11 @@ const oceanEcology=(()=>{
  }
  function paintHUD(){
   const hud=node('ecologyHUD');if(!hud)return;const f=chooseTarget();runtime.target=f?.uid||null;document.body.classList.toggle('ecology-tool',!!runtime.tool&&playAllowed());
-  hud.classList.toggle('hidden',!playAllowed()||!(f||runtime.tool||runtime.grabbedUID||(state().accompany&&partner())));
-  const name=node('ecologyTarget');name.textContent=f?SPECIES[f.species].name+' · 信任 '+Math.round(individual(f).trust)+'%':'靠近一位生物，再選輕撫或餵食';
+  hud.classList.toggle('hidden',!playAllowed()||!(f||runtime.tool||runtime.grabbedUID||(!inResearchVehicle()&&state().accompany&&partner())));
+  const name=node('ecologyTarget');name.textContent=f?(persistent.seen.includes(SPECIES[f.species].id)?SPECIES[f.species].name:'這位海洋訪客')+' · 信任 '+Math.round(individual(f).trust)+'%':'先點選附近的生物，再輕撫或餵食';
   node('ecologyPet').classList.toggle('active',runtime.tool==='pet');node('ecologyFeed').classList.toggle('active',runtime.tool==='feed');node('ecologyRide').textContent=runtime.grabbedUID?'鬆手':'抓握同行';node('ecologyRide').classList.toggle('hidden',!runtime.grabbedUID&&!(f&&speciesTraits(f.species).grabbable)&&!partner());
   node('ecologyBefriend').classList.toggle('hidden',!f||!profile(f)||(state().released||[]).includes(f.uid)||state().partners.some(p=>p.uid===f.uid));
-  node('ecologyWhistle').classList.toggle('hidden',!partner());
+  node('ecologyWhistle').classList.toggle('hidden',!partner()||inResearchVehicle());
   const disc=node('ecologyTouch');disc.classList.toggle('hidden',!f||!runtime.tool||!playAllowed());
   if(f&&runtime.tool){const p=targetDisc(f);disc.style.left=p.x+'px';disc.style.top=p.y+'px';disc.style.width=disc.style.height=p.r*2+'px';disc.textContent=runtime.tool==='pet'?'來回輕撫 · 連點觸碰':speciesTraits(f.species).feedable?'點一下餵食':'這位訪客不接受食物';}
  }
@@ -293,7 +294,7 @@ const oceanEcology=(()=>{
   paintHUD();if(type!=='training'){runtime.training=null;paintTraining();if(typeof document!=='undefined')document.body.classList.remove('ecology-training');}if(!['ecology','partners','training','partnerInvite'].includes(type))return false;
   document.body.classList.toggle('ecology-training',type==='training'&&!active);const s=state();
   if(type==='ecology'){
-   panelTitle('FIELD NOTES / THREE LAYERS','相遇，會留下更多細節');node('panelBody').innerHTML='<p class="panel-note">靠近生物後用畫面上的輕撫手勢，或在小魚旁撒下少量食物。再次點選使用中的工具即可收起。隔一段時間重新觀察，逐步揭開三層遊戲筆記。互動皆為原創遊戲設定。</p>'+(active?'<button id="ecologyActivate" class="primary">'+(runtime.tool?'收起互動工具':'開始輕撫互動')+'</button>':'')+SPECIES.map(sp=>{const r=s.field[sp.id],n=knowledge(r);return '<article class="ecology-record"><b>'+safe(sp.name)+' <small>'+n+' / 3</small></b><p>'+safe(n?sp.hint:'第一層：安靜觀察，留下辨識線索。')+'</p><p>'+safe(n>=2?sp.detail:'第二層：至少兩次相遇，累積 14 點互動記錄。')+'</p><p>'+safe(n>=3?'個人筆記：'+Math.round(r.seconds)+' 秒觀察 · '+r.encounters+' 次相遇 · '+r.photos+' 張照片。':'第三層：至少三次相遇，累積 30 點互動記錄。')+'</p></article>';}).join('');
+   panelTitle('FIELD NOTES / THREE LAYERS','相遇，會留下更多細節');node('panelBody').innerHTML='<p class="panel-note">先點選附近的生物，再用畫面上的輕撫手勢，或在小魚旁撒下少量食物。再次點選使用中的工具即可收起。隔一段時間重新觀察，逐步揭開三層遊戲筆記。互動皆為原創遊戲設定。</p>'+(active?'<button id="ecologyActivate" class="primary">'+(runtime.tool?'收起互動工具':'開始輕撫互動')+'</button>':'')+SPECIES.map(sp=>{const r=s.field[sp.id],n=knowledge(r);return '<article class="ecology-record"><b>'+safe(sp.name)+' <small>'+n+' / 3</small></b><p>'+safe(n?sp.hint:'第一層：安靜觀察，留下辨識線索。')+'</p><p>'+safe(n>=2?sp.detail:'第二層：至少兩次相遇，累積 14 點互動記錄。')+'</p><p>'+safe(n>=3?'個人筆記：'+Math.round(r.seconds)+' 秒觀察 · '+r.encounters+' 次相遇 · '+r.photos+' 張照片。':'第三層：至少三次相遇，累積 30 點互動記錄。')+'</p></article>';}).join('');
    if(node('ecologyActivate'))node('ecologyActivate').onclick=()=>{closePanel();setTool(runtime.tool||'pet');};
    return true;
   }
@@ -304,6 +305,7 @@ const oceanEcology=(()=>{
   }
   if(type==='partners'){
    panelTitle('CETACEAN PARTNERS','每一位，都是不同的朋友');node('panelBody').innerHTML='<p class="panel-note">先觀察 6 秒，再輕撫建立 18% 信任，邀請身旁的鯨豚同行。名冊有三個席位，每種一位。告別會結束這位夥伴的訓練關係；可再認識同種的其他個體。</p>'+s.partners.map(p=>'<article class="ecology-record"><b>'+safe(p.name)+'</b><small> '+safe(SPECIES[fishByUID(p.uid)?.species]?.name||p.uid)+'</small><label>名字 <input maxlength="18" data-partner-name="'+p.uid+'" value="'+safe(p.name)+'"></label><button class="muted-btn" data-partner-select="'+p.uid+'">'+(s.selected===p.uid?'目前同行':'選為同行夥伴')+'</button><p>'+Object.entries(TRICKS).filter(([id,tr])=>!tr.legacy||p.mastery[id]).map(([id,tr])=>tr.name+' '+(p.mastery[id]||0)+'/5').join(' · ')+'</p><button class="muted-btn" data-partner-release="'+p.uid+'">告別這位夥伴</button></article>').join('')+(s.partners.length?'<button class="primary" id="ecologyAccompany">'+(s.accompany?'讓夥伴休息':'邀請選定夥伴同行')+'</button><button class="muted-btn" id="ecologyTrainingOpen">船邊訓練</button>':'<button class="primary" id="ecologyFindDolphin">標記銀翼水道</button>');
+   if(inResearchVehicle())node('panelBody').insertAdjacentHTML('afterbegin','<p class="feature-result">研究潛航期間，夥伴會留在淺海。同行偏好與訓練紀錄都會保留。</p>');
    node('panelBody').insertAdjacentHTML('beforeend','<h3>尋找海上的朋友</h3><div class="partner-candidates">'+SPECIES.filter(sp=>typeof partnerTraits==='function'?partnerTraits(sp):sp.id==='dolphin').map(sp=>'<button class="muted-btn" data-partner-habitat="'+sp.id+'">'+safe(sp.name)+' · 標記棲地</button>').join('')+'</div>');
    for(const b of node('panelBody').querySelectorAll('[data-partner-habitat]'))b.onclick=()=>markPlace(b.dataset.partnerHabitat==='dolphin'?'wings':'habitat:'+b.dataset.partnerHabitat);
    for(const input of node('panelBody').querySelectorAll('[data-partner-name]'))input.onchange=()=>setName(input.dataset.partnerName,input.value);
@@ -324,8 +326,7 @@ const oceanEcology=(()=>{
  function init(){
   if(runtime.initialized)return;runtime.initialized=true;voyage.state.companion=false;
   for(const id of persistent.seen)if(species(id)&&!state().field[id])state().field[id]={points:4,seconds:0,encounters:1,photos:0};
-  const style=document.createElement('style');style.textContent=`#ecologyHUD{position:fixed;left:50%;bottom:104px;transform:translateX(-50%);display:flex;flex-wrap:wrap;justify-content:center;gap:6px;align-items:center;z-index:19;padding:8px 12px;border:1px solid #b8d8c235;border-radius:18px;background:#082b32dc;backdrop-filter:blur(12px);width:max-content;max-width:calc(100vw - 28px)}#ecologyHUD button{border:1px solid #b9d7c247;border-radius:10px;padding:9px 11px;background:#16434b;color:#e8f1df;white-space:nowrap}#ecologyHUD button.active{background:#bcd4a9;color:#173732}#ecologyTarget{font-size:11px;max-width:150px;line-height:1.6}#ecologyTouch{position:fixed;transform:translate(-50%,-50%);border:1px dashed #d8e6c5ab;border-radius:50%;z-index:18;display:flex;align-items:center;justify-content:center;color:#eaf0cf;font-size:12px;text-shadow:0 2px 4px #001b22;touch-action:none;user-select:none;pointer-events:none;background:#bce8a508}.ecology-record{padding:17px 0;border-bottom:1px solid #ffffff20}.ecology-record p{font-size:13px;line-height:1.8;color:#a5bfc0}.partner-candidates{display:grid;grid-template-columns:1fr 1fr;gap:8px}.partner-candidates button{font-size:12px;min-height:44px}.ecology-record label{display:block;margin:14px 0}.ecology-record input{max-width:190px;background:#102f37;border:1px solid #617c75;color:#e2eddb;padding:8px;border-radius:6px}.ecology-training-progress{height:5px;background:#294a4d;margin:15px 0}.ecology-training-progress i{display:block;height:100%;background:#d2d5a2}.ecology-tricks{display:flex;gap:7px;margin:16px 0}.ecology-part{position:fixed;transform:translate(-50%,-50%);width:44px;height:44px;border:1px dashed #e2eac2;border-radius:50%;background:#133a4777;color:#f1f0d9;z-index:32;touch-action:none;user-select:none;font-size:12px}.ecology-training #welcome{visibility:hidden;pointer-events:none}.ecology-training #scrim{background:transparent;backdrop-filter:none;pointer-events:none}body:has(#photoViewer:not(.hidden)) #ecologyHUD,body:has(#photoViewer:not(.hidden)) #ecologyTouch,body:has(#cameraFrame:not(.hidden)) #ecologyHUD,body:has(#cameraFrame:not(.hidden)) #ecologyTouch,body.cinematic #ecologyHUD,body.cinematic #ecologyTouch{display:none!important}.ecology-training #panel{width:min(390px,94vw)}.ecology-training .panel-head{padding:14px 18px 12px}.ecology-training .panel-head h2{font-size:20px;margin-top:5px}.ecology-training #panelBody{padding:12px 18px 20px}.ecology-help{font-size:12px;color:#d4e0d2;line-height:1.7}.ecology-help summary{cursor:pointer;min-height:32px}.ecology-training .panel-note{margin-bottom:10px}.ecology-training #ecologyTrainingStatus{font-size:12px;line-height:1.5;margin:8px 0}.ecology-training .feature-toolbar{display:flex;gap:6px;margin:8px 0;position:sticky;bottom:0;background:#092831;padding:7px 0;z-index:2}.ecology-training .feature-toolbar button{min-width:0;min-height:44px;padding:8px;flex:1;margin:0;font-size:11px}.ecology-training .ecology-training-progress{margin:8px 0}.ecology-training #ecologyStrength{min-height:30px;vertical-align:middle}@media(pointer:coarse){#ecologyHUD{bottom:291px;gap:4px;padding:6px}#ecologyHUD button{padding:8px;min-width:44px;min-height:44px;font-size:11px}#ecologyTarget{display:none}}body.ecology-tool #focusCard{visibility:hidden}@media(max-height:550px) and (orientation:landscape){#ecologyHUD{top:64px;bottom:auto;gap:4px;padding:6px}#ecologyHUD button{padding:8px;min-width:44px;min-height:44px;font-size:11px}#ecologyTarget{display:none}}@media(max-width:650px){.ecology-training #panel{top:auto;bottom:8px;max-height:37vh;left:3vw;right:auto;width:94vw}}`;
-  document.head.appendChild(style);const hud=document.createElement('div');hud.id='ecologyHUD';hud.className='hidden';hud.innerHTML='<span id="ecologyTarget"></span><button id="ecologyPet">輕撫</button><button id="ecologyFeed">餵食</button><button id="ecologyWhistle">哨子</button><button id="ecologyBefriend" class="hidden">邀請同行</button><button id="ecologyRide" class="hidden">抓握夥伴</button>';
+ const hud=document.createElement('div');hud.id='ecologyHUD';hud.className='hidden';hud.innerHTML='<span id="ecologyTarget"></span><button id="ecologyPet">輕撫</button><button id="ecologyFeed">餵食</button><button id="ecologyWhistle">哨子</button><button id="ecologyBefriend" class="hidden">邀請同行</button><button id="ecologyRide" class="hidden">抓握夥伴</button>';
   document.body.appendChild(hud);const touch=document.createElement('div');touch.id='ecologyTouch';touch.className='hidden';document.body.appendChild(touch);
   node('ecologyPet').onclick=()=>setTool('pet');node('ecologyFeed').onclick=()=>setTool('feed');node('ecologyBefriend').onclick=inviteTarget;node('ecologyRide').onclick=toggleRide;node('ecologyWhistle').onclick=whistle;
   const canvas=renderer.canvas;
