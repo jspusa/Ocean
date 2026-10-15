@@ -1,0 +1,13 @@
+{
+  "id": "./",
+  "name": "重返蔚藍 · Ocean",
+  "short_name": "Ocean",
+  "lang": "zh-Hant",
+  "start_url": "./?app=1",
+  "scope": "./",
+  "display": "standalone",
+  "display_override": ["fullscreen", "standalone"],
+  "orientation": "landscape",
+  "background_color": "#051e29",
+  "theme_color": "#031329"
+}
