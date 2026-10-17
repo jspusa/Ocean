@@ -5,7 +5,7 @@ Python 3.10+ and Node.js 18+; standard libraries only, no npm dependencies.
 from pathlib import Path
 import base64,hashlib,json,subprocess,sys
 ROOT=Path(__file__).resolve().parent
-JS_FILES=['engine.js','world.js','reef_detail.js','next_reef.js','individuals.js','open_world.js','trench.js','fauna.js','cetaceans.js','abyss_fauna.js','trench_fauna.js','fauna_world.js','cetacean_world.js','regions.js','abyss_world.js','trench_world.js','scene_cache.js','seasons.js','audio.js','performance.js','selection.js','app.js','voyage.js','features.js','ecology.js','exploration.js','expedition.js','aquarium.js','photography.js','navigation.js','ship.js','microcosm.js','story.js','deepsea.js','bootstrap.js']
+JS_FILES=['engine.js','world.js','reef_detail.js','next_reef.js','individuals.js','open_world.js','trench.js','fauna.js','cetaceans.js','abyss_fauna.js','trench_fauna.js','fauna_world.js','cetacean_world.js','regions.js','abyss_world.js','trench_world.js','pelagic_life.js','scene_cache.js','seasons.js','audio.js','performance.js','selection.js','app.js','voyage.js','features.js','ecology.js','exploration.js','expedition.js','aquarium.js','photography.js','navigation.js','ship.js','microcosm.js','story.js','deepsea.js','mobile-controls.js','bootstrap.js']
 def main():
     version=(ROOT/'VERSION').read_text().strip()
     if '--pack-only' not in sys.argv:
@@ -18,17 +18,17 @@ def main():
     config='const ASSETS='+json.dumps(assets,separators=(',',':'))+';\nconst MUSIC='+json.dumps(music,separators=(',',':'))+';\n'
     config+='const WORLD='+json.dumps('data:application/octet-stream;base64,'+base64.b64encode((ROOT/'assets/reef.mesh.gz').read_bytes()).decode())+';\n'
     js=config+'\n'.join((ROOT/'src'/n).read_text('utf-8') for n in JS_FILES)
-    portable=shell.replace('/*__CSS__*/',(ROOT/'src/style.css').read_text('utf-8')).replace('/*__JS__*/',js.replace('</script','<\\/script'))
+    portable=shell.replace('/*__CSS__*/',(ROOT/'src/style.css').read_text('utf-8')+'\n'+(ROOT/'src/mobile-controls.css').read_text('utf-8')).replace('/*__JS__*/',js.replace('</script','<\\/script'))
     (ROOT/'standalone.html').write_text(portable,'utf-8')
     config='const ASSETS='+json.dumps({p.stem:'assets/'+p.name+'?v='+version for p in images},separators=(',',':'))+';\nconst MUSIC='+json.dumps({p.stem:'music/'+p.name for p in tracks},separators=(',',':'))+';\n'
     config+='const WORLD="assets/reef.mesh.gz?v='+version+'";\n'
     (ROOT/'src/config.js').write_text(config,'utf-8')
-    site=shell.replace('<style>/*__CSS__*/</style>','<link rel="stylesheet" href="src/style.css?v='+version+'">')
+    site=shell.replace('<style>/*__CSS__*/</style>','<link rel="stylesheet" href="src/style.css?v='+version+'">\n<link rel="stylesheet" href="src/mobile-controls.css?v='+version+'">\n<link rel="manifest" href="ocean.webmanifest?v='+version+'">')
     tags='\n'.join('<script src="src/'+n+'?v='+version+'"></script>' for n in ['config.js']+JS_FILES)
     site=site.replace('<script>/*__JS__*/</script>',tags)
     (ROOT/'index.html').write_text(site,'utf-8')
     # Integrity manifest covers the served game and source, not archived releases or QA captures.
-    files=[ROOT/n for n in ['index.html','.nojekyll','VERSION','README.md','CREDITS.md','build.py','bake_scene.cjs']]
+    files=[ROOT/n for n in ['index.html','.nojekyll','VERSION','README.md','CREDITS.md','build.py','bake_scene.cjs','ocean.webmanifest']]
     for folder in ['src','assets','music']:
         files.extend(p for p in (ROOT/folder).rglob('*') if p.is_file())
     records=[{'path':str(p.relative_to(ROOT)),'bytes':p.stat().st_size,'sha256':hashlib.sha256(p.read_bytes()).hexdigest()} for p in sorted(files)]

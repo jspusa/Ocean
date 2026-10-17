@@ -114,6 +114,15 @@ void main(){vec3 p=aPosition,n=aNormal;vLocal=p;vUV=aUV;vTag=aTag;
   float y=p.y,z=p.z,ny=n.y,nz=n.z,c=cos(aPose.x),s=sin(aPose.x);
   p.y=y*c-z*s;p.z=y*s+z*c;n.y=ny*c-nz*s;n.z=ny*s+nz*c;
  }
+ // Whale sharks propel a vertical tail sideways; the head remains steady.
+ if(uKind==12){
+  float u=clamp((p.x+.50)/.60,0.,1.),tail=1.-u*u*(3.-2.*u);
+  float slope=(p.x>-.50&&p.x<.10)?-6.*u*(1.-u)/.60:0.;
+  float beat=uTime*.8+aExtra.x,wave=beat+p.x*3.8,amplitude=.035;
+  p.z+=sin(wave)*amplitude*tail*tail;
+  n.x-=amplitude*(cos(wave)*3.8*tail*tail+sin(wave)*2.*tail*slope)*n.z;
+  if(aTag>2.5&&aTag<3.5&&p.x>-.24){float flex=sin(beat*.55)*.035;p.y+=abs(p.z)*flex;n.z-=sign(p.z)*flex*n.y;}
+ }
  // Deep-water rig: Pose.w is radians/second; metres remain entirely in instance
  // scale. Tag 6 is only the esca or tail photophore, never an animal's eyes.
  if(uKind==10){
@@ -479,6 +488,7 @@ void main(){
   col+=(albedo*diffuse+vec3(lampSpec))*vec3(1.0,.91,.80)*lampTransmission*cone*uTorchParams.z/(1.+lampDistance*lampDistance*uTorchParams.w);
  }
  if(uKind==10&&vTag>5.5&&vTag<6.5)col+=vec3(.20,.56,.40)*(1.+.04*sin(uTime*.7+vSeed));
+ if(uKind==11&&vTag>5.5&&vTag<6.5)col+=vec3(.07,.48,.64)*(.82+.18*sin(uTime*.55+vSeed));
  frag=vec4(max(col,vec3(0.)),clamp(coverage,.0,1.));
 
 }`;
@@ -572,7 +582,7 @@ void main(){vec3 cell=vec3(48.,32.,48.);vec3 p=aP.xyz;
  vAlpha*=clamp(exp(min(0.,uCamera.y)*.022)+beam*.42,0.,1.);vType=aP.w;}`;
 const POINT_FS=`#version 300 es
 precision highp float;in float vAlpha;in float vType;out vec4 frag;
-void main(){float r=length(gl_PointCoord-.5);frag=vec4(.37,.66,.84,(1.-smoothstep(.04,.5,r))*vAlpha);}`;
+void main(){float r=length(gl_PointCoord-.5);frag=vec4(mix(vec3(.39,.62,.69),vec3(.64,.76,.77),vType),(1.-smoothstep(.04,.5,r))*vAlpha);}`;
 const RAY_VS=`#version 300 es
 precision highp float;layout(location=0) in vec3 aPosition;layout(location=1) in vec2 aUV;uniform mat4 uVP;uniform vec3 uRenderOrigin;out vec2 vUV;out vec3 vP;void main(){vP=aPosition;vUV=aUV;gl_Position=uVP*vec4(aPosition-uRenderOrigin,1.);}`;
 const RAY_FS=`#version 300 es
@@ -585,7 +595,7 @@ const VOLUME_FS=`#version 300 es
 precision highp float;in vec2 uv;out vec4 frag;
 uniform sampler2D uDepth;uniform sampler2D uVolumeShadow;
 uniform vec2 uResolution;uniform vec2 uVolumeResolution;uniform mat4 uInvVP;uniform mat4 uLightVP;
-uniform vec3 uEye;uniform vec3 uRenderOrigin;uniform vec3 uLightDir;uniform vec3 uLightColor;uniform float uTime;uniform float uSun;uniform float uClarity;uniform int uQuality;
+uniform vec3 uEye;uniform vec3 uRenderOrigin;uniform vec3 uLightDir;uniform vec3 uLightColor;uniform float uTime;uniform float uSun;uniform float uClarity;uniform float uLamp;uniform int uQuality;
 ${NOISE_GLSL}
 ${WATER_OPTICS_GLSL}
 vec3 at(vec2 p,float d){vec4 h=uInvVP*vec4(p*2.-1.,d*2.-1.,1.);return h.xyz/h.w;}
@@ -608,6 +618,8 @@ void main(){float d=texture(uDepth,uv).r;vec3 p=at(uv,min(d,.99999));vec3 delta=
  // Stratification is shared by neighboring pixels: per-pixel jitter without a temporal
  // history produces a visible diagonal mesh in clear water, especially on phones.
  vec3 scatter=vec3(0.);float stepLength=span/float(steps);
+ vec3 forward=normalize(at(vec2(.5),.5)-uEye);
+ float torchCone=smoothstep(.76,.987,dot(rd,forward))*uLamp;
  for(int i=0;i<12;i++){if(i>=steps)break;float stratum=.30+fract(float(i)*.618033989)*.40;float s=(float(i)+stratum)*stepLength;vec3 q=uEye+rd*s;float dep=max(0.,-q.y-uRenderOrigin.y);
   vec2 surf=q.xz+uRenderOrigin.xz-(q.y+uRenderOrigin.y)*uLightDir.xz/max(.2,uLightDir.y);
   // Broad, irregular swell focuses shafts. Atlas caustics supply only a little detail;
@@ -618,6 +630,8 @@ void main(){float d=texture(uDepth,uv).r;vec3 p=at(uv,min(d,.99999));vec3 delta=
   float beam=.08+focused*(.54+min(caustic(surf*.64,uTime*.83),2.4)*.055);
   vec3 solar=sunThroughWater(dep,uLightDir.y);
   scatter+=uLightColor*solar*visibility(q)*beam*exp(-extinction*s)*stepLength*.011*phase*uSun;
+  float torchScatter=torchCone/(1.+s*s*.055)*smoothstep(.3,1.5,s);
+  scatter+=vec3(.42,.66,.73)*torchScatter*exp(-extinction*s*2.)*stepLength*.006;
  }
  frag=vec4(scatter,1.-ao);
 }`;
@@ -747,7 +761,7 @@ class Renderer{
    const i=b.instances[k];if(i.ecologyPresent===false)continue;const p=i.p,sc=i.s||UNIT3,tint=i.tint||UNIT3;
    if(eye&&planes){const dx=p[0]-eye[0],dy=p[1]-eye[1],dz=p[2]-eye[2],d2=dx*dx+dy*dy+dz*dz;
     if((atomicGround?d2>=max2:d2>max2)||d2<min2)continue;
-    const r=b.radius*Math.max(sc[0],sc[1],sc[2])*((b.kind===8||b.kind===9||b.kind===10||b.kind===11)?1.15:1);let outside=false;
+    const r=b.radius*Math.max(sc[0],sc[1],sc[2])*((b.kind===8||b.kind===9||b.kind===10||b.kind===11||b.kind===12)?1.15:1);let outside=false;
     for(let n=0;n<6;n++){const pl=planes[n];if(pl[0]*p[0]+pl[1]*p[1]+pl[2]*p[2]+pl[3]<-r){outside=true;break;}}
     if(outside)continue;
    }

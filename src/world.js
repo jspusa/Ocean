@@ -155,21 +155,21 @@ function rayGeometry(low=false){
  }return g;
 }
 // A fully three-dimensional, smoothly profiled whale; no imported model or silhouette sprite.
-function whaleGeometry(){const g=new Geometry();g.material=10;g.tag=1;const smoothStep=(a,b,x)=>{let t=clamp((x-a)/(b-a),0,1);return t*t*(3-2*t);};
+function whaleGeometry(low=false){const g=new Geometry();g.material=10;g.tag=1;g.shadow=!low;const smoothStep=(a,b,x)=>{let t=clamp((x-a)/(b-a),0,1);return t*t*(3-2*t);};
  // Nonuniform head stations make a rounded, broad rostrum, not a pointed fish snout.
  const profile=[.012,.30,.49,.64,.78,.94,1.,.93,.76,.55,.33,.18,.09,.035];
  const stations=[3.70,3.64,3.50,3.15,2.60,1.90,1.,-.10,-1.30,-2.45,-3.40,-4.,-4.55,-4.70];
  function sample(values,t){let q=clamp(t,0,1)*(values.length-1),i=Math.floor(q),f=q-i,n=values.length;let a=values[Math.max(0,i-1)],b=values[Math.min(n-1,i)],c=values[Math.min(n-1,i+1)],d=values[Math.min(n-1,i+2)];return .5*((2*b)+(-a+c)*f+(2*a-5*b+4*c-d)*f*f+(-a+3*b-3*c+d)*f*f*f);}
- surface(g,(u,v)=>{let a=u*TAU,r=sample(profile,v),x=sample(stations,v),head=1.-smoothStep(.03,.35,v);return [x,Math.cos(a)*r*(.94-head*.29)+.12*Math.sin(v*Math.PI),Math.sin(a)*r];},64,120,(p)=>{let underside=clamp((-p[1]-.10)*2.8,0,1);return V.lerp([.24,.29,.32],[.62,.66,.65],underside*.75);},1);
+ surface(g,(u,v)=>{let a=u*TAU,r=sample(profile,v),x=sample(stations,v),head=1.-smoothStep(.03,.35,v);return [x,Math.cos(a)*r*(.94-head*.29)+.12*Math.sin(v*Math.PI),Math.sin(a)*r];},low?24:64,low?40:120,(p)=>{let underside=clamp((-p[1]-.10)*2.8,0,1);return V.lerp([.24,.29,.32],[.62,.66,.65],underside*.75);},1);
  // Long cambered pectoral fins and white leading edges.
- for(const side of [-1,1]){g.tag=2;surface(g,(u,v)=>{let a=v*TAU,w=(.29+.07*Math.sin(u*Math.PI))*(1-u*.90);return [1.25-u*2.4+Math.cos(a)*w,-.18-u*.53+Math.sin(a)*.055*(1-u*.8),side*(.63+u*2.75)];},42,18,(p,u,v)=>Math.cos(v*TAU)>.12?[.54,.58,.58]:[.17,.22,.24],side>0?1:-1);
- g.tag=3;surface(g,(u,v)=>{let a=v*TAU,span=u,w=(.56-.12*u)*(1-u*.87);return [-4.61-u*.54+Math.cos(a)*w,-.02+Math.sin(a)*.065*(1-u*.85),side*(u*1.94)];},38,20,[.22,.28,.31],side>0?1:-1);
- g.tag=4;g.sphere([2.93,-.045,side*.697],[.065,.07,.032],[.022,.036,.045],18,12);g.sphere([2.947,-.024,side*.722],[.014,.015,.009],[.72,.77,.79],12,8);
+ for(const side of [-1,1]){g.tag=2;surface(g,(u,v)=>{let a=v*TAU,w=(.29+.07*Math.sin(u*Math.PI))*(1-u*.90);return [1.25-u*2.4+Math.cos(a)*w,-.18-u*.53+Math.sin(a)*.055*(1-u*.8),side*(.63+u*2.75)];},low?14:42,low?8:18,(p,u,v)=>Math.cos(v*TAU)>.12?[.54,.58,.58]:[.17,.22,.24],side>0?1:-1);
+ g.tag=3;surface(g,(u,v)=>{let a=v*TAU,span=u,w=(.56-.12*u)*(1-u*.87);return [-4.61-u*.54+Math.cos(a)*w,-.02+Math.sin(a)*.065*(1-u*.85),side*(u*1.94)];},low?14:38,low?8:20,[.22,.28,.31],side>0?1:-1);
+ g.tag=4;g.sphere([2.93,-.045,side*.697],[.065,.07,.032],[.022,.036,.045],low?8:18,low?6:12);if(!low)g.sphere([2.947,-.024,side*.722],[.014,.015,.009],[.72,.77,.79],12,8);
  // Mouth seam and several small rostral tubercles.
- let prev=null;for(let i=0;i<23;i++){let v=i/22,x=3.58-v*2.6,p=[x,-.135-v*.30,side*(.41+Math.sin(v*1.65)*.48)];if(prev)g.tube(prev,p,.012,.012,[.07,.11,.14],5);prev=p;}
- for(let i=0;i<5;i++){let x=2.35+i*.17;g.sphere([x,.45-i*.045,side*.28],[.065,.044,.065],[.37,.42,.43],12,8);}}
+ let prev=null;const mouthSteps=low?9:23;for(let i=0;i<mouthSteps;i++){let v=i/(mouthSteps-1),x=3.58-v*2.6,p=[x,-.135-v*.30,side*(.41+Math.sin(v*1.65)*.48)];if(prev)g.tube(prev,p,.012,.012,[.07,.11,.14],5);prev=p;}
+ for(let i=0;i<5;i++){let x=2.35+i*.17;g.sphere([x,.45-i*.045,side*.28],[.065,.044,.065],[.37,.42,.43],low?6:12,low?4:8);}}
  // Dorsal fin, with thickness instead of a flat triangle.
- surface(g,(u,v)=>{let a=v*TAU;return [-2.12-u*.41+Math.cos(a)*.30*(1-u),.59+u*.37,Math.sin(a)*.095*(1-u)];},24,18,[.20,.25,.27],1);
+ surface(g,(u,v)=>{let a=v*TAU;return [-2.12-u*.41+Math.cos(a)*.30*(1-u),.59+u*.37,Math.sin(a)*.095*(1-u)];},low?10:24,low?8:18,[.20,.25,.27],1);
  return g;}
 function diverGeometry(){let g=new Geometry(),suit=rgb(0x223e49),trim=rgb(0x68afa9),tank=rgb(0xb0b8ac),skin=rgb(0xb39379);g.sphere([0,0,0],[.32,.22,.66],suit,16,10);g.tube([0,.24,-.45],[0,.24,.4],.16,.16,tank,12);g.tube([0,.26,-.50],[0,.26,-.36],.11,.11,trim,10);g.sphere([0,.05,-.86],[.22,.22,.24],skin,24,16);g.box([0,.07,-1.05],[.39,.17,.08],rgb(0x376b73));for(let side of [-1,1]){g.tube([side*.22,-.03,.37],[side*.20,-.1,1.1],.13,.10,suit,10);g.tube([side*.2,-.1,1.1],[side*.29,-.2,1.64],.10,.08,suit,10);g.quad([side*.12,-.20,1.55],[side*.43,-.20,1.55],[side*.5,-.2,2.22],[side*.04,-.2,2.22],trim);g.tube([side*.23,0,-.37],[side*.56,-.18,-.52],.09,.075,suit,8);g.tube([side*.56,-.18,-.52],[side*.44,-.26,-.86],.075,.05,suit,8);g.sphere([side*.44,-.26,-.9],[.07,.06,.12],skin,9,6);}g.material=0;return g;}
 function addLife(r){let counts=[4,9,8,7,16,62,7,9,3,3,1];

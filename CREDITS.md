@@ -82,3 +82,7 @@
 ## 0.15 原創深海研究
 
 三個深海研究站、研究潛航器、斷層幾何、相機相對坐標、材質與動作為原創即時圖像。新三種生物依MBARI及原始分類文獻的形態、尺寸與深度資料建立；參考來源與推定界線見 [TRENCH-FAUNA-REFERENCE](docs/parity/TRENCH-FAUNA-REFERENCE.md)。圖鑑縮圖由本作實際WebGL模型產生；未使用Wii模型、貼圖或音樂。光照、柔軟組織與動作仍是即時遊戲近似，並非實測或物理完整模擬。
+
+## 0.16 連續海域與大型生物
+
+新增藍鯨、鯨鯊皆為本專案程序建立的原創模型及縮圖，沒有下載第三方模型。體型與形態參考 [NOAA 藍鯨](https://www.fisheries.noaa.gov/species/blue-whale) 與 [NOAA 鯨鯊](https://www.fisheries.noaa.gov/species/whale-shark)。代表個體為 26 m 與 8.5 m；巡游路線、共棲海域和深海助游為遊戲編排。

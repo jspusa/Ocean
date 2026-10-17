@@ -1,8 +1,9 @@
-/* Original research transect in real game metres. Remote XZ keeps the released
- * reef, its identities and routes unchanged. Loaded before regional collision.
- * No external assets, legacy random calls, or runtime geometry allocations. */
+/* A continuous continental slope joins the reef to the deep ocean. Existing
+ * habitats keep their world coordinates and saved discoveries. */
+const trenchCoastalGround=groundHeight;
 const OceanTrench=(()=>{
- const bounds={min:[620,-7060,-240],max:[900,-.65,60],left:620,right:900,top:-240,bottom:60},solids=[],surfaces=[],groups=new Map();
+ const coastalGround=trenchCoastalGround,worldBounds={left:-285,right:900,top:-395,bottom:215};
+ const bounds={min:[260,-7060,-395],max:[900,-.65,215],left:260,right:900,top:-395,bottom:215},solids=[],surfaces=[],groups=new Map();
  const stations=[
   {id:'midwater',name:'微光中層站',depth:700,p:[760,-700,-90],look:[770,-700,-100]},
   {id:'slope',name:'深海泥底站',depth:1400,p:[754,-1400,-103],look:[763,-1402,-111]},
@@ -29,8 +30,8 @@ const OceanTrench=(()=>{
   return (.16*Math.sin(x*.33+z*.19)+.09*Math.cos(z*.49-x*.12)+.04*Math.sin(x*.77-z*.41))*smooth((core-2)/3);
  }
  function axis(min,max,step,homes,k){const values=new Set();for(let n=min;n<=max;n+=step)values.add(n);values.add(max);for(const p of homes)for(const d of [-3,-2,2,3])if(p[k]+d>min&&p[k]+d<max)values.add(p[k]+d);return [...values].sort((a,b)=>a-b);}
- const floorGrid={xs:axis(620,900,5,habitats.mariana_snailfish.homes,0),zs:axis(-240,60,5,habitats.mariana_snailfish.homes,2)};
- function bedSample(x,z){const distance=Math.hypot(x-780,z+132),plain=-7030+5*Math.sin((x-720)*.025)*Math.cos((z+120)*.024),w=1-smooth((distance-20)/20),edge=smooth(Math.min(x-620,900-x,z+240,60-z)/5);return mix(plain,-7002.5,w)+sedimentRelief(x,z,habitats.mariana_snailfish.homes)*edge;}
+ const floorGrid={xs:axis(260,900,5,habitats.mariana_snailfish.homes,0),zs:axis(-395,215,5,habitats.mariana_snailfish.homes,2)};
+ function bedSample(x,z){const distance=Math.hypot(x-780,z+132),plain=-7030+5*Math.sin((x-720)*.025)*Math.cos((z+120)*.024),w=1-smooth((distance-20)/20),edge=smooth(Math.min(x-620,900-x,z+240,60-z)/5),deep=mix(plain,-7002.5,w)+sedimentRelief(x,z,habitats.mariana_snailfish.homes)*edge;return x<620?mix(coastalGround(x,z),deep,smooth((x-260)/360)):deep;}
  function cell(axis,value){let low=0,high=axis.length-1;while(high-low>1){const middle=(low+high)>>1;if(axis[middle]<=value)low=middle;else high=middle;}return Math.min(low,axis.length-2);}
  function groundHeight(x,z){
   if(!containsXZ(x,z))return null;
@@ -78,7 +79,7 @@ const OceanTrench=(()=>{
  // depth. Replanning must never first visit the last completed station.
  function clearRouteSegment(a,b){
   if(typeof OceanRegions!=='undefined'&&!OceanRegions.pathClear(a,b,.4))return false;
-  const steps=Math.max(1,Math.ceil(V.dist(a,b)/4));for(let i=0;i<=steps;i++){const p=V.lerp(a,b,i/steps);if(p[1]<groundHeight(p[0],p[2])+.81)return false;}return true;
+  const steps=Math.max(1,Math.ceil(V.dist(a,b)/4));for(let i=0;i<=steps;i++){const p=V.lerp(a,b,i/steps),floor=groundHeight(p[0],p[2])??coastalGround(p[0],p[2]);if(p[1]<floor+.81)return false;}return true;
  }
  function departure(start,x){
   const goal=[x,start[1],-90];if(clearRouteSegment(start,goal))return [start.slice(),goal];
@@ -89,9 +90,12 @@ const OceanTrench=(()=>{
   return [];
  }
  function route(fromId,toId,currentPosition=null){
-  const a=stations.find(s=>s.id===fromId),b=stations.find(s=>s.id===toId);if(!a||!b||currentPosition!==null&&!containsPosition(currentPosition))return [];
+  const a=stations.find(s=>s.id===fromId),b=stations.find(s=>s.id===toId);if(!a||!b||currentPosition!==null&&(!Array.isArray(currentPosition)||currentPosition.length!==3||!currentPosition.every(Number.isFinite)))return [];
   const start=(currentPosition||a.p).slice();let out=[];
-  for(const rise of [0,2,-2,8,-8,32]){const lifted=[start[0],Math.min(-600,start[1]+rise),start[2]];if(rise&&!clearRouteSegment(start,lifted))continue;const path=departure(lifted,b.p[0]);if(path.length){out=rise?[start,...path]:path;break;}}
+  // From the reef, swim through open water and descend the same unbroken
+  // column that manual swimming uses. No deployment or scene transition.
+  if(start[0]<720||start[0]>800){out=[start,[start[0],-3,start[2]],[b.p[0],-3,-90]];}
+  else for(const rise of [0,2,-2,8,-8,32]){const lifted=[start[0],Math.min(-.65,start[1]+rise),start[2]];if(rise&&!clearRouteSegment(start,lifted))continue;const path=departure(lifted,b.p[0]);if(path.length){out=rise?[start,...path]:path;break;}}
   if(!out.length)return [];
   const exit=out.at(-1),entry=[b.p[0],b.p[1],-90],count=Math.max(4,Math.ceil(Math.abs(exit[1]-entry[1])/96));
   for(let i=1;i<=count;i++)out.push(V.lerp(exit,entry,i/count));if(V.dist(entry,b.p)>.001)out.push(b.p.slice());
@@ -101,8 +105,17 @@ const OceanTrench=(()=>{
 
  for(const s of surfaces)for(let x=Math.floor(s.minX/10);x<=Math.floor(s.maxX/10);x++)for(let z=Math.floor(s.minZ/10);z<=Math.floor(s.maxZ/10);z++){const key=x+','+z;if(!surfaceCells.has(key))surfaceCells.set(key,[]);surfaceCells.get(key).push(s);}
  function nearbySolids(p,r=0){return typeof OceanRegions!=='undefined'?OceanRegions.nearbySolids(p,r):solids.filter(s=>p.every((n,i)=>n>=s.min[i]-r&&n<=s.max[i]+r));}
- function build(renderer){for(const {g,origin}of groups.values()){const batch=renderer.batch(g,[{p:origin.slice()}]);batch.sceneRole='region:trench';batch.regionRole='strata';batch.maxDistance=300;}}
+ // Recenter each depth slice on its real terrain. The continental slope is
+ // hundreds of metres west of the old station origins and must not disappear
+ // just because an instance origin, rather than its surface, is far away.
+ for(const entry of groups.values()){
+  const {g,origin}=entry,min=[Infinity,Infinity,Infinity],max=[-Infinity,-Infinity,-Infinity];
+  for(let i=0;i<g.v.length;i+=12)for(let k=0;k<3;k++){min[k]=Math.min(min[k],g.v[i+k]);max[k]=Math.max(max[k],g.v[i+k]);}
+  const center=min.map((n,k)=>(n+max[k])*.5);for(let i=0;i<g.v.length;i+=12)for(let k=0;k<3;k++)g.v[i+k]-=center[k];
+  for(let k=0;k<3;k++)origin[k]+=center[k];entry.distance=Math.max(300,Math.hypot(...max.map((n,k)=>(n-min[k])*.5))+100);
+ }
+ function build(renderer){for(const {g,origin,distance}of groups.values()){const batch=renderer.batch(g,[{p:origin.slice()}]);batch.sceneRole='region:trench';batch.regionRole='strata';batch.maxDistance=distance;}}
  function freeze(o){if(o&&typeof o==='object'){for(const p of Object.values(o))freeze(p);Object.freeze(o);}return o;}
- freeze(bounds);freeze(stations);freeze(habitats);freeze(solids);
- return Object.freeze({bounds,stations,habitats,solids,containsXZ,containsPosition,groundHeight,floorAt,nearbySolids,route,build});
+ freeze(bounds);freeze(worldBounds);freeze(stations);freeze(habitats);freeze(solids);
+ return Object.freeze({bounds,worldBounds,stations,habitats,solids,containsXZ,containsPosition,groundHeight,floorAt,nearbySolids,route,build});
 })();

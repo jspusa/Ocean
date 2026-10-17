@@ -176,12 +176,12 @@ const oceanMobileUI = (() => {
   }
   function updateInstructions() {
     if ($('introControls')) $('introControls').textContent = touch()
-      ? '左側移動 · 滑動畫面環視 · 角落拍照／加速 · 支援橫向'
-      : 'WASD 游動 · 拖曳環視 · C 加速 · X 取景';
+      ? '左搖桿游動 · 拖曳環視 · ↑↓ 浮潛'
+      : 'WASD 游動 · 拖曳環視 · E／Q 浮潛';
     const help = document.querySelector('#panelBody .menu-help');
     if (help) help.textContent = touch()
-      ? '左下搖桿移動，直接滑動畫面環視；↑ ↓ 改變深度。右下角可拍照、開關加速。點一下附近生物觀察，點空白處取消。'
-      : 'WASD 游動，拖曳環視，E／Q 改變深度，C 開關加速。點一下附近生物觀察，點空白處取消。';
+      ? '左搖桿游動 · 拖曳環視 · ↑↓ 浮潛 · 右下拍照／加速'
+      : 'WASD 游動 · 拖曳環視 · E／Q 浮潛 · C 加速';
   }
   function init() {
     if (initialized) return;

@@ -1,7 +1,7 @@
 /* OPEN WATER 0.8 — original continuous-world art and landmarks.
    Game metres, NOT surveyed coordinates or a real dive plan.
    The old sculpted core is retained; new vistas are authored as linked destinations. */
-const OPEN_WORLD={bounds:{x:270,z:295,centerZ:-90},boat:[-24,0,43],version:'0.15.0'};
+const OPEN_WORLD={bounds:{x:270,z:295,centerZ:-90},boat:[-24,0,43],version:'0.16.0'};
 const coreGroundHeight=groundHeight;
 groundHeight=function(x,z){
  const core=coreGroundHeight(x,z);
@@ -29,18 +29,22 @@ addGroundTiles=function(r){
  for(let iz=0;iz<count;iz++)for(let ix=0;ix<count;ix++){
   const cx=(ix-4.5)*span,cz=(iz-4.5)*span-90;
   for(let lod=0;lod<2;lod++){
-   const g=new Geometry();g.material=1;g.shadow=true;const N=lod?7:22;
-   function pt(i,j,n=N){let x=cx+(i/n-.5)*span,z=cz+(j/n-.5)*span;return [x-cx,groundHeight(x,z),z-cz];}
+   const g=new Geometry();g.material=1;g.shadow=true;const clipped=cx+span/2>260,coarse=lod&&!clipped,N=coarse?7:22;
+   // The continuous trench slope owns terrain east of x=260. Collapse the
+   // outer tile strip onto that shared coast instead of drawing a shelf over it.
+   function pt(i,j,n=N){let x=Math.min(260,cx+(i/n-.5)*span),z=cz+(j/n-.5)*span;return [x-cx,groundHeight(x,z),z-cz];}
    function norm(p){const x=p[0]+cx,z=p[2]+cz,e=.20;return V.norm([groundHeight(x-e,z)-groundHeight(x+e,z),2*e,groundHeight(x,z-e)-groundHeight(x,z+e)]);}
-   const start=lod?1:0,end=lod?N-1:N;
-   for(let j=start;j<end;j++)for(let i=start;i<end;i++){let p=[pt(i,j),pt(i+1,j),pt(i+1,j+1),pt(i,j+1)],n=p.map(norm);const col=[.90,.89,.83];g.tri(p[0],p[2],p[1],col,[n[0],n[2],n[1]]);g.tri(p[0],p[3],p[2],col,[n[0],n[3],n[2]]);}
-   if(lod){
+   // The four-metre coast strip has only 88 triangles at full resolution.
+   // Keep those samples in both LODs so its new eastern edge cannot crack.
+   const start=coarse?1:0,end=coarse?N-1:N;
+   for(let j=start;j<end;j++)for(let i=start;i<end;i++){let p=[pt(i,j),pt(i+1,j),pt(i+1,j+1),pt(i,j+1)],n=p.map(norm);if(p[0][0]===p[1][0])continue;const col=[.90,.89,.83];g.tri(p[0],p[2],p[1],col,[n[0],n[2],n[1]]);g.tri(p[0],p[3],p[2],col,[n[0],n[3],n[2]]);}
+   if(coarse){
     // Every tile/LOD shares the near mesh's exact 22-segment perimeter. A
     // triangulated ring joins it to the coarse interior without vertical skirts
     // or mismatched edge heights on steep terrain. The near mesh is unchanged.
     const outer=22,inner=N-2;
     const ring=(side,i,n,inset)=>{const a=i+inset,b=n+inset,k=inset,ij=[[a,k],[b,a],[b-a+k,b],[k,b-a+k]][side];return pt(ij[0],ij[1],n+2*inset);};
-    const put=(a,b,c)=>{if(V.cross(V.sub(b,a),V.sub(c,a))[1]<0)[b,c]=[c,b];g.tri(a,b,c,[.90,.89,.83],[norm(a),norm(b),norm(c)]);};
+    const put=(a,b,c)=>{const face=V.cross(V.sub(b,a),V.sub(c,a));if(V.len(face)<1e-9)return;if(face[1]<0)[b,c]=[c,b];g.tri(a,b,c,[.90,.89,.83],[norm(a),norm(b),norm(c)]);};
     for(let side=0;side<4;side++){
      const a=Array.from({length:outer+1},(_,i)=>ring(side,i,outer,0)),b=Array.from({length:inner+1},(_,i)=>ring(side,i,inner,1));let i=0,j=0;
      while(i<outer||j<inner){if(j===inner||(i<outer&&(i+1)/outer<=(j+1)/inner)){put(a[i],a[i+1],b[j]);i++;}else{put(a[i],b[j+1],b[j]);j++;}}

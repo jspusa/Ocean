@@ -19,6 +19,9 @@ const trenchArt=(()=>{
   const red=[.29,.075,.067],pale=[.46,.17,.11],paint=p=>blend(red,pale,.22+.14*Math.sin(p[0]*7+p[2]*13)+.055*Math.sin(p[0]*57+p[1]*47)*Math.sin(p[2]*43));
   body(g,[[-.5,0,0,0],[-.45,0,.080,.071],[-.34,0,.145,.136],[-.20,0,.155,.143],[-.09,0,.124,.123],[.025,0,.112,.119],[.115,0,.089,.088],[.15,0,0,0]],paint,low);
   for(const side of [-1,1]){eye(g,[.005,.012,side*.113],.062,low,[.40,.25,.12]);tagged(g,3,()=>{const roots=[],edges=[];for(let i=0;i<=12;i++){const u=i/12,x=-.36+u*.21;roots.push([x,.022,side*(.128+.008*Math.sin(u*Math.PI))]);edges.push([x-.065*Math.sin(u*Math.PI),.02+.045*Math.sin(u*Math.PI),side*(.132+.15*Math.sin(u*Math.PI))]);}fin(g,roots,edges,pale,.001);});}
+  // Paired mantle photophores remain small physical organs. The renderer adds
+  // their own blue light without turning the eyes or whole animal emissive.
+  tagged(g,6,()=>{for(const side of [-1,1])ellipsoid(g,[-.405,.050,side*.092],[.018,.012,.010],[.24,.66,.77],low,.45);});
   // Eight arms support an actual interbrachial web. Its scalloped free edge
   // remains separate from the two narrow collecting filaments near the head.
   tagged(g,3,()=>{for(const inside of [false,true]){const start=g.v.length;skin(g,(u,v)=>{const a=v*TAU,rad=.086+.104*Math.sin(u*Math.PI*.69),lobe=Math.pow(.5+.5*Math.cos(a*8),3),x=.10+u*(.24+.15*lobe);return [x,Math.cos(a)*(rad+(inside?-.001:.001)),Math.sin(a)*(rad+(inside?-.001:.001))];},low?8:16,low?32:64,inside?[.39,.14,.11]:paint);if(inside)for(let k=start;k<g.v.length;k+=36){const b=g.v.slice(k+12,k+24),c=g.v.slice(k+24,k+36);g.v.splice(k+12,24,...c,...b);for(const j of [0,12,24])for(let n=3;n<6;n++)g.v[k+j+n]*=-1;}}});

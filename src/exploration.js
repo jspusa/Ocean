@@ -3,7 +3,9 @@
  * GPU allocation is fixed at initialization; editing ink only changes instance data.
  */
 const ExplorationRules=(()=>{
- const bounds={left:-285,right:285,top:-395,bottom:215},cols=30,rows=32;
+ const reefBounds={left:-285,right:285,top:-395,bottom:215},reefCols=30,rows=32;
+ const bounds=typeof OceanTrench!=='undefined'&&OceanTrench.worldBounds?OceanTrench.worldBounds:reefBounds;
+ const offshoreCols=Math.max(0,Math.ceil((bounds.right-reefBounds.right)/19)),cols=reefCols+offshoreCols,reefCells=reefCols*rows;
  const limits={strokes:48,points:64,segments:48*63,trail:1024,pickup:3.2,surveyRadius:25};
  const colors={mint:{name:'薄荷',hex:'#b5efd5',rgb:[.53,.91,.70]},amber:{name:'琥珀',hex:'#f5d080',rgb:[.98,.70,.24]},coral:{name:'珊瑚',hex:'#efa394',rgb:[.97,.40,.29]},blue:{name:'天空',hex:'#a8dcf5',rgb:[.41,.76,1]},white:{name:'珍珠',hex:'#edf4e4',rgb:[.96,.98,.84]}};
  const artifacts=[
@@ -18,10 +20,13 @@ const ExplorationRules=(()=>{
   {id:'blue_capsule',name:'海流研究筒',place:'pelagic',offset:[12,10],shape:'capsule',description:'封閉的金屬研究筒，上面刻著手寫水流箭頭。遊戲裡的船員可把它放回收藏桌，接著記錄新的海。'}
  ];
  const ids=new Set(artifacts.map(a=>a.id)),finitePoint=p=>Array.isArray(p)&&p.length===3&&p.every(Number.isFinite);
- const pointRegion=p=>!finitePoint(p)?null:typeof OceanTrench!=='undefined'&&OceanTrench.containsPosition(p)?'trench':p[0]>=-285&&p[0]<=285&&p[1]>=-120&&p[1]<=-.18&&p[2]>=-395&&p[2]<=215?'reef':null;
+ const pointRegion=p=>!finitePoint(p)?null:typeof OceanTrench!=='undefined'&&OceanTrench.containsPosition(p)||p[0]>=reefBounds.left&&p[0]<=reefBounds.right&&p[1]>=-120&&p[1]<=-.18&&p[2]>=reefBounds.top&&p[2]<=reefBounds.bottom?'ocean':null;
  const dist=(a,b)=>Math.hypot(a[0]-b[0],a[1]-b[1],a[2]-b[2]);
- const center=i=>[bounds.left+(i%cols+.5)/cols*(bounds.right-bounds.left),bounds.top+(Math.floor(i/cols)+.5)/rows*(bounds.bottom-bounds.top)];
- const eligible=i=>{const [x,z]=center(i);return (x/268)**2+((z+90)/293)**2<=1;};
+ // The first 960 IDs retain their original coordinates, preserving every old
+ // survey cell without remapping a save. Eastern cells are appended after them.
+ function cellBounds(i){const reef=i<reefCells,n=reef?i:i-reefCells,count=reef?reefCols:offshoreCols,left=reef?reefBounds.left:reefBounds.right,right=reef?reefBounds.right:bounds.right,width=(right-left)/count,height=(bounds.bottom-bounds.top)/rows,x=left+n%count*width,z=bounds.top+Math.floor(n/count)*height;return [x,z,x+width,z+height];}
+ const center=i=>{if(i<reefCells)return [reefBounds.left+(i%reefCols+.5)/reefCols*(reefBounds.right-reefBounds.left),reefBounds.top+(Math.floor(i/reefCols)+.5)/rows*(reefBounds.bottom-reefBounds.top)];const [x,z,right,bottom]=cellBounds(i);return [(x+right)/2,(z+bottom)/2];};
+ const eligible=i=>{if(i>=reefCells)return i<cols*rows;const [x,z]=center(i);return (x/268)**2+((z+90)/293)**2<=1;};
  const cells=Array.from({length:cols*rows},(_,i)=>i).filter(eligible),cellSet=new Set(cells);
  const initial=()=>({schema:1,survey:[],trail:[],found:[],collected:[],strokes:[],penColor:'mint',target:null,sequence:0});
  function sanitize(raw){
@@ -40,7 +45,7 @@ const ExplorationRules=(()=>{
   if(Array.isArray(raw.strokes))for(const stroke of raw.strokes.slice(-limits.strokes)){
    if(!stroke||!Number.isInteger(stroke.id)||stroke.id<1||stroke.id>1e9||used.has(stroke.id)||!Object.hasOwn(colors,stroke.color)||!Array.isArray(stroke.points))continue;
    const points=[];
-   for(const p of stroke.points.slice(0,limits.points))if(pointRegion(p)&&(!points.length||pointRegion(p)===pointRegion(points[0])&&dist(p,points.at(-1))>=.025))points.push(p.map(n=>Math.round(n*1000)/1000));
+   for(const p of stroke.points.slice(0,limits.points))if(pointRegion(p)&&(!points.length||dist(p,points.at(-1))>=.025&&dist(p,points.at(-1))<=24))points.push(p.map(n=>Math.round(n*1000)/1000));
    if(points.length<2)continue;used.add(stroke.id);s.strokes.push({id:stroke.id,color:stroke.color,points});s.sequence=Math.max(s.sequence,stroke.id);
   }
   const target=raw.target;
@@ -49,7 +54,7 @@ const ExplorationRules=(()=>{
   return s;
  }
  function reveal(s,p,radius=limits.surveyRadius){
-  if(!finitePoint(p)||p[1]>=0||!Number.isFinite(radius)||radius<=0)return 0;
+  if(!pointRegion(p)||!Number.isFinite(radius)||radius<=0)return 0;
   const known=new Set(s.survey),r=Math.min(35,radius),before=known.size;
   for(const i of cells){const c=center(i);if(Math.hypot(c[0]-p[0],c[1]-p[2])<=r)known.add(i);}
   if(known.size>before)s.survey=[...known];return known.size-before;
@@ -86,7 +91,7 @@ const ExplorationRules=(()=>{
  }
  function intersectPlane(ray,plane){if(!ray||!plane)return null;const dot=(a,b)=>a.reduce((sum,n,i)=>sum+n*b[i],0),den=dot(ray.direction,plane.normal);if(Math.abs(den)<.05)return null;const length=dot(plane.point.map((n,i)=>n-ray.origin[i]),plane.normal)/den;if(length<.2||length>12)return null;return ray.origin.map((n,i)=>n+ray.direction[i]*length);}
  function segmentDistance(point,a,b){const dx=b[0]-a[0],dy=b[1]-a[1],l=dx*dx+dy*dy,u=l?Math.max(0,Math.min(1,((point[0]-a[0])*dx+(point[1]-a[1])*dy)/l)):0;return Math.hypot(point[0]-a[0]-u*dx,point[1]-a[1]-u*dy);}
- return {bounds,cols,rows,limits,colors,artifacts,initial,sanitize,reveal,recordTrail,surveyStats,canPickup,collect,appendStroke,segments,screenRay,intersectPlane,segmentDistance,center,eligible,cells,finitePoint,pointRegion};
+ return {bounds,cols,rows,limits,colors,artifacts,initial,sanitize,reveal,recordTrail,surveyStats,canPickup,collect,appendStroke,segments,screenRay,intersectPlane,segmentDistance,center,cellBounds,eligible,cells,finitePoint,pointRegion};
 })();
 
 const oceanExploration=(()=>{
@@ -229,7 +234,7 @@ const oceanExploration=(()=>{
    body.innerHTML='<p class="panel-note">你實際游過的水域會逐格亮起，航跡隨存檔保存。可放大並拖曳海圖；細線是走過的路，虛線是目的地方向。</p><canvas id="explorationChart" class="exploration-mini-chart" width="600" height="530" aria-label="已探索水域與遊戲目的地"></canvas><div class="exploration-zoom"><button id="explorationZoomOut" aria-label="縮小海圖">−</button><output id="explorationZoomValue" aria-live="polite">100%</output><button id="explorationZoomIn" aria-label="放大海圖">＋</button><button id="explorationZoomReset">完整海域</button></div><div class="exploration-legend"><span>深色：未測記 · 細線：航跡</span><span>◇：打撈物</span></div><div class="feature-toolbar"><button id="explorationFullMap" class="muted-btn">開啟海域地圖</button><button id="explorationClearTarget" class="muted-btn">清除工具標記</button></div>';
    const canvas=$('explorationChart');bindChart(canvas);drawPreview(canvas);$('explorationFullMap').onclick=()=>openPanel('map');$('explorationClearTarget').onclick=()=>{s.target=null;persistNow();renderPanel('exploration');};
   }else if(panelTab==='ink'){
-   body.innerHTML='<p class="panel-note">在眼前約 4 公尺的位置，用手指或滑鼠畫下路標。線條會留在三維海域中，轉身、游遠或重新載入後仍在原位。每筆最多 64 個取樣點，最多保存 48 筆。</p><div class="feature-toolbar"><button id="explorationStartPen" class="primary">使用水中筆 ↗</button><button id="explorationStartErase" class="muted-btn">使用橡皮擦</button></div><p class="panel-note inset-note">'+(active?'描繪時先停止游動；完成後恢復操控。':'先從研究船開始一次潛水。')+'</p><div id="explorationInkList">'+(s.strokes.length?s.strokes.map(stroke=>`<div class="exploration-ink-row"><i style="background:${R.colors[stroke.color].hex}"></i><span>筆記 ${stroke.id} · 深度 ${(-stroke.points[0][1]).toFixed(1)} m</span><button data-ink-mark="${stroke.id}">標記位置 ↗</button></div>`).join(''):'<p class="empty">海裡還沒有留下筆記。</p>')+'</div>';
+   body.innerHTML='<p class="panel-note">在眼前約 4 公尺的位置，用手指或滑鼠畫下路標。線條會留在三維海域中，轉身、游遠或重新載入後仍在原位。每筆最多 64 個取樣點，最多保存 48 筆。</p><div class="feature-toolbar"><button id="explorationStartPen" class="primary">使用水中筆 ↗</button><button id="explorationStartErase" class="muted-btn">使用橡皮擦</button></div><p class="panel-note inset-note">'+(active?'描繪時先停止游動；完成後恢復操控。':'進入海中即可使用水中筆。')+'</p><div id="explorationInkList">'+(s.strokes.length?s.strokes.map(stroke=>`<div class="exploration-ink-row"><i style="background:${R.colors[stroke.color].hex}"></i><span>筆記 ${stroke.id} · 深度 ${(-stroke.points[0][1]).toFixed(1)} m</span><button data-ink-mark="${stroke.id}">標記位置 ↗</button></div>`).join(''):'<p class="empty">海裡還沒有留下筆記。</p>')+'</div>';
    $('explorationStartPen').disabled=!active;$('explorationStartErase').disabled=!active;$('explorationStartPen').onclick=()=>setPen('draw');$('explorationStartErase').onclick=()=>setPen('erase');body.querySelectorAll('[data-ink-mark]').forEach(button=>button.onclick=()=>markTarget('ink',+button.dataset.inkMark));
   }else{
    body.innerHTML=`<p class="panel-note">已帶回 ${s.collected.length} / ${R.artifacts.length} 件原創航海收藏。先在海中發現物件，靠近到 ${R.limits.pickup} 公尺內、確認沒有礁體遮擋，再按 R 或「打撈」。</p><div class="exploration-items">`+items.map(item=>{const collected=s.collected.includes(item.id),found=s.found.includes(item.id),place=LANDMARKS.find(l=>l.id===item.place);return `<article class="exploration-item ${found?'':'unfound'}"><header><h3>${found?item.name:'未發現的航海物件'}</h3><small>${collected?'已收藏':found?'已發現':'線索'}</small></header><p>${collected?item.description:found?'物件仍在海裡。前往標記，親自靠近並打撈。':'在'+place.name+'附近的海床仔細尋找。'}</p>${found&&!collected?`<button class="muted-btn" data-artifact-mark="${item.id}">標記 ${item.name} ↗</button>`:''}</article>`;}).join('')+'</div>';
@@ -239,19 +244,19 @@ const oceanExploration=(()=>{
  }
  function markTarget(kind,id){const s=state();if(!['artifact','ink'].includes(kind)||kind==='artifact'&&(!s.found.includes(id)||s.collected.includes(id))||kind==='ink'&&!s.strokes.some(stroke=>stroke.id===id))return;s.target={kind,id};persistNow();closePanel();paintHUD();toast('已標記 '+targetLabel()+' · 游向海中的菱形標誌');}
  function drawMap(ctx,w,h){
-  const s=state(),deep=typeof oceanDeepsea!=='undefined'&&oceanDeepsea.isActive(),region=deep?'trench':'reef',known=new Set(s.survey),cellWidth=w/R.cols,cellHeight=h/R.rows;ctx.save();
-  for(let i=0;!deep&&i<R.cols*R.rows;i++){if(known.has(i))continue;ctx.fillStyle=R.eligible(i)?'rgba(1,14,25,.89)':'rgba(1,12,21,.96)';ctx.fillRect(i%R.cols*cellWidth,Math.floor(i/R.cols)*cellHeight,cellWidth+.5,cellHeight+.5);}
+  const s=state(),known=new Set(s.survey);ctx.save();
+  for(let i=0;i<R.cols*R.rows;i++){if(known.has(i))continue;const [left,top,right,bottom]=R.cellBounds(i),a=chartPoint(left,top,w,h),b=chartPoint(right,bottom,w,h);ctx.fillStyle=R.eligible(i)?'rgba(1,14,25,.89)':'rgba(1,12,21,.96)';ctx.fillRect(a[0],a[1],b[0]-a[0]+.5,b[1]-a[1]+.5);}
   ctx.strokeStyle='rgba(193,225,212,.72)';ctx.lineWidth=1.4;ctx.beginPath();
-  for(const node of s.trail){if(R.pointRegion(node.p)!==region||deep&&Math.abs(node.p[1]-player.p[1])>90)continue;const p=chartPoint(node.p[0],node.p[2],w,h);if(node.start)ctx.moveTo(...p);else ctx.lineTo(...p);}ctx.stroke();
-  for(const stroke of s.strokes){if(R.pointRegion(stroke.points[0])!==region||deep&&Math.abs(stroke.points[0][1]-player.p[1])>90)continue;ctx.strokeStyle=R.colors[stroke.color].hex;ctx.lineWidth=2;ctx.beginPath();stroke.points.forEach((p,i)=>{const q=chartPoint(p[0],p[2],w,h);i?ctx.lineTo(...q):ctx.moveTo(...q)});ctx.stroke();}
-  for(const item of items)if(!deep&&s.found.includes(item.id)&&!s.collected.includes(item.id)){const p=chartPoint(item.p[0],item.p[2],w,h);ctx.strokeStyle='#eed299';ctx.lineWidth=1.4;ctx.beginPath();ctx.moveTo(p[0],p[1]-5);ctx.lineTo(p[0]+5,p[1]);ctx.lineTo(p[0],p[1]+5);ctx.lineTo(p[0]-5,p[1]);ctx.closePath();ctx.stroke();}
-  const destination=targetPosition();if(destination&&R.pointRegion(destination)===region){const end=chartPoint(destination[0],destination[2],w,h),origin=active?player.p:voyage.state.resume?.p;if(origin){const start=chartPoint(origin[0],origin[2],w,h);ctx.strokeStyle='#f2d990';ctx.setLineDash([4,5]);ctx.beginPath();ctx.moveTo(...start);ctx.lineTo(...end);ctx.stroke();ctx.setLineDash([]);}ctx.strokeStyle='#f4e0a9';ctx.beginPath();ctx.arc(...end,9,0,TAU);ctx.stroke();}
+  for(const node of s.trail){const p=chartPoint(node.p[0],node.p[2],w,h);if(node.start)ctx.moveTo(...p);else ctx.lineTo(...p);}ctx.stroke();
+  for(const stroke of s.strokes){ctx.strokeStyle=R.colors[stroke.color].hex;ctx.lineWidth=2;ctx.beginPath();stroke.points.forEach((p,i)=>{const q=chartPoint(p[0],p[2],w,h);i?ctx.lineTo(...q):ctx.moveTo(...q)});ctx.stroke();}
+  for(const item of items)if(s.found.includes(item.id)&&!s.collected.includes(item.id)){const p=chartPoint(item.p[0],item.p[2],w,h);ctx.strokeStyle='#eed299';ctx.lineWidth=1.4;ctx.beginPath();ctx.moveTo(p[0],p[1]-5);ctx.lineTo(p[0]+5,p[1]);ctx.lineTo(p[0],p[1]+5);ctx.lineTo(p[0]-5,p[1]);ctx.closePath();ctx.stroke();}
+  const destination=targetPosition();if(destination&&R.pointRegion(destination)){const end=chartPoint(destination[0],destination[2],w,h),origin=active?player.p:voyage.state.resume?.p;if(origin){const start=chartPoint(origin[0],origin[2],w,h);ctx.strokeStyle='#f2d990';ctx.setLineDash([4,5]);ctx.beginPath();ctx.moveTo(...start);ctx.lineTo(...end);ctx.stroke();ctx.setLineDash([]);}ctx.strokeStyle='#f4e0a9';ctx.beginPath();ctx.arc(...end,9,0,TAU);ctx.stroke();}
   ctx.restore();
  }
  function drawPreview(canvas){
   const ctx=canvas.getContext('2d'),w=canvas.width,h=canvas.height;ctx.save();ctx.clearRect(0,0,w,h);ctx.translate(chartView.x,chartView.y);ctx.scale(chartView.scale,chartView.scale);ctx.fillStyle='#153c45';ctx.fillRect(0,0,w,h);ctx.strokeStyle='#c5dac024';for(let i=1;i<8;i++){ctx.beginPath();ctx.moveTo(i*w/8,0);ctx.lineTo(i*w/8,h);ctx.moveTo(0,i*h/8);ctx.lineTo(w,i*h/8);ctx.stroke();}drawMap(ctx,w,h);
-  const deep=typeof oceanDeepsea!=='undefined'&&oceanDeepsea.isActive();if(!deep)oceanNavigation.feature.drawMap(ctx,w,h);ctx.font='11px sans-serif';for(const l of deep?[]:LANDMARKS){const p=chartPoint(l.x,l.z,w,h);ctx.fillStyle=voyage.state.visited.includes(l.id)?'#d4e9d0':'#90acae';ctx.beginPath();ctx.arc(...p,3.5,0,TAU);ctx.fill();ctx.fillText(l.name,p[0]+7,p[1]+3);}
-  if(deep){ctx.fillStyle='#b9d5c6';ctx.fillText('研究站平面圖 · 目前深度上下90m',12,20);}if(active){const p=chartPoint(player.p[0],player.p[2],w,h);ctx.save();ctx.translate(...p);ctx.rotate(player.yaw);ctx.fillStyle='#eef6e1';ctx.beginPath();ctx.moveTo(0,-8);ctx.lineTo(-5,6);ctx.lineTo(5,6);ctx.closePath();ctx.fill();ctx.restore();}ctx.fillStyle='#b9d5c6';ctx.fillText('N ↑',w-35,20);ctx.restore();if($('explorationZoomValue'))$('explorationZoomValue').textContent=Math.round(chartView.scale*100)+'%';
+  oceanNavigation.feature.drawMap(ctx,w,h);ctx.font='11px sans-serif';for(const l of LANDMARKS){const p=chartPoint(l.x,l.z,w,h);ctx.fillStyle=voyage.state.visited.includes(l.id)?'#d4e9d0':'#90acae';ctx.beginPath();ctx.arc(...p,3.5,0,TAU);ctx.fill();ctx.fillText(l.name,p[0]+7,p[1]+3);}
+  if(typeof OceanTrench!=='undefined'){const p=chartPoint(760,-90,w,h);ctx.fillStyle='#b9d5c6';ctx.fillText('海溝 · 700–7,000 m',p[0]+8,p[1]-9);}if(active){const p=chartPoint(player.p[0],player.p[2],w,h);ctx.save();ctx.translate(...p);ctx.rotate(player.yaw);ctx.fillStyle='#eef6e1';ctx.beginPath();ctx.moveTo(0,-8);ctx.lineTo(-5,6);ctx.lineTo(5,6);ctx.closePath();ctx.fill();ctx.restore();}ctx.fillStyle='#b9d5c6';ctx.fillText('N ↑',w-35,20);ctx.restore();if($('explorationZoomValue'))$('explorationZoomValue').textContent=Math.round(chartView.scale*100)+'%';
  }
  function bindChart(canvas){
   const pointers=new Map();let drag=null,pinch=null,moved=false;
