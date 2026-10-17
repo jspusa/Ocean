@@ -1,14 +1,15 @@
-/* Original miniature habitats, not a reconstruction of natural depth ranges. */
+/* Depth-stratified habitats on the continuous continental slope. Positions are
+ * authored game geography; species no longer share the shallow rift showcase. */
 const AbyssWorldRules={sites:{
- coelacanth:{homes:[[-155,-72,-282],[-151,-81,-301]],radius:1.8},
- giant_squid:{homes:[[-151,-73,-310]],radius:3.0},
- pelican_eel:{homes:[[-153,-81,-298],[-146,-88,-318]],radius:1.0},
- humpback_anglerfish:{homes:[[-145,-88,-312],[-157,-77,-289]],radius:.15},
- japanese_spider_crab:{homes:[[166,-53.99,-221],[169,-53.99,-228]],radius:.30}
+ coelacanth:{homes:[[304,-216,-210],[305,-217,-249]],radius:1.8,habitat:'大陸坡岩礁邊緣；本海域約 216–217 m。'},
+ giant_squid:{homes:[[390,-680,-170]],radius:3.0,habitat:'深海中層的開放水域；本海域約 680 m。'},
+ pelican_eel:{homes:[[406,-1050,-65],[465,-1450,-220]],radius:1.0,habitat:'深海中下層的開放水域；本海域約 1,050–1,450 m。'},
+ humpback_anglerfish:{homes:[[354,-580,-76],[416,-910,-218]],radius:.15,habitat:'光線微弱的深海中層；本海域約 580–910 m。靠近微光後可用微觀探索觀察。'},
+ japanese_spider_crab:{homes:[[298,-220,-219],[300,-220,-241]],radius:.30,habitat:'大陸坡的砂泥底；本海域約 220 m，沿沉積台地緩慢行走。'}
 }};
 // Keep old chart indices stable; region entrances carry an actual underwater y.
 for(const l of OceanRegions.landmarks)LANDMARKS.push({...l,y:l.spawn[1]});
-for(const sp of ABYSS_SPECIES)sp.zone=sp.id==='japanese_spider_crab'?10:11;
+for(const sp of ABYSS_SPECIES){sp.zone=sp.id==='japanese_spider_crab'?10:11;sp.habitat=AbyssWorldRules.sites[sp.id].habitat;}
 const spawnBeforeAbyss=addLife;
 addLife=function(r){
  spawnBeforeAbyss(r);

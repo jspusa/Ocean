@@ -1,5 +1,5 @@
 {
-  "version": "0.16.0",
+  "version": "0.17.0",
   "scope": "served game and build sources",
   "files": [
     {
@@ -9,18 +9,18 @@
     },
     {
       "path": "CREDITS.md",
-      "bytes": 8378,
-      "sha256": "e7a9c2b9b78b28789990b79f24aa0bd417afbfca606a44a13c2e20cf41e06e6f"
+      "bytes": 9076,
+      "sha256": "d1e96cbf1fdc3ea09dd9838d8ccbdc9d748e19779def12a56e28bdbd781f0d28"
     },
     {
       "path": "README.md",
-      "bytes": 16081,
-      "sha256": "9af8c85e8a01e987fae69e21b283be82a33035119cfe698fef19cb8eb5bc5c86"
+      "bytes": 17660,
+      "sha256": "1657bfcbc36675f5fae70942e20a1d9a56a80a985a6f9067bbe759ecca287907"
     },
     {
       "path": "VERSION",
       "bytes": 7,
-      "sha256": "aa037454b5e8320521a32b278a3f4aff05fc79009ab5503f5d4a1b9a33b38c47"
+      "sha256": "02d38e98e88f4a8dc2ea40dbb769338601066fc94920b52882a14f21ad97f7ee"
     },
     {
       "path": "assets/caustics.jpg",
@@ -219,8 +219,8 @@
     },
     {
       "path": "assets/reef.mesh.gz",
-      "bytes": 21197535,
-      "sha256": "b0ad124a493dfa947682e00a47d35a702d9962c728a7735c0f283a16b5b25a45"
+      "bytes": 21633234,
+      "sha256": "719cee472608b570784271d4004ea47cf3d5c4427eff84d86d00bed72f6d96a6"
     },
     {
       "path": "assets/rock_diff.jpg",
@@ -265,7 +265,7 @@
     {
       "path": "index.html",
       "bytes": 12257,
-      "sha256": "c1c35e9d7a191b1cb6e3139233fe3444de5dbce58f4a2039cb9592ffbd1342b6"
+      "sha256": "4f864063120014da36ce325418caae1604e19c0839cf071c4d84af35ec1b4cd2"
     },
     {
       "path": "music/blue_silence.mp3",
@@ -294,13 +294,13 @@
     },
     {
       "path": "src/abyss_world.js",
-      "bytes": 1951,
-      "sha256": "d3d8ada39031294bdcd36fe625c8eda289eee8be0dc8ef75f43ab62b8fb4649b"
+      "bytes": 2473,
+      "sha256": "adcf9ec548669eb9083d027b497e6ea1e1847e59160e7029e7e299a46ea5c95d"
     },
     {
       "path": "src/app.js",
-      "bytes": 64415,
-      "sha256": "bb0158a4d2c97367774fe9f6a87160419ddbe65e1e666ecfae0f0373ad2e822c"
+      "bytes": 69551,
+      "sha256": "7db9d93d62aa6747d7c97e91923ec4dea883226018fc0169b50cdc40621ba31b"
     },
     {
       "path": "src/aquarium.js",
@@ -309,8 +309,8 @@
     },
     {
       "path": "src/audio.js",
-      "bytes": 10789,
-      "sha256": "5efd339de78e33a87f2e4b9482d2d8f06015acd8832502e3f2288bb701c46837"
+      "bytes": 10918,
+      "sha256": "ddbde7b461d6bfee280b0f2029abc7802ffbc686671524d075152a345fbafa35"
     },
     {
       "path": "src/bootstrap.js",
@@ -319,33 +319,33 @@
     },
     {
       "path": "src/cetacean_world.js",
-      "bytes": 1732,
-      "sha256": "05ab6fd8975113c7cd9de4666e4a97badf637b1c69634fd0e1b7bf7b58326e61"
+      "bytes": 2491,
+      "sha256": "9514494f6079a97c06199ec5f66c6272e2647612a3822cd91a3001b3b4093ad6"
     },
     {
       "path": "src/cetaceans.js",
-      "bytes": 20734,
-      "sha256": "27905d4e2fb487273c423ba768ebf86f538713089c29927e73e8d91ef251137d"
+      "bytes": 20755,
+      "sha256": "39a2c9a620849c3de8841bd3d8dc2d8d359d8c8ba1329f9111ccdf40997e58ae"
     },
     {
       "path": "src/config.js",
       "bytes": 2607,
-      "sha256": "398aca0ed62247c38c3a3920047816d69ccceb6606300908fb64850b572afe3e"
+      "sha256": "cd8fe6116409fbf6aebf6659691cf947dc5a9e0bd455b51d351c9adb6bb710ab"
     },
     {
       "path": "src/deepsea.js",
-      "bytes": 8636,
-      "sha256": "c129cafea4af0c93b1cbfd024cddb15e9bd4d4d2b96048eda862518952ee6b28"
+      "bytes": 9246,
+      "sha256": "e8393c6aeab288f4ae5d2f4660dc220388c2cb01d7d3ac8fd4029a9426d64307"
     },
     {
       "path": "src/ecology.js",
-      "bytes": 46809,
-      "sha256": "a27bcd256bc51275dd734582ce6d2ff7559b120ad6867d1f5e0991bd6d3c8043"
+      "bytes": 47059,
+      "sha256": "29d41d030cea37771d8553f5994a36af53f9ba3405ad6f61a8034bae264d2ff2"
     },
     {
       "path": "src/engine.js",
-      "bytes": 82931,
-      "sha256": "fe5a59f8fc12726d65dfdf97634fbd4db0f654e6607f1be46a07241c9390659e"
+      "bytes": 87618,
+      "sha256": "4bbe62af159909023b79a9d6fea5de68ac9eec654d4eb75efade914f3ea55037"
     },
     {
       "path": "src/expedition.js",
@@ -405,12 +405,12 @@
     {
       "path": "src/open_world.js",
       "bytes": 15743,
-      "sha256": "e8959ab75b83f03e5321cafc0ebbb053b49035d62b437a064fa32f4815c647cf"
+      "sha256": "62c5305f49473c4c7709cd35f42ff05746d31ccbb5c2a99b6a2d7225ffede35a"
     },
     {
       "path": "src/pelagic_life.js",
-      "bytes": 10281,
-      "sha256": "c992d5990b81887b761c3aafdb484d8a49778c4d4d6cedb15df013f14c4aa309"
+      "bytes": 9818,
+      "sha256": "bdbc36aaa0a267bd6aee81e3cf625394b0fd28e19801e77e16a0f69af4ae1756"
     },
     {
       "path": "src/performance.js",
@@ -439,8 +439,8 @@
     },
     {
       "path": "src/seasons.js",
-      "bytes": 6782,
-      "sha256": "ae76957dd3761ef7bf4bfb8fec285b62753973d76f4abcb622865bc83cf76034"
+      "bytes": 7091,
+      "sha256": "51c2e61a4191c68fafd43249e0bdd4363ef3c02ace12d5a0922560a409dc341e"
     },
     {
       "path": "src/selection.js",
@@ -450,7 +450,7 @@
     {
       "path": "src/shell.html",
       "bytes": 10246,
-      "sha256": "2c5f6f7b636ed111e82f0147533fc4792cb57db34d58b1b9d3f1104266b842fe"
+      "sha256": "0a1bda976ec6749ce19c3d55ae80dbae816d2c85fe4bf60c913de29dee64d55d"
     },
     {
       "path": "src/ship.js",
@@ -459,18 +459,18 @@
     },
     {
       "path": "src/story.js",
-      "bytes": 19414,
-      "sha256": "5c44ba495bfefec72b7fd477f2643701d94d4bc6293c974dacbe5f0f0c4956aa"
+      "bytes": 19443,
+      "sha256": "21a4cf0b16b09997f6f42f448c8a860cd56cbfd308c19baf51f4d82a7ec4142c"
     },
     {
       "path": "src/style.css",
-      "bytes": 52653,
-      "sha256": "827a9a66e08c3ce62921cdd9190e46bfc85a02b331e0c26997df3dcf5ef4959b"
+      "bytes": 52716,
+      "sha256": "9cf76b5aadbbb3a1eac15fdd41e305812e9d2a97faeff8916c52faa48a5d1994"
     },
     {
       "path": "src/trench.js",
-      "bytes": 12982,
-      "sha256": "2d6cdf3078a035217934996d822fd3e8e39a243e6f73201acdc7d09e9a239288"
+      "bytes": 13344,
+      "sha256": "fa2e491138fcb28e55a1ad0517170cca77e6c42d3cfc671b1cf66d237cf9fe50"
     },
     {
       "path": "src/trench_fauna.js",
@@ -484,13 +484,13 @@
     },
     {
       "path": "src/voyage.js",
-      "bytes": 37195,
-      "sha256": "1e4e6197a98c16dbc82e1047bfb5942c61684670aae3ee2900fc1d90eccaa0bb"
+      "bytes": 37594,
+      "sha256": "b4dabf9dae48c2de6e000491d6cc4486fa627f38543b761b47cff4c297742b81"
     },
     {
       "path": "src/world.js",
-      "bytes": 30473,
-      "sha256": "fb11caed37a812022f7a59d773bbc4b5371956f37592dcbf9d2299b5f96eee0c"
+      "bytes": 33244,
+      "sha256": "495d6a067fb8c2b28dbdd7ac91c5ad1663742dd20da94f7daa346d540e78414b"
     }
   ]
 }

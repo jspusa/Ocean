@@ -13,7 +13,7 @@ const modes=[{id:'desktop',width:1100,height:740,touch:false},{id:'portrait',wid
   const context=await browser.newContext({viewport:{width:m.width,height:m.height},deviceScaleFactor:1,isMobile:m.touch,hasTouch:m.touch}),page=await context.newPage();page.setDefaultTimeout(60000);
   page.on('pageerror',e=>errors.push({mode:m.id,message:e.message}));
   await page.addInitScript(()=>{if(!localStorage.getItem('return-blue.shilang.v1'))localStorage.setItem('return-blue.shilang.v1',JSON.stringify({settings:{quality:0,adaptive:false,startWithSound:false,reduced:true}}));});
-  await page.goto(url+(url.includes('?')?'&':'?')+'still');await page.waitForFunction(()=>window.__ocean?.ready,null,{timeout:120000});await page.locator('#loading').waitFor({state:'hidden'});
+  await page.goto(url+(url.includes('?')?'&':'?')+'still');await page.waitForFunction(()=>window.__ocean?.ready||!document.getElementById('errorBox').classList.contains('hidden'),null,{timeout:120000});if(!await page.evaluate(()=>window.__ocean?.ready))throw Error(await page.locator('#errorMessage').textContent());await page.locator('#loading').waitFor({state:'hidden'});
   check(m.id+' boots compiled scene and shaders',await page.evaluate(()=>renderer.sceneLoad.compiled&&renderer.gl.getError()===0));
   check(m.id+' minimal home fits viewport',await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth&&document.querySelectorAll('#welcome .primary:not([hidden])').length===1&&$('startBtn').getBoundingClientRect().bottom<innerHeight));
   await page.screenshot({path:path.join(out,'free-ocean-'+m.id+'-home.png'),timeout:90000});
@@ -22,6 +22,10 @@ const modes=[{id:'desktop',width:1100,height:740,touch:false},{id:'portrait',wid
   await page.selectOption('#qualityPreset','0');await click('#closePanel');
   await click('#startBtn');await page.waitForFunction(()=>active&&$('welcome').classList.contains('hidden'));
   check(m.id+' one click enters unrestricted swimming',await page.evaluate(()=>voyage.state.mode==='free'&&renderer.submersible===false&&!voyage.state.features.deepsea.deployed));
+  check(m.id+' initial reef has no nearby giant animals or wild cold-water cetaceans',await page.evaluate(()=>{
+   const large=new Set(['whale','blue_whale','whale_shark','orca','false_killer_whale']),cold=new Set(['beluga','commerson_dolphin','white_sided_dolphin']);
+   return life.filter(f=>large.has(SPECIES[f.species]?.id)).every(f=>V.dist(f.p,player.p)>200)&&life.filter(f=>cold.has(SPECIES[f.species]?.id)).every(f=>f.ecologyPresent===false);
+  }));
   await click('#pauseBtn');await page.waitForFunction(()=>modal==='diveMenu');await click('#mapBtn');const mapBefore=await page.evaluate(()=>player.p.slice());await click('[data-mark="trench:hadal"]');
   check(m.id+' unified map marks depth without teleporting',await page.evaluate(p=>voyage.state.waypoint==='trench:hadal'&&V.dist(player.p,p)<.001,mapBefore));
   if(!m.touch){
@@ -42,10 +46,13 @@ const modes=[{id:'desktop',width:1100,height:740,touch:false},{id:'portrait',wid
    const cross=await page.evaluate(()=>{resetInput();player.p=[258,-10,-90];player.yaw=Math.PI/2;player.pitch=0;keys.add('KeyW');for(let i=0;i<300;i++)updatePlayer(1/60);keys.clear();return player.p.slice();});check('continuous controls cross the old reef boundary',cross[0]>270&&cross[1]<0,cross);
    const saved=await page.evaluate(()=>{player.p=[766,-7000,-120];player.yaw=.4;player.pitch=-.1;resetInput();oceanDeepsea.feature.tick();saveVoyage();return player.p.slice();});
    await click('#pauseBtn');await click('#menuHome');check('home saves exact hadal position without debrief',await page.evaluate(p=>!active&&$('debrief').classList.contains('hidden')&&V.dist(voyage.state.resume.p,p)<.001,saved));
-   await page.reload();await page.waitForFunction(()=>window.__ocean?.ready,null,{timeout:120000});await page.locator('#loading').waitFor({state:'hidden'});await click('#shipContinue');await page.waitForFunction(()=>active&&$('welcome').classList.contains('hidden'));
+   await page.reload();await page.waitForFunction(()=>window.__ocean?.ready||!document.getElementById('errorBox').classList.contains('hidden'),null,{timeout:120000});if(!await page.evaluate(()=>window.__ocean?.ready))throw Error(await page.locator('#errorMessage').textContent());await page.locator('#loading').waitFor({state:'hidden'});await click('#shipContinue');await page.waitForFunction(()=>active&&$('welcome').classList.contains('hidden'));
    check('reload continues swimming at 7000m',await page.evaluate(p=>V.dist(player.p,p)<.001&&oceanDeepsea.isActive()&&!renderer.submersible,saved));
    await page.evaluate(()=>{updateLife(10);const f=life.find(f=>SPECIES[f.species].id==='blue_whale');let camera;for(const height of [5,10,15])for(let i=0;i<16;i++){const angle=i*Math.PI/8,p=V.add(f.p,[Math.sin(angle)*30,height,Math.cos(angle)*30]);if(!camera&&p[1]<-.7&&p[1]>groundHeight(p[0],p[2])+1&&!blocked(p,f.p))camera=p;}if(!camera)throw Error('No clear whale view');window.__renderView(camera,f.p,10);oceanDeepsea.feature.tick();});await page.screenshot({path:path.join(out,'free-ocean-blue-whale.png'),timeout:90000});
    check('blue whale and whale shark are actual rendered actors',await page.evaluate(()=>['blue_whale','whale_shark'].every(id=>life.some(f=>SPECIES[f.species].id===id&&f.s[0]>=8.5))&&renderer.gl.getError()===0));
+   const patrol=await page.evaluate(()=>{const fish=life.find(f=>SPECIES[f.species].id==='blue_whale'),destination=voyageDestination('habitat:blue_whale');return V.dist([destination.x,destination.y-.6,destination.z],fish.p)<.01&&destination.radius<20;});check('optional whale marker follows the real offshore animal',patrol);
+   await page.evaluate(()=>{updateLife(12);const f=life.find(f=>SPECIES[f.species].id==='whale_shark'),c=Math.cos(f.yaw),s=Math.sin(f.yaw),offset=[c*6+s*9,2,-s*6+c*9];window.__renderView(V.add(f.p,offset),f.p,12);oceanDeepsea.feature.tick();});await page.screenshot({path:path.join(out,'free-ocean-whale-shark.png'),timeout:90000});
+   check('offshore whale shark retains sunlight and a valid rendered surface',await page.evaluate(()=>renderer.gl.getError()===0&&player.p[1]<-10&&player.p[0]>300&&$('areaName').textContent==='外海大陸坡'));
    await page.evaluate(()=>{updateLife(12);const f=life.find(f=>SPECIES[f.species].id==='mariana_snailfish');window.__renderView(V.add(f.p,[.38,.12,.8]),f.p,12);oceanDeepsea.feature.tick();});await page.screenshot({path:path.join(out,'free-ocean-hadal.png'),timeout:90000});
    check('hadal rendering keeps lamp and no GL error',await page.evaluate(()=>renderer.lamp&&!renderer.submersible&&renderer.gl.getError()===0));
   }

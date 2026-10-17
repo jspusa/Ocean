@@ -4,6 +4,8 @@
 
 查閱日期：2026-10-13。現有 27 類順序維持；新 ID 依序追加 27–31，使用獨立 `ABYSS_SPECIES`，不寫入原有 `FAUNA_SPECIES` 或 `CETACEAN_SPECIES`。
 
+**0.17 棲地修訂（2026-10-17）：** 下方約百公尺微縮深谷的敘述保留作 0.13 歷史基線。現在九個原有個體已移至連續大陸坡：腔棘魚 216–217 m、日本蜘蛛蟹 220 m 沉積台地、巨型烏賊 680 m、鮟鱇 580／910 m、吞鰻 1,050／1,450 m。圖鑑、標記與調查取景沿用實際位置，UID、模型尺度和已完成進度不變。台地渲染與碰撞使用同一網格。這些是依自然深度方向調整的原創棲地，並非同一真實潛點的共存紀錄或一比一海底地形。
+
 ## 形態與公尺尺度
 
 - **Coelacanth／腔棘魚，`coelacanth`，Latimeria chalumnae。** 模型全長 1.5 m。[Australian Museum](https://australian.museum/learn/animals/fishes/coelacanth-latimeria-chalumnae-smith-1939/) 列約 2 m 的體型，辨識重點包括肉質成對鰭及尾端額外中央尾葉；西印度洋種是鋼藍色，不能把另一種印尼腔棘魚的棕色當同一種。本模型有成對葉狀胸／腹鰭、分開的兩個背鰭、鰓蓋與三部分尾形。配色使用平滑頂點取樣。[Smithsonian Ocean](https://ocean.si.edu/ocean-life/fish/coelacanth) 支持成對鰭的肢狀擺動；這不表示腔棘魚會在海底用鰭步行。

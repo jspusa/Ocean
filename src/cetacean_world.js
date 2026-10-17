@@ -1,13 +1,16 @@
 /* Original authored open-water ranges. Coordinates are game metres, not surveys. */
 const CetaceanWorldRules={
  common_dolphin:{anchor:[-78,-35],radius:18,depth:-8},
- white_sided_dolphin:{anchor:[-167,-105],radius:22,depth:-12},
- commerson_dolphin:{anchor:[-68,81],radius:13,depth:-7},
- orca:{anchor:[133,-223],radius:26,depth:-15},
- beluga:{anchor:[-145,44],radius:18,depth:-10},
- false_killer_whale:{anchor:[191,-93],radius:25,depth:-15},
+ white_sided_dolphin:{anchor:[-167,-105],radius:22,depth:-12,wild:false,habitat:'北太平洋溫帶與冷水海域'},
+ commerson_dolphin:{anchor:[-68,81],radius:13,depth:-7,wild:false,habitat:'南半球寒冷的近岸海域'},
+ orca:{anchor:[445,-305],radius:52,depth:-18,surfacePeriod:140,habitat:'外海陸坡上方 · 開放水域'},
+ beluga:{anchor:[-145,44],radius:18,depth:-10,wild:false,habitat:'北極與亞北極冷水海域'},
+ false_killer_whale:{anchor:[510,85],radius:60,depth:-17,surfacePeriod:120,habitat:'暖水外海 · 陸坡與深水盆地上方'},
  rissos_dolphin:{anchor:[39,-235],radius:22,depth:-17}
 };
+// Keep catalogue entries and actor identities for photographs, exhibits and
+// explicitly selected companions, without inventing polar wildlife on a reef.
+for(const sp of CETACEAN_SPECIES){const def=CetaceanWorldRules[sp.id];sp.wildHabitat=def.wild!==false;if(def.habitat)sp.habitat=def.habitat;if(def.surfacePeriod)sp.motionProfile={...sp.motionProfile,surfacePeriod:def.surfacePeriod};}
 const spawnBeforeCetaceans=addLife;
 addLife=function(r){
  spawnBeforeCetaceans(r);
@@ -20,6 +23,7 @@ addLife=function(r){
    if(groundHeight(home[0],home[2])+hull+.35>=-hull-.12)throw Error('Cetacean range too shallow: '+sp.id);
    home[1]=clamp(home[1],groundHeight(home[0],home[2])+hull+.5,-hull-.3);
    const f={fauna:true,species:index,p:home.slice(),home:home.slice(),center:home.slice(),homeYaw:k*.3,modelCenter:high.modelBounds.min.map((n,i)=>(n+high.modelBounds.max[i])*.5),s:[sp.size,sp.size,sp.size],yaw:0,pitch:0,phase:k*2.1,orbit:k*2.1,radius:def.radius,height:0,speed:.1,bob:k*1.7,retreat:0,faunaVisibility:1,tint:[1,1,1]};
+   f.wildHabitat=def.wild!==false;if(!f.wildHabitat)f.ecologyPresent=false;
    life.push(f);actors.push(f);
   }
   const hi=r.batch(high,actors,9,true);hi.maxDistance=38;

@@ -39,11 +39,12 @@ class OceanAudio {
   if(document.hidden||!this.enabled||!settings.sound){this.master.gain.setTargetAtTime(0,now,.08);return;}
   const training=modal==='training'&&typeof oceanEcology!=='undefined'&&!!oceanEcology.snapshot().training;
   const resting=modal==='shipRest'&&typeof oceanShip!=='undefined'&&oceanShip.snapshot().mode==='rest';
+  const surface=active&&typeof oceanSwimActions!=='undefined'&&oceanSwimActions.isSurface();
   const available=active||training||resting;this.master.gain.setTargetAtTime(available?settings.master:0,now,.70);
   this.depth=Math.max(0,-player.p[1]);const blend=clamp((this.depth-12)/36,0,1);this.blend=blend;
   this.music.gain.setTargetAtTime(settings.music*((modal || photoOpen) ? .62 : 1),now,1.2);
   // Parentheses are explicit: opening a panel ducks music, it does not restart it.
-  this.environment.gain.setTargetAtTime(resting?0:settings.ambience*((modal || photoOpen) ? .55 : 1),now,.35);
+  this.environment.gain.setTargetAtTime(resting?0:settings.ambience*(surface?.32:1)*((modal || photoOpen) ? .55 : 1),now,.35);
   this.stems[0].gain.setTargetAtTime(this.custom?0:Math.cos(blend*Math.PI/2),now,3.0);
   this.stems[1].gain.setTargetAtTime(this.custom?0:Math.sin(blend*Math.PI/2),now,3.0);
   this.waterFilter.frequency.setTargetAtTime(mix(720,320,blend),now,2);
@@ -51,8 +52,8 @@ class OceanAudio {
   const inhale=phase<.34?Math.sin(phase/.34*Math.PI):0;
   const exhale=phase>.44&&phase<.78?Math.sin((phase-.44)/.34*Math.PI):0;
   const submersible=renderer.submersible===true;
-  this.breath.gain.setTargetAtTime(active&&!submersible?(inhale*.033+exhale*.014)*settings.breath:0,now,.08);
-  if(active&&!submersible&&!modal&&!photoOpen&&settings.ambience>.02){
+  this.breath.gain.setTargetAtTime(active&&!surface&&!submersible?(inhale*.033+exhale*.014)*settings.breath:0,now,.08);
+  if(active&&!surface&&!submersible&&!modal&&!photoOpen&&settings.ambience>.02){
    if(exhale>.2&&now>this.nextBubble){this.bubble();this.nextBubble=now+.20+Math.random()*.24;}
    if(now-this.lastWhale>36+(1-blend)*20){this.lastWhale=now;this.whale(blend);}
    if(V.len(player.velocity)>.5&&now-this.lastKick>1.8){this.lastKick=now;this.fin();}

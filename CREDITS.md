@@ -86,3 +86,9 @@
 ## 0.16 連續海域與大型生物
 
 新增藍鯨、鯨鯊皆為本專案程序建立的原創模型及縮圖，沒有下載第三方模型。體型與形態參考 [NOAA 藍鯨](https://www.fisheries.noaa.gov/species/blue-whale) 與 [NOAA 鯨鯊](https://www.fisheries.noaa.gov/species/whale-shark)。代表個體為 26 m 與 8.5 m；巡游路線、共棲海域和深海助游為遊戲編排。
+
+## 0.17 大型生物與棲地修訂
+
+藍鯨、鯨鯊與大翅鯨的連續曲面、鰭根、尾鰭、表面斑紋及喉褶為本專案重新建立的原創程序幾何／著色器，沒有使用外部模型、掃描或貼圖。形態參考沿用上述 NOAA 資料；鯨豚與深海物種的自然棲地依據見 [鯨豚參考](docs/parity/CETACEAN-REFERENCE.md) 與 [深海生物參考](docs/parity/ABYSS-FAUNA-REFERENCE.md)。棲地分層不代表這些物種在同一真實海域共存，路徑、數量和遭遇頻率仍為遊戲編排。
+
+水面環視與快速回頭的功能依據為 [Wii 原版說明書研究](docs/WII-PARITY-REFERENCE.md)，鍵盤、觸控與手把映射由本作設計。

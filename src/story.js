@@ -15,7 +15,7 @@ const StoryRules=(()=>{
    {point:'abyss-middle',kind:'deploy',seconds:5,title:'部署中層觀測器',note:'第二台觀測器已固定，與上層使用同一時間基準。'},
    {point:'abyss-lower',kind:'deploy',seconds:5,title:'部署下層觀測器',note:'第三台觀測器已固定。回到中層，開始連續記錄。'},
    {point:'abyss-middle',kind:'record',seconds:20,title:'在中層連續記錄 20 秒',note:'三個深度的記錄已齊備。觀測器留在原位，回船讀取這次的資料。'}]},
-  {id:'living-dark',title:'黑暗也有生命',region:'abyss',brief:'澄：在裂谷附近尋找腔棘魚與巨型烏賊。保持距離、讓完整輪廓進入視野，再開始觀察。這片海是我們的原創想像，並非兩種生物共棲的現場調查。',reply:'澄：你帶回了兩種完全不同的生存方式。古老的石板沒有給我們答案，只提醒人們持續觀察。最後，把自己的儀器帶回家。',steps:[
+  {id:'living-dark',title:'黑暗也有生命',region:'abyss',brief:'澄：沿東側大陸坡向深處游，先在約 216 m 的台地邊緣尋找腔棘魚，再到約 680 m 的開放水域觀察巨型烏賊。調查位置會標出各自棲地；停穩，讓完整輪廓進入視野。',reply:'澄：你帶回了兩個深度、兩種不同的生存方式。古老的石板沒有給我們答案，只提醒人們持續觀察。最後，把自己的儀器帶回家。',steps:[
    {species:'coelacanth',kind:'observe',seconds:8,title:'安靜觀察腔棘魚 8 秒',note:'厚實身體與肉質偶鰭，在微光中緩慢移動。'},
    {species:'giant_squid',kind:'observe',seconds:8,title:'安靜觀察巨型烏賊 8 秒',note:'身體維持流線，腕與觸腕隨水流變化。記錄輪廓，不追逐牠。'}]},
   {id:'leave-no-trace',title:'把回聲帶回家',region:'abyss',brief:'澄：按由深到淺的順序回收三台觀測器。海床不需要留下我們的工作痕跡；完成後回船整理整段調查。',reply:'澄：從洞中的一道光，到黑暗裡的生命，這份潮譜已經有了新的頁面。把記錄留在研究桌，把海留給下一次相遇。',steps:[

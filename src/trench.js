@@ -31,7 +31,15 @@ const OceanTrench=(()=>{
  }
  function axis(min,max,step,homes,k){const values=new Set();for(let n=min;n<=max;n+=step)values.add(n);values.add(max);for(const p of homes)for(const d of [-3,-2,2,3])if(p[k]+d>min&&p[k]+d<max)values.add(p[k]+d);return [...values].sort((a,b)=>a-b);}
  const floorGrid={xs:axis(260,900,5,habitats.mariana_snailfish.homes,0),zs:axis(-395,215,5,habitats.mariana_snailfish.homes,2)};
- function bedSample(x,z){const distance=Math.hypot(x-780,z+132),plain=-7030+5*Math.sin((x-720)*.025)*Math.cos((z+120)*.024),w=1-smooth((distance-20)/20),edge=smooth(Math.min(x-620,900-x,z+240,60-z)/5),deep=mix(plain,-7002.5,w)+sedimentRelief(x,z,habitats.mariana_snailfish.homes)*edge;return x<620?mix(coastalGround(x,z),deep,smooth((x-260)/360)):deep;}
+ function bedSample(x,z){
+  const distance=Math.hypot(x-780,z+132),plain=-7030+5*Math.sin((x-720)*.025)*Math.cos((z+120)*.024),w=1-smooth((distance-20)/20),edge=smooth(Math.min(x-620,900-x,z+240,60-z)/5),deep=mix(plain,-7002.5,w)+sedimentRelief(x,z,habitats.mariana_snailfish.homes)*edge;
+  const slope=x<620?mix(coastalGround(x,z),deep,smooth((x-260)/360)):deep;
+  // A depositional bench interrupts the steep upper slope at 220 m. Its broad
+  // sediment core supports full spider-crab legs; the curved shoulder blends
+  // into the same sampled terrain used by rendering and collision queries.
+  const bench=1-smooth((Math.max(Math.abs((x-298)/10),Math.abs((z+230)/26))-1)/.8);
+  return mix(slope,-220,bench);
+ }
  function cell(axis,value){let low=0,high=axis.length-1;while(high-low>1){const middle=(low+high)>>1;if(axis[middle]<=value)low=middle;else high=middle;}return Math.min(low,axis.length-2);}
  function groundHeight(x,z){
   if(!containsXZ(x,z))return null;

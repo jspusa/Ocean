@@ -50,11 +50,11 @@ function outputGain(source,destination,seen=new Set()){
 async function fixture(){
  const notices=[],settings={sound:true,master:.7,music:.5,ambience:.6,breath:.8};
  const context=vm.createContext({console,window:{AudioContext},document:{hidden:false},settings,
-  active:false,modal:'shipRest',photoOpen:false,shipMode:'rest',training:null,
+  active:false,modal:'shipRest',photoOpen:false,shipMode:'rest',training:null,renderer:{submersible:false},surface:false,
   player:{p:[0,0,0],velocity:[0,0,0]},MUSIC:{shallows:'data:audio/mpeg;base64,AA==',blue_silence:'data:audio/mpeg;base64,AA=='},
   atob,clamp:(n,a,b)=>Math.max(a,Math.min(b,n)),mix:(a,b,t)=>a+(b-a)*t,V:{len:v=>Math.hypot(...v)},
   $:()=>null,toast:value=>notices.push(value),setInterval:()=>1,setTimeout:()=>1});
- vm.runInContext('const oceanShip={snapshot:()=>({mode:shipMode})};const oceanEcology={snapshot:()=>({training})};'+source,context);
+ vm.runInContext('const oceanShip={snapshot:()=>({mode:shipMode})};const oceanEcology={snapshot:()=>({training})};const oceanSwimActions={isSurface:()=>surface};'+source,context);
  const audio=vm.runInContext('oceanAudio',context);await audio.start();audio.tick();
  return {context,audio,settings,notices,musicGain:()=>[...audio.sources,...(audio.custom?[audio.custom]:[])].reduce((sum,node)=>sum+outputGain(node,audio.ctx.destination),0)};
 }
@@ -101,6 +101,13 @@ async function check(name,run){try{await run(await fixture());results.push({name
   await local(f);f.context.modal='training';f.context.shipMode=null;f.context.training={stage:'ready'};f.audio.tick();
   assert(f.musicGain()>0);assert.equal(outputGain(f.audio.breath,f.audio.ctx.destination),0);
   f.context.training=null;f.audio.tick();assert.equal(f.musicGain(),0);
+ });
+ await check('Surface look fades underwater ambience and breathing; diving restores the same audio graph',f=>{
+  f.context.active=true;f.context.modal=null;f.context.player.p=[0,-.8,0];f.audio.ctx.currentTime=2;f.audio.lastWhale=2;f.audio.tick();
+  const underwater=f.audio.environment.gain.value,breath=f.audio.breath.gain.value,nodes=f.audio.ctx.nodes.length;assert(breath>0);
+  f.context.surface=true;f.audio.tick();assert.equal(f.audio.breath.gain.value,0);assert(f.audio.environment.gain.value<underwater*.4);
+  f.audio.ctx.currentTime=4.5;f.context.player.velocity=[1,0,0];f.audio.tick();assert.equal(f.audio.ctx.nodes.length,nodes,'surface emits no underwater bubble/kick/whale effects');
+  f.context.surface=false;f.audio.ctx.currentTime=2;f.context.player.velocity=[0,0,0];f.audio.tick();assert.equal(f.audio.breath.gain.value,breath);assert.equal(f.audio.environment.gain.value,underwater);
  });
  await check('Sound setting and audio mute each close local music at rest',async f=>{
   await local(f);f.settings.sound=false;f.audio.tick();assert.equal(f.musicGain(),0);

@@ -3,6 +3,11 @@
 const DeepseaRules=(()=>{
  const initial=()=>({schema:1,deployed:false,station:'midwater',visited:[]});
  const station=id=>OceanTrench.stations.find(s=>s.id===id);
+ function areaName(p){
+  if(!Array.isArray(p)||p.length!==3||!p.every(Number.isFinite)||!OceanTrench.containsXZ(p[0],p[2]))return null;
+  const near=OceanTrench.stations.find(s=>V.dist(p,s.p)<45);if(near)return near.name;
+  const depth=-p[1];return depth<200?'外海大陸坡':depth<500?'大陸坡岩礁':depth<1000?'深海中層':depth<6000?'深海':'海溝深處';
+ }
  function sanitize(raw){const s=initial();if(!raw||typeof raw!=='object')return s;const found=station(raw.station);if(found)s.station=found.id;if(Array.isArray(raw.visited))s.visited=[...new Set(raw.visited.filter(id=>station(id)))];return s;}
  function canResume(raw,p){const b=OceanTrench.worldBounds;return Array.isArray(p)&&p.length===3&&p.every(Number.isFinite)&&p[0]>=b.left&&p[0]<=b.right&&p[2]>=b.top&&p[2]<=b.bottom&&p[1]>=OceanTrench.bounds.min[1]&&p[1]<=-.65;}
  function advance(position,route,index,budget){
@@ -17,10 +22,11 @@ const DeepseaRules=(()=>{
   const depth=Math.max(0,-p[1]),floor=groundHeight(p[0],p[2]),clearance=Math.max(0,p[1]-floor);
   let nearest=clearance;
   for(const habitat of Object.values(OceanTrench.habitats))for(const home of habitat.homes)nearest=Math.min(nearest,V.dist(p,home));
+  if(typeof AbyssWorldRules!=='undefined')for(const habitat of Object.values(AbyssWorldRules.sites))for(const home of habitat.homes)nearest=Math.min(nearest,V.dist(p,home));
   const open=smooth01((nearest-12)/145),deep=smooth01((depth-80)/500);
   return mix(2.2,72,open*deep);
  }
- return {initial,sanitize,station,canResume,advance,swimScale};
+ return {initial,sanitize,station,areaName,canResume,advance,swimScale};
 })();
 const oceanDeepsea=(()=>{
  const R=DeepseaRules,state=()=>oceanFeatures.state('deepsea');let transit=null,patrol=null,lastHUD=0;
@@ -52,7 +58,8 @@ const oceanDeepsea=(()=>{
  function paintHUD(){
   const enabled=isActive();document.body.classList.toggle('deepsea-active',enabled);if(typeof oceanDiveUI!=='undefined')oceanDiveUI.setVehicleLabel('');
   const label=$('deepseaStatus');if(label){label.classList.toggle('hidden',!transit||!!modal||photoOpen);label.querySelector('span').textContent=transit?'順著海流 · '+R.station(transit.target).name:current().name;label.querySelector('button').classList.toggle('hidden',!transit&&!patrol);}
-  if(enabled){$('areaName').textContent=current().name;const air=$('airStatus');if(air)air.textContent='自由探索';}
+  const area=active&&R.areaName(player.p);if(area)$('areaName').textContent=area;
+  if(enabled){const air=$('airStatus');if(air)air.textContent='自由探索';}
  }
  function tick(){
   if(isActive()){
@@ -85,6 +92,6 @@ const oceanDeepsea=(()=>{
   };
   renderer.submersible=false;
  }
- const feature={id:'deepsea',initial:R.initial,sanitize:R.sanitize,init,prepareDive,startDive:start,endDive:end,tick,paintHUD,photoMetadata(photo){if(isActive())photo.area=current().name+' · '+Math.round(-player.p[1]).toLocaleString()+' m';},shipRender(){if(voyage.state.resume&&R.canResume(state(),voyage.state.resume.p)&&voyage.state.resume.p[1]<-160)$('shipContinue').textContent='繼續深海探索';},reset(){transit=null;patrol=null;renderer.submersible=false;},renderPanel(type){if(type!=='deepsea')return false;render();return true;}};
+ const feature={id:'deepsea',initial:R.initial,sanitize:R.sanitize,init,prepareDive,startDive:start,endDive:end,tick,paintHUD,photoMetadata(photo){const area=R.areaName(player.p);if(area)photo.area=area+' · '+Math.round(-player.p[1]).toLocaleString()+' m';},shipRender(){if(voyage.state.resume&&R.canResume(state(),voyage.state.resume.p)&&voyage.state.resume.p[1]<-160)$('shipContinue').textContent='繼續深海探索';},reset(){transit=null;patrol=null;renderer.submersible=false;},renderPanel(type){if(type!=='deepsea')return false;render();return true;}};
  oceanFeatures.register(feature);return {isActive,deploy,travel,cancelTravel,current,feature,snapshot:()=>({deployed:false,freeSwimming:true,deep:isActive(),station:state().station,travelTarget:transit?.target||null,vehicle:false,position:player.p.slice()})};
 })();

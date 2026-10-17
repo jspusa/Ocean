@@ -2,7 +2,7 @@
 'use strict';
 const fs=require('node:fs'),path=require('node:path'),vm=require('node:vm'),assert=require('node:assert/strict');
 const ctx=vm.createContext({console}),root=path.resolve(__dirname,'../..'),read=n=>fs.readFileSync(path.join(root,'src',n+'.js'),'utf8');
-for(const n of ['engine','world','reef_detail','next_reef','open_world','fauna','cetaceans','abyss_fauna','individuals'])vm.runInContext(read(n),ctx);
+for(const n of ['engine','world','reef_detail','next_reef','open_world','trench','fauna','cetaceans','abyss_fauna','individuals'])vm.runInContext(read(n),ctx);
 const species=vm.runInContext('ABYSS_SPECIES',ctx),all=vm.runInContext('SPECIES',ctx),pose=vm.runInContext('faunaMotionPose',ctx),bounds=sp=>sp.modelBounds;
 const clone=x=>JSON.parse(JSON.stringify(x));let checks=0;function check(label,run){run();checks++;console.log('PASS '+label)}
 function actor(sp){return {uid:sp.id+'-001',species:all.indexOf(sp),fauna:true,abyss:true,p:[0,-80,0],home:[0,-80,0],s:[sp.size,sp.size,sp.size],phase:.6,homeYaw:.3,radius:sp.motionProfile.radius,habitatFloor:-83,habitatCeiling:-75,bioSeed:73};}

@@ -149,7 +149,7 @@ const legacyFind=findSpecies;
 findSpecies=function(index,specific=null){
  const deep=typeof oceanDeepsea!=='undefined'&&oceanDeepsea.isActive();
  const candidates=life.filter(f=>f.species===index&&f.ecologyPresent!==false);let fish=specific||candidates.reduce((a,f)=>!a||V.dist(f.p,player.p)<V.dist(a.p,player.p)?f:a,null);
- if(!fish||fish.ecologyPresent===false){const sp=SPECIES[index];if(sp.fauna)markPlace('habitat:'+sp.id);toast(oceanSeasons.hint(sp.id));return;}
+ if(!fish||fish.ecologyPresent===false){const sp=SPECIES[index];if(sp.fauna&&sp.wildHabitat!==false)markPlace('habitat:'+sp.id);toast(oceanSeasons.hint(sp.id));return;}
  if(V.dist(animalFocusPoint(fish),player.p)>speciesTraits(index).observeDistance){markPlace('habitat:'+SPECIES[index].id);toast('已標記棲地，直接游近就能觀察。');return;}
  if(SPECIES[index].traits?.micro){closePanel();if(typeof oceanMicrocosm!=='undefined'&&V.dist(animalFocusPoint(fish),player.p)<=speciesTraits(index).observeDistance){oceanMicrocosm.enter(fish.uid);}else{markPlace('habitat:'+SPECIES[index].id);toast('已標記棲地；游近後開啟微觀探索，尋找細小的身影。');}return;}
  if(voyage.state.mode==='journey'&&V.dist(fish.p,player.p)>(index===10?85:20)){
@@ -163,8 +163,8 @@ function voyageDestination(id=voyage.state.waypoint){
  if(typeof id==='string'&&id.startsWith('trench:')){const station=OceanTrench.stations.find(st=>id==='trench:'+st.id);return station?{id,name:station.name,x:station.p[0],y:station.p[1],z:station.p[2],radius:20}:null;}
  if(typeof id==='string'&&id.startsWith('study:')&&typeof OceanRegions!=='undefined'){const a=OceanRegions.points[id.slice(6)];return a?{id,name:a.name,x:a.p[0],y:a.p[1],z:a.p[2],radius:4}:null;}
  if(typeof id==='string'&&id.startsWith('habitat:')){
-  const sp=SPECIES.find(s=>'habitat:'+s.id===id),f=sp&&life.find(f=>SPECIES[f.species]===sp);if(!f)return null;
-  const p=f.home||f.center||f.p;return {id,name:sp.name+'棲地',x:p[0],y:p[1]+.6,z:p[2],radius:3};
+  const sp=SPECIES.find(s=>'habitat:'+s.id===id),owned=voyage.state.features?.ecology?.partners||[],f=sp&&life.find(f=>SPECIES[f.species]===sp&&(sp.wildHabitat!==false||owned.some(p=>p.uid===f.uid)));if(!f)return null;
+  const companion=sp.wildHabitat===false,p=companion||sp.pelagic?f.p:f.home||f.center||f.p;return {id,name:sp.name+(companion?'夥伴':sp.pelagic?'巡游方位':'棲地'),x:p[0],y:p[1]+.6,z:p[2],radius:sp.pelagic?Math.max(8,Math.min(18,sp.size*.6)):3};
  }
  return id==='boat'?{id:'boat',name:'研究船',x:OPEN_WORLD.boat[0],z:OPEN_WORLD.boat[2],radius:12}:LANDMARKS.find(l=>l.id===id);}
 function markPlace(id){const l=voyageDestination(id);if(!l)return;voyage.state.waypoint=id;saveVoyage();closePanel();toast('已標記：'+l.name+' · 跟隨方位前進');}
@@ -278,8 +278,8 @@ function pollGamepad(){
   const vertical=(g.buttons[7]?.value||0)-(g.buttons[6]?.value||0);if(Math.abs(vertical)>.04||voyage.gamepadDepth){verticalInput=vertical;voyage.gamepadDepth=Math.abs(vertical)>.04;}
  }
  const press=i=>g.buttons[i]?.pressed&&!voyage.gamepadButtons[i];
- if(press(9)){if(modal)closePanel();else if(active)openPanel('pause');}
- if(active&&!modal&&!photoOpen){if(press(0))takePhoto();if(press(1))observeNearest();if(press(2))openPanel('map');if(press(3))toggleCruise();}
+ if(press(9)){if(modal)closePanel();else if(active&&!oceanSwimActions.exit())openPanel('diveMenu');}
+ if(active&&!modal&&!photoOpen){if(press(0))takePhoto();if(press(1))observeNearest();if(press(2))openPanel('map');if(press(3))toggleCruise();if(press(4))oceanSwimActions.quickTurn();if(press(5))oceanSwimActions.toggleSurface();}
  voyage.gamepadButtons=g.buttons.map(b=>b.pressed);
 }
 function initVoyage(){

@@ -4,53 +4,60 @@
 const PELAGIC_SPECIES=[];
 const pelagicArt=(()=>{
  const blend=cetaceanArt.blend,soft=cetaceanArt.soft;
+ // Long, low rostrum and a broad rounded U-shaped head. The last section is an
+ // elliptical cap, not a row of narrow cones converging into a pointed fish nose.
  const whale={
-  body:[[-.48,0,0,0],[-.42,0,.013,.012],[-.32,.003,.030,.025],[-.18,.003,.052,.044],[-.02,0,.069,.062],[.14,-.003,.075,.071],[.28,-.005,.063,.071],[.39,-.010,.041,.062],[.465,-.010,.024,.041],[.498,-.010,.007,.017],[.5,-.010,0,0]],
-  dorsal:[[-.22,.044,0,.033,.005],[-.239,.068,0,.023,.004],[-.258,.089,0,.011,.002],[-.272,.091,0,0,0]],
-  flipper:[[.18,-.040,.054,.035,.007],[.123,-.063,.102,.034,.006],[.067,-.080,.139,.022,.004],[.028,-.083,.157,0,0]],
-  fluke:[[-.455,0,0,.020,.007],[-.472,.002,.042,.035,.007],[-.471,.005,.091,.030,.005],[-.450,.008,.134,.013,.002],[-.438,.009,.151,0,0]],
-  eyeX:.363,eyeY:-.014,eyeRadius:.0025,mouthStart:.17,mouthEnd:.492,mouthLevel:-.33,blowX:.28,
-  paint(p){const [x,y,z]=p,mottle=.5+.25*Math.sin(x*83+Math.sin(z*137))*.7+.17*Math.sin(x*151-z*93)*Math.sin(y*123+z*87),belly=1-soft(-.052,-.017,y);return blend(blend([.22,.32,.37],[.40,.50,.52],mottle),[.56,.62,.61],belly*.55);},
-  finColor:p=>blend([.22,.32,.37],[.48,.56,.56],1-soft(-.07,-.02,p[1])),
-  detail(g,low){
-   // Curved ventral pleats sit on the body surface, so the throat reads at close
-   // range without a painted stripe floating through the animal.
-   for(let k=0;k<(low?10:24);k++){const angle=Math.PI*.63+k/(low?9:23)*Math.PI*.74,path=[];for(let j=0;j<=(low?9:24);j++){const x=mix(-.03,.455,j/(low?9:24)),p=cetaceanArt.profileAt(whale.body,x);path.push([x,p[1]+Math.cos(angle)*(p[2]+.00065),Math.sin(angle)*(p[3]+.00065)]);}faunaArt.tube(g,path,.00035,[.28,.37,.39],low?3:4);}
-   // Baleen whales have a paired blowhole, distinct from toothed cetaceans.
-   const blow=cetaceanArt.profileAt(whale.body,.28),cap=[.28,blow[1]+blow[2]+.001,0];faunaArt.ellipsoid(g,cap,[.014,.0015,.010],whale.paint(cap),low?10:16,5);
-   for(const side of [-1,1])faunaArt.ellipsoid(g,[.28,cap[1]+.0013,side*.005],[.008,.0007,.0025],[.055,.085,.10],low?8:12,5);
-  }
+  body:[[-.464,0,0,0],[-.425,0,.014,.015],[-.34,.002,.029,.026],[-.22,.003,.046,.040],[-.08,.002,.063,.056],[.06,-.002,.072,.066],[.18,-.004,.071,.070],[.29,-.008,.057,.069],[.38,-.014,.034,.061],[.46,-.018,.020,.047],[.50,-.018,0,0]],
+  dorsal:[[-.235,.040,0,.037,.010],[-.247,.062,0,.029,.007],[-.271,.084,0,.013,.003],[-.286,.087,0,0,0]],
+  flipper:[[.19,-.030,.030,.051,.025],[.157,-.045,.064,.044,.019],[.109,-.059,.104,.032,.012],[.050,-.074,.139,.017,.005],[.018,-.078,.154,0,0]],
+  // The thumbnail uses these sections; the actual flukes are one continuous
+  // surface across the peduncle, with a shallow central trailing-edge notch.
+  fluke:[[-.459,0,0,.016,.006],[-.474,.002,.046,.027,.006],[-.463,.004,.100,.022,.004],[-.429,.005,.155,0,0]],
+  eyeX:.338,eyeY:-.018,eyeRadius:.0022,mouthStart:.17,mouthEnd:.492,mouthLevel:-.33,blowX:.255,
+  paint(p){const belly=1-soft(-.052,-.014,p[1]);return blend([.25,.35,.40],[.49,.56,.56],belly*.62);},
+  finColor:p=>blend([.23,.32,.37],[.43,.50,.51],1-soft(-.072,-.032,p[1]))
  };
- const sharkRows=[[-.48,0,0,0],[-.39,0,.016,.013],[-.27,0,.035,.027],[-.13,.002,.061,.046],[.02,0,.083,.068],[.17,0,.093,.086],[.31,-.003,.083,.096],[.405,-.008,.057,.092],[.465,-.009,.036,.070],[.499,-.009,.015,.036],[.5,-.009,0,0]];
- function sharkPaint(p){const [x,y,z]=p,belly=1-soft(-.053,-.025,y),row=Math.round(x*63),a=x*63-row,b=z*80-Math.round(z*80+(row%2)*.5)+(row%2)*.5,spots=1-soft(.16,.28,Math.hypot(a,b));return blend(blend([.20,.31,.34],[.71,.77,.70],spots*(1-belly)),[.70,.73,.66],belly);}
+ const sharkRows=[[-.425,0,0,0],[-.378,0,.017,.014],[-.29,.001,.030,.024],[-.17,.002,.048,.037],[-.035,.001,.070,.056],[.105,0,.084,.075],[.23,-.002,.084,.087],[.34,-.005,.070,.093],[.425,-.009,.045,.088],[.465,-.010,.031,.077],[.50,-.010,0,0]];
+ // Pigment is deliberately broad. Filtered fragment shading supplies spots,
+ // pleats and scars, so distant triangles never become coloured patchwork.
+ const sharkPaint=p=>blend([.24,.33,.35],[.64,.67,.61],(1-soft(-.056,-.024,p[1]))*.83);
+ function eyes(g,rows,x,y,r,low,flatten=0){
+  const p=marineProfile(rows,x),power=1-flatten*smooth01((x-.26)/.16),z=p[3]*Math.pow(Math.max(0,1-Math.pow(Math.abs((y-p[1])/p[2]),2/power)),power/2);g.tag=4;
+  for(const side of [-1,1]){faunaArt.ellipsoid(g,[x,y,side*(z-r*.15)],[r,r*.70,r*.42],[.025,.036,.038],low?10:20,low?8:12);}
+ }
+ function blueWhale(g,low){
+  g.tag=1;marineBody(g,whale.body,low,whale.paint,.46);
+  g.tag=3;marineFin(g,whale.dorsal,low,whale.paint,true);
+  for(const side of [-1,1])marineFin(g,whale.flipper.map(p=>[p[0],p[1],p[2]*side,p[3],p[4]]),low,whale.finColor);
+  marineFlukes(g,low,whale.paint);
+  eyes(g,whale.body,whale.eyeX,whale.eyeY,whale.eyeRadius,low);
+  // Mouth seams, ventral grooves and the paired blowhole are skin shading.
+  // No intersecting tube ropes, artificial nasal cap or third blowhole mesh.
+  g.tag=1;
+ }
  function shark(g,low){
-  cetaceanArt.skin(g,(u,v)=>{const p=cetaceanArt.profileAt(sharkRows,mix(-.48,.5,u)),a=v*TAU;return [p[0],p[1]+Math.cos(a)*p[2],Math.sin(a)*p[3]];},low?40:100,low?20:48,sharkPaint);
-  const fin=(rows,vertical=false)=>cetaceanArt.skin(g,(u,v)=>{const n=rows.length-1,q=u*n,i=Math.min(n-1,Math.floor(q)),t=q-i,p=rows[i].map((v,k)=>mix(v,rows[i+1][k],smooth01(t))),a=v*TAU;return vertical?[p[0]+Math.cos(a)*p[3],p[1],p[2]+Math.sin(a)*p[4]]:[p[0]+Math.cos(a)*p[3],p[1]+Math.sin(a)*p[4],p[2]];},low?12:30,low?8:14,sharkPaint);
+  g.tag=1;marineBody(g,sharkRows,low,sharkPaint,.465,.18);
   g.tag=3;
   for(const side of [-1,1]){
-   fin([[.20,-.046,side*.070,.047,.009],[.12,-.064,side*.149,.056,.007],[.019,-.078,side*.222,.032,.004],[-.016,-.081,side*.252,0,0]]);
-   fin([[-.14,-.036,side*.036,.029,.006],[-.19,-.051,side*.096,.034,.004],[-.24,-.052,side*.124,0,0]]);
+   marineFin(g,[[.19,-.030,side*.030,.064,.026],[.137,-.046,side*.087,.059,.021],[.065,-.062,side*.154,.043,.012],[-.011,-.076,side*.211,.025,.006],[-.039,-.078,side*.231,0,0]],low,sharkPaint);
+   marineFin(g,[[-.13,-.022,side*.020,.042,.016],[-.171,-.036,side*.065,.036,.011],[-.221,-.043,side*.102,.021,.005],[-.25,-.045,side*.115,0,0]],low,sharkPaint);
   }
-  fin([[.01,.074,0,.065,.008],[-.025,.124,0,.044,.007],[-.080,.188,0,.019,.004],[-.098,.202,0,0,0]],true);
-  fin([[-.235,.042,0,.035,.005],[-.263,.083,0,.022,.004],[-.293,.101,0,0,0]],true);
-  // The upper lobe is longer than the lower lobe: a vertical heterocercal
-  // shark tail, not the horizontal flukes of the blue whale beside it.
-  fin([[-.445,0,0,.032,.010],[-.473,.080,0,.040,.008],[-.509,.163,0,.022,.005],[-.542,.217,0,0,0]],true);
-  fin([[-.446,0,0,.028,.010],[-.481,-.065,0,.034,.007],[-.522,-.128,0,0,0]],true);
-  g.tag=4;
-  for(const side of [-1,1]){const p=cetaceanArt.profileAt(sharkRows,.423);faunaArt.ellipsoid(g,[.423,.003,side*(p[3]+.001)],[.0058,.0042,.0028],[.022,.035,.036],low?8:14,low?5:8);}
+  marineFin(g,[[.005,.047,0,.073,.022],[-.019,.091,0,.055,.015],[-.054,.146,0,.032,.009],[-.091,.183,0,.013,.004],[-.103,.187,0,0,0]],low,sharkPaint,true);
+  marineFin(g,[[-.23,.022,0,.040,.012],[-.256,.053,0,.029,.008],[-.282,.081,0,.012,.004],[-.296,.084,0,0,0]],low,sharkPaint,true);
+  marineFin(g,[[-.25,-.020,0,.031,.010],[-.278,-.045,0,.022,.007],[-.307,-.068,0,0,0]],low,sharkPaint,true);
+  // A single smooth caudal surface spans both lobes. Its longer upper lobe
+  // continues the peduncle; there is no stacked pair of disconnected triangles.
+  marineFin(g,[[-.492,-.125,0,0,0],[-.466,-.085,0,.017,.004],[-.425,-.035,0,.029,.009],[-.393,.007,0,.032,.014],[-.418,.077,0,.031,.010],[-.462,.150,0,.023,.006],[-.500,.205,0,0,0]],low,sharkPaint,true);
+  eyes(g,sharkRows,.423,.004,.0044,low,.18);
   g.tag=1;
-  // Broad terminal mouth and five visible gill slits on each side.
-  faunaArt.tube(g,Array.from({length:low?13:25},(_,i)=>{const z=(i/(low?12:24)-.5)*.128,y=-.025;let a=.4,b=.5;for(let k=0;k<18;k++){const x=(a+b)*.5,p=cetaceanArt.profileAt(sharkRows,x);if(((y-p[1])/p[2])**2+(z/p[3])**2<1)a=x;else b=x;}return [(a+b)*.5+.001,y,z];}),.0018,[.045,.071,.073],low?4:6);
-  for(const side of [-1,1])for(let k=0;k<5;k++){const x=.235-k*.021,p=cetaceanArt.profileAt(sharkRows,x),path=[];for(let j=0;j<=8;j++){const a=mix(.30,2.30,j/8);path.push([x-.008*Math.sin(a),p[1]+Math.cos(a)*p[2]*.91,side*(Math.sin(a)*p[3]+.001)]);}faunaArt.tube(g,path,.0012,[.085,.14,.15],low?3:5);}
  }
- return {whale,shark};
+ return {whale,blueWhale,shark,sharkRows};
 })();
-faunaArt.builders.blue_whale=(g,low)=>cetaceanArt.build(g,pelagicArt.whale,low);
+faunaArt.builders.blue_whale=pelagicArt.blueWhale;
 faunaArt.builders.whale_shark=pelagicArt.shark;
 const pelagicEntries=[
- {id:'blue_whale',name:'藍鯨',latin:'Balaenoptera musculus',en:'BLUE WHALE',size:26,color:0x63818b,cetacean:true,renderKind:9,naturalSize:'本作代表個體全長 26 m',hint:'二十六公尺的灰藍身軀、斑駁背部、小背鰭與寬大的水平尾鰭。',detail:'藍鯨是現存最大的動物。游到礁庭外緣，能從牠的胸鰭一路望向遠處的尾鰭；緩慢巡游、出現位置與共處物種為本作原創編排。',source:'https://www.fisheries.noaa.gov/species/blue-whale',sourceLabel:'NOAA Fisheries · Blue Whale',motionProfile:{cruiseSpeed:1.7,beat:.58,surfacePeriod:150,depthSwing:3},materialProfile:{skin:'cetacean',roughness:.52,subsurface:.06,patternScale:110},traits:{motion:'cetacean',observeDistance:65,contactDistance:3,targetRadius:6.5,viewDistance:24},aquarium:{cost:100}},
- {id:'whale_shark',name:'鯨鯊',latin:'Rhincodon typus',en:'WHALE SHARK',size:8.5,color:0x526f73,renderKind:12,naturalSize:'本作代表個體全長 8.5 m',hint:'寬平頭部、前端大嘴、點線斑紋，以及上下擺幅不同的垂直尾鰭。',detail:'鯨鯊是濾食性鯊魚，也是現存最大的魚類。牠的尾鰭左右擺動，與藍鯨上下擺動的水平尾鰭不同。這片海的雙鯨鯊巡游路線是原創遊戲配置。',source:'https://www.fisheries.noaa.gov/species/whale-shark',sourceLabel:'NOAA Fisheries · Whale Shark',motionProfile:{cruiseSpeed:.85,beat:.8,surfacePeriod:1e9,depthSwing:.65},materialProfile:{skin:'fish',roughness:.63,subsurface:.06,patternScale:120},traits:{motion:'pelagic',observeDistance:35,contactDistance:2,targetRadius:2.4,viewDistance:10},aquarium:{cost:100}}
+ {id:'blue_whale',name:'藍鯨',latin:'Balaenoptera musculus',en:'BLUE WHALE',size:26,color:0x63818b,cetacean:true,renderKind:9,naturalSize:'本作代表個體全長 26 m',hint:'二十六公尺的灰藍身軀、斑駁背部、小背鰭與寬大的水平尾鰭。',habitat:'外海大陸坡 · 上層開放水域',detail:'藍鯨是現存最大的動物，以磷蝦為主要食物。在外海大陸坡上方的開放水域尋找牠；這裡只有一隻緩慢巡游的代表個體，遠離淺礁與入水區。',source:'https://www.fisheries.noaa.gov/species/blue-whale',sourceLabel:'NOAA Fisheries · Blue Whale',motionProfile:{cruiseSpeed:1.7,beat:.58,surfacePeriod:150,depthSwing:3},materialProfile:{skin:'cetacean',roughness:.52,subsurface:.06,patternScale:110},traits:{motion:'cetacean',observeDistance:65,contactDistance:3,targetRadius:6.5,viewDistance:24},aquarium:{cost:100}},
+ {id:'whale_shark',name:'鯨鯊',latin:'Rhincodon typus',en:'WHALE SHARK',size:8.5,color:0x526f73,renderKind:12,naturalSize:'本作代表個體全長 8.5 m',hint:'寬平頭部、前端大嘴、點線斑紋，以及上下擺幅不同的垂直尾鰭。',habitat:'暖水外礁與大陸坡 · 上層水域',detail:'鯨鯊是暖水海域的濾食性鯊魚，也是現存最大的魚類。牠會在浮游生物豐富的外礁與開放水域覓食；本作兩隻個體分散在不同的外海走廊，尾鰭左右擺動。',source:'https://www.fisheries.noaa.gov/species/whale-shark',sourceLabel:'NOAA Fisheries · Whale Shark',motionProfile:{cruiseSpeed:.85,beat:.8,surfacePeriod:1e9,depthSwing:.65},materialProfile:{skin:'fish',roughness:.63,subsurface:.06,patternScale:120},traits:{motion:'pelagic',observeDistance:35,contactDistance:2,targetRadius:2.4,viewDistance:10},aquarium:{cost:100}}
 ];
 for(const entry of pelagicEntries){
  const sp=registerFauna({...entry,pelagic:true,zone:7,bodyLength:1,traits:{micro:false,feedable:false,grabbable:false,...entry.traits}},PELAGIC_SPECIES);
@@ -58,8 +65,10 @@ for(const entry of pelagicEntries){
  else sp.thumb='data:image/svg+xml;charset=utf-8,'+encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 420 210"><rect width="420" height="210" fill="#0a303a"/><path d="M43 108Q41 72 111 72L226 89 300 104 351 53 326 113 351 162 297 123 183 141 94 139Q45 135 43 108Z" fill="#526f73"/><path d="M186 90L219 45 227 94M132 129L197 177 185 133" fill="#415e63"/><g fill="#ccd5c9">'+Array.from({length:30},(_,i)=>'<circle cx="'+(70+i%10*19)+'" cy="'+(89+Math.floor(i/10)*16)+'" r="2.6"/>').join('')+'<circle cx="62" cy="99" r="3" fill="#10292e"/></g><path d="M45 117L65 121" stroke="#183d43" stroke-width="2"/><text x="20" y="192" font-family="sans-serif" font-size="10" letter-spacing="1" fill="#92b4b6">WHALE SHARK · ORIGINAL MODEL</text></svg>');
 }
 const PelagicWorldRules={
- blue_whale:{homes:[[-22,-6.6,-72]],radius:48,phases:[1.1]},
- whale_shark:{homes:[[8,-4.8,-17],[61,-9,-63]],radius:17,phases:[2.2,.85]}
+ // Large filter feeders occupy separate offshore corridors. Their complete
+ // loops stay beyond the introductory reef and its longest viewing distance.
+ blue_whale:{homes:[[535,-38,-205]],radius:92,phases:[1.1]},
+ whale_shark:{homes:[[390,-17,35],[650,-24,85]],radius:42,phases:[2.2,.85]}
 };
 const spawnBeforePelagic=addLife;
 addLife=function(renderer){
@@ -68,7 +77,7 @@ addLife=function(renderer){
   const high=faunaGeometry(sp),low=faunaGeometry(sp,true),def=PelagicWorldRules[sp.id],actors=[],index=SPECIES.indexOf(sp);
   for(const [k,position] of def.homes.entries()){
    const home=position.slice(),phase=def.phases[k],f={fauna:true,pelagic:true,species:index,p:home.slice(),home,center:home.slice(),homeYaw:0,modelCenter:high.modelBounds.min.map((v,i)=>(v+high.modelBounds.max[i])*.5),s:[sp.size,sp.size,sp.size],yaw:0,pitch:0,phase,orbit:phase,radius:def.radius,height:0,speed:sp.motionProfile.cruiseSpeed,bob:phase,retreat:0,faunaVisibility:1,tint:[1,1,1]};
-   actors.push(f);life.push(f);
+   pelagicMotionPose(f,0);actors.push(f);life.push(f);
   }
   const hi=renderer.batch(high,actors,sp.renderKind,true);hi.maxDistance=sp.size*3;
   const lo=renderer.batch(low,actors,sp.renderKind,true);lo.minDistance=hi.maxDistance;lo.maxDistance=320;lo.shadow=false;
@@ -77,11 +86,11 @@ addLife=function(renderer){
 };
 // Broad animals need an authored, continuously clear corridor. Reusing small
 // cetacean obstacle detours can switch candidate rocks as spatial buckets change,
-// making a giant whale jump across the reef. These shallow-water ellipses were
+// making a giant whale jump across the reef. These offshore corridors were
 // checked with the entire animal's conservative body and animation envelope.
 function pelagicMotionPose(f,time,out=f.p,context=null){
  if(context?.exhibit)return cetaceanMotionPose(f,time,out,context);
- const sp=SPECIES[f.species],home=f.home||f.center,radius=f.radius,omega=sp.motionProfile.cruiseSpeed/radius,a=time*omega+f.phase,bob=sp.id==='blue_whale'?.35:.22;
+ const sp=SPECIES[f.species],home=f.home||f.center,radius=f.radius,omega=sp.motionProfile.cruiseSpeed/radius,a=time*omega+f.phase,bob=sp.id==='blue_whale'?3.5:1.4;
  out[0]=home[0]+Math.cos(a)*radius;out[2]=home[2]+Math.sin(a)*radius*.72;out[1]=home[1]+Math.sin(time*.061+f.phase)*bob;
  const dx=-Math.sin(a)*radius*omega,dz=Math.cos(a)*radius*.72*omega,dy=Math.cos(time*.061+f.phase)*bob*.061;
  f.yaw=Math.atan2(-dz,dx);f.pitch=Math.atan2(dy,Math.hypot(dx,dz));f.bank=0;f.effort=.65;f.cetaceanBeat=sp.motionProfile.beat;f.partnerFinPulse=0;f.faunaVisibility=1;f.faunaVisible=true;f.retreat=0;f.faunaTime=time;return out;
