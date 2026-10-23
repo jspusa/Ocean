@@ -5,8 +5,10 @@ async function loadCompiledScene(renderer){
  const started=performance.now();let bytes,header,base;
  try{
   const response=await fetch(WORLD);if(!response.ok)throw new Error('scene HTTP '+response.status);
-  const packed=await response.arrayBuffer();if(packed.byteLength>24*1024*1024)throw new Error('scene archive is oversized');
-  const stream=new Blob([packed]).stream().pipeThrough(new DecompressionStream('gzip'));
+  // Bound both sides while streaming. Avoid retaining the compressed archive
+  // and a Blob copy alongside the decoded scene during startup on phones.
+  const bounded=(limit,message)=>{let length=0;return new TransformStream({transform(chunk,controller){length+=chunk.byteLength;if(length>limit)throw new Error(message);controller.enqueue(chunk);}});};
+  const stream=response.body.pipeThrough(bounded(24*1024*1024,'scene archive is oversized')).pipeThrough(new DecompressionStream('gzip')).pipeThrough(bounded(80*1024*1024,'decoded scene is oversized'));
   bytes=await new Response(stream).arrayBuffer();const view=new DataView(bytes);
   if(bytes.byteLength<8||bytes.byteLength>80*1024*1024||view.getUint32(0,true)!==0x35424652)throw new Error('invalid scene header');
   const length=view.getUint32(4,true);base=8+length;if(base>bytes.byteLength||base%4)throw new Error('invalid scene offsets');
@@ -18,8 +20,16 @@ async function loadCompiledScene(renderer){
   }
  }catch(error){console.warn('Compiled scene unavailable; generating original scene instead.',error);return false;}
  const pause=()=>new Promise(resolve=>requestAnimationFrame(resolve));
+ // Keep canonical meshes local to this load. Renderer may share their immutable
+ // GPU buffers, but must not retain the CPU views (which own the whole archive).
+ const meshes=new Map(),sameBits=(a,b)=>{
+  const x=new Uint32Array(a.buffer,a.byteOffset,a.byteLength/4),y=new Uint32Array(b.buffer,b.byteOffset,b.byteLength/4);
+  for(let i=0;i<x.length;i++)if(x[i]!==y[i])return false;return true;
+ };
  for(let i=0;i<header.batches.length;i++){
-  const b=header.batches[i];const mesh={vertices:new Float32Array(bytes,base+b.vertexOffset,b.vertexFloats),indices:new Uint32Array(bytes,base+b.indexOffset,b.indexCount),radius:b.radius};
+  const b=header.batches[i],candidate={vertices:new Float32Array(bytes,base+b.vertexOffset,b.vertexFloats),indices:new Uint32Array(bytes,base+b.indexOffset,b.indexCount),radius:b.radius};
+  const key=b.vertexFloats+':'+b.indexCount+':'+b.radius;let bucket=meshes.get(key);if(!bucket)meshes.set(key,bucket=[]);
+  const found=bucket.find(mesh=>sameBits(mesh.vertices,candidate.vertices)&&sameBits(mesh.indices,candidate.indices)),mesh=found||candidate;if(!found)bucket.push(mesh);
   const batch=renderer.batch({indexed:mesh,material:b.material,species:b.species,shadow:b.shadow},b.instanceIDs.map(n=>header.nodes[n]),b.kind,b.dynamic);
   for(const k of ['minDistance','maxDistance','shadowProxy','visible','sceneRole'])if(b[k]!==undefined)batch[k]=b[k];
   if(i%12===0){$('loadDetail').textContent='展開礁體 · '+Math.round(i/header.batches.length*100)+'%';await pause();}

@@ -49,6 +49,13 @@ function indexGeometry(source){
  }
  return {vertices:new Float32Array(vertex),indices:new Uint32Array(index),radius};
 }
+function meshIndexData(indices){
+ // WebGL2 reserves 0xffff for fixed primitive restart. Keep wide indices when
+ // that value is a real vertex; all smaller values have an exact 16-bit form.
+ if(indices.BYTES_PER_ELEMENT===2)return indices;
+ for(let k=0;k<indices.length;k++)if(indices[k]>=65535)return indices;
+ return new Uint16Array(indices);
+}
 function meshCullBounds(vertices){
  const min=[Infinity,Infinity,Infinity],max=[-Infinity,-Infinity,-Infinity];
  for(let k=0;k<vertices.length;k+=12)for(let axis=0;axis<3;axis++){
@@ -830,12 +837,22 @@ class Renderer{
 
  batch(geo,instances,kind=0,dynamic=false){
   const g=this.gl,mesh=geo.indexed||indexGeometry(geo.v),vao=g.createVertexArray();g.bindVertexArray(vao);
-  const vb=g.createBuffer();g.bindBuffer(g.ARRAY_BUFFER,vb);g.bufferData(g.ARRAY_BUFFER,mesh.vertices,g.STATIC_DRAW);
+  // Compiled meshes are immutable. Loader-canonicalized copies may share only
+  // geometry buffers; each draw batch still owns its VAO and instance state.
+  // Weak keys let the large decoded scene storage go after loading finishes.
+  if(!this.meshBuffers)this.meshBuffers=new WeakMap();let stored=this.meshBuffers.get(mesh);
+  if(!stored){
+   const indices=meshIndexData(mesh.indices),vb=g.createBuffer(),eb=g.createBuffer();
+   g.bindBuffer(g.ARRAY_BUFFER,vb);g.bufferData(g.ARRAY_BUFFER,mesh.vertices,g.STATIC_DRAW);
+   g.bindBuffer(g.ELEMENT_ARRAY_BUFFER,eb);g.bufferData(g.ELEMENT_ARRAY_BUFFER,indices,g.STATIC_DRAW);
+   stored={vb,eb,indexType:indices.BYTES_PER_ELEMENT===2?g.UNSIGNED_SHORT:g.UNSIGNED_INT};this.meshBuffers.set(mesh,stored);
+  }
+  const {vb,eb,indexType}=stored;g.bindBuffer(g.ARRAY_BUFFER,vb);
   this.attr(0,3,48,0);this.attr(1,3,48,12);this.attr(2,3,48,24);this.attr(7,2,48,36);this.attr(8,1,48,44);
-  const eb=g.createBuffer();g.bindBuffer(g.ELEMENT_ARRAY_BUFFER,eb);g.bufferData(g.ELEMENT_ARRAY_BUFFER,mesh.indices,g.STATIC_DRAW);
+  g.bindBuffer(g.ELEMENT_ARRAY_BUFFER,eb);
   const ib=g.createBuffer(),data=new Float32Array(instances.length*24);g.bindBuffer(g.ARRAY_BUFFER,ib);g.bufferData(g.ARRAY_BUFFER,data.byteLength,g.DYNAMIC_DRAW);
   this.attr(3,3,96,0,1);this.attr(4,4,96,12,1);this.attr(5,3,96,28,1);this.attr(6,2,96,40,1);this.attr(9,4,96,48,1);this.attr(10,4,96,64,1);this.attr(11,4,96,80,1);
-  const b={vao,vb,eb,ib,count:mesh.indices.length,vertexCount:mesh.vertices.length/12,indexType:g.UNSIGNED_INT,instances,data,kind,dynamic,material:geo.material||0,species:geo.species??-1,visible:true,shadow:geo.shadow!==false,radius:mesh.radius,drawCount:instances.length,_lastVisible:null};
+  const b={vao,vb,eb,ib,count:mesh.indices.length,vertexCount:mesh.vertices.length/12,indexType,instances,data,kind,dynamic,material:geo.material||0,species:geo.species??-1,visible:true,shadow:geo.shadow!==false,radius:mesh.radius,drawCount:instances.length,_lastVisible:null};
   // Rigid geometry may lie far from its instance pivot (seabed tiles), or be
   // very thin (trench walls). Keep the existing sphere as a cheap first test,
   // then reject the tighter box only when it is wholly outside a clip plane.
@@ -910,16 +927,20 @@ class Renderer{
   }
   this.waterCount=positions.length/3;this.waterVAO=g.createVertexArray();g.bindVertexArray(this.waterVAO);this.waterBuffer=g.createBuffer();g.bindBuffer(g.ARRAY_BUFFER,this.waterBuffer);g.bufferData(g.ARRAY_BUFFER,new Float32Array(positions),g.STATIC_DRAW);this.attr(0,3,12,0);g.bindVertexArray(null);
  }
- setupBubbles(){const g=this.gl;this.bubbles=[];this.lastBubbleTime=-1;this.bubbleVAO=g.createVertexArray();g.bindVertexArray(this.bubbleVAO);this.bubbleBuffer=g.createBuffer();g.bindBuffer(g.ARRAY_BUFFER,this.bubbleBuffer);g.bufferData(g.ARRAY_BUFFER,512*4*4,g.DYNAMIC_DRAW);this.attr(0,4,16,0);g.bindVertexArray(null);}
- renderBubbles(eye,t){if(this.submersible){this.bubbles=[];this.bubbleTime=t;return;}const g=this.gl;const dt=Math.max(0,Math.min(.1,t-(this.bubbleTime??t)));this.bubbleTime=t;
+ setupBubbles(){const g=this.gl;this.bubbles=[];this.bubbleData=new Float32Array(512*4);this.lastBubbleTime=-1;this.bubbleVAO=g.createVertexArray();g.bindVertexArray(this.bubbleVAO);this.bubbleBuffer=g.createBuffer();g.bindBuffer(g.ARRAY_BUFFER,this.bubbleBuffer);g.bufferData(g.ARRAY_BUFFER,this.bubbleData.byteLength,g.DYNAMIC_DRAW);this.attr(0,4,16,0);g.bindVertexArray(null);}
+ renderBubbles(eye,t){if(this.submersible){this.bubbles.length=0;this.bubbleTime=t;return;}const g=this.gl;const dt=Math.max(0,Math.min(.1,t-(this.bubbleTime??t)));this.bubbleTime=t;
  if(typeof active!=='undefined'&&active){let breathPhase=(typeof oceanAudio!=='undefined'&&oceanAudio.enabled&&oceanAudio.ctx)?((oceanAudio.ctx.currentTime-oceanAudio.startedAt)%7.6)/7.6:(t%7.6)/7.6;
  if(breathPhase>.43&&breathPhase<.82&&t-this.lastBubbleTime>.105){this.lastBubbleTime=t;
  const third=typeof settings!=='undefined'&&settings.third&&!follow;let origin=third?player.p:eye;let f=dir(),right=[Math.cos(player.yaw),0,Math.sin(player.yaw)];
  for(let k=0;k<3;k++){let side=third?0:rr(.34,.60);this.bubbles.push({p:V.add(origin,V.add(V.mul(f,third?.60:.45),V.add(V.mul(right,side),[rr(-.03,.01),third?.05:-.14,0]))),r:rr(.012,.033),a:0,phase:rr(0,6.28)});}}
  }
- let data=[];this.bubbles=this.bubbles.filter(b=>b.a<9&&b.p[1]<-.12).slice(-500);
- for(let b of this.bubbles){b.a+=dt;b.p[1]+=dt*(.30+b.r*6.);b.p[0]+=Math.sin(t*2.1+b.phase)*dt*.035;b.p[2]+=.018*dt;data.push(...b.p,b.r*(1+b.a*.16));}
- if(!data.length)return;g.bindVertexArray(this.bubbleVAO);g.bindBuffer(g.ARRAY_BUFFER,this.bubbleBuffer);g.bufferSubData(g.ARRAY_BUFFER,0,new Float32Array(data));this.common(this.bubbleProgram,eye,this.vp,t);g.uniform1f(this.uniform(this.bubbleProgram,'uHeight'),this.canvas.height);g.drawArrays(g.POINTS,0,data.length/4);}
+ // Preserve filter-before-update and the newest 500 survivors, without making
+ // temporary arrays or a new upload buffer on every underwater frame.
+ const bubbles=this.bubbles,data=this.bubbleData;let kept=0,j=0;
+ for(let i=0;i<bubbles.length;i++){const b=bubbles[i];if(b.a<9&&b.p[1]<-.12)bubbles[kept++]=b;}
+ const start=Math.max(0,kept-500);if(start)for(let i=start;i<kept;i++)bubbles[i-start]=bubbles[i];bubbles.length=kept-start;
+ for(const b of bubbles){b.a+=dt;b.p[1]+=dt*(.30+b.r*6.);b.p[0]+=Math.sin(t*2.1+b.phase)*dt*.035;b.p[2]+=.018*dt;data[j++]=b.p[0];data[j++]=b.p[1];data[j++]=b.p[2];data[j++]=b.r*(1+b.a*.16);}
+ if(!j)return;g.bindVertexArray(this.bubbleVAO);g.bindBuffer(g.ARRAY_BUFFER,this.bubbleBuffer);g.bufferSubData(g.ARRAY_BUFFER,0,data,0,j);this.common(this.bubbleProgram,eye,this.vp,t);g.uniform1f(this.uniform(this.bubbleProgram,'uHeight'),this.canvas.height);g.drawArrays(g.POINTS,0,j/4);}
  setupParticles(){let g=this.gl,a=[];for(let i=0;i<1300;i++)a.push(rr(-45,45),rr(-28,-.2),rr(-55,35),random());this.particleVAO=g.createVertexArray();g.bindVertexArray(this.particleVAO);let b=g.createBuffer();g.bindBuffer(g.ARRAY_BUFFER,b);g.bufferData(g.ARRAY_BUFFER,new Float32Array(a),g.STATIC_DRAW);this.attr(0,4,16,0);g.bindVertexArray(null);}
  setupRays(){let a=[];for(let i=0;i<20;i++){let x=rr(-29,22),z=rr(-42,12),w=rr(.8,1.7),bottom=-rr(13,24),bw=w*rr(2.1,4.5);for(let orient=0;orient<2;orient++){let ox=orient?0:1,oz=orient?1:0,p=[[x-w*ox,-.04,z-w*oz],[x+w*ox,-.04,z+w*oz],[x-bottom*.40+bw*ox,bottom,z+bottom*.27+bw*oz],[x-bottom*.40-bw*ox,bottom,z+bottom*.27-bw*oz]],uv=[[0,0],[1,0],[1,1],[0,1]];for(let k of [0,1,2,0,2,3])a.push(...p[k],...uv[k]);}}this.rayCount=a.length/5;let g=this.gl;this.rayVAO=g.createVertexArray();g.bindVertexArray(this.rayVAO);let b=g.createBuffer();g.bindBuffer(g.ARRAY_BUFFER,b);g.bufferData(g.ARRAY_BUFFER,new Float32Array(a),g.STATIC_DRAW);this.attr(0,3,20,0);this.attr(1,2,20,12);g.bindVertexArray(null);}
  setupShadow(){

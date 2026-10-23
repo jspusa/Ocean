@@ -158,6 +158,9 @@ function cetaceanMotionPose(f,time,out=f.p,context=null){
 // New deep-water catalogue uses small, habitat-bounded paths, never the
 // cetaceans' surfacing cycle. Bounds include all tentacles/legs at metre scale.
 const abyssAhead=[0,0,0],abyssBehind=[0,0,0];
+// Both depth-clearance sweeps use the same authored ring, including its centre
+// sample. Reuse the exact directions instead of recomputing them per pose.
+const faunaFloorDirections=Array.from({length:9},(_,i)=>{const a=i*(Math.PI*2)/8;return [Math.cos(a),Math.sin(a)];});
 function abyssEnvelope(f){const sp=SPECIES[f.species],b=sp.modelBounds,s=f.s[0],hx=Math.max(Math.abs(b.min[0]),Math.abs(b.max[0])),hz=Math.max(Math.abs(b.min[2]),Math.abs(b.max[2])),crawl=sp.traits.motion==='crawl',bend=crawl?0:s*(hx*.10+.018);return {horizontal:s*Math.hypot(hx,hz)+.025+s*.02,bottom:Math.max(0,-b.min[1]*s)+bend,top:b.max[1]*s+bend};}
 function abyssTrajectory(f,time,out,context=null){
  const sp=SPECIES[f.species],profile=sp.motionProfile,home=f.home||f.center,phase=f.phase??f.bob??0,exhibit=!!context?.exhibit,hull=abyssEnvelope(f),crawl=sp.traits.motion==='crawl';
@@ -178,7 +181,7 @@ function abyssTrajectory(f,time,out,context=null){
   let floor=Number.isFinite(f.habitatFloor)?f.habitatFloor:-Infinity,roof=Number.isFinite(f.habitatCeiling)?f.habitatCeiling:0;
   // Sample the full horizontal envelope. Root-supplied habitat limits are
   // centre-height limits, already reduced by the authored model clearance.
-  for(let i=0;i<9;i++){const a=i*TAU/8,r=i===8?0:hull.horizontal,px=out[0]+Math.cos(a)*r,pz=out[2]+Math.sin(a)*r;if(floorFn)floor=Math.max(floor,floorFn(px,pz)+hull.bottom+(crawl?0:.025));if(roofFn)roof=Math.min(roof,roofFn(px,pz,home[1])-hull.top-.025);}
+  for(let i=0;i<9;i++){const d=faunaFloorDirections[i],r=i===8?0:hull.horizontal,px=out[0]+d[0]*r,pz=out[2]+d[1]*r;if(floorFn)floor=Math.max(floor,floorFn(px,pz)+hull.bottom+(crawl?0:.025));if(roofFn)roof=Math.min(roof,roofFn(px,pz,home[1])-hull.top-.025);}
   if(floor<=roof)y=clamp(y,floor,roof);else {out[0]=home[0];out[2]=home[2];y=home[1];}
  }
  out[1]=y;return out;
@@ -209,7 +212,7 @@ function trenchMotionPose(f,time,out=f.p,context=null){
  out[0]=home[0]+c*x+s*z;out[2]=home[2]-s*x+c*z;out[1]=home[1]+(crawl?0:Math.sin(a*.61+phase)*profile.bob);
  let floor=Number.isFinite(f.habitatFloor)?f.habitatFloor:-Infinity,ceiling=Number.isFinite(f.habitatCeiling)?f.habitatCeiling:0;
  if(!exhibit){const world=typeof OceanTrench!=='undefined'?OceanTrench:null,floorAt=context?.floorAt||(context?.groundHeight?((x,z)=>context.groundHeight(x,z)):world?.floorAt),roofAt=context?.ceilingAt;
-  if(floorAt)for(let i=0;i<9;i++){const angle=i*TAU/8,r=i===8?0:hull.horizontal,px=out[0]+Math.cos(angle)*r,pz=out[2]+Math.sin(angle)*r,h=floorAt(px,pz,home[1]+hull.top+.1);if(Number.isFinite(h))floor=Math.max(floor,h+hull.bottom+(crawl?0:.015));if(roofAt){const roof=roofAt(px,pz,home[1]);if(Number.isFinite(roof))ceiling=Math.min(ceiling,roof-hull.top-.015);}}
+  if(floorAt)for(let i=0;i<9;i++){const d=faunaFloorDirections[i],r=i===8?0:hull.horizontal,px=out[0]+d[0]*r,pz=out[2]+d[1]*r,h=floorAt(px,pz,home[1]+hull.top+.1);if(Number.isFinite(h))floor=Math.max(floor,h+hull.bottom+(crawl?0:.015));if(roofAt){const roof=roofAt(px,pz,home[1]);if(Number.isFinite(roof))ceiling=Math.min(ceiling,roof-hull.top-.015);}}
   if(floor<=ceiling)out[1]=crawl&&Number.isFinite(floor)?floor:clamp(out[1],floor,ceiling);else {out[0]=home[0];out[1]=home[1];out[2]=home[2];}
  }
  const vx=Math.cos(a)*radius*omega,vz=Math.cos(a*.73)*radius*.42*.73*omega,dx=c*vx+s*vz,dz=-s*vx+c*vz,dy=crawl?0:Math.cos(a*.61+phase)*profile.bob*.61*omega;
@@ -259,22 +262,27 @@ function updateLife(t){
   f.bank=clamp(turn*.23,-.17,.17);f.effort=clamp(Math.hypot(dx,dy,dz)/.055/(f.s[0]*1.8),.22,1.);
  }
 }
+const reefSchoolMotion=new WeakMap();
 function updateReefSchool(t){
  // One current-following shoal. Turns travel along its body instead of every fish
  // endlessly orbiting the same point like particles in a decorative vortex.
  for(const f of shoal){
   const id=f.bioSeed||bioHash(f.slot+1),q=f.schoolOffset||[0,0,0];
-  const delay=bioValue(id,17)*1.6,tt=t-delay,a=tt*.044;
-  const cx=1+Math.sin(a)*8.5,cz=-12-Math.cos(a*.79)*5.5;
+  // Phase, radial placement and identity are stable during play. Keep them out
+  // of the frame math, while allowing authored edits to invalidate this entry.
+  let fixed=reefSchoolMotion.get(f);
+  if(!fixed||fixed.id!==id||fixed.phase!==f.phase||fixed.rad!==f.rad){fixed={id,phase:f.phase,rad:f.rad,delay:bioValue(id,17)*1.6,along:Math.cos(f.phase)*f.rad*5.3,spread:Math.sin(f.phase)*f.rad*1.65,vertical:Math.sin(f.phase*1.91)*f.rad*.48};reefSchoolMotion.set(f,fixed);}
+  const tt=t-fixed.delay,a=tt*.044;
+  const sinA=Math.sin(a),cx=1+sinA*8.5,cz=-12-Math.cos(a*.79)*5.5;
   const dx=Math.cos(a)*.374,dz=Math.sin(a*.79)*.191;
   const heading=Math.atan2(dz,dx),c=Math.cos(heading),s=Math.sin(heading);
-  const along=Math.cos(f.phase)*f.rad*5.3,spread=Math.sin(f.phase)*f.rad*1.65;
-  const breathing=1+.12*Math.sin(tt*.27),ripple=.12*Math.sin(tt*.72+along*.65+f.phase);
+  const along=fixed.along,spread=fixed.spread;
+  const ripplePhase=Math.sin(tt*.72+along*.65+f.phase),breathing=1+.12*Math.sin(tt*.27),ripple=.12*ripplePhase;
   f.p[0]=cx+c*along-s*(spread*breathing+ripple)+q[0]*.14;
-  f.p[1]=-6.7+Math.sin(tt*.07)*.38+q[1]*.58+Math.sin(f.phase*1.91)*f.rad*.48;
+  f.p[1]=-6.7+Math.sin(tt*.07)*.38+q[1]*.58+fixed.vertical;
   f.p[2]=cz+s*along+c*(spread*breathing+ripple)+q[2]*.12;
-  f.yaw=-heading+.06*Math.sin(tt*.72+along*.65+f.phase);
-  f.pitch=Math.cos(tt*.07)*.022;f.bank=.025*Math.sin(a);f.effort=.53+.15*Math.sin(tt*.72+f.phase);
+  f.yaw=-heading+.06*ripplePhase;
+  f.pitch=Math.cos(tt*.07)*.022;f.bank=.025*sinA;f.effort=.53+.15*Math.sin(tt*.72+f.phase);
  }
 }
 /* Species contour remains identical across high and low detail meshes. */

@@ -14,8 +14,8 @@
     },
     {
       "path": "README.md",
-      "bytes": 18243,
-      "sha256": "2ae06509bce1fa15ece876a2a16fd8197922055f391f40b4216c30c8044cba03"
+      "bytes": 18431,
+      "sha256": "8f0899f01d50a0230ca330e621ff08bd264dfb7d10925dfc06762455f3a35971"
     },
     {
       "path": "VERSION",
@@ -344,8 +344,8 @@
     },
     {
       "path": "src/engine.js",
-      "bytes": 90428,
-      "sha256": "3f162cb9f481726de48245805974072041bc3a3eae45e11fb061440b6e904c3a"
+      "bytes": 91798,
+      "sha256": "8740b47eafca15ae201169faf33992359246edbb62a174c09ff886f743d51092"
     },
     {
       "path": "src/expedition.js",
@@ -374,8 +374,8 @@
     },
     {
       "path": "src/individuals.js",
-      "bytes": 32766,
-      "sha256": "7840869333f167a6610720a0da9e781d94aba030037e020897504e798e78e0f0"
+      "bytes": 33476,
+      "sha256": "b035517dfa2260f6d732c09651b52a0c608f6e6b7b62ccff45a9ab311b2312d0"
     },
     {
       "path": "src/microcosm.js",
@@ -434,8 +434,8 @@
     },
     {
       "path": "src/scene_cache.js",
-      "bytes": 2971,
-      "sha256": "e49a818570b4db0d5346b1f8bd24f3e861e49d435601a05809a25b0996b49bee"
+      "bytes": 4005,
+      "sha256": "455410a5e1f24cc1ea635cb468046272069e18f5c35c72b5dbaa7cb80c184cc3"
     },
     {
       "path": "src/seasons.js",
