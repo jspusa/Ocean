@@ -812,13 +812,44 @@ vec3 b=a*.5+.25*(texture(uImage,uv-d*.5).rgb+texture(uImage,uv+d*.5).rgb);
 float lb=L(b);frag=vec4(lb<lo||lb>hi?a:b,1.);
 }`;
 
+// These common surfaces keep the original arithmetic while allowing the
+// compiler to remove every unrelated rig and material branch ahead of play.
+function surfaceShaderSource(source,kind,material){
+ if(!((kind===0&&(material===2||material===3))||(kind===1&&material===6)))throw new RangeError('Unsupported surface shader');
+ for(const [name,value]of [['uKind',kind],['uMat',material]]){
+  const declaration='uniform int '+name+';';if(!source.includes(declaration))throw new Error('Missing surface shader uniform: '+name);
+  source=source.replace(declaration,'const int '+name+'='+value+';');
+ }return source;
+}
+
 class Renderer{
  constructor(canvas,initialQuality=null){this.canvas=canvas;const g=canvas.getContext('webgl2',{alpha:false,antialias:false,depth:true,preserveDrawingBuffer:false,powerPreference:'high-performance'});if(!g)throw new Error('請以支援 WebGL 2 的一般瀏覽器開啟。');this.gl=g;this.maxTextureSize=g.getParameter(g.MAX_TEXTURE_SIZE);this.mobile=matchMedia('(pointer:coarse)').matches;this.batches=[];this.fog=[.0008,.005,.028];this.lightDir=V.norm([-.36,1.,.30]);this.lightColor=[1.05,1.02,.93];this.clarity=1.;this.lamp=false;this.dynamicScale=1;this.lighting="day";this.fogDensity=.034;this.sun=1.02;this.quality=initialQuality??(this.mobile?1:2);this.exposure=1.11;this.drawCalls=0;this.frame=0;
-  this.program=this.makeProgram(VS,FS);this.shadowProgram=this.makeProgram(VS,SHADOW_FS);this.waterProgram=this.makeProgram(WATER_VS,WATER_FS);this.pointProgram=this.makeProgram(POINT_VS,POINT_FS);this.rayProgram=this.makeProgram(RAY_VS,RAY_FS);this.postProgram=this.makeProgram(POST_VS,POST_FS);this.volumeProgram=this.makeProgram(POST_VS,VOLUME_FS);this.volumeFilterProgram=this.makeProgram(POST_VS,VOLUME_FILTER_FS);this.bubbleProgram=this.makeProgram(BUBBLE_VS,BUBBLE_FS);this.aaProgram=this.makeProgram(POST_VS,AA_FS);this.skyProgram=this.makeProgram(POST_VS,SKY_FS);this.msaaSamples=0;
+  this.program=this.makeProgram(VS,FS);this.setupSurfacePrograms();this.shadowProgram=this.makeProgram(VS,SHADOW_FS);this.waterProgram=this.makeProgram(WATER_VS,WATER_FS);this.pointProgram=this.makeProgram(POINT_VS,POINT_FS);this.rayProgram=this.makeProgram(RAY_VS,RAY_FS);this.postProgram=this.makeProgram(POST_VS,POST_FS);this.volumeProgram=this.makeProgram(POST_VS,VOLUME_FS);this.volumeFilterProgram=this.makeProgram(POST_VS,VOLUME_FILTER_FS);this.bubbleProgram=this.makeProgram(BUBBLE_VS,BUBBLE_FS);this.aaProgram=this.makeProgram(POST_VS,AA_FS);this.skyProgram=this.makeProgram(POST_VS,SKY_FS);this.msaaSamples=0;
   this.floatColor=!!g.getExtension('EXT_color_buffer_float');this.aniso=g.getExtension('EXT_texture_filter_anisotropic');this.textures=[];this.loaded=this.loadTextures();g.enable(g.DEPTH_TEST);g.disable(g.CULL_FACE);this.lightVP=mm(ortho(-51,51,-51,51,.1,180),lookAt([-42,84,14],[0,-12,-12]));
   this.setupWater();this.setupBubbles();this.setupParticles();this.setupRays();this.setupShadow();this.postVAO=g.createVertexArray();this.resize();
  }
- makeProgram(v,f){let g=this.gl;const shader=(type,src)=>{let s=g.createShader(type);g.shaderSource(s,src);g.compileShader(s);if(!g.getShaderParameter(s,g.COMPILE_STATUS))throw Error(g.getShaderInfoLog(s));return s;};let p=g.createProgram(),vs=shader(g.VERTEX_SHADER,v),fs=shader(g.FRAGMENT_SHADER,f);g.attachShader(p,vs);g.attachShader(p,fs);g.linkProgram(p);g.deleteShader(vs);g.deleteShader(fs);if(!g.getProgramParameter(p,g.LINK_STATUS))throw Error(g.getProgramInfoLog(p));return {p,u:{}};}
+ makeProgram(v,f){
+  const g=this.gl;let p=null,vs=null,fs=null;
+  const shader=(type,src)=>{const s=g.createShader(type);try{g.shaderSource(s,src);g.compileShader(s);if(!g.getShaderParameter(s,g.COMPILE_STATUS))throw Error(g.getShaderInfoLog(s));return s;}catch(error){if(s)g.deleteShader(s);throw error;}};
+  try{vs=shader(g.VERTEX_SHADER,v);fs=shader(g.FRAGMENT_SHADER,f);p=g.createProgram();g.attachShader(p,vs);g.attachShader(p,fs);g.linkProgram(p);if(!g.getProgramParameter(p,g.LINK_STATUS))throw Error(g.getProgramInfoLog(p));return {p,u:{}};}
+  catch(error){if(p)g.deleteProgram(p);throw error;}
+  finally{if(vs)g.deleteShader(vs);if(fs)g.deleteShader(fs);}
+ }
+ setupSurfacePrograms(){
+  if(this.surfacePrograms)return this.surfacePrograms;
+  const programs=this.surfacePrograms=new Map();this.surfaceProgramFailures=new Map();
+  for(const [kind,material]of [[0,2],[0,3],[1,6]]){const key=kind+':'+material;
+   try{programs.set(key,this.makeProgram(surfaceShaderSource(VS,kind,material),surfaceShaderSource(FS,kind,material)));}
+   catch(error){this.surfaceProgramFailures.set(key,String(error?.message||error));}
+  }return programs;
+ }
+ surfaceProgram(b){
+  const programs=this.surfacePrograms;if(!programs)return this.program;
+  if(b.kind===0&&b.material===2)return programs.get('0:2')||this.program;
+  if(b.kind===0&&b.material===3)return programs.get('0:3')||this.program;
+  if(b.kind===1&&b.material===6)return programs.get('1:6')||this.program;
+  return this.program;
+ }
  uniform(p,n){if(!(n in p.u))p.u[n]=this.gl.getUniformLocation(p.p,n);return p.u[n];}
  // Programs omit uniforms they do not use. Their cached null locations are
  // WebGL no-ops; skip those calls while forwarding active values unchanged.
@@ -1054,11 +1085,15 @@ class Renderer{
   g.colorMask(true,true,true,true);
   g.bindFramebuffer(g.FRAMEBUFFER,this.msaaFBO||this.sceneFBO);if(this.msaaSamples)g.enable(g.SAMPLE_ALPHA_TO_COVERAGE);g.viewport(0,0,this.canvas.width,this.canvas.height);g.clearColor(.002,.025,.045,1);g.clear(g.COLOR_BUFFER_BIT|g.DEPTH_BUFFER_BIT);
   g.depthFunc(g.LEQUAL);this.common(this.skyProgram,eye,this.vp,t);this.setMatrix4fv(this.skyProgram,'uInvVP',false,inv);g.bindVertexArray(this.postVAO);g.drawArrays(g.TRIANGLES,0,3);g.depthFunc(g.LESS);this.drawCalls++;
-  const p=this.program;this.common(p,eye,this.vp,t);this.set1f(p,'uFogDensity',this.fogDensity);this.set1f(p,'uShadowTexel',1/this.shadowSize);this.set1f(p,'uShadows',1);
-  const names=['uSand','uSandN','uRock','uRockN','uShell','uShellN','uCoral','uCoralN'];for(let i=0;i<8;i++){this.bindTex(i,this.textures[i]);this.set1i(p,names[i],i);}this.bindTex(8,this.shadowTexture);g.bindSampler(8,this.shadowSampler);this.set1i(p,'uShadow',8);this.bindTex(10,this.dynamicShadowTexture);g.bindSampler(10,this.shadowSampler);this.set1i(p,'uDynamicShadow',10);
-  this.submittedTriangles=0;this.submittedVertices=0;const planes=this.frustum(this.vp),state={},ls=this.mobile?(this.quality===0?.64:.82):(this.quality===0?.75:1);
+  const surfaceStates=new Map();let activeSurface=null;
+  const names=['uSand','uSandN','uRock','uRockN','uShell','uShellN','uCoral','uCoralN'];for(let i=0;i<8;i++)this.bindTex(i,this.textures[i]);this.bindTex(8,this.shadowTexture);g.bindSampler(8,this.shadowSampler);this.bindTex(10,this.dynamicShadowTexture);g.bindSampler(10,this.shadowSampler);
+  this.submittedTriangles=0;this.submittedVertices=0;const planes=this.frustum(this.vp),ls=this.mobile?(this.quality===0?.64:.82):(this.quality===0?.75:1);
   for(const b of this.batches){if(!b.visible)continue;this.updateBatch(b,eye,planes);if(!b.drawCount)continue;
    this.submittedTriangles+=b.count/3*b.drawCount;this.submittedVertices+=b.vertexCount*b.drawCount;
+   const p=this.surfaceProgram(b);let state=surfaceStates.get(p);
+   if(!state){this.common(p,eye,this.vp,t);this.set1f(p,'uFogDensity',this.fogDensity);this.set1f(p,'uShadowTexel',1/this.shadowSize);this.set1f(p,'uShadows',1);
+    for(let i=0;i<8;i++)this.set1i(p,names[i],i);this.set1i(p,'uShadow',8);this.set1i(p,'uDynamicShadow',10);state={};surfaceStates.set(p,state);activeSurface=p;
+   }else if(activeSurface!==p){g.useProgram(p.p);activeSurface=p;}
    const min=(b.minDistance||0)*ls,max=(b.maxDistance||220)*ls,fade=b.material!==1&&((b.minDistance||0)>0||(b.maxDistance&&b.maxDistance<180))?.60:0;
    if(state.min!==min||state.max!==max||state.fade!==fade){this.set3f(p,'uLODBounds',min,max,fade);state.min=min;state.max=max;state.fade=fade;}
    this.batchUniforms(p,b,state);this.drawBatch(b);}
