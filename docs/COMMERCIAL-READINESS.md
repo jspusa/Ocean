@@ -1,0 +1,39 @@
+# 商用授權與素材來源紀錄
+
+稽核日期：2026-10-23。基準為 `98d788f889e2b4aa2fedcd4d8526c5f065b6cd14`（0.17.1）。本紀錄只把程式庫內可核對的授權、來源及發布條件列明；不把作者聲明當成獨立權利清查，也不把功能試玩版標為已完成商業發售驗收。
+
+現有 [LICENSE](../LICENSE) 是 MIT，明文允許使用、修改、發布、再授權及銷售副本。散布本作或其重要部分時，必須保留其中的版權及許可文字。[CREDITS](../CREDITS.md) 另明示原創程式、程序幾何、貼圖與音樂按該授權提供。這些是目前可用的商用許可依據；授權中的免保證條款仍適用。
+
+## 已能在版本庫核對的來源
+
+| 發布內容 | 可核對的建立方式與證據 | 授權／來源界線 |
+| --- | --- | --- |
+| 遊戲程式、介面、故事、存檔與即時著色器 | `src/`、`CREDITS.md`、`LICENSE` | 本庫以 MIT 提供；未發現發布包內的第三方 JavaScript 程式庫或 CDN 執行依賴 |
+| 地形、珊瑚、動物與船的幾何 | `src/world.js`、`reef_detail.js`、`individuals.js`、各 `*_fauna.js`／`*_world.js`；`bake_scene.cjs`、`partition_scene.cjs` | 程序原始碼與編譯流程在庫內；`CREDITS.md` 聲明沒有擷取 Nintendo 或外部模型 |
+| 沙、岩石、珊瑚、龜殼 diffuse／normal 與光紋 | `make_textures.py`、`assets/*_diff.jpg`、`*_nor_gl.jpg`、`caustics.jpg` | 產生器標示為原創程序素材；不是取得外部攝影掃描授權的證據 |
+| 融合珊瑚資料 | `tools/sculpt_coral.py` → `assets/coral_forms.json` | 原始場函數、亂數種子及等值面產生方式可讀；未附外部掃描資料 |
+| 圖鑑影像與後備圖 | `assets/guide_*.jpg`、`tests/parity/*guide*`／模型渲染工具、各物種模組的 SVG 後備圖 | `CREDITS.md` 記錄 JPEG 由本作模型的 WebGL 棚景製作；SVG 定義在本庫。這是來源紀錄，尚未逐張獨立重製或做影像權利鑑識 |
+| 雙軌音樂 | `compose_music.py`、`music/score.json` → `shallows.mp3`／`blue_silence.mp3` | 可見樂句、合成器、效果與固定種子；作者紀錄聲明不含第三方錄音、soundfont 或任天堂旋律。未做獨立音樂相似性審查 |
+| 呼吸、氣泡、鯨鳴感回聲等音效 | `src/audio.js` 的 Web Audio 合成 | 本庫即時合成；未發現隨包附帶的第三方生物錄音 |
+| 字型 | `src/style.css` 等樣式使用系統字型 | 稽核時沒有 `.ttf`、`.otf`、`.woff` 或 `.woff2` 字型檔；不因 CSS 列出字型名稱取得另行散布該字型的權利 |
+| 生物與原作功能參考連結 | `docs/parity/*REFERENCE.md`、物種條目的 `source`／`sources` | 參考網站的文字、照片、商標及其他內容仍有各自權利；連結與形態研究不等於可把網站照片下載後加入商品 |
+
+外部工具只用於開發：基本網站建置使用 Node.js／Python 標準函式庫；重製貼圖、音樂或珊瑚的選用工具會使用 NumPy、SciPy、Pillow、scikit-image、SoundFile 與 ffmpeg。這些套件或執行檔沒有隨網頁載入。若日後另售含工具或執行環境的套件，應依實際附帶版本保留其授權，不把本庫 MIT 當成第三方工具的授權。
+
+## 本輪可直接補齊的散布事項
+
+0.18 的建置已把既有 `LICENSE` 完整原文放入 `index.html`／`standalone.html` 註解，完整性清單也記錄 `LICENSE`。`commercial-packaging.cjs` 驗證兩種散布成品與授權檔雜湊，避免單檔被單獨轉交後遺失授權；沒有改寫版權人或另創授權。
+
+新模型、文字或音樂應在 `CREDITS.md` 留下自己的來源與產生方式，並隨本庫保留原始碼；加入任何外部資產前，先記錄來源網址、作者、具體授權版本與必要標示。歷史發行 ZIP 保留原樣，不表示其中每一項檔案已完成獨立權利查驗。
+
+## 對外發布與商品描述
+
+- 本作對外名稱是「重返蔚藍／Return to the Blue」。Nintendo、Wii、Endless Ocean／FOREVER BLUE 是功能研究對象，不能用本庫 MIT 宣稱取得其名稱、商標、模型、音樂或原作故事的使用許可。
+- 當前文件仍列有完整多人、內容覆蓋、實體裝置與真人全流程驗收缺口；商品頁只可描述已實作且驗證的功能，不把「持續追求 feature parity」寫成「已完整等效」。見 [功能追蹤](../FEATURE_PARITY.md) 與 [發布清單](../RELEASE_CHECKLIST.md)。
+- 本版程式只讀取同站程式／幾何／貼圖／音樂，進度及照片使用瀏覽器本機儲存；未發現帳號、支付、廣告或分析服務。若加入這些服務，現有「沒有上傳或第三方追蹤」說明須隨真實行為更新。
+
+GitHub Pages 的 [官方使用限制](https://docs.github.com/en/pages/getting-started-with-github-pages/github-pages-limits)（本次重新查閱）指出，它不供用作經營網店、主要促成商業交易或商用 SaaS 的免費代管。本作目前的免費靜態展示沒有收款流程；若要經營付費網頁服務或交易網站，仍須選擇符合用途的商店／代管與交付方式。MIT 的銷售許可不會變更代管平台的使用條款。
+
+## 尚缺的外部證據
+
+版本庫沒有個別貢獻者的權利歸屬／移轉文件、品牌核名結果、獨立美術／音樂權利審查或實體裝置發售驗收結果。這些項目未能從程式碼自行補造。對現有 MIT 授權可作事實陳述；目前不能據此聲稱「全部權利已獨立審核」或「已通過所有付費發售條件」。

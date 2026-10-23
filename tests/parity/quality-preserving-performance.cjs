@@ -6,6 +6,7 @@ const pw=require(process.env.PLAYWRIGHT_PATH||'playwright');
 const option=(name,fallback)=>process.argv.find(x=>x.startsWith('--'+name+'='))?.slice(name.length+3)||fallback;
 const originalURL=option('original','http://127.0.0.1:8001/'),candidateURL=option('candidate','http://127.0.0.1:8000/');
 const out=option('out','qa/parity/quality-preserving-performance.json'),baselinePath=option('baseline','qa/parity/quality-original.json');
+const existingOnly=process.argv.includes('--existing-content-only');
 const errors=[],profiles=[{id:'desktop',mobile:false,quality:2},{id:'mobile',mobile:true,quality:1}];
 const commonViews=[{id:'reef',p:[0,-8,7],aim:[0,-8,-10]},{id:'offshore',p:[390,-32,-184],aim:[390,-32,-210]},{id:'hadal',p:[766,-7000,-120],aim:[766,-7000,-145]}];
 const desktopViews=[{id:'cave',p:[-218,-26,-69],aim:[-218,-25,-47.5]},{id:'ruins',p:[176,-49,-197],aim:[187,-51,-225]},{id:'reef-reversed',p:[0,-8,-10],aim:[0,-9,8]},{...commonViews[0],id:'reef-wide',viewport:{width:550,height:370}}];
@@ -23,8 +24,9 @@ async function capture(browser,url,label){
   assert.ok(await page.evaluate(()=>window.__ocean?.ready),await page.locator('#errorMessage').textContent());
   for(const view of [...commonViews,...(profile.mobile?mobileViews:desktopViews)]){
    await page.setViewportSize(view.viewport||{width:320,height:240});
-   const row=await page.evaluate(async({view,profile})=>{
+   const row=await page.evaluate(async({view,profile,existingOnly})=>{
     settings.adaptive=false;settings.third=false;settings.lamp=false;renderer.quality=profile.quality;renderer.dynamicScale=1;renderer.resize();
+    if(existingOnly)for(const b of renderer.batches)if(b.sceneRole==='reef-fish-expansion')b.visible=false;
     if(window.__prepareView)await __prepareView(view.p,view.aim,8);else __renderView(view.p,view.aim,8);
     const gl=renderer.gl,original=gl.bufferSubData;let uploadCalls=0,uploadBytes=0,uniformCalls=0;
     const uniformOriginals={},uniformCallsByMethod={};
@@ -38,7 +40,7 @@ async function capture(browser,url,label){
     let encoded='';for(let i=0;i<pixels.length;i+=16384)encoded+=String.fromCharCode(...pixels.subarray(i,i+16384));
     const topBatches=renderer.batches.map((b,index)=>({index,role:b.sceneRole||null,kind:b.kind,material:b.material,species:b.species,dynamic:!!b.dynamic,triangles:b.visible?b.count/3*b.drawCount:0,drawCount:b.drawCount,meshTriangles:b.count/3,radius:b.radius,instances:b.instances.length,examplePosition:b.instances[0]?.p,minDistance:b.minDistance||0,maxDistance:b.maxDistance||220})).filter(b=>b.triangles>0).sort((a,b)=>b.triangles-a.triangles).slice(0,12);
     return {profile:profile.id,scene:view.id,quality:renderer.quality,mobile:renderer.mobile,resolution:[renderer.canvas.width,renderer.canvas.height],volumeResolution:[renderer.volumeW,renderer.volumeH],msaaSamples:renderer.msaaSamples,triangles:renderer.submittedTriangles,drawCalls:renderer.drawCalls,shadowDraws:renderer.shadowDraws,uploadCalls,uploadBytes,uniformCalls,uniformCallsByMethod,topBatches,pixels:btoa(encoded),gl:gl.getError()};
-   },{view,profile});
+   },{view,profile,existingOnly});
    rows.push(row);console.log(label+' '+profile.id+' '+view.id+': '+row.triangles+' triangles, '+row.drawCalls+' draws, '+row.uploadCalls+' uploads, MSAA '+row.msaaSamples);
   }
   // Exercise the real application loop on a controlled 120 Hz display. Only
@@ -81,7 +83,7 @@ async function capture(browser,url,label){
   for(let i=0;i<a.length;i++){if(i%4!==3){min=Math.min(min,a[i]);max=Math.max(max,a[i]);}const delta=Math.abs(a[i]-b[i]);if(delta)differingChannels++;maxDifference=Math.max(maxDifference,delta);sumDifference+=delta;}
   return {profile:before.profile,scene:before.scene,before:summarize(before),after:summarize(after),pixels:{differingChannels,maxDifference,meanDifference:sumDifference/a.length,originalRange:max-min}};
  });
- fs.mkdirSync(path.dirname(out),{recursive:true});fs.writeFileSync(out,JSON.stringify({method:'Same fixed camera/time, quality, MSAA and framebuffer. Exact readPixels comparison on one software WebGL renderer, plus real animate() at controlled 120 Hz with a render spy. Work counts are not FPS or power measurements.',comparisons,errors},null,2));
+ fs.mkdirSync(path.dirname(out),{recursive:true});fs.writeFileSync(out,JSON.stringify({existingContentOnly:existingOnly,method:'Same fixed camera/time, quality, MSAA and framebuffer. Exact readPixels comparison on one software WebGL renderer, plus real animate() at controlled 120 Hz with a render spy. Work counts are not FPS or power measurements.'+(existingOnly?' New reef-fish-expansion batches are hidden for the pre-existing content comparison; new fish require separate visual verification.':''),comparisons,errors},null,2));
  assert.equal(errors.length,0,errors.join('; '));
  for(const row of comparisons){
   assert.equal(row.before.gl,0);assert.equal(row.after.gl,0);assert.ok(row.pixels.originalRange>20,'Original image must contain visible contrast');

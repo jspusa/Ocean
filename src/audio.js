@@ -2,7 +2,7 @@
    Two 120-second original, synchronized stems are crossfaded by simulated depth.
    Soundscapes are synthesized; they are artistic, not scientific field recordings. */
 class OceanAudio {
- constructor(){this.ctx=null;this.ready=false;this.loading=null;this.enabled=false;this.custom=null;this.sources=[];this.noise=null;this.lastBreath=-1;this.lastWhale=-100;this.lastKick=0;this.nextBubble=0;this.depth=18;this.effectsEmitted=0;this.startedAt=0;}
+ constructor(){this.ctx=null;this.ready=false;this.loading=null;this.enabled=false;this.custom=null;this.customName=null;this.localGeneration=0;this.sources=[];this.noise=null;this.lastBreath=-1;this.lastWhale=-100;this.lastKick=0;this.nextBubble=0;this.depth=18;this.effectsEmitted=0;this.startedAt=0;}
  async start(){
   if(!this.ctx){const AC=window.AudioContext||window.webkitAudioContext;if(!AC)throw Error('瀏覽器不支援 Web Audio。');
    try{this.ctx=new AC({latencyHint:'playback',sampleRate:24000});}catch(_){this.ctx=new AC();}
@@ -77,8 +77,26 @@ class OceanAudio {
  mute(){this.enabled=false;if(this.ctx){this.master.gain.setTargetAtTime(0,this.ctx.currentTime,.06);setTimeout(()=>{if(!this.enabled)this.ctx.suspend().catch(()=>{});},350);}}
  pause(){if(this.ctx)this.ctx.suspend().catch(()=>{});}
  resume(){if(this.ctx&&this.enabled&&settings.sound)this.ctx.resume().catch(()=>{if(!document.hidden)toast('聲音暫停，請點一下右上角聲音鍵。');});}
- async loadLocal(file){if(!file)return;if(file.size>32*1024*1024){toast('請選擇 32 MB 以內的音訊檔。');return;}await this.start();try{const buffer=await this.ctx.decodeAudioData(await file.arrayBuffer());if(this.custom){this.custom.stop();this.custom.disconnect();}const src=this.ctx.createBufferSource();src.buffer=buffer;src.loop=true;src.connect(this.music);src.start();this.custom=src;this.customName=file.name;toast('已載入本機音樂；檔案不會上傳或隨網頁分享。');}catch(_){toast('音訊無法解碼，請改用 MP3、M4A 或 WAV。');}}
- resetMusic(){if(this.custom){this.custom.stop();this.custom.disconnect();this.custom=null;}this.tick();}
+ async loadLocal(file){
+  if(!file)return;const generation=++this.localGeneration;
+  if(file.size>32*1024*1024){toast('請選擇 32 MB 以內的音訊檔。');return;}
+  let next=null;
+  try{
+   await this.start();if(generation!==this.localGeneration)return;
+   const bytes=await file.arrayBuffer();if(generation!==this.localGeneration)return;
+   const buffer=await this.ctx.decodeAudioData(bytes);if(generation!==this.localGeneration)return;
+   // A failed replacement must leave the playing track intact. The generation
+   // checks discard obsolete reads/decodes; Web Audio decoding itself has no abort.
+   next=this.ctx.createBufferSource();next.buffer=buffer;next.loop=true;next.connect(this.music);next.start();
+   if(this.custom){this.custom.stop();this.custom.disconnect();}
+   this.custom=next;this.customName=file.name;next=null;this.tick();
+   toast('已載入本機音樂；檔案不會上傳或隨網頁分享。');
+  }catch(_){
+   if(next){try{next.stop();}catch(_){}next.disconnect();}
+   if(generation===this.localGeneration)toast('音訊無法解碼，請改用 MP3、M4A 或 WAV。');
+  }
+ }
+ resetMusic(){this.localGeneration++;if(this.custom){this.custom.stop();this.custom.disconnect();this.custom=null;}this.customName=null;this.tick();}
  get status(){return {context:this.ctx?.state||'not-started',musicReady:this.ready,originalStems:this.sources.length,blend:this.blend||0,effects:this.effectsEmitted,custom:!!this.custom};}
 }
 const oceanAudio=new OceanAudio();
