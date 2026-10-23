@@ -23,9 +23,9 @@ async function capture(browser,url,label){
   assert.ok(await page.evaluate(()=>window.__ocean?.ready),await page.locator('#errorMessage').textContent());
   for(const view of [...commonViews,...(profile.mobile?mobileViews:desktopViews)]){
    await page.setViewportSize(view.viewport||{width:320,height:240});
-   const row=await page.evaluate(({view,profile})=>{
+   const row=await page.evaluate(async({view,profile})=>{
     settings.adaptive=false;settings.third=false;settings.lamp=false;renderer.quality=profile.quality;renderer.dynamicScale=1;renderer.resize();
-    __renderView(view.p,view.aim,8);
+    if(window.__prepareView)await __prepareView(view.p,view.aim,8);else __renderView(view.p,view.aim,8);
     const gl=renderer.gl,original=gl.bufferSubData;let uploadCalls=0,uploadBytes=0,uniformCalls=0;
     const uniformOriginals={},uniformCallsByMethod={};
     for(const name of ['uniform1i','uniform1f','uniform2f','uniform2fv','uniform3f','uniform3fv','uniform4f','uniform4fv','uniformMatrix4fv']){

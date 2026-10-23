@@ -1,6 +1,7 @@
 /* Precompiled scene: decode off the hot path and upload bounded slices to WebGL.
    Original generation remains as a fallback; no server, CDN or API key needed. */
 async function loadCompiledScene(renderer){
+ if(typeof WORLD_STREAM!=='undefined'&&await loadStreamedScene(renderer,WORLD_STREAM))return true;
  if(typeof DecompressionStream==='undefined'||typeof WORLD==='undefined')return false;
  const started=performance.now();let bytes,header,base;
  try{

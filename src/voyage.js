@@ -106,6 +106,7 @@ takePhoto=async function(){
  if(!oceanPhotography.canCapture()){toast(oceanPhotography.blockedReason());return;}
  voyage.photoBusy=true;
  try{
+  if(renderer.sceneStream){updateCamera();oceanFeatures.call('afterCamera',0);await renderer.sceneStream.ready(eye);if(!active||modal||photoOpen)return;}
   const photo=legacyPhoto();if(!photo)return;const grade=gradePhoto();
   photo.grade=grade.score;photo.metrics=grade.metrics;photo.species=grade.subject?SPECIES[grade.subject.species].name:'海底風景';photo.individual=grade.subject?.uid||null;
   oceanFeatures.call('photoMetadata',photo);

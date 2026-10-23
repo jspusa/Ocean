@@ -865,7 +865,15 @@ class Renderer{
   }
   this.updateBatch(b);this.batches.push(b);g.bindVertexArray(null);return b;
  }
+ deferredBatch(meta,instances){
+  const b={instances,data:new Float32Array(instances.length*24),count:meta.indexCount,vertexCount:meta.vertexFloats/12,kind:meta.kind,dynamic:meta.dynamic,material:meta.material||0,species:meta.species??-1,shadow:meta.shadow!==false,visible:meta.visible!==false,radius:meta.radius,drawCount:0,vao:null,vb:null,eb:null,ib:null};
+  for(const k of ['minDistance','maxDistance','shadowProxy','sceneRole'])if(meta[k]!==undefined)b[k]=meta[k];this.batches.push(b);return b;
+ }
+ attachBatchMesh(b,mesh){
+  const visible=b.visible,replacement=this.batch({indexed:mesh,material:b.material,species:b.species,shadow:b.shadow},b.instances,b.kind,b.dynamic);this.batches.pop();Object.assign(b,replacement);b.visible=visible;
+ }
  updateBatch(b,eye=null,planes=null,shadowPass=false){
+  if(b.streamMesh!==undefined&&!b.vao){b.drawCount=0;return;}
   let j=0;const a=b.data;const lodScale=this.mobile?(this.quality===0?.64:.82):(this.quality===0?.75:1);
   // Terrain LODs have matching edges but different interior heights. Submit
   // exactly one opaque surface; overlapping dithered surfaces fight in depth.
@@ -1008,6 +1016,7 @@ class Renderer{
  }
  bindTex(unit,tex){let g=this.gl;g.activeTexture(g.TEXTURE0+unit);g.bindTexture(g.TEXTURE_2D,tex);}
  render(eye,target,t){
+  if(this.sceneStream&&!this.sceneStream.update(eye)){this.dirty=true;return false;}
   this.dirty=false;const begin=performance.now(),g=this.gl;this.drawCalls=0;this.shadowDraws=0;
   const near=Number.isFinite(this.photoNear)?clamp(this.photoNear,.002,.16):.16;
   this.renderOrigin=eye[1]<-500?eye.map(n=>Math.round(n/64)*64):[0,0,0];const origin=this.renderOrigin,relativeEye=V.sub(eye,origin),relativeTarget=V.sub(target,origin);
