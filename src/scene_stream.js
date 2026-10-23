@@ -26,6 +26,24 @@ class SceneStream{
  }
  scale(){const r=this.renderer;return r.mobile?(r.quality===0?.64:.82):(r.quality===0?.75:1);}
  needed(eye,padding=0){const ids=new Set(),scale=this.scale();for(const m of this.meshes)if(m.pinned||m.batches.some(b=>streamBatchNear(b,eye,padding,scale)))ids.add(m.id);return ids;}
+ neededRanges(eye){
+  // The current view uses three paddings. Classify them in one live traversal,
+  // so moved instances, visibility and quality edits cannot leave stale bounds.
+  const required=new Set(),preload=new Set(),keep=new Set(),scale=this.scale(),cx=Math.round(eye[0]/16)*16,cy=Math.round(eye[1]/16)*16-4,cz=Math.round(eye[2]/16)*16-12;
+  for(const m of this.meshes){let matches=m.pinned?7:0;
+   if(!m.pinned)for(const b of m.batches){
+    if(!b.visible)continue;const reach=(b.maxDistance||220)*scale+.6,required2=reach*reach,preload2=(reach+48)**2,keep2=(reach+128)**2,shadow=b.shadow&&!b.dynamic&&b.kind!==3;
+    for(const f of b.instances){const p=f.p;let x=p[0]-eye[0],y=p[1]-eye[1],z=p[2]-eye[2],distance=x*x+y*y+z*z;
+     if(shadow){x=p[0]-cx;y=p[1]-cy;z=p[2]-cz;distance=Math.min(distance,x*x+y*y+z*z);}
+     if(distance<=required2)matches|=1;if(distance<=preload2)matches|=2;if(distance<=keep2)matches|=4;
+     if(matches===7)break;
+    }
+    if(matches===7)break;
+   }
+   if(matches&1)required.add(m.id);if(matches&2)preload.add(m.id);if(matches&4)keep.add(m.id);
+  }
+  return {required,preload,keep};
+ }
  request(id,priority=0){
   if((this.retryAfter.get(id)||0)>performance.now())return Promise.reject(new Error('region retry pending'));
   if(this.jobs.has(id)){const job=this.jobs.get(id);job.priority=Math.min(job.priority,priority);return job.promise;}
@@ -65,12 +83,12 @@ class SceneStream{
   this.stats();
  }
  update(eye,prefetch=true){
-  const now=performance.now(),required=this.needed(eye);let ready=true;
+  const now=performance.now(),ranges=prefetch?this.neededRanges(eye):null,required=ranges?ranges.required:this.needed(eye);let ready=true;
   for(const id of required){const m=this.meshes[id];if(!m.resident){ready=false;this.request(m.meta.chunk,0).catch(error=>this.failed(error));}}
   if(prefetch){
    const points=streamPreloadEyes(eye,this.lastEye,(now-this.lastTime)/1000);
    this.lastEye=eye.slice();this.lastTime=now;
-   const ahead=new Set(),keep=this.needed(eye,128);for(const point of points)for(const id of this.needed(point,48))ahead.add(id);
+   const ahead=ranges.preload,keep=ranges.keep;for(let point=1;point<points.length;point++)for(const id of this.needed(points[point],48))ahead.add(id);
    if(ready)for(const id of ahead){keep.add(id);const m=this.meshes[id];if(!m.resident)this.request(m.meta.chunk,1).catch(error=>this.failed(error));}
    this.trim(keep,now);
   }

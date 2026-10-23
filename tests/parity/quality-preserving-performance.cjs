@@ -7,6 +7,7 @@ const option=(name,fallback)=>process.argv.find(x=>x.startsWith('--'+name+'='))?
 const originalURL=option('original','http://127.0.0.1:8001/'),candidateURL=option('candidate','http://127.0.0.1:8000/');
 const out=option('out','qa/parity/quality-preserving-performance.json'),baselinePath=option('baseline','qa/parity/quality-original.json');
 const existingOnly=process.argv.includes('--existing-content-only');
+const unchangedWork=process.argv.includes('--unchanged-work');
 const errors=[],profiles=[{id:'desktop',mobile:false,quality:2},{id:'mobile',mobile:true,quality:1}];
 const commonViews=[{id:'reef',p:[0,-8,7],aim:[0,-8,-10]},{id:'offshore',p:[390,-32,-184],aim:[390,-32,-210]},{id:'hadal',p:[766,-7000,-120],aim:[766,-7000,-145]}];
 const desktopViews=[{id:'cave',p:[-218,-26,-69],aim:[-218,-25,-47.5]},{id:'ruins',p:[176,-49,-197],aim:[187,-51,-225]},{id:'reef-reversed',p:[0,-8,-10],aim:[0,-9,8]},{...commonViews[0],id:'reef-wide',viewport:{width:550,height:370}}];
@@ -83,7 +84,7 @@ async function capture(browser,url,label){
   for(let i=0;i<a.length;i++){if(i%4!==3){min=Math.min(min,a[i]);max=Math.max(max,a[i]);}const delta=Math.abs(a[i]-b[i]);if(delta)differingChannels++;maxDifference=Math.max(maxDifference,delta);sumDifference+=delta;}
   return {profile:before.profile,scene:before.scene,before:summarize(before),after:summarize(after),pixels:{differingChannels,maxDifference,meanDifference:sumDifference/a.length,originalRange:max-min}};
  });
- fs.mkdirSync(path.dirname(out),{recursive:true});fs.writeFileSync(out,JSON.stringify({existingContentOnly:existingOnly,method:'Same fixed camera/time, quality, MSAA and framebuffer. Exact readPixels comparison on one software WebGL renderer, plus real animate() at controlled 120 Hz with a render spy. Work counts are not FPS or power measurements.'+(existingOnly?' New reef-fish-expansion batches are hidden for the pre-existing content comparison; new fish require separate visual verification.':''),comparisons,errors},null,2));
+ fs.mkdirSync(path.dirname(out),{recursive:true});fs.writeFileSync(out,JSON.stringify({existingContentOnly:existingOnly,unchangedWork,method:'Same fixed camera/time, quality, MSAA and framebuffer. Exact readPixels comparison on one software WebGL renderer, plus real animate() at controlled 120 Hz with a render spy. Work counts are not FPS or power measurements.'+(existingOnly?' New reef-fish-expansion batches are hidden for the pre-existing content comparison; new fish require separate visual verification.':''),comparisons,errors},null,2));
  assert.equal(errors.length,0,errors.join('; '));
  for(const row of comparisons){
   assert.equal(row.before.gl,0);assert.equal(row.after.gl,0);assert.ok(row.pixels.originalRange>20,'Original image must contain visible contrast');
@@ -91,6 +92,7 @@ async function capture(browser,url,label){
   assert.equal(row.pixels.differingChannels,0,'Rendered pixels must remain identical: '+row.profile+'/'+row.scene);
   assert.ok(row.after.uploadCalls<=row.before.uploadCalls,'GPU upload calls must not increase');
   assert.ok(row.after.uniformCalls<=row.before.uniformCalls,'GPU uniform calls must not increase');
+  if(unchangedWork)for(const key of ['triangles','drawCalls','shadowDraws','uploadCalls','uploadBytes','uniformCalls'])assert.equal(row.after[key],row.before[key],key+' must be unchanged for a CPU-only optimization');
   if(row.before.cadence){
    assert.deepEqual(row.after.cadence,row.before.cadence,'Animation cadence, elapsed time and swimming must match the original');
    for(const sample of row.after.cadence){
@@ -102,5 +104,5 @@ async function capture(browser,url,label){
   }
   console.log('PASS identical pixels '+row.profile+'/'+row.scene+'; uploads '+row.before.uploadCalls+' -> '+row.after.uploadCalls);
  }
- assert.ok(comparisons.some(row=>row.after.uploadCalls<row.before.uploadCalls),'Expected a measured reduction in redundant uploads');
+ if(!unchangedWork)assert.ok(comparisons.some(row=>row.after.uploadCalls<row.before.uploadCalls),'Expected a measured reduction in redundant uploads');
 })().catch(error=>{console.error(error);process.exitCode=1;});

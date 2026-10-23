@@ -17,6 +17,9 @@ const OceanRegions=(()=>{
  function ground(x,z){
   if(typeof OceanTrench!=='undefined'&&OceanTrench.containsXZ(x,z))return OceanTrench.groundHeight(x,z);
   let y=originalGround(x,z);
+  // Outside these conservative supports every regional blend has exactly zero
+  // weight. Keep the original surface without evaluating five distant shapes.
+  if(!(x>=-246&&x<=-202&&z>=-95&&z<=-28)&&!(x>=143&&x<=211&&z>=-249&&z<=-182)&&!(x>=-176&&x<=-123&&z>=-338&&z<=-245))return y;
   const cave=boxWeight(x,z,-236,-212,-85,-38,10);
   if(cave)y=mixRegion(y,-29,cave);
   const ruins=boxWeight(x,z,155,199,-237,-194,12);
@@ -154,6 +157,13 @@ const OceanRegions=(()=>{
  for(const s of solids)for(let x=Math.floor(s.min[0]/tileSize);x<=Math.floor(s.max[0]/tileSize);x++)for(let y=Math.floor(s.min[1]/verticalSize);y<=Math.floor(s.max[1]/verticalSize);y++)for(let z=Math.floor(s.min[2]/tileSize);z<=Math.floor(s.max[2]/tileSize);z++){
   const key=x+','+y+','+z;if(!tiles.has(key))tiles.set(key,[]);tiles.get(key).push(s);
  }
+ // Ceiling rays stay in one XZ column. Index only immutable roof references,
+ // so a deep animal does not rebuild a Set while walking to the surface.
+ const roofColumns=new Map();
+ for(const s of solids)if(s.role==='roof')for(let x=Math.floor(s.min[0]/tileSize);x<=Math.floor(s.max[0]/tileSize);x++)for(let z=Math.floor(s.min[2]/tileSize);z<=Math.floor(s.max[2]/tileSize);z++){
+  const key=x+','+z;if(!roofColumns.has(key))roofColumns.set(key,[]);roofColumns.get(key).push(s);
+ }
+ for(const column of roofColumns.values())Object.freeze(column);
  function candidates(a,b=a,r=0){
   const lo=a.map((n,i)=>Math.min(n,b[i])-r),hi=a.map((n,i)=>Math.max(n,b[i])+r),sizes=[tileSize,verticalSize,tileSize],start=lo.map((n,i)=>Math.floor(n/sizes[i])),end=hi.map((n,i)=>Math.floor(n/sizes[i])),out=new Set();
   if((end[0]-start[0]+1)*(end[1]-start[1]+1)*(end[2]-start[2]+1)>1200){for(const s of solids)if(s.min.every((n,i)=>n<=hi[i]&&s.max[i]>=lo[i]))out.add(s);}
@@ -267,8 +277,9 @@ const OceanRegions=(()=>{
   if(best)p.splice(0,3,...best);return p;
  }
  function ceilingAt(x,z,fromY=-Infinity){
+  const column=roofColumns.get(Math.floor(x/tileSize)+','+Math.floor(z/tileSize));if(!column)return 0;
   const a=[x,Number.isFinite(fromY)?fromY:-150,z],d=[0,150-a[1],0];let y=0;
-  for(const s of candidates(a,[x,150,z]))if(s.role==='roof'){const hit=interval(s,a,d);if(hit&&hit[1]>0&&hit[0]>=0)y=Math.min(y,a[1]+hit[0]*d[1]);}return y;
+  for(const s of column){const hit=interval(s,a,d);if(hit&&hit[1]>0&&hit[0]>=0)y=Math.min(y,a[1]+hit[0]*d[1]);}return y;
  }
  function coverage(p){return ceilingAt(p[0],p[2],p[1])<0?1:0;}
  // Chisel-cut stone with true bevels. Plane faces stay aligned with collision
