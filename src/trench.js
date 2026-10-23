@@ -40,11 +40,17 @@ const OceanTrench=(()=>{
   const bench=1-smooth((Math.max(Math.abs((x-298)/10),Math.abs((z+230)/26))-1)/.8);
   return mix(slope,-220,bench);
  }
+ // The rendered seabed and physics share these immutable grid samples. Keep
+ // doubles (the generator's original precision), rather than evaluating the
+ // same procedural terrain four times for every swimmer/animal height query.
+ const bedHeights=new Float64Array(floorGrid.xs.length*floorGrid.zs.length);
+ for(let j=0;j<floorGrid.zs.length;j++)for(let i=0;i<floorGrid.xs.length;i++)bedHeights[j*floorGrid.xs.length+i]=bedSample(floorGrid.xs[i],floorGrid.zs[j]);
+ const bedHeight=(i,j)=>bedHeights[j*floorGrid.xs.length+i];
  function cell(axis,value){let low=0,high=axis.length-1;while(high-low>1){const middle=(low+high)>>1;if(axis[middle]<=value)low=middle;else high=middle;}return Math.min(low,axis.length-2);}
  function groundHeight(x,z){
   if(!containsXZ(x,z))return null;
   const q=floorGrid,i=cell(q.xs,x),j=cell(q.zs,z),a=clamp((x-q.xs[i])/(q.xs[i+1]-q.xs[i]),0,1),b=clamp((z-q.zs[j])/(q.zs[j+1]-q.zs[j]),0,1);
-  const h=(di,dj)=>bedSample(q.xs[i+di],q.zs[j+dj]),h00=h(0,0),h10=h(1,0),h11=h(1,1),h01=h(0,1);
+  const h00=bedHeight(i,j),h10=bedHeight(i+1,j),h11=bedHeight(i+1,j+1),h01=bedHeight(i,j+1);
   return a>=b?h00+(h10-h00)*a+(h11-h10)*b:h00+(h11-h01)*a+(h01-h00)*b;
  }
  function heightInTriangle(p,x,z){const [a,b,c]=p,den=(b[2]-c[2])*(a[0]-c[0])+(c[0]-b[0])*(a[2]-c[2]);if(Math.abs(den)<1e-12)return null;const u=((b[2]-c[2])*(x-c[0])+(c[0]-b[0])*(z-c[2]))/den,v=((c[2]-a[2])*(x-c[0])+(a[0]-c[0])*(z-c[2]))/den;return u>=-1e-8&&v>=-1e-8&&u+v<=1+1e-8?u*a[1]+v*b[1]+(1-u-v)*c[1]:null;}
@@ -81,7 +87,7 @@ const OceanTrench=(()=>{
  for(let j=0;j<shelfGrid.zs.length-1;j++)for(let i=0;i<shelfGrid.xs.length-1;i++){const x=shelfGrid.xs[i],z=shelfGrid.zs[j],x1=shelfGrid.xs[i+1],z1=shelfGrid.zs[j+1],p=[[x,shelf(x,z),z],[x1,shelf(x1,z),z],[x1,shelf(x1,z1),z1],[x,shelf(x,z1),z1]];prism('terrace-'+j+'-'+i+'a',[p[0],p[2],p[1]],1,-3.5,17,'roof');prism('terrace-'+j+'-'+i+'b',[p[0],p[3],p[2]],1,-3.5,17,'roof');}
  // Bottom sediment is divided into chunks horizontally as well as by depth.
  // Geometry remains local even at seven kilometres; no origin at the sea level.
- const q=floorGrid;for(let j=0;j<q.zs.length-1;j++)for(let i=0;i<q.xs.length-1;i++){const x=q.xs[i],z=q.zs[j],x1=q.xs[i+1],z1=q.zs[j+1],p=[[x,bedSample(x,z),z],[x1,bedSample(x1,z),z],[x1,bedSample(x1,z1),z1],[x,bedSample(x,z1),z1]];for(const ids of [[0,2,1],[0,3,2]]){const triangle=ids.map(k=>p[k]);emit(triangle,faceNormal(...triangle),17);}}
+ const q=floorGrid;for(let j=0;j<q.zs.length-1;j++)for(let i=0;i<q.xs.length-1;i++){const x=q.xs[i],z=q.zs[j],x1=q.xs[i+1],z1=q.zs[j+1],p=[[x,bedHeight(i,j),z],[x1,bedHeight(i+1,j),z],[x1,bedHeight(i+1,j+1),z1],[x,bedHeight(i,j+1),z1]];for(const ids of [[0,2,1],[0,3,2]]){const triangle=ids.map(k=>p[k]);emit(triangle,faceNormal(...triangle),17);}}
 
  // A bounded visibility graph handles the finite terrace edge at the current
  // depth. Replanning must never first visit the last completed station.

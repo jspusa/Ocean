@@ -14,8 +14,8 @@
     },
     {
       "path": "README.md",
-      "bytes": 18206,
-      "sha256": "a2d4ef4062e7540e1afd823c64126330f5e46c4c2d14977a4a3db4dbe8e0eb36"
+      "bytes": 18243,
+      "sha256": "2ae06509bce1fa15ece876a2a16fd8197922055f391f40b4216c30c8044cba03"
     },
     {
       "path": "VERSION",
@@ -299,8 +299,8 @@
     },
     {
       "path": "src/app.js",
-      "bytes": 70180,
-      "sha256": "9cadfe06b8551fa88645ef620f0cf7f9859de272766d7ed7643fdb9ece5d52f4"
+      "bytes": 71842,
+      "sha256": "885e2fa3ada8016569f29966b64e2e0ef6c535576a90fa8851c5a94ac611c7e7"
     },
     {
       "path": "src/aquarium.js",
@@ -344,8 +344,8 @@
     },
     {
       "path": "src/engine.js",
-      "bytes": 88374,
-      "sha256": "a41ab000d0f38c8358f099bb6caea00bd664f96bca24e1d12ef6f8c518deb0f4"
+      "bytes": 90428,
+      "sha256": "3f162cb9f481726de48245805974072041bc3a3eae45e11fb061440b6e904c3a"
     },
     {
       "path": "src/expedition.js",
@@ -389,8 +389,8 @@
     },
     {
       "path": "src/mobile-controls.js",
-      "bytes": 12907,
-      "sha256": "1f22fd2f7cebdb8eb01b2d2cc47f2985472ae5088f38b95ab12839b02e202528"
+      "bytes": 12837,
+      "sha256": "68a284dae58af8c6b7dcc116ec6f9a14f9ef27b3ce0d19a401d6cf140ac8665a"
     },
     {
       "path": "src/navigation.js",
@@ -414,8 +414,8 @@
     },
     {
       "path": "src/performance.js",
-      "bytes": 9593,
-      "sha256": "103121f77c87ac828ddee4c16efbae7c3127f43290b2b9c5cfdc89835682fb5d"
+      "bytes": 7606,
+      "sha256": "ac40aa1253ce098f1ca18cc7f5da88163d653c629fddcebcd8caaaeed21732f4"
     },
     {
       "path": "src/photography.js",
@@ -469,8 +469,8 @@
     },
     {
       "path": "src/trench.js",
-      "bytes": 13344,
-      "sha256": "fa2e491138fcb28e55a1ad0517170cca77e6c42d3cfc671b1cf66d237cf9fe50"
+      "bytes": 13871,
+      "sha256": "7db31084574da566abc740747125fabde960ecb7695a79fbaef4ecccffff0154"
     },
     {
       "path": "src/trench_fauna.js",

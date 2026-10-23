@@ -1,0 +1,420 @@
+{
+  "source": "948c046a67fb5b7c7b8f77466b4b24171e75be9d:src/engine.js",
+  "draws": [
+    {
+      "pass": "static",
+      "id": "terrain-a",
+      "uniforms": {
+        "uKind": [
+          0
+        ],
+        "uMat": [
+          1
+        ],
+        "uSpecies": [
+          -1
+        ],
+        "uRigClass": [
+          0
+        ],
+        "uSurfaceProfile": [
+          -1,
+          0,
+          1,
+          -1
+        ]
+      }
+    },
+    {
+      "pass": "static",
+      "id": "terrain-b",
+      "uniforms": {
+        "uKind": [
+          0
+        ],
+        "uMat": [
+          1
+        ],
+        "uSpecies": [
+          -1
+        ],
+        "uRigClass": [
+          0
+        ],
+        "uSurfaceProfile": [
+          -1,
+          0,
+          1,
+          -1
+        ]
+      }
+    },
+    {
+      "pass": "static",
+      "id": "rock",
+      "uniforms": {
+        "uKind": [
+          0
+        ],
+        "uMat": [
+          2
+        ],
+        "uSpecies": [
+          -1
+        ],
+        "uRigClass": [
+          0
+        ],
+        "uSurfaceProfile": [
+          -1,
+          0,
+          1,
+          -1
+        ]
+      }
+    },
+    {
+      "pass": "static",
+      "id": "terrain-c",
+      "uniforms": {
+        "uKind": [
+          0
+        ],
+        "uMat": [
+          1
+        ],
+        "uSpecies": [
+          -1
+        ],
+        "uRigClass": [
+          0
+        ],
+        "uSurfaceProfile": [
+          -1,
+          0,
+          1,
+          -1
+        ]
+      }
+    },
+    {
+      "pass": "static",
+      "id": "animal",
+      "uniforms": {
+        "uKind": [
+          0
+        ],
+        "uMat": [
+          6
+        ],
+        "uSpecies": [
+          0
+        ],
+        "uRigClass": [
+          3
+        ],
+        "uSurfaceProfile": [
+          0.4,
+          0.2,
+          2,
+          0
+        ]
+      }
+    },
+    {
+      "pass": "colour",
+      "id": "terrain-a",
+      "uniforms": {
+        "uSand": [
+          0
+        ],
+        "uSandN": [
+          1
+        ],
+        "uRock": [
+          2
+        ],
+        "uRockN": [
+          3
+        ],
+        "uShell": [
+          4
+        ],
+        "uShellN": [
+          5
+        ],
+        "uCoral": [
+          6
+        ],
+        "uCoralN": [
+          7
+        ],
+        "uShadow": [
+          8
+        ],
+        "uDynamicShadow": [
+          10
+        ],
+        "uLODBounds": [
+          0,
+          220,
+          0
+        ],
+        "uKind": [
+          0
+        ],
+        "uMat": [
+          1
+        ],
+        "uSpecies": [
+          -1
+        ],
+        "uRigClass": [
+          0
+        ],
+        "uSurfaceProfile": [
+          -1,
+          0,
+          1,
+          -1
+        ]
+      }
+    },
+    {
+      "pass": "colour",
+      "id": "terrain-b",
+      "uniforms": {
+        "uSand": [
+          0
+        ],
+        "uSandN": [
+          1
+        ],
+        "uRock": [
+          2
+        ],
+        "uRockN": [
+          3
+        ],
+        "uShell": [
+          4
+        ],
+        "uShellN": [
+          5
+        ],
+        "uCoral": [
+          6
+        ],
+        "uCoralN": [
+          7
+        ],
+        "uShadow": [
+          8
+        ],
+        "uDynamicShadow": [
+          10
+        ],
+        "uLODBounds": [
+          0,
+          220,
+          0
+        ],
+        "uKind": [
+          0
+        ],
+        "uMat": [
+          1
+        ],
+        "uSpecies": [
+          -1
+        ],
+        "uRigClass": [
+          0
+        ],
+        "uSurfaceProfile": [
+          -1,
+          0,
+          1,
+          -1
+        ]
+      }
+    },
+    {
+      "pass": "colour",
+      "id": "rock",
+      "uniforms": {
+        "uSand": [
+          0
+        ],
+        "uSandN": [
+          1
+        ],
+        "uRock": [
+          2
+        ],
+        "uRockN": [
+          3
+        ],
+        "uShell": [
+          4
+        ],
+        "uShellN": [
+          5
+        ],
+        "uCoral": [
+          6
+        ],
+        "uCoralN": [
+          7
+        ],
+        "uShadow": [
+          8
+        ],
+        "uDynamicShadow": [
+          10
+        ],
+        "uLODBounds": [
+          0,
+          220,
+          0
+        ],
+        "uKind": [
+          0
+        ],
+        "uMat": [
+          2
+        ],
+        "uSpecies": [
+          -1
+        ],
+        "uRigClass": [
+          0
+        ],
+        "uSurfaceProfile": [
+          -1,
+          0,
+          1,
+          -1
+        ]
+      }
+    },
+    {
+      "pass": "colour",
+      "id": "terrain-c",
+      "uniforms": {
+        "uSand": [
+          0
+        ],
+        "uSandN": [
+          1
+        ],
+        "uRock": [
+          2
+        ],
+        "uRockN": [
+          3
+        ],
+        "uShell": [
+          4
+        ],
+        "uShellN": [
+          5
+        ],
+        "uCoral": [
+          6
+        ],
+        "uCoralN": [
+          7
+        ],
+        "uShadow": [
+          8
+        ],
+        "uDynamicShadow": [
+          10
+        ],
+        "uLODBounds": [
+          0,
+          220,
+          0
+        ],
+        "uKind": [
+          0
+        ],
+        "uMat": [
+          1
+        ],
+        "uSpecies": [
+          -1
+        ],
+        "uRigClass": [
+          0
+        ],
+        "uSurfaceProfile": [
+          -1,
+          0,
+          1,
+          -1
+        ]
+      }
+    },
+    {
+      "pass": "colour",
+      "id": "animal",
+      "uniforms": {
+        "uSand": [
+          0
+        ],
+        "uSandN": [
+          1
+        ],
+        "uRock": [
+          2
+        ],
+        "uRockN": [
+          3
+        ],
+        "uShell": [
+          4
+        ],
+        "uShellN": [
+          5
+        ],
+        "uCoral": [
+          6
+        ],
+        "uCoralN": [
+          7
+        ],
+        "uShadow": [
+          8
+        ],
+        "uDynamicShadow": [
+          10
+        ],
+        "uLODBounds": [
+          0,
+          220,
+          0
+        ],
+        "uKind": [
+          0
+        ],
+        "uMat": [
+          6
+        ],
+        "uSpecies": [
+          0
+        ],
+        "uRigClass": [
+          3
+        ],
+        "uSurfaceProfile": [
+          0.4,
+          0.2,
+          2,
+          0
+        ]
+      }
+    }
+  ]
+}

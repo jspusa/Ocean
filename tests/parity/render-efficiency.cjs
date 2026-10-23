@@ -42,11 +42,11 @@ function multisampling(mobile,quality,supported){
  const gl=new Proxy({SAMPLES:1,FRAMEBUFFER_COMPLETE:2,NO_ERROR:0,getInternalformatParameter:()=>supported,checkFramebufferStatus:()=>2,getError:()=>0,createFramebuffer:()=>++id,createRenderbuffer:()=>++id,renderbufferStorageMultisample:(_,samples,...dimensions)=>allocations.push({samples,dimensions})},{get:(o,k)=>k in o?o[k]:()=>{}});
  const renderer=Object.assign(Object.create(Renderer.prototype),{gl,mobile,quality,floatColor:true});renderer.setupMultisampling(390,844);return {samples:renderer.msaaSamples,allocations};
 }
-check('mobile balanced quality uses existing FXAA without multisample buffers',()=>{
- const r=multisampling(true,1,[4,2]);assert.equal(r.samples,0);assert.equal(r.allocations.length,0);
+check('balanced quality preserves supported 2x MSAA on desktop and mobile',()=>{
+ for(const mobile of [false,true])assert.equal(multisampling(mobile,1,[4,2]).samples,2);
 });
-check('balanced quality never silently escalates unsupported 2x MSAA to 4x',()=>{
- const r=multisampling(false,1,[4]);assert.equal(r.samples,0);assert.equal(r.allocations.length,0);
+check('balanced quality preserves 4x fallback when 2x is unsupported',()=>{
+ for(const mobile of [false,true])assert.equal(multisampling(mobile,1,[4]).samples,4);
 });
 check('explicit high quality retains supported 4x antialiasing on either device',()=>{
  for(const mobile of [false,true])assert.equal(multisampling(mobile,2,[4,2]).samples,4);

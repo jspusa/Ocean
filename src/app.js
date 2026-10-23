@@ -25,10 +25,45 @@ function collide(pos,from=null){
  const bounds=OceanTrench.worldBounds;
  pos[0]=clamp(pos[0],bounds.left+.5,bounds.right-.5);pos[2]=clamp(pos[2],bounds.top+.5,bounds.bottom-.5);
  pos[1]=clamp(pos[1],groundHeight(pos[0],pos[2])+.82,-.65);
- for(const ob of obstacles){const sx=ob.s[0]+.4,sy=ob.s[1]+.4,sz=ob.s[2]+.4;let qx=(pos[0]-ob.p[0])/sx,qy=(pos[1]-ob.p[1])/sy,qz=(pos[2]-ob.p[2])/sz,d2=qx*qx+qy*qy+qz*qz;
-  if(d2<1){if(d2<.0001){pos[1]=ob.p[1]+sy;continue;}const k=1/Math.sqrt(d2);pos[0]=ob.p[0]+qx*k*sx;pos[1]=ob.p[1]+qy*k*sy;pos[2]=ob.p[2]+qz*k*sz;}}
+ let nearby=reefObstacleCandidates(pos);
+ for(let n=0;n<nearby.length;n++){const id=nearby[n],ob=obstacles[id],sx=ob.s[0]+.4,sy=ob.s[1]+.4,sz=ob.s[2]+.4;let qx=(pos[0]-ob.p[0])/sx,qy=(pos[1]-ob.p[1])/sy,qz=(pos[2]-ob.p[2])/sz,d2=qx*qx+qy*qy+qz*qz;
+  if(d2<1){if(d2<.0001)pos[1]=ob.p[1]+sy;else{const k=1/Math.sqrt(d2);pos[0]=ob.p[0]+qx*k*sx;pos[1]=ob.p[1]+qy*k*sy;pos[2]=ob.p[2]+qz*k*sz;}
+   // A push can enter another cell. Preserve the original one-pass order:
+   // discover later obstacles at the new position, never revisit earlier ones.
+   nearby=reefObstacleCandidates(pos,pos,id);n=-1;
+  }}
  pos[1]=clamp(pos[1],groundHeight(pos[0],pos[2])+.82,-.65);if(typeof OceanRegions!=='undefined')OceanRegions.resolve(pos,.4,from);return pos;
 }
+function reefObstacleCandidates(a,b=a,after=-1){
+ // Scene-owned reef obstacles are immutable during play; boat movement changes
+ // render batches, not these rocks. Length changes rebuild after load/generation.
+ // Future same-length edits must call invalidate() before the next query.
+ let cache=reefObstacleCandidates.cache;
+ if(!cache||cache.count!==obstacles.length){
+  const tiles=new Map(),bounds=[],ids=[];
+  for(let i=0;i<obstacles.length;i++){
+   // Expand slightly beyond the largest clearance to cover rounding at cell edges.
+   const ob=obstacles[i],p=ob.p,s=ob.s,lo=p.map((v,k)=>v-s[k]-.40000001),hi=p.map((v,k)=>v+s[k]+.40000001);
+   bounds.push({lo,hi});ids.push(i);
+   for(let x=Math.floor(lo[0]/16);x<=Math.floor(hi[0]/16);x++)for(let y=Math.floor(lo[1]/16);y<=Math.floor(hi[1]/16);y++)for(let z=Math.floor(lo[2]/16);z<=Math.floor(hi[2]/16);z++){
+    const key=x+','+y+','+z;if(!tiles.has(key))tiles.set(key,[]);tiles.get(key).push(i);
+   }
+  }
+  cache=reefObstacleCandidates.cache={count:obstacles.length,tiles,bounds,ids};
+ }
+ const lo=a.map((v,k)=>Math.min(v,b[k])),hi=a.map((v,k)=>Math.max(v,b[k]));
+ if(!lo.every(Number.isFinite)||!hi.every(Number.isFinite))return cache.ids.filter(i=>i>after);
+ const start=lo.map(v=>Math.floor(v/16)),end=hi.map(v=>Math.floor(v/16));
+ let ids;
+ // Huge chart/observation rays must not walk thousands of empty grid cells.
+ if((end[0]-start[0]+1)*(end[1]-start[1]+1)*(end[2]-start[2]+1)>512)ids=cache.ids;
+ else{
+  const found=new Set();for(let x=start[0];x<=end[0];x++)for(let y=start[1];y<=end[1];y++)for(let z=start[2];z<=end[2];z++)for(const id of cache.tiles.get(x+','+y+','+z)||[])found.add(id);
+  ids=Array.from(found).sort((x,y)=>x-y);
+ }
+ return ids.filter(i=>i>after&&cache.bounds[i].lo.every((v,k)=>v<=hi[k]&&cache.bounds[i].hi[k]>=lo[k]));
+}
+reefObstacleCandidates.invalidate=()=>{reefObstacleCandidates.cache=null;};
 function dir(){return [Math.sin(player.yaw)*Math.cos(player.pitch),Math.sin(player.pitch),-Math.cos(player.yaw)*Math.cos(player.pitch)];}
 function startDive(tour=false){if(!ready)return;oceanSwimActions.exit();oceanPerf.pause();oceanPerf.count=0;oceanPerf.cursor=0;
  // AudioContext is resumed directly by this user gesture, before any async work.
@@ -80,7 +115,7 @@ const oceanSwimActions=(()=>{
   const a=player.p,b=head();
   if(typeof OceanRegions!=='undefined'&&(OceanRegions.segmentBlocked(a,b,.22)||OceanRegions.pointBlocked(b,.22)))return false;
   // Sweep the camera's full clearance through deck/rock ellipsoids as well.
-  for(const ob of obstacles){const s=ob.s.map(n=>n+.22),q=a.map((v,i)=>(v-ob.p[i])/s[i]),d=b.map((v,i)=>(v-a[i])/s[i]),length=V.dot(d,d),u=clamp(-V.dot(q,d)/Math.max(.000001,length),0,1),near=V.add(q,V.mul(d,u));if(V.dot(near,near)<1)return false;}
+  for(const id of reefObstacleCandidates(a,b)){const ob=obstacles[id],s=ob.s.map(n=>n+.22),q=a.map((v,i)=>(v-ob.p[i])/s[i]),d=b.map((v,i)=>(v-a[i])/s[i]),length=V.dot(d,d),u=clamp(-V.dot(q,d)/Math.max(.000001,length),0,1),near=V.add(q,V.mul(d,u));if(V.dot(near,near)<1)return false;}
   return true;
  }
  function exit(){const was=surface;surface=false;if(was){cameraCut=true;renderer.dirty=true;renderer.forceShadow=true;}return was;}
@@ -132,7 +167,7 @@ function updateCamera(dt=1/60,renderPosition=null){
    if(typeof OceanRegions!=='undefined')OceanRegions.resolve(anchor,.23);
    const ab=V.sub(desired,anchor);let safeFraction=V.dist(anchor,regionSafe(anchor,desired))/Math.max(.001,V.len(ab));
    // Analytic segment/ellipsoid sweep avoids the old twelve-step snapping camera.
-   for(const ob of obstacles){const sx=ob.s[0]+.20,sy=ob.s[1]+.20,sz=ob.s[2]+.20,x=(anchor[0]-ob.p[0])/sx,y=(anchor[1]-ob.p[1])/sy,z=(anchor[2]-ob.p[2])/sz,dx=ab[0]/sx,dy=ab[1]/sy,dz=ab[2]/sz;
+   for(const id of reefObstacleCandidates(anchor,desired)){const ob=obstacles[id],sx=ob.s[0]+.20,sy=ob.s[1]+.20,sz=ob.s[2]+.20,x=(anchor[0]-ob.p[0])/sx,y=(anchor[1]-ob.p[1])/sy,z=(anchor[2]-ob.p[2])/sz,dx=ab[0]/sx,dy=ab[1]/sy,dz=ab[2]/sz;
     const A=dx*dx+dy*dy+dz*dz,B=2*(x*dx+y*dy+z*dz),C=x*x+y*y+z*z-1,disc=B*B-4*A*C;
     if(A>.00001&&disc>=0&&C>0){const hit=(-B-Math.sqrt(disc))/(2*A);if(hit>0&&hit<safeFraction)safeFraction=Math.max(.14,hit-.055);}}
    for(let i=1;i<=5;i++){const q=V.lerp(anchor,desired,i/5);if(q[1]<groundHeight(q[0],q[2])+.25){safeFraction=Math.min(safeFraction,Math.max(.14,(i-1)/5));break;}}
@@ -145,7 +180,7 @@ function updateCamera(dt=1/60,renderPosition=null){
   lastCameraThird=third;cameraCut=false;
  }else{const l=LANDMARKS[selectedEntry];eye=l.spawn.slice();eye[0]+=settings.reduced?0:Math.sin(t*.032)*.5;const yaw=l.yaw+(settings.reduced?0:Math.sin(t*.019)*.026);target=V.add(eye,[Math.sin(yaw)*10,Math.sin(l.pitch)*10,-Math.cos(yaw)*10]);diverBatch.visible=false;cameraCut=true;}
 }
-function blocked(a,b,clearance=.13){if(typeof OceanRegions!=='undefined'&&OceanRegions.segmentBlocked(a,b,clearance))return true;let ab=V.sub(b,a),d=V.len(ab);for(let o of obstacles){let t=clamp(V.dot(V.sub(o.p,a),ab)/(d*d),0,1),p=V.add(a,V.mul(ab,t)),q=p.map((v,i)=>(v-o.p[i])/(o.s[i]*.93));if(t>.02&&t<.98&&V.dot(q,q)<1)return true;}for(let k=1;k<6;k++){let p=V.lerp(a,b,k/6);if(p[1]<groundHeight(p[0],p[2])+clearance)return true;}return false;}
+function blocked(a,b,clearance=.13){if(typeof OceanRegions!=='undefined'&&OceanRegions.segmentBlocked(a,b,clearance))return true;let ab=V.sub(b,a),d=V.len(ab);for(const id of reefObstacleCandidates(a,b)){const o=obstacles[id];let t=clamp(V.dot(V.sub(o.p,a),ab)/(d*d),0,1),p=V.add(a,V.mul(ab,t)),q=p.map((v,i)=>(v-o.p[i])/(o.s[i]*.93));if(t>.02&&t<.98&&V.dot(q,q)<1)return true;}for(let k=1;k<6;k++){let p=V.lerp(a,b,k/6);if(p[1]<groundHeight(p[0],p[2])+clearance)return true;}return false;}
 function observe(dt){
  const rc=$('reticle'),card=$('focusCard');rc.classList.remove('focusing');
  if(!active||modal||photoOpen||voyage.photoMode||document.hidden||document.body.classList.contains('cinematic')){oceanSelection.suspend();return;}
@@ -165,22 +200,14 @@ function turnCamera(dx,dy){stopAuto();player.yaw+=dx*.0037*settings.sensitivity;
 function mouseLookUnavailable(){if(!settings.lookLock)return;settings.lookLock=false;persist();toast('自由環視未獲瀏覽器允許；已恢復按住畫面拖曳。');}
 async function lockMouseLook(){if(!active||modal||photoOpen||!settings.lookLock||!$('ocean').requestPointerLock)return;try{await $('ocean').requestPointerLock();}catch(_){mouseLookUnavailable();}}
 let simulationAccumulator=0,previousPhysicsPosition=null,hudClock=0,observationClock=0;
-let nextRenderAt=0,renderRate=0;
 function animate(ms){
  if(!ready)return;
- if(window.__freeze){lastTime=ms;nextRenderAt=0;oceanPerf.pause();requestAnimationFrame(animate);return;}
- if(document.hidden||(document.hasFocus&&!document.hasFocus())){lastTime=ms;nextRenderAt=0;oceanPerf.pause();simulationAccumulator=0;requestAnimationFrame(animate);return;}
+ if(window.__freeze){lastTime=ms;oceanPerf.pause();requestAnimationFrame(animate);return;}
+ const realDt=Math.max(0,(ms-lastTime)/1000||1/60),dt=Math.min(realDt,.10);lastTime=ms;
+ if(document.hidden||(document.hasFocus&&!document.hasFocus())){oceanPerf.pause();simulationAccumulator=0;requestAnimationFrame(animate);return;}
  pollGamepad();
  const liveFeature=!active&&oceanFeatures.shouldAnimate();
- if((modal||photoOpen)&&!renderer.dirty&&!liveFeature){lastTime=ms;nextRenderAt=0;oceanPerf.pause();simulationAccumulator=0;requestAnimationFrame(animate);return;}
- // Keep high-refresh screens from multiplying simulation and GPU work. Time
- // advances only on rendered frames, so a 30 Hz budget retains normal swim speed.
- const rate=active?(renderer.quality===0?30:60):(liveFeature?30:15),interval=1000/rate;
- if(rate!==renderRate||ms<lastTime){renderRate=rate;nextRenderAt=ms;oceanPerf.pause();}
- oceanPerf.target=active?rate:60;
- if(!renderer.dirty&&ms+.5<nextRenderAt){requestAnimationFrame(animate);return;}
- nextRenderAt=ms>nextRenderAt+interval?ms+interval:nextRenderAt+interval;
- const realDt=Math.max(0,(ms-lastTime)/1000||1/rate),dt=Math.min(realDt,.10);lastTime=ms;
+ if((modal||photoOpen)&&!renderer.dirty&&!liveFeature){oceanPerf.pause();simulationAccumulator=0;requestAnimationFrame(animate);return;}
  const begin=performance.now();let renderPosition=null;
  if((!modal&&!photoOpen)||liveFeature){
   t+=dt;

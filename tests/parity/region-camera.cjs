@@ -6,7 +6,9 @@ const context=vm.createContext({console});
 for(const name of ['engine','world','reef_detail','next_reef','individuals','open_world','trench','regions'])vm.runInContext(fs.readFileSync('src/'+name+'.js','utf8'),context,{filename:name+'.js'});
 const raw=zlib.gunzipSync(fs.readFileSync('assets/reef.mesh.gz')),header=JSON.parse(raw.subarray(8,8+raw.readUInt32LE(4)));context.actualObstacles=header.obstacles;
 vm.runInContext(`obstacles.push(...actualObstacles);var active=true,settings={third:true},player={p:[0,-8,8],yaw:0,pitch:0},auto=false,follow=null,eye=[0,0,0],target=[0,0,0],cameraCut=true,lastCameraThird=false,cameraFollowLength=6.3,stick=[0,0];diverBatch={instances:[{p:[0,0,0]}]};function dir(){return [Math.sin(player.yaw)*Math.cos(player.pitch),Math.sin(player.pitch),-Math.cos(player.yaw)*Math.cos(player.pitch)]}`,context);
-const app=fs.readFileSync('src/app.js','utf8');vm.runInContext(app.slice(app.indexOf('function updateCamera('),app.indexOf('function blocked(')),context);
+const app=fs.readFileSync('src/app.js','utf8');
+vm.runInContext(app.slice(app.indexOf('function reefObstacleCandidates('),app.indexOf('function dir(')),context);
+vm.runInContext(app.slice(app.indexOf('function updateCamera('),app.indexOf('function blocked(')),context);
 const R=vm.runInContext('OceanRegions',context),camera=vm.runInContext('updateCamera',context),clone=v=>JSON.parse(JSON.stringify(v));
 let passed=0,failed=0;
 function check(name,fn){try{fn();passed++;console.log('PASS '+name);}catch(error){failed++;console.error('FAIL '+name+'\n'+error.stack);}}
