@@ -6,7 +6,7 @@ const rgb=h=>[(h>>16&255)/255,(h>>8&255)/255,(h&255)/255];
 let seed=84129;function random(){seed=(Math.imul(seed,1664525)+1013904223)>>>0;return seed/4294967296;}const rr=(a,b)=>a+random()*(b-a);
 const V={add:(a,b)=>[a[0]+b[0],a[1]+b[1],a[2]+b[2]],sub:(a,b)=>[a[0]-b[0],a[1]-b[1],a[2]-b[2]],mul:(a,s)=>[a[0]*s,a[1]*s,a[2]*s],dot:(a,b)=>a[0]*b[0]+a[1]*b[1]+a[2]*b[2],cross:(a,b)=>[a[1]*b[2]-a[2]*b[1],a[2]*b[0]-a[0]*b[2],a[0]*b[1]-a[1]*b[0]],len:a=>Math.hypot(...a),norm(a){let l=Math.hypot(...a)||1;return a.map(x=>x/l)},dist:(a,b)=>Math.hypot(a[0]-b[0],a[1]-b[1],a[2]-b[2]),lerp:(a,b,t)=>a.map((x,i)=>mix(x,b[i],t))};
 // Authored lamp parameters are shared by rendering and photograph evaluation.
-const TorchLightRules=Object.freeze({outer:.76,inner:.987,strength:2.2,falloff:.055,extinction:Object.freeze([.044,.018,.009])});
+const TorchLightRules=Object.freeze({outer:.62,inner:.98,strength:2.2,falloff:.024,extinction:Object.freeze([.044,.018,.009])});
 function torchIllumination(point,eye,forward){
  if(![point,eye,forward].every(p=>Array.isArray(p)&&p.length===3&&p.every(Number.isFinite)))return 0;
  const delta=V.sub(point,eye),distance=V.len(delta),direction=V.norm(forward);if(V.len(direction)<.5)return 0;
@@ -599,16 +599,21 @@ void main(){vec4 w=uInvVP*vec4(uv*2.-1.,.99999,1.);vec3 rd=normalize(w.xyz/w.w-(
  frag=vec4(sky,1.);gl_FragDepth=1.;
 }`;
 
-// The long-wave mesh and filtered capillary normals use the same stationary ocean field.
-const WATER_WAVES_GLSL=`
+// Surface waves and underwater shafts share phase, direction and dispersion.
+const WATER_PHASE_GLSL=`
+float oceanWaveNumber(float k){return .105*pow(1.62,k);}
 float oceanPhase(vec2 p,float time,float k,vec2 direction){
- float frequency=.105*pow(1.62,k);
+ float frequency=oceanWaveNumber(k);
  return dot(p,direction)*frequency+time*sqrt(9.81*frequency)*.43+k*k*.81;
 }
+`;
+// The long-wave mesh and filtered capillary normals use the same stationary ocean field.
+const WATER_WAVES_GLSL=`
+${WATER_PHASE_GLSL}
 vec3 oceanWave(vec2 p,float time,float footprint){
  vec3 result=vec3(0.);
  for(int i=0;i<10;i++){float k=float(i),angle=k*2.399963+.37;vec2 direction=vec2(cos(angle),sin(angle));
-  float frequency=.105*pow(1.62,k),phase=oceanPhase(p,time,k,direction);
+  float frequency=oceanWaveNumber(k),phase=oceanPhase(p,time,k,direction);
   float filtered=1.-smoothstep(.55,2.5,footprint*frequency);
   float slope=.023/(1.+k*.18)*filtered;
   result.xy+=direction*cos(phase)*slope;
@@ -690,7 +695,7 @@ precision highp float;in vec2 uv;out vec4 frag;
 uniform sampler2D uDepth;uniform sampler2D uVolumeShadow;
 uniform vec2 uResolution;uniform vec2 uVolumeResolution;uniform mat4 uInvVP;uniform mat4 uLightVP;
 uniform vec3 uEye;uniform vec3 uRenderOrigin;uniform vec3 uLightDir;uniform vec3 uLightColor;uniform float uTime;uniform float uSun;uniform float uClarity;uniform float uLamp;uniform int uQuality;
-${NOISE_GLSL}
+${WATER_PHASE_GLSL}
 ${WATER_OPTICS_GLSL}
 vec3 at(vec2 p,float d){vec4 h=uInvVP*vec4(p*2.-1.,d*2.-1.,1.);return h.xyz/h.w;}
 float visibility(vec3 p){vec4 a=uLightVP*vec4(p,1.);vec3 q=a.xyz/a.w*.5+.5;
@@ -713,19 +718,28 @@ void main(){float d=texture(uDepth,uv).r;vec3 p=at(uv,min(d,.99999));vec3 delta=
  // history produces a visible diagonal mesh in clear water, especially on phones.
  vec3 scatter=vec3(0.);float stepLength=span/float(steps);
  vec3 forward=normalize(at(vec2(.5),.5)-uEye);
- float torchCone=smoothstep(.76,.987,dot(rd,forward))*uLamp;
+ float torchCone=smoothstep(${TorchLightRules.outer},${TorchLightRules.inner},dot(rd,forward))*uLamp;
+ // Project the two longest surface waves along sunlight into the water.
+ // Their smooth ridges remain world-anchored as the camera swims. Hoisting
+ // the affine phase avoids repeating world projection in every march step.
+ vec2 sunSlope=uLightDir.xz/max(.2,uLightDir.y);
+ vec2 surfaceStart=uEye.xz+uRenderOrigin.xz-(uEye.y+uRenderOrigin.y)*sunSlope;
+ vec2 surfaceRate=rd.xz-rd.y*sunSlope;
+ const vec2 direction0=vec2(cos(.37),sin(.37));
+ const vec2 direction1=vec2(cos(2.769963),sin(2.769963));
+ vec2 phaseStart=vec2(oceanPhase(surfaceStart,uTime,0.,direction0),oceanPhase(surfaceStart,uTime,1.,direction1));
+ vec2 phaseRate=vec2(dot(surfaceRate,direction0)*oceanWaveNumber(0.),dot(surfaceRate,direction1)*oceanWaveNumber(1.));
  for(int i=0;i<12;i++){if(i>=steps)break;float stratum=.30+fract(float(i)*.618033989)*.40;float s=(float(i)+stratum)*stepLength;vec3 q=uEye+rd*s;float dep=max(0.,-q.y-uRenderOrigin.y);
-  vec2 surf=q.xz+uRenderOrigin.xz-(q.y+uRenderOrigin.y)*uLightDir.xz/max(.2,uLightDir.y);
-  // Broad, irregular swell focuses shafts. Atlas caustics supply only a little detail;
-  // using their fine periodic lattice as the beam mask creates a striped curtain.
-  vec2 warp=vec2(sin(surf.y*.041+uTime*.018),cos(surf.x*.037-uTime*.015))*.52;
-  float swell=noise(vec3(surf*.105+warp,uTime*.025));
-  float focused=pow(smoothstep(.34,.76,swell),3.);
-  float beam=.08+focused*(.54+min(caustic(surf*.64,uTime*.83),2.4)*.055);
+  vec2 wavePhase=phaseStart+phaseRate*s;
+  float ridge=.5+.3*sin(wavePhase.x)+.2*sin(wavePhase.y);
+  float focused=.55*ridge*ridge;
+  // Fine atlas caustics belong on receivers. Sampling them sparsely through
+  // the water aliases into floating light patches and costs two fetches/step.
+  float beam=.08+focused*.595;
   vec3 solar=sunThroughWater(dep,uLightDir.y);
   scatter+=uLightColor*solar*visibility(q)*beam*exp(-extinction*s)*stepLength*.011*phase*uSun;
-  float torchScatter=torchCone/(1.+s*s*.055)*smoothstep(.3,1.5,s);
-  scatter+=vec3(.42,.66,.73)*torchScatter*exp(-extinction*s*2.)*stepLength*.006;
+  float torchScatter=torchCone/(1.+s*s*${TorchLightRules.falloff})*smoothstep(.3,1.5,s);
+  scatter+=vec3(.42,.66,.73)*torchScatter*exp(-extinction*s*2.)*stepLength*.003;
  }
  frag=vec4(scatter,1.-ao);
 }`;
@@ -1020,7 +1034,11 @@ class Renderer{
   const stat=make(this.shadowSize),dyn=make(this.dynamicShadowSize);this.shadowTexture=stat.tex;this.shadowFBO=stat.fbo;this.dynamicShadowTexture=dyn.tex;this.dynamicShadowFBO=dyn.fbo;
   this._shadowKey='';this.dynamicLightVP=this.lightVP;g.bindFramebuffer(g.FRAMEBUFFER,null);
  }
- resize(){
+ resize(commit=false){
+  // Resizing a presented canvas clears its drawing buffer immediately. Queue it
+  // until a render can finish, including while streamed terrain is unavailable.
+  if(this.frame>0&&!commit){this.pendingResize=true;this.dirty=true;return;}
+  this.pendingResize=false;
   const g=this.gl;this.dirty=true;this.width=innerWidth;this.height=innerHeight;
   const cap=this.quality===2?2:this.quality===1?1.5:1;const dpr=Math.min(devicePixelRatio||1,cap);
   const scale=this.quality===0?.82:1;let w=Math.max(2,Math.round(this.width*dpr*scale)),h=Math.max(2,Math.round(this.height*dpr*scale));
@@ -1079,6 +1097,7 @@ class Renderer{
  bindTex(unit,tex){let g=this.gl;g.activeTexture(g.TEXTURE0+unit);g.bindTexture(g.TEXTURE_2D,tex);}
  render(eye,target,t){
   if(this.sceneStream&&!this.sceneStream.update(eye)){this.dirty=true;return false;}
+  if(this.pendingResize)this.resize(true);
   this.dirty=false;const begin=performance.now(),g=this.gl;this.drawCalls=0;this.shadowDraws=0;
   const near=Number.isFinite(this.photoNear)?clamp(this.photoNear,.002,.16):.16;
   this.renderOrigin=eye[1]<-500?eye.map(n=>Math.round(n/64)*64):[0,0,0];const origin=this.renderOrigin,relativeEye=V.sub(eye,origin),relativeTarget=V.sub(target,origin);
@@ -1090,7 +1109,9 @@ class Renderer{
   this.lightDir=underwater?[sx,Math.sqrt(1-sx*sx-sz*sz),sz]:this.airLightDir;
   this.lightColor=profile.color;this.sun=profile.sun;
   const center=[Math.round(eye[0]/16)*16,Math.round(eye[1]/16)*16-4,Math.round(eye[2]/16)*16-12];
-  const key=center.join(',')+this.lighting+(underwater?'water':'air');
+  // Relative-origin boundaries differ from shadow-cell boundaries. A cached
+  // light matrix must use the same origin as this frame's instance positions.
+  const key=center.join(',')+this.lighting+(underwater?'water':'air')+':'+origin.join(',');
   g.enable(g.DEPTH_TEST);g.depthMask(true);g.disable(g.BLEND);
   if(this._shadowKey!==key||this.forceShadow){
    this._shadowKey=key;this.forceShadow=false;this.renderLightVP=stableLightMatrix(mm(ortho(-40,40,-40,40,.1,230),lookAt(V.sub(V.add(center,V.mul(this.lightDir,100)),origin),V.sub(center,origin))),this.shadowSize);this.lightVP=origin.some(n=>n!==0)?worldProjection(this.renderLightVP,origin):this.renderLightVP;

@@ -1,5 +1,5 @@
 {
-  "version": "0.18.5",
+  "version": "0.18.6",
   "scope": "served game and build sources",
   "files": [
     {
@@ -19,13 +19,13 @@
     },
     {
       "path": "README.md",
-      "bytes": 23425,
-      "sha256": "027adb94f1a943781f568d79dd0a47c470ce9547f8b576ac1a7d08a766cee90c"
+      "bytes": 24142,
+      "sha256": "e563af8f74140c54c46d0815da5d2bd405364012de6ab6ba64eba23a1daa32e9"
     },
     {
       "path": "VERSION",
       "bytes": 7,
-      "sha256": "e3c122270d6e92cef71ca9884b7f0483dc584de61b4155d040a97a97d7a6cdc3"
+      "sha256": "b75303572e20c4b39fdf3df111cdaafbfe7c449e4b69402603aef724a4972150"
     },
     {
       "path": "assets/caustics.jpg",
@@ -224,8 +224,8 @@
     },
     {
       "path": "assets/reef.mesh.gz",
-      "bytes": 21633234,
-      "sha256": "719cee472608b570784271d4004ea47cf3d5c4427eff84d86d00bed72f6d96a6"
+      "bytes": 22393427,
+      "sha256": "d7362e9ec299ddc13130f52c411be9def2295e0296a34ebb3cc92efdabbe01ec"
     },
     {
       "path": "assets/rock_diff.jpg",
@@ -263,24 +263,19 @@
       "sha256": "03feb48d5eefe255d4cfcfba606be4a6f173e5f1f254517820c5bf2824b05d03"
     },
     {
-      "path": "assets/scene/chunk-052c9cd1e881aa81de43.bin.gz",
-      "bytes": 12676,
-      "sha256": "052c9cd1e881aa81de439b5bd0e4050fdd633ce9d1febd3884c54b6e037f90fc"
-    },
-    {
-      "path": "assets/scene/chunk-077e9c686cf86fb74dae.bin.gz",
-      "bytes": 12704,
-      "sha256": "077e9c686cf86fb74dae26fa3f2108397fcec1bdca38a024c081b57e7b224fb7"
-    },
-    {
-      "path": "assets/scene/chunk-0b02bb42065c0bddec5e.bin.gz",
-      "bytes": 175865,
-      "sha256": "0b02bb42065c0bddec5e4db3a0c522518fdd03f6201b518bd283d8b7089c2d79"
+      "path": "assets/scene/chunk-076abfa4c8c600b7e9f4.bin.gz",
+      "bytes": 3154,
+      "sha256": "076abfa4c8c600b7e9f4a07241ebdbb2359e259d339321bd452ed5a0c4c9c8b4"
     },
     {
       "path": "assets/scene/chunk-0b76ddd7fb5a00a28997.bin.gz",
       "bytes": 10733,
       "sha256": "0b76ddd7fb5a00a28997d671ba3f975bbccd313b4d0e9dd3cbe5e341fcd5f1ee"
+    },
+    {
+      "path": "assets/scene/chunk-0b987621c39af66a2a10.bin.gz",
+      "bytes": 22575,
+      "sha256": "0b987621c39af66a2a1080258b8e55fc5339c4e5ffbec4cf422d63bc349f34b1"
     },
     {
       "path": "assets/scene/chunk-0d7f3feb6ba93dd3bad9.bin.gz",
@@ -291,11 +286,6 @@
       "path": "assets/scene/chunk-0da09355c1c16a0ea626.bin.gz",
       "bytes": 129615,
       "sha256": "0da09355c1c16a0ea626fca06bdc57f1c2ad5e5368d72af783478e903fb32477"
-    },
-    {
-      "path": "assets/scene/chunk-0de75467b6a6597b2789.bin.gz",
-      "bytes": 12631,
-      "sha256": "0de75467b6a6597b278971e6ff033ecaeba8ccbcbaf977f1de9f76c993102430"
     },
     {
       "path": "assets/scene/chunk-0e200536617d673f7077.bin.gz",
@@ -313,14 +303,14 @@
       "sha256": "1097b2873c31104657f56082ba561ba7281ad98797757fa2b8575898c2ad4ab0"
     },
     {
-      "path": "assets/scene/chunk-131f850375680c56e12b.bin.gz",
-      "bytes": 12835,
-      "sha256": "131f850375680c56e12ba058a708c790b03a89b6531127689ee8be22636e044b"
-    },
-    {
       "path": "assets/scene/chunk-14c515c6ead2d517b2b3.bin.gz",
       "bytes": 66698,
       "sha256": "14c515c6ead2d517b2b3864d44aae3f42fc2756d4d5c5856feff2bf72e3abc79"
+    },
+    {
+      "path": "assets/scene/chunk-14f96a469e621260228a.bin.gz",
+      "bytes": 176066,
+      "sha256": "14f96a469e621260228a554ee2da987a7ade53233448112dd63dbd06ce116aba"
     },
     {
       "path": "assets/scene/chunk-1825002a3a65b6467447.bin.gz",
@@ -331,11 +321,6 @@
       "path": "assets/scene/chunk-183201151fa6c54db88d.bin.gz",
       "bytes": 10724,
       "sha256": "183201151fa6c54db88de84226f09ac58b3f36ae67aebd28e15555d58f91e449"
-    },
-    {
-      "path": "assets/scene/chunk-1b5c4d52a07a51292da3.bin.gz",
-      "bytes": 96818,
-      "sha256": "1b5c4d52a07a51292da32b3de32f4cabc8af56249db6eb8271e8743c2f78932d"
     },
     {
       "path": "assets/scene/chunk-1b6baf3a6f4a88a149b5.bin.gz",
@@ -358,14 +343,19 @@
       "sha256": "1f6b07e45404dc8d9e4e7f92a57b9e2248c40feaaf937be96e046b40894cec34"
     },
     {
+      "path": "assets/scene/chunk-1f87d1151f04380ceb2e.bin.gz",
+      "bytes": 13000,
+      "sha256": "1f87d1151f04380ceb2e44907b7bd1082e01e3d82e9294b22736a5c24cdf9af3"
+    },
+    {
       "path": "assets/scene/chunk-20242299b998424aaa4b.bin.gz",
       "bytes": 320099,
       "sha256": "20242299b998424aaa4b50e266b3c94d82745e8ca8e1f097014560f2c9e7f85d"
     },
     {
-      "path": "assets/scene/chunk-20573685d59cc36e61f3.bin.gz",
-      "bytes": 25628,
-      "sha256": "20573685d59cc36e61f33ddfb5bb342858c87ed8c86576cc42fb89daa1d93610"
+      "path": "assets/scene/chunk-22efb9f67db15e78fab9.bin.gz",
+      "bytes": 12865,
+      "sha256": "22efb9f67db15e78fab9066aa52863500e2e30b83827a5d5c6a8eb5fb1a90d6b"
     },
     {
       "path": "assets/scene/chunk-246c0b68711549fe754d.bin.gz",
@@ -373,14 +363,29 @@
       "sha256": "246c0b68711549fe754dfcace49c04bef2380774eb812dd3614532be92b24bf3"
     },
     {
+      "path": "assets/scene/chunk-2545865f684f7c21710a.bin.gz",
+      "bytes": 12828,
+      "sha256": "2545865f684f7c21710a9c10c24a48749f9dbbf9a8f407ce2621416310e10396"
+    },
+    {
       "path": "assets/scene/chunk-26b14befba8963813ed4.bin.gz",
       "bytes": 67296,
       "sha256": "26b14befba8963813ed4a9facf5d4241b4662ba5db2b58ebe4df2e030e9a2761"
     },
     {
+      "path": "assets/scene/chunk-2798806d9f231af8c0aa.bin.gz",
+      "bytes": 20221,
+      "sha256": "2798806d9f231af8c0aa8d59a175d89a59c019de1d82e51c1580ba8a56ee7bcd"
+    },
+    {
       "path": "assets/scene/chunk-27fee286adecffa2395b.bin.gz",
       "bytes": 80803,
       "sha256": "27fee286adecffa2395b2e13d7ea7ce0bd77479c2477ef878b8c420f6152ebce"
+    },
+    {
+      "path": "assets/scene/chunk-281bda53e42d0a7f46ea.bin.gz",
+      "bytes": 26026,
+      "sha256": "281bda53e42d0a7f46ea307a59ae63a9d93f7b20bd6c02fc26138e2aa373789d"
     },
     {
       "path": "assets/scene/chunk-28458975eb7953fc52fd.bin.gz",
@@ -408,6 +413,11 @@
       "sha256": "2cd5d97fbc493d5ab0f3b3e1278c54ed0c50abd0ddfea1218ce570cf5abcdf6f"
     },
     {
+      "path": "assets/scene/chunk-2ce0f8b86cdfa6e22de6.bin.gz",
+      "bytes": 23711,
+      "sha256": "2ce0f8b86cdfa6e22de6dc13dbe213454634605f8a72ee39143aece4257d0da0"
+    },
+    {
       "path": "assets/scene/chunk-2ec2284edd31e8755014.bin.gz",
       "bytes": 300512,
       "sha256": "2ec2284edd31e8755014ee278d4748a6bcd7199b341f92c4f7716d5a712631a6"
@@ -418,24 +428,9 @@
       "sha256": "2ec895d1e2cbf2293da8a11d55402e7bd795141450171401ca7466441f8bebfe"
     },
     {
-      "path": "assets/scene/chunk-2fd8a41bf81c1aee18ee.bin.gz",
-      "bytes": 15613,
-      "sha256": "2fd8a41bf81c1aee18eea7e9a1f4c00b61df6e0e93ff74ce4f197e6469078bc5"
-    },
-    {
-      "path": "assets/scene/chunk-3299ddb4d08a38aeadb7.bin.gz",
-      "bytes": 19070,
-      "sha256": "3299ddb4d08a38aeadb714ed7142fb6cd38cffce60fafe0427f69dc334d3789d"
-    },
-    {
-      "path": "assets/scene/chunk-33bb4356873a23363e4e.bin.gz",
-      "bytes": 51538,
-      "sha256": "33bb4356873a23363e4ee6edbcec72b61c2daa531c3123dd454629739ae725d1"
-    },
-    {
-      "path": "assets/scene/chunk-34ff0aa773f1b61bdbc0.bin.gz",
-      "bytes": 198767,
-      "sha256": "34ff0aa773f1b61bdbc0f6a28a9229cca5890ae15c379e4d8d76fc66cd234fbf"
+      "path": "assets/scene/chunk-30c6366fe0cce667b233.bin.gz",
+      "bytes": 3140,
+      "sha256": "30c6366fe0cce667b233348425f36767446628bb90a38546600a11b1e30fcc24"
     },
     {
       "path": "assets/scene/chunk-36bca38c8b7ee90659fa.bin.gz",
@@ -453,9 +448,9 @@
       "sha256": "396c2b1cbdffe27fc4c5cd7380b0eeda2af5b061551dba5fdcab20aba55f3df4"
     },
     {
-      "path": "assets/scene/chunk-39ed3d63ba1102c339b1.bin.gz",
-      "bytes": 14026,
-      "sha256": "39ed3d63ba1102c339b1733b207bf8f4cfd873c68d60403e622a571143e60f56"
+      "path": "assets/scene/chunk-3b0bbcc005ce36580f42.bin.gz",
+      "bytes": 36007,
+      "sha256": "3b0bbcc005ce36580f4235747fe13cf8027b6eec0a0bd666614d6e74d1acee0e"
     },
     {
       "path": "assets/scene/chunk-3d21e6c0b8e6ba5a23c9.bin.gz",
@@ -483,16 +478,6 @@
       "sha256": "3e8e82ffc36b9ecda34d283c6c11d4f224adca65818286afe92ebcb51becf8e3"
     },
     {
-      "path": "assets/scene/chunk-4009a4167418318944be.bin.gz",
-      "bytes": 12701,
-      "sha256": "4009a4167418318944be5c8d816cb577dd7f3189bdb2aca1bb8536605c209b2a"
-    },
-    {
-      "path": "assets/scene/chunk-400fbe99e49063ea3f79.bin.gz",
-      "bytes": 12707,
-      "sha256": "400fbe99e49063ea3f791c1cabb6ffeb4815df31d1e2c1f85a770921c4a553a7"
-    },
-    {
       "path": "assets/scene/chunk-40e44179a4a24e5720b4.bin.gz",
       "bytes": 65780,
       "sha256": "40e44179a4a24e5720b4da98c72446ffd304e62907e2a41612b982508d7304f1"
@@ -513,6 +498,11 @@
       "sha256": "4af600c856c5c85391c9f5345e18e6317399b176bee458c6c53ab2111ef6a4af"
     },
     {
+      "path": "assets/scene/chunk-50fbd3320f07e27b3492.bin.gz",
+      "bytes": 48177,
+      "sha256": "50fbd3320f07e27b349234fe9497b432b1a7f4f38aa82c2975752fed0c690211"
+    },
+    {
       "path": "assets/scene/chunk-5212c69f4563f67feb18.bin.gz",
       "bytes": 260059,
       "sha256": "5212c69f4563f67feb1835a5b2d8c791922200551feeccc6e393b85faf59ad16"
@@ -521,16 +511,6 @@
       "path": "assets/scene/chunk-52395456058fae4756fc.bin.gz",
       "bytes": 345223,
       "sha256": "52395456058fae4756fcb710db677890a6829e18fe668132fd4efcda6423b8ee"
-    },
-    {
-      "path": "assets/scene/chunk-54a1aafce2e36975c3fd.bin.gz",
-      "bytes": 23343,
-      "sha256": "54a1aafce2e36975c3fd9e77dcc596f74d84f54d1e44fd15ab32f7e399e1b5be"
-    },
-    {
-      "path": "assets/scene/chunk-55f0cae2cb2e5482c6f0.bin.gz",
-      "bytes": 12610,
-      "sha256": "55f0cae2cb2e5482c6f07bc8f6634f6e48745148fc4a33fc16c71b4c816f2025"
     },
     {
       "path": "assets/scene/chunk-563d39d06298138ab367.bin.gz",
@@ -553,9 +533,9 @@
       "sha256": "5876f89c1b4defa3195fcb2247f3b24fd8c173fd6e88dcd792c02ed6b8d7155f"
     },
     {
-      "path": "assets/scene/chunk-5b9fae13d6b97a1b6091.bin.gz",
-      "bytes": 35491,
-      "sha256": "5b9fae13d6b97a1b6091214204ac1289e955ae8fb7bf6ae3f7701b79754ffaf1"
+      "path": "assets/scene/chunk-58b76cd725f99463adb3.bin.gz",
+      "bytes": 15846,
+      "sha256": "58b76cd725f99463adb346f186e788c57ba2e60f4bb29ab9d30a6420d0da3071"
     },
     {
       "path": "assets/scene/chunk-5bfc43cffc674cc624db.bin.gz",
@@ -568,6 +548,11 @@
       "sha256": "5cc4e82067c8b235e11a34be5414a950c40d58346cb965b56acc809861ab84f7"
     },
     {
+      "path": "assets/scene/chunk-5d9610bccb45166c2a99.bin.gz",
+      "bytes": 32709,
+      "sha256": "5d9610bccb45166c2a99563efed2c781faa2e57405ae6dcba40608c6966b7400"
+    },
+    {
       "path": "assets/scene/chunk-60dd725fd772766039f2.bin.gz",
       "bytes": 859967,
       "sha256": "60dd725fd772766039f2233fbdcd634bfc37f16171f65a9db02086da9e7b8dfd"
@@ -578,9 +563,14 @@
       "sha256": "61e05f03427367a8a84a3c82ba408a205804002cd8bb563df1764fdfae390552"
     },
     {
-      "path": "assets/scene/chunk-667a923ce3d9f64405e5.bin.gz",
-      "bytes": 12657,
-      "sha256": "667a923ce3d9f64405e53cde665bbd78ddf3d903cc2b966a86c21b87c121f607"
+      "path": "assets/scene/chunk-629b48eb73a16b6d500d.bin.gz",
+      "bytes": 12788,
+      "sha256": "629b48eb73a16b6d500d9fc699313d352f61d3517b50db640bbf4926c35fc414"
+    },
+    {
+      "path": "assets/scene/chunk-63efa04ec9c8678ff9f2.bin.gz",
+      "bytes": 13033,
+      "sha256": "63efa04ec9c8678ff9f2a5cec7092bf032550bb8cb279c68b3f3641b0b19026c"
     },
     {
       "path": "assets/scene/chunk-66ac2a155813f5858ac6.bin.gz",
@@ -588,24 +578,19 @@
       "sha256": "66ac2a155813f5858ac633d5ee0caf5899ae6aef79be135cdafdfc1cf41cec93"
     },
     {
-      "path": "assets/scene/chunk-6717a62e11db568a235a.bin.gz",
-      "bytes": 3156,
-      "sha256": "6717a62e11db568a235a5c2e120b7e13a903909e4bd16e46cb613d012c883a78"
+      "path": "assets/scene/chunk-66d769314f637d2f88e2.bin.gz",
+      "bytes": 12998,
+      "sha256": "66d769314f637d2f88e29798b82a60e85aca205e0f0c7f4b99e9f8d7428f5ac6"
     },
     {
-      "path": "assets/scene/chunk-69479eb3015129fe057c.bin.gz",
-      "bytes": 12670,
-      "sha256": "69479eb3015129fe057c10a6fd91de48893d578525469def707a8bae04f1d773"
+      "path": "assets/scene/chunk-67e9fac29e23d32a4182.bin.gz",
+      "bytes": 31712,
+      "sha256": "67e9fac29e23d32a4182f313087df84b871baec46d5276b0a16a8a336147bde3"
     },
     {
-      "path": "assets/scene/chunk-6b68b98a46983ed29044.bin.gz",
-      "bytes": 14968,
-      "sha256": "6b68b98a46983ed29044242c3a597420c2c0b916a76d5a12917329e8d398580d"
-    },
-    {
-      "path": "assets/scene/chunk-6c70b1ed7eb3fda6642a.bin.gz",
-      "bytes": 12808,
-      "sha256": "6c70b1ed7eb3fda6642ac3cbca38e4c0aa89af81474dd4a3dc54a5f67d587d62"
+      "path": "assets/scene/chunk-6c4d5a41603a628ca5ef.bin.gz",
+      "bytes": 18880,
+      "sha256": "6c4d5a41603a628ca5efdbadef938ec241d0f8d86b44aad7f0b6885dffccd61d"
     },
     {
       "path": "assets/scene/chunk-6e476f13b69a882fb654.bin.gz",
@@ -638,14 +623,14 @@
       "sha256": "71c183048973f45d5c57fa3e4f5e93e8a5d0929667e0819a5c2615db936a3a13"
     },
     {
-      "path": "assets/scene/chunk-73ece75540180d6437be.bin.gz",
-      "bytes": 18584,
-      "sha256": "73ece75540180d6437be8810d0abac1be06f2dcb14d16f663f4aa8f40662b65f"
-    },
-    {
       "path": "assets/scene/chunk-75096807e8d3cb11d84a.bin.gz",
       "bytes": 10782,
       "sha256": "75096807e8d3cb11d84afa356c795cc0f0f6b2246ea88dcf757cc7686b0c286d"
+    },
+    {
+      "path": "assets/scene/chunk-76456f0e5ff3d790e10b.bin.gz",
+      "bytes": 28247,
+      "sha256": "76456f0e5ff3d790e10b27596f62caef90701467bbdb363f7cc8a9000018b6a3"
     },
     {
       "path": "assets/scene/chunk-7713b8c4ece73fdfa093.bin.gz",
@@ -653,9 +638,9 @@
       "sha256": "7713b8c4ece73fdfa093a3847a08068158a525713440cc458c8c5a2f8b367617"
     },
     {
-      "path": "assets/scene/chunk-7976fbdfda24046609ce.bin.gz",
-      "bytes": 17684,
-      "sha256": "7976fbdfda24046609cebeafc0c3f0bf74db941c414b1d4b53a6fbadc63f30ba"
+      "path": "assets/scene/chunk-78103bc6c939158d28f9.bin.gz",
+      "bytes": 37064,
+      "sha256": "78103bc6c939158d28f958b873eac9a107b02f0b491f3db726d1c87ead057b0b"
     },
     {
       "path": "assets/scene/chunk-7a4e4ec18da1d49bce02.bin.gz",
@@ -663,19 +648,19 @@
       "sha256": "7a4e4ec18da1d49bce025e6aa6c9a19d695201718607980a3da74c9e5397045c"
     },
     {
+      "path": "assets/scene/chunk-7b41066776a330ae23db.bin.gz",
+      "bytes": 246155,
+      "sha256": "7b41066776a330ae23db59a96b91e8c4398f7cf473e6c650e14b6351d46f2f91"
+    },
+    {
       "path": "assets/scene/chunk-7bda3c6c80d8cc9f33cc.bin.gz",
       "bytes": 65789,
       "sha256": "7bda3c6c80d8cc9f33ccb5993559331c0f0dd500d193b8b53a720a4f35602cdb"
     },
     {
-      "path": "assets/scene/chunk-7c0bee899554fa8e863e.bin.gz",
-      "bytes": 132878,
-      "sha256": "7c0bee899554fa8e863e5eee183a049fb56a4159d19f497675ebdc05c96d9815"
-    },
-    {
-      "path": "assets/scene/chunk-7e1387e08e8d08d92539.bin.gz",
-      "bytes": 12760,
-      "sha256": "7e1387e08e8d08d9253971510814887b40dcc1d9ec706586c37dd2e95d694a8f"
+      "path": "assets/scene/chunk-7e635e828b714f7684eb.bin.gz",
+      "bytes": 19361,
+      "sha256": "7e635e828b714f7684eb0e8927f44358b3148feed7e26176405927ab6d6e11b3"
     },
     {
       "path": "assets/scene/chunk-7f3311cefa9ac9cacf04.bin.gz",
@@ -693,14 +678,9 @@
       "sha256": "80fdd0abec27105b3d71dcb410192f3e8b313a35c0cd7b146e28bb96dfdd3264"
     },
     {
-      "path": "assets/scene/chunk-8479b35764f4e3890955.bin.gz",
-      "bytes": 12823,
-      "sha256": "8479b35764f4e38909557a4ccaa89e60191a8857122e3ddffd26901ea7c8e8d5"
-    },
-    {
-      "path": "assets/scene/chunk-85a4296151f8bca64133.bin.gz",
-      "bytes": 12662,
-      "sha256": "85a4296151f8bca641337b35fc4d380d6a681f335e53835c4a243c06d1a95eb0"
+      "path": "assets/scene/chunk-816235956c8fdb7a5998.bin.gz",
+      "bytes": 13037,
+      "sha256": "816235956c8fdb7a5998251f3d9ed5672fb0f2a287fc8365ec8ad65e2c745294"
     },
     {
       "path": "assets/scene/chunk-87e2e51dcfffc8a413f8.bin.gz",
@@ -716,6 +696,16 @@
       "path": "assets/scene/chunk-88919e75d45e922d5f5d.bin.gz",
       "bytes": 10691,
       "sha256": "88919e75d45e922d5f5d990cdf1ff79e7f3ccbde5fbcddb5ae6535b67d00e97c"
+    },
+    {
+      "path": "assets/scene/chunk-88d82e46fde21331401f.bin.gz",
+      "bytes": 257585,
+      "sha256": "88d82e46fde21331401ff0d3489c7b9ebb0138cbad495bf251c47f2e7cc15557"
+    },
+    {
+      "path": "assets/scene/chunk-8c878bb3c9cee9966437.bin.gz",
+      "bytes": 12877,
+      "sha256": "8c878bb3c9cee99664378788a56405dbf3a5968ee76e7ef6e620af025941430a"
     },
     {
       "path": "assets/scene/chunk-8d4c67e7e15af06dbb90.bin.gz",
@@ -738,11 +728,6 @@
       "sha256": "91b8f3a6fdc1f4f145b5cac065d454098d07d13165ff50fa51a4587629256a46"
     },
     {
-      "path": "assets/scene/chunk-92af91f22266370d4bf7.bin.gz",
-      "bytes": 23409,
-      "sha256": "92af91f22266370d4bf7cfe7aca9467428e85aa05642f9ddc4a486b390ffc604"
-    },
-    {
       "path": "assets/scene/chunk-92f3e27e2ab4cc714374.bin.gz",
       "bytes": 10709,
       "sha256": "92f3e27e2ab4cc714374e5900a0f60511bbe46670a22cdd2b295a9a6f13cf70b"
@@ -763,14 +748,19 @@
       "sha256": "9629ea0b0138012ed28aca232a95bc0a1637faeba8d36f39205f288a69348c4a"
     },
     {
+      "path": "assets/scene/chunk-97ab373485962b29010d.bin.gz",
+      "bytes": 32300,
+      "sha256": "97ab373485962b29010db33e43744ce8cab7779eb537aba5c0a2c80d973dd40f"
+    },
+    {
       "path": "assets/scene/chunk-97e9adce23dd510b7d85.bin.gz",
       "bytes": 213532,
       "sha256": "97e9adce23dd510b7d85cc838d7b106baf2f0bcbabced03a56bb9ba8064c43a3"
     },
     {
-      "path": "assets/scene/chunk-98152f8b747aedadf327.bin.gz",
-      "bytes": 12728,
-      "sha256": "98152f8b747aedadf3273726fe30bb7fc6648a75d4917846e1dd7feab6f71be8"
+      "path": "assets/scene/chunk-9838dcd61d5753325bdb.bin.gz",
+      "bytes": 167188,
+      "sha256": "9838dcd61d5753325bdb74eab9964d79ed4242132af69f3c739fa1acfa6bad2b"
     },
     {
       "path": "assets/scene/chunk-98f276d3c8f4bd339a2d.bin.gz",
@@ -778,24 +768,39 @@
       "sha256": "98f276d3c8f4bd339a2da41ecb2562be568c8c32d9a4606fd66fa9b210d69770"
     },
     {
+      "path": "assets/scene/chunk-99af1805ef4c63c61c06.bin.gz",
+      "bytes": 228466,
+      "sha256": "99af1805ef4c63c61c06d9e44435f17bea35274e359b42343b95a5ac7e6cd009"
+    },
+    {
+      "path": "assets/scene/chunk-9b333519486071df89c6.bin.gz",
+      "bytes": 12895,
+      "sha256": "9b333519486071df89c65c281e195e13ef9358a9a39f48774f5455b348316e4a"
+    },
+    {
       "path": "assets/scene/chunk-9ce0e6954f8186412902.bin.gz",
       "bytes": 293999,
       "sha256": "9ce0e6954f8186412902a6f95401aebbc60519d2848b87362a5b8c688459f5b5"
     },
     {
-      "path": "assets/scene/chunk-9de15103330e6c4cb832.bin.gz",
-      "bytes": 160539,
-      "sha256": "9de15103330e6c4cb832509697ca8db4d557b10f75dded121714278f8578b88b"
+      "path": "assets/scene/chunk-9d3a3ca57cf08b7c922f.bin.gz",
+      "bytes": 23639,
+      "sha256": "9d3a3ca57cf08b7c922f207eb55237d3202e9d62481aa69cbd2c5d6ee43066de"
+    },
+    {
+      "path": "assets/scene/chunk-9dd9063c5c4e28075e6a.bin.gz",
+      "bytes": 41875,
+      "sha256": "9dd9063c5c4e28075e6abd0e07e1c9e40e71341c1a8fb62942aa0ef31040350c"
+    },
+    {
+      "path": "assets/scene/chunk-9de303570f10c44faeac.bin.gz",
+      "bytes": 12936,
+      "sha256": "9de303570f10c44faeac70faa33d98b1d0a5cbd11d646433c1c0b9181720354e"
     },
     {
       "path": "assets/scene/chunk-9e63e9b76bd79f3b3303.bin.gz",
       "bytes": 298264,
       "sha256": "9e63e9b76bd79f3b3303bf34be465cc33c10f10fe0efc45a8d22d333112c2a1c"
-    },
-    {
-      "path": "assets/scene/chunk-9e6d8189f8789d297a32.bin.gz",
-      "bytes": 34937,
-      "sha256": "9e6d8189f8789d297a32af07e9a82d94bf881a3c25e47fb6b01d1df103a42d08"
     },
     {
       "path": "assets/scene/chunk-9e79fa8d38803578420d.bin.gz",
@@ -808,14 +813,14 @@
       "sha256": "9eccdf754409816397722801065e54aa11ff8dc2971f7660496a55ba451d44af"
     },
     {
-      "path": "assets/scene/chunk-a4c051de7a1635e07ebf.bin.gz",
-      "bytes": 21156,
-      "sha256": "a4c051de7a1635e07ebfda169ca4b2b94cb51e1e8b7d09a3390a9a30ec1e48d2"
+      "path": "assets/scene/chunk-9fb3082d7989c094addd.bin.gz",
+      "bytes": 52457,
+      "sha256": "9fb3082d7989c094adddff5066c310b72df699328b253b33bef1c74d7fa1b2e5"
     },
     {
-      "path": "assets/scene/chunk-a579a014d240898ac4d8.bin.gz",
-      "bytes": 201783,
-      "sha256": "a579a014d240898ac4d8a440dc2dac1749ebc2f30129253e89514fc300f1b779"
+      "path": "assets/scene/chunk-a1f1bcf283c179b2c4cc.bin.gz",
+      "bytes": 13141,
+      "sha256": "a1f1bcf283c179b2c4cc78b9d4c155cc7ebbb47fd2ee3e2163906aed736bc155"
     },
     {
       "path": "assets/scene/chunk-a7134329f51a6beca6fe.bin.gz",
@@ -848,11 +853,6 @@
       "sha256": "a9c539765de8fbebdbbcac8f26b70eeb527967deba341049ed6140aca2d2cb3a"
     },
     {
-      "path": "assets/scene/chunk-ab30d0d9f7a91b949ab3.bin.gz",
-      "bytes": 182003,
-      "sha256": "ab30d0d9f7a91b949ab31de3b4fba6218d8e44e1ed52b17701785f83280d78d0"
-    },
-    {
       "path": "assets/scene/chunk-ac020c149a657729e0fa.bin.gz",
       "bytes": 138836,
       "sha256": "ac020c149a657729e0fa779597c8b88b4ab11b1abab8613047cb72952613878a"
@@ -863,14 +863,14 @@
       "sha256": "ac259f92eda6bb6caa04a700092cf02ee1036eb4b14ee0e792240829ddae5370"
     },
     {
+      "path": "assets/scene/chunk-ac52a19e99da23c1186a.bin.gz",
+      "bytes": 97013,
+      "sha256": "ac52a19e99da23c1186ae2773d42d0b063b5a19645f89026305326ba8df3908a"
+    },
+    {
       "path": "assets/scene/chunk-aeb4d147ae6c5c7421bb.bin.gz",
       "bytes": 10701,
       "sha256": "aeb4d147ae6c5c7421bb67095eefa8f578d243031d31e4d9f9085d2d35858772"
-    },
-    {
-      "path": "assets/scene/chunk-aec3c638c1189f0ba523.bin.gz",
-      "bytes": 19976,
-      "sha256": "aec3c638c1189f0ba52305043d595f9bf466a46ad82fdc145c7eedab4dbe6386"
     },
     {
       "path": "assets/scene/chunk-b02ae416640f7bc5205b.bin.gz",
@@ -878,9 +878,14 @@
       "sha256": "b02ae416640f7bc5205b2120745e6052270e510a333e20fae1f78b2de9033257"
     },
     {
-      "path": "assets/scene/chunk-b401c70c7df7790af7ca.bin.gz",
-      "bytes": 12740,
-      "sha256": "b401c70c7df7790af7ca3ec9e3c96ec57108ff54cbfdb6aff3921b964c40a2f6"
+      "path": "assets/scene/chunk-b0f0aa785cad2c4f7924.bin.gz",
+      "bytes": 40232,
+      "sha256": "b0f0aa785cad2c4f79248553a4ab24c471da567e1ef4a2bc6fd5ade171ac5de8"
+    },
+    {
+      "path": "assets/scene/chunk-b2a69343cb60d5be8028.bin.gz",
+      "bytes": 13049,
+      "sha256": "b2a69343cb60d5be80281dfd91f42056641374542032627bb6c6997e8bed286c"
     },
     {
       "path": "assets/scene/chunk-b552792490e6c6768190.bin.gz",
@@ -888,9 +893,9 @@
       "sha256": "b552792490e6c6768190e8d4349e647f5b9479f21d6afdd7ccd0f4739d305c17"
     },
     {
-      "path": "assets/scene/chunk-b57a13ff636fdc8e1a92.bin.gz",
-      "bytes": 22177,
-      "sha256": "b57a13ff636fdc8e1a9293a4b8e1afe617722d523441c4eb9e640053cb1352ae"
+      "path": "assets/scene/chunk-b55a6f958bbcdbca9880.bin.gz",
+      "bytes": 14265,
+      "sha256": "b55a6f958bbcdbca9880fc93c8ed3b87ebe1b00813fd616803ddaa6eb5ec38c1"
     },
     {
       "path": "assets/scene/chunk-b7893ee16ad64a6171e8.bin.gz",
@@ -908,6 +913,11 @@
       "sha256": "b95816af83e7e7807d43906f0048b3d0eec408903163626405397c1e4b4cf43e"
     },
     {
+      "path": "assets/scene/chunk-ba17b4d98a1355242e9a.bin.gz",
+      "bytes": 12894,
+      "sha256": "ba17b4d98a1355242e9aa78d5f6a5db2e15390c387940ea2295fd0b225a2faf2"
+    },
+    {
       "path": "assets/scene/chunk-bb14a522627c34501a49.bin.gz",
       "bytes": 56366,
       "sha256": "bb14a522627c34501a495435e56d5f2cdf8ef2130066479b2c5a4263ff71c836"
@@ -923,19 +933,19 @@
       "sha256": "bd17581e2bdba72d257b010a427c67eae1cfb6fdab904bc4c98f5555b707b3c0"
     },
     {
-      "path": "assets/scene/chunk-bf7ae726ec90786212f8.bin.gz",
-      "bytes": 39733,
-      "sha256": "bf7ae726ec90786212f81e87410279fe5480d9f5277cea56138c86a2cb29a140"
-    },
-    {
       "path": "assets/scene/chunk-c04273e13f0f0b91de37.bin.gz",
       "bytes": 234878,
       "sha256": "c04273e13f0f0b91de372c847d6baac76e71f454a4a9938b02f54e391867d1fe"
     },
     {
-      "path": "assets/scene/chunk-c266f170c376ffab5bda.bin.gz",
-      "bytes": 68356,
-      "sha256": "c266f170c376ffab5bda0126fc6d4c149956b985b022435d5b60bdf9f769fab0"
+      "path": "assets/scene/chunk-c41ad82735a43ef31fb2.bin.gz",
+      "bytes": 13020,
+      "sha256": "c41ad82735a43ef31fb2937d6727b5cd200477180c632d0b140aa34f17704f61"
+    },
+    {
+      "path": "assets/scene/chunk-c433c68b0771ffabc89c.bin.gz",
+      "bytes": 12911,
+      "sha256": "c433c68b0771ffabc89cbebba7708b6b8003a085ed9369650a4c2382c9d685db"
     },
     {
       "path": "assets/scene/chunk-c787c9432e6a957d153a.bin.gz",
@@ -943,14 +953,14 @@
       "sha256": "c787c9432e6a957d153a917255f06f1ad4e8cbd77f5121f277944b94564ff64e"
     },
     {
-      "path": "assets/scene/chunk-c7be0f60cd8897ac891f.bin.gz",
-      "bytes": 12801,
-      "sha256": "c7be0f60cd8897ac891f89c37c353a9fd7db83edcf0f6a17a587d6a63051a376"
-    },
-    {
       "path": "assets/scene/chunk-c859d64b2a9528d5dc06.bin.gz",
       "bytes": 160792,
       "sha256": "c859d64b2a9528d5dc0645e5f3ec573a19742d9ca2a6397455f0ef8350f6bcaf"
+    },
+    {
+      "path": "assets/scene/chunk-c8843a7fbf836b110f78.bin.gz",
+      "bytes": 12909,
+      "sha256": "c8843a7fbf836b110f782258b272aa9f515430f31327a8006b7d2174d21edef0"
     },
     {
       "path": "assets/scene/chunk-cb8edc378e5c8e166675.bin.gz",
@@ -961,6 +971,16 @@
       "path": "assets/scene/chunk-cbe2731c96de620ffd62.bin.gz",
       "bytes": 10744,
       "sha256": "cbe2731c96de620ffd621c1dd31a174165de7c7972557e421e44e8afdd05b26d"
+    },
+    {
+      "path": "assets/scene/chunk-cc0e53c3c2bd283687f2.bin.gz",
+      "bytes": 59936,
+      "sha256": "cc0e53c3c2bd283687f26f64dd80c6ce07e6a34ae9cb74d42033b2614abb880a"
+    },
+    {
+      "path": "assets/scene/chunk-cc46033dbe7a40ac2c8c.bin.gz",
+      "bytes": 17995,
+      "sha256": "cc46033dbe7a40ac2c8c0dfd273a5e7a858f6030fa83d708ca9f006fa32f2b0a"
     },
     {
       "path": "assets/scene/chunk-ccc48790c92ebb0beb72.bin.gz",
@@ -983,9 +1003,9 @@
       "sha256": "cf9bb485bb39d04257f3019227e55bf0d1be9dc92cd09bf38619350d286eaaad"
     },
     {
-      "path": "assets/scene/chunk-d0f3be0b772677959015.bin.gz",
-      "bytes": 3141,
-      "sha256": "d0f3be0b772677959015a3186887db2b37d6ef196bc7e1c1fe5f336f0bf3bef8"
+      "path": "assets/scene/chunk-d08b964ca2d4c6bc7b2d.bin.gz",
+      "bytes": 15166,
+      "sha256": "d08b964ca2d4c6bc7b2dec3a42013eada78a4e7d96a751ee2b2bb8b2ac7ca951"
     },
     {
       "path": "assets/scene/chunk-d342e84158b8d9fdcdc4.bin.gz",
@@ -993,19 +1013,14 @@
       "sha256": "d342e84158b8d9fdcdc4e4c7d3b2d4822eb3f4a370f4697a283a706b1eb655a5"
     },
     {
-      "path": "assets/scene/chunk-d5e05ff45f545f4f0cce.bin.gz",
-      "bytes": 41281,
-      "sha256": "d5e05ff45f545f4f0cce99bbc53e0130372d629413a703ebfd716cc4cabcd588"
+      "path": "assets/scene/chunk-d41ab1a6e501fa5d3679.bin.gz",
+      "bytes": 13062,
+      "sha256": "d41ab1a6e501fa5d3679d864fe5ecb3c03ca206549a5318cd1eedfcb278e251f"
     },
     {
-      "path": "assets/scene/chunk-d6b06fda3866cb34a2c6.bin.gz",
-      "bytes": 24816,
-      "sha256": "d6b06fda3866cb34a2c671457899fbea37af24051c2e371bb7d76cb5aa0b642e"
-    },
-    {
-      "path": "assets/scene/chunk-d8948cc43c13a13114c6.bin.gz",
-      "bytes": 12730,
-      "sha256": "d8948cc43c13a13114c6f1ab321cbb74537e53ac28be0538daf51ff2e3bc7e81"
+      "path": "assets/scene/chunk-d7fc04ad1c42788c7195.bin.gz",
+      "bytes": 25963,
+      "sha256": "d7fc04ad1c42788c719536404a556d65ed6f89e9c596bcc987d3202d1cf1eb4b"
     },
     {
       "path": "assets/scene/chunk-d96eeb77d5bfa5f698d7.bin.gz",
@@ -1013,14 +1028,14 @@
       "sha256": "d96eeb77d5bfa5f698d7891bbb236f83f5ec5b1024f764468471046283f9a6b2"
     },
     {
+      "path": "assets/scene/chunk-dcfebc266147765ee30e.bin.gz",
+      "bytes": 21588,
+      "sha256": "dcfebc266147765ee30eb5d4b7d8d8624742ee4eabb0b9375777ca3c1014ee5f"
+    },
+    {
       "path": "assets/scene/chunk-ddbeade6dfa0f519a01c.bin.gz",
       "bytes": 65878,
       "sha256": "ddbeade6dfa0f519a01c8876fb93a871a9c9a5074bdabc28f2048da8f23b23d0"
-    },
-    {
-      "path": "assets/scene/chunk-de7529523e641684dfc0.bin.gz",
-      "bytes": 27719,
-      "sha256": "de7529523e641684dfc0baed51ff08a81f14f8dba8bf6e291b75142fac0c0a1d"
     },
     {
       "path": "assets/scene/chunk-df32a2d73b4efaa13918.bin.gz",
@@ -1053,11 +1068,6 @@
       "sha256": "e3260527a6e69d2c98346b53701ea956478b9a929d9ccde6a3887563ec23afc2"
     },
     {
-      "path": "assets/scene/chunk-e46e63cdb730b38c9522.bin.gz",
-      "bytes": 47610,
-      "sha256": "e46e63cdb730b38c9522073b3217a47425575c2ffef1ccccc6903f968ca715bb"
-    },
-    {
       "path": "assets/scene/chunk-e5821efc96bdf9a45eeb.bin.gz",
       "bytes": 65790,
       "sha256": "e5821efc96bdf9a45eebe8248defd58ea7de25eeff44e85a264f336743a59d0f"
@@ -1068,9 +1078,9 @@
       "sha256": "e9e93b82dad113d118d242c70ce3c0a7148cd3d142e8b2f40acbae89f2f2385e"
     },
     {
-      "path": "assets/scene/chunk-eb2249e7c02ade9d05c4.bin.gz",
-      "bytes": 25549,
-      "sha256": "eb2249e7c02ade9d05c4494d7b8debe8f967045acf90e9a87c93df46d95fc5e4"
+      "path": "assets/scene/chunk-ea0458f4038363b0d7db.bin.gz",
+      "bytes": 12852,
+      "sha256": "ea0458f4038363b0d7dbbd59f6d7b97b473a326b10cdacac4cb8e7cb6526ae1a"
     },
     {
       "path": "assets/scene/chunk-ebe94ed665960ba7623f.bin.gz",
@@ -1083,24 +1093,24 @@
       "sha256": "ecc704e223475614e5d8b0b8cf0f857c342b6c1b235ddf659dd807c6e8a167e1"
     },
     {
-      "path": "assets/scene/chunk-f4d952ae3224883b9ba3.bin.gz",
-      "bytes": 12734,
-      "sha256": "f4d952ae3224883b9ba38927db18cdbf0f4241e2a21d4a7873019e7a9ea157d2"
+      "path": "assets/scene/chunk-eef37999f1c6b9e67e1b.bin.gz",
+      "bytes": 12849,
+      "sha256": "eef37999f1c6b9e67e1b8d4870ec37f0e47794585c7e0d8a0a3f7f4af049364d"
     },
     {
-      "path": "assets/scene/chunk-f67304ce9b0dc5903743.bin.gz",
-      "bytes": 36520,
-      "sha256": "f67304ce9b0dc59037434ebefc1ad6955e5e804d82c33a71d333433cf44d793f"
+      "path": "assets/scene/chunk-f134d56161b977726cf2.bin.gz",
+      "bytes": 108891,
+      "sha256": "f134d56161b977726cf2e4e860cbcf2a8b0a6098527e8a521fd9c85a32a6f8c4"
     },
     {
-      "path": "assets/scene/chunk-f980de7e5e82c017c7be.bin.gz",
-      "bytes": 12939,
-      "sha256": "f980de7e5e82c017c7be3a4978a17e83d074690e9836e6458946ccc13dfdb00e"
+      "path": "assets/scene/chunk-f1d24f638e170a54fda7.bin.gz",
+      "bytes": 725322,
+      "sha256": "f1d24f638e170a54fda74b1e83580c2f4e9e2844d541b4541136e68a2f801bc1"
     },
     {
-      "path": "assets/scene/chunk-f9e4e5227bd388015758.bin.gz",
-      "bytes": 12851,
-      "sha256": "f9e4e5227bd388015758c82dc13a5ff58c32f46c29ac9d452f95e46569db8282"
+      "path": "assets/scene/chunk-f215c4c2d6585c199fd2.bin.gz",
+      "bytes": 35501,
+      "sha256": "f215c4c2d6585c199fd2966639a92706e676f651fb579fe502960f58a6b0ae61"
     },
     {
       "path": "assets/scene/chunk-fa059db86a75f8bae17a.bin.gz",
@@ -1108,14 +1118,14 @@
       "sha256": "fa059db86a75f8bae17a8ed183465145cc77603c7b7fd082b04c560306af202f"
     },
     {
-      "path": "assets/scene/chunk-fc00a4b1ce7b3b0aa70a.bin.gz",
-      "bytes": 694166,
-      "sha256": "fc00a4b1ce7b3b0aa70a8d3cbd849282de5ad65634a7b4dc1406c75cfb11d646"
+      "path": "assets/scene/chunk-fa8fc9d58dc69cd7861c.bin.gz",
+      "bytes": 60904,
+      "sha256": "fa8fc9d58dc69cd7861c16cc890595a7e6e007db0ec7bf69dd3ecc28e0eb7b3b"
     },
     {
-      "path": "assets/scene/chunk-fc537998b8b4d75cbc3f.bin.gz",
-      "bytes": 12847,
-      "sha256": "fc537998b8b4d75cbc3fa61522388e387e644a17edd24bff5fe3c422b0312ceb"
+      "path": "assets/scene/chunk-fb64de87dd6d03ff5508.bin.gz",
+      "bytes": 12915,
+      "sha256": "fb64de87dd6d03ff5508e48e106a9667efe55d65b14122632a0fe3565280452f"
     },
     {
       "path": "assets/scene/chunk-fc63a6b7655ba6c37bb0.bin.gz",
@@ -1134,8 +1144,8 @@
     },
     {
       "path": "assets/scene/index.json",
-      "bytes": 1707935,
-      "sha256": "539e94408d7ac2b13750a5d37a9476a0a3c7c86b42b050b3e65fef93a64c6030"
+      "bytes": 1787389,
+      "sha256": "b837abb439aa5eaaaab7c8945b10ac327014f982c9c6c479618c6f515683bb06"
     },
     {
       "path": "assets/shell_diff.jpg",
@@ -1160,7 +1170,7 @@
     {
       "path": "index.html",
       "bytes": 13663,
-      "sha256": "b9df332c65ad61027165451e4693dc7236f659e337be195543370ecf376eb33e"
+      "sha256": "bbbb0b4f6ab28283c98c44728c916f020774e6cc523b6f0ab19f3daa683a09e8"
     },
     {
       "path": "music/blue_silence.mp3",
@@ -1199,8 +1209,8 @@
     },
     {
       "path": "src/app.js",
-      "bytes": 72498,
-      "sha256": "c8f844e91dc7c7cc134e5beed0eb4092b48432e406aca308eef4744caa0e576e"
+      "bytes": 72723,
+      "sha256": "31a30ab24dff3afe5a11a54f8a451b604b1e4fbbb758b36334cc239a136f0177"
     },
     {
       "path": "src/aquarium.js",
@@ -1230,12 +1240,12 @@
     {
       "path": "src/config.js",
       "bytes": 2662,
-      "sha256": "213853f326be025c26bdd3e7ebd1474f4837ed06d8ab8c95006cc9ca11d3c1ad"
+      "sha256": "d8c3bd9263f44d7ed76724ead6bf40b4f94c34b5a19f8344d8c439f11d36602f"
     },
     {
       "path": "src/deepsea.js",
-      "bytes": 9246,
-      "sha256": "e8393c6aeab288f4ae5d2f4660dc220388c2cb01d7d3ac8fd4029a9426d64307"
+      "bytes": 15136,
+      "sha256": "08b7e220f77ccc0e3db34ebcd753184d3ad5239abfdb321cec2cfe22628a8d88"
     },
     {
       "path": "src/ecology.js",
@@ -1244,8 +1254,8 @@
     },
     {
       "path": "src/engine.js",
-      "bytes": 96232,
-      "sha256": "17589f3ad67201f50d2772bbee446f4c7eeb6265e921141de289ba3dfd0a1648"
+      "bytes": 97517,
+      "sha256": "bd5e3ca3aff08e87c99bc2a7f7b944a8a68bb45876265c1e7a0a63c6452e41fa"
     },
     {
       "path": "src/expedition.js",
@@ -1365,7 +1375,7 @@
     {
       "path": "src/shell.html",
       "bytes": 10246,
-      "sha256": "32d9247fd8d752ae91d4cf6a15a33cb33f15192f6ca906d06c07590d84c87e80"
+      "sha256": "ffe4c31379248ef4ef43a6bda642a5d5d285f95cf44585dfd76ba77173a0ac80"
     },
     {
       "path": "src/ship.js",
@@ -1384,8 +1394,8 @@
     },
     {
       "path": "src/trench.js",
-      "bytes": 13871,
-      "sha256": "7db31084574da566abc740747125fabde960ecb7695a79fbaef4ecccffff0154"
+      "bytes": 17530,
+      "sha256": "9a5effc78056129471821f897f2b6f180c54770ca8e83b7c4eca6d8b9c410f0f"
     },
     {
       "path": "src/trench_fauna.js",
@@ -1394,8 +1404,8 @@
     },
     {
       "path": "src/trench_world.js",
-      "bytes": 1443,
-      "sha256": "d3fec2cb631fbc891825244ef88d3dca86c0740b20c02b4002b595f36cd45721"
+      "bytes": 2945,
+      "sha256": "b03b66bd09c7004e91fe46a221592ab9f8c83dd9359d8c70531d5d01654c2650"
     },
     {
       "path": "src/voyage.js",

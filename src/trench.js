@@ -14,6 +14,15 @@ const OceanTrench=(()=>{
   sea_pig:{station:'slope',homes:[[763,-1402,-111],[768,-1402,-115]],radius:.24},
   mariana_snailfish:{station:'hadal',homes:[[776,-7001.8,-130],[783,-7002.0,-135]],radius:.45}
  };
+ // Authored populations on the continuous descent, not field-sighting data.
+ // Their depths stay inside the museum/research ranges documented in
+ // TRENCH-EXPLORATION-REFERENCE.md. Existing individuals are never relocated.
+ const encounters=[
+  {id:'giant-squid-pass',species:'giant_squid',home:[775,-680,-114],gate:[766,-680,-90],station:'midwater',radius:.85,guide:true},
+  {id:'upper-pelican',species:'pelican_eel',home:[768,-1120,-112],gate:[766,-1120,-90],station:'slope',radius:.5,guide:false},
+  {id:'pelican-pass',species:'pelican_eel',home:[764,-2300,-114],gate:[766,-2300,-90],station:'hadal',radius:.5,guide:true},
+  ...[2400,3600,5200].flatMap(depth=>[[763,-112],[768,-116]].map(([x,z],i)=>({id:depth===3600&&i===0?'mud-fauna-pass':'mud-'+depth+'-'+i,species:'sea_pig',home:[x,-depth-2,z],gate:[766,-depth,-90],station:'hadal',radius:.24,guide:depth===3600&&i===0})))
+ ];
  // Patrols are camera/vehicle routes, not interaction targets on the mud.
  stations[0].route=[stations[0].p.slice(),[768,-700,-98],[774,-702,-106],[768,-701,-110],stations[0].p.slice()];
  stations[1].route=[stations[1].p.slice(),[759,-1400,-107],[765,-1400,-112],[770,-1400,-117],[774,-1400,-109],stations[1].p.slice()];
@@ -31,9 +40,14 @@ const OceanTrench=(()=>{
  }
  function axis(min,max,step,homes,k){const values=new Set();for(let n=min;n<=max;n+=step)values.add(n);values.add(max);for(const p of homes)for(const d of [-3,-2,2,3])if(p[k]+d>min&&p[k]+d<max)values.add(p[k]+d);return [...values].sort((a,b)=>a-b);}
  const floorGrid={xs:axis(260,900,5,habitats.mariana_snailfish.homes,0),zs:axis(-395,215,5,habitats.mariana_snailfish.homes,2)};
+ // A real, narrow erosional cut begins beyond the original snailfish cores.
+ // Add shared grid lines, not an overlapping plane: rendering, floor queries
+ // and neighbouring cell edges use the same connected surface.
+ for(const [key,points]of [['xs',[774,777,780,783,786]],['zs',[-138,-141,-145,-151]]])floorGrid[key]=[...new Set([...floorGrid[key],...points])].sort((a,b)=>a-b);
  function bedSample(x,z){
   const distance=Math.hypot(x-780,z+132),plain=-7030+5*Math.sin((x-720)*.025)*Math.cos((z+120)*.024),w=1-smooth((distance-20)/20),edge=smooth(Math.min(x-620,900-x,z+240,60-z)/5),deep=mix(plain,-7002.5,w)+sedimentRelief(x,z,habitats.mariana_snailfish.homes)*edge;
-  const slope=x<620?mix(coastalGround(x,z),deep,smooth((x-260)/360)):deep;
+  const cut=18*(1-smooth((Math.abs(x-780)-2)/5))*smooth((-z-137.5)/3.5)*(1-smooth((-z-172)/16));
+  const slope=x<620?mix(coastalGround(x,z),deep,smooth((x-260)/360)):deep-cut;
   // A depositional bench interrupts the steep upper slope at 220 m. Its broad
   // sediment core supports full spider-crab legs; the curved shoulder blends
   // into the same sampled terrain used by rendering and collision queries.
@@ -73,18 +87,40 @@ const OceanTrench=(()=>{
  // Two fault walls run continuously down the transect. Dense sections around
  // the three stations expose broad ledges and inclined bedding in silhouette.
  const levels=new Set([-580,-7040]);for(let y=-580;y>-7040;y-=128)levels.add(y);
- for(const s of stations)for(let dy=-22;dy<=22;dy+=2)levels.add(-s.depth+dy);
+ // Redistribute the existing polygon budget toward the near silhouettes and
+ // actual ledges. Three-metre wall strata remain much finer than transit gaps.
+ for(const s of stations){levels.add(-s.depth);for(let dy=-22;dy<=22;dy+=3)levels.add(-s.depth+dy);}
  const ys=[...levels].sort((a,b)=>b-a),zs=Array.from({length:15},(_,i)=>-188+i*10);
  function wallX(y,z,side){const bed=y+.12*z,layer=Math.floor(bed/3.4),ledge=.62*Math.sin(layer*1.91)+.25*Math.sin(layer*.47),weather=.35*Math.sin(z*.23+y*.08),curve=2.1*Math.sin(y*.0027)+1.6*Math.cos(z*.045);return 762+side*(28+curve+ledge+weather);}
  for(const side of [-1,1])for(let j=0;j<ys.length-1;j++)for(let k=0;k<zs.length-1;k++){
   const at=(y,z)=>[wallX(y,z,side),y,z],p=[at(ys[j],zs[k]),at(ys[j],zs[k+1]),at(ys[j+1],zs[k+1]),at(ys[j+1],zs[k])];
   prism('wall-'+side+'-'+j+'-'+k+'a',[p[0],p[1],p[2]],0,side*8);prism('wall-'+side+'-'+j+'-'+k+'b',[p[0],p[2],p[3]],0,side*8);
  }
+ // Short fault spurs project from the main walls into the light's useful
+ // range. Each has an irregular sloping face, a 30–55m vertical section and
+ // real solid volume. Their tips flank the animals rather than walling off
+ // the current corridor or the saved observation/patrol positions.
+ function spur(id,{x,z0,z1,top,bottom,side,thickness}){
+  const rows=Math.ceil((top-bottom)/5),cols=5;
+  const at=(j,k)=>{const y=mix(top,bottom,j/rows),z=mix(z0,z1,k/cols),edge=Math.sin(Math.PI*k/cols),profile=.52*Math.sin((y-top)*.53)+.26*Math.sin((y-top)*1.27),slant=(top-y)*.025;return [x+side*(slant+2*(1-edge)+profile),y,z];};
+  for(let j=0;j<rows;j++)for(let k=0;k<cols;k++){const p=[at(j,k),at(j,k+1),at(j+1,k+1),at(j+1,k)];prism(id+'-'+j+'-'+k+'a',[p[0],p[1],p[2]],0,side*thickness);prism(id+'-'+j+'-'+k+'b',[p[0],p[2],p[3]],0,side*thickness);}
+ }
+ spur('midwater-spur',{x:774,z0:-96,z1:-104,top:-682,bottom:-730,side:1,thickness:20});
+ spur('slope-spur',{x:770,z0:-115,z1:-127,top:-1384,bottom:-1428,side:1,thickness:25});
+ spur('slope-left-spur',{x:756,z0:-112,z1:-127,top:-1384,bottom:-1428,side:-1,thickness:24});
+ spur('hadal-left-spur',{x:770,z0:-132,z1:-151,top:-6984,bottom:-7040,side:-1,thickness:38});
+ spur('hadal-back-spur',{x:788,z0:-140,z1:-157,top:-6980,bottom:-7040,side:1,thickness:14});
  // The 1400m muddy terrace is a real, finite ledge, open below it. Its central
  // patch stays exactly level for the small deposit feeders' feet.
  const shelf=(x,z)=>-1402-2.8*smooth(Math.max(Math.abs(x-766)/15,Math.abs(z+113)/13)-.48)+sedimentRelief(x,z,habitats.sea_pig.homes)*smooth(Math.min(x-751,781-x,z+126,-100-z)/3);
  const shelfGrid={xs:axis(751,781,2,habitats.sea_pig.homes,0),zs:axis(-126,-100,2,habitats.sea_pig.homes,2)};
  for(let j=0;j<shelfGrid.zs.length-1;j++)for(let i=0;i<shelfGrid.xs.length-1;i++){const x=shelfGrid.xs[i],z=shelfGrid.zs[j],x1=shelfGrid.xs[i+1],z1=shelfGrid.zs[j+1],p=[[x,shelf(x,z),z],[x1,shelf(x1,z),z],[x1,shelf(x1,z1),z1],[x,shelf(x,z1),z1]];prism('terrace-'+j+'-'+i+'a',[p[0],p[2],p[1]],1,-3.5,17,'roof');prism('terrace-'+j+'-'+i+'b',[p[0],p[3],p[2]],1,-3.5,17,'roof');}
+ // Small, finite mud deposits interrupt the descent. They are open below;
+ // floorAt selects the occupied layer rather than the seven-kilometre floor.
+ for(const depth of [2400,3600,5200]){
+  const homes=encounters.filter(e=>e.species==='sea_pig'&&e.home[1]===-depth-2).map(e=>e.home),xs=axis(756,775,5,homes,0),zs=axis(-123,-104,5,homes,2),y=(x,z)=>-depth-2-3*smooth((Math.max(Math.abs(x-765.5),Math.abs(z+113.5))-7.5)/2)+sedimentRelief(x,z,homes)*.65;
+  for(let j=0;j<zs.length-1;j++)for(let i=0;i<xs.length-1;i++){const x=xs[i],z=zs[j],x1=xs[i+1],z1=zs[j+1],p=[[x,y(x,z),z],[x1,y(x1,z),z],[x1,y(x1,z1),z1],[x,y(x,z1),z1]];prism('mud-'+depth+'-'+j+'-'+i+'a',[p[0],p[2],p[1]],1,-7,17,'roof');prism('mud-'+depth+'-'+j+'-'+i+'b',[p[0],p[3],p[2]],1,-7,17,'roof');}
+ }
  // Bottom sediment is divided into chunks horizontally as well as by depth.
  // Geometry remains local even at seven kilometres; no origin at the sea level.
  const q=floorGrid;for(let j=0;j<q.zs.length-1;j++)for(let i=0;i<q.xs.length-1;i++){const x=q.xs[i],z=q.zs[j],x1=q.xs[i+1],z1=q.zs[j+1],p=[[x,bedHeight(i,j),z],[x1,bedHeight(i+1,j),z],[x1,bedHeight(i+1,j+1),z1],[x,bedHeight(i,j+1),z1]];for(const ids of [[0,2,1],[0,3,2]]){const triangle=ids.map(k=>p[k]);emit(triangle,faceNormal(...triangle),17);}}
@@ -130,6 +166,6 @@ const OceanTrench=(()=>{
  }
  function build(renderer){for(const {g,origin,distance}of groups.values()){const batch=renderer.batch(g,[{p:origin.slice()}]);batch.sceneRole='region:trench';batch.regionRole='strata';batch.maxDistance=distance;}}
  function freeze(o){if(o&&typeof o==='object'){for(const p of Object.values(o))freeze(p);Object.freeze(o);}return o;}
- freeze(bounds);freeze(worldBounds);freeze(stations);freeze(habitats);freeze(solids);
- return Object.freeze({bounds,worldBounds,stations,habitats,solids,containsXZ,containsPosition,groundHeight,floorAt,nearbySolids,route,build});
+ freeze(bounds);freeze(worldBounds);freeze(stations);freeze(habitats);freeze(encounters);freeze(solids);
+ return Object.freeze({bounds,worldBounds,stations,habitats,encounters,solids,containsXZ,containsPosition,groundHeight,floorAt,nearbySolids,route,build});
 })();

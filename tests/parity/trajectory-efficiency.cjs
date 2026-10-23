@@ -20,7 +20,8 @@ const original=world(true),candidate=world(),results=[];
 function check(name,run){try{const evidence=run();results.push({name,pass:true,evidence});console.log('PASS '+name+(evidence?' '+JSON.stringify(evidence):''));}catch(error){results.push({name,pass:false,error:error.message});console.error('FAIL '+name+'\n'+error.message);}}
 check('boot fixture includes the 64 reef fish before individual initialization',()=>{
  const counts=vm.runInContext('({allLife:allLife.length,reef:allLife.filter(f=>f.reefFish).length,reefBatches:motionRenderer.batches.length,shoal:shoal.length})',candidate.ctx);
- assert.equal(counts.allLife,header.life.length+header.decorLife.length+64);assert.equal(counts.reef,64);assert.equal(counts.reefBatches,8);return counts;
+ // A full bake now already contains the reef expansion. Boot must reuse it.
+ assert.equal(counts.allLife,header.life.length+header.decorLife.length);assert.equal(counts.reef,64);assert.equal(counts.reefBatches,0);return counts;
 });
 check('all animal and shoal state is exact across forward, repeated and rewound time',()=>{
  const times=[0,.008,.016,.055,.25,1,8,19,120,600,7000,3,3];

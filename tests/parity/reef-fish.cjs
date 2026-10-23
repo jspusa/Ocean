@@ -4,8 +4,11 @@
 const fs=require('node:fs'),path=require('node:path'),vm=require('node:vm'),zlib=require('node:zlib'),assert=require('node:assert/strict'),crypto=require('node:crypto');
 const root=path.resolve(__dirname,'../..'),read=n=>fs.readFileSync(path.join(root,'src',n+'.js'),'utf8'),raw=zlib.gunzipSync(fs.readFileSync(path.join(root,'assets/reef.mesh.gz'))),header=JSON.parse(raw.subarray(8,8+raw.readUInt32LE(4)));
 const modules=['engine','world','reef_detail','next_reef','individuals','open_world','trench','fauna','cetaceans','abyss_fauna','trench_fauna','fauna_world','cetacean_world','regions','abyss_world','trench_world','pelagic_life'];
-function world(expansion=true){
- const ctx=vm.createContext({console,header:JSON.parse(JSON.stringify(header))});for(const n of modules)vm.runInContext(read(n),ctx,{filename:n});if(expansion)vm.runInContext(read('reef_fauna'),ctx,{filename:'reef_fauna'});
+function world(expansion=true,compiled=false){
+ // Exercise the original runtime append route even after a full bake includes
+ // these animals. The separate compiled route below must never append again.
+ const input=JSON.parse(JSON.stringify(header));if(!compiled)input.life=input.life.filter(i=>!input.nodes[i].reefFish);
+ const ctx=vm.createContext({console,header:input});for(const n of modules)vm.runInContext(read(n),ctx,{filename:n});if(expansion)vm.runInContext(read('reef_fauna'),ctx,{filename:'reef_fauna'});
  vm.runInContext('obstacles.push(...header.obstacles);reefPatches.push(...header.reefPatches);life.push(...header.life.map(i=>header.nodes[i]));decorLife.push(...header.decorLife.map(i=>header.nodes[i]));shoal.push(...header.shoal.map(i=>header.nodes[i]));allLife=life.concat(decorLife);initializeIndividuals({batches:[]});',ctx);
  const renderer={batches:[],batch(g,instances,kind,dynamic){const b={g,instances,kind,dynamic};this.batches.push(b);return b;}};
  if(expansion){ctx.renderer=renderer;vm.runInContext('ensureReefFish(renderer);initializeIndividuals(renderer);',ctx);}
@@ -17,6 +20,11 @@ assert.equal(current.get('JSON.stringify(SPECIES.slice(0,SPECIES.length-REEF_FIS
 assert.equal(new Set(fish.map(f=>f.uid)).size,64);
 const initialCount=current.get('life.length');assert.equal(current.get('ensureReefFish(renderer)'),false);assert.equal(current.get('life.length'),initialCount);assert.equal(current.renderer.batches.length,8);
 console.log('PASS four usable species, 64 unique actors and eight shared LOD batches append idempotently');
+if(header.life.some(i=>header.nodes[i].reefFish)){
+ const baked=world(true,true),residents=baked.get('life.filter(f=>f.reefFish)');assert.equal(residents.length,64);assert.equal(baked.renderer.batches.length,0);
+ const identity=f=>JSON.stringify([f.uid,Array.from(f.home),Array.from(f.s),f.bioSeed]);assert.deepEqual(Array.from(residents,identity),Array.from(fish,identity));assert.equal(baked.get('ensureReefFish(renderer)'),false);
+ console.log('PASS compiled reef fish preserve the runtime identities and do not create duplicate actors or batches');
+}
 let bytes=0;const fingerprints=new Set();
 for(const sp of entries){
  assert(sp.thumb.startsWith('data:image/svg+xml;charset=utf-8,'));assert(decodeURIComponent(sp.thumb).includes('viewBox="0 0 420 210"'));assert(sp.source.startsWith('https://'));

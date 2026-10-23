@@ -3,10 +3,15 @@
 'use strict';
 const fs=require('node:fs'),path=require('node:path'),vm=require('node:vm'),assert=require('node:assert/strict'),crypto=require('node:crypto');
 const source=fs.readFileSync(path.resolve(__dirname,'../../src/engine.js'),'utf8'),fixturePath=path.join(__dirname,'fixtures/uniform-state-v018.json');
+// Keep the immutable pre-cache fixture. Normalize only the two deliberately
+// authored 0.18.6 changes for its uniform-state comparison; real current passes
+// still exercise location caching and null-call removal below. Lamp parameters
+// are independently checked against actual surface/photo uniforms by trench-lighting.
+const comparableSource=source.replace('outer:.62,inner:.98,strength:2.2,falloff:.024','outer:.76,inner:.987,strength:2.2,falloff:.055').replace('uniform sampler2D uVolumeShadow;','uniform sampler2D uVolumeShadow;uniform sampler2D uCaustic;');
 const digest=value=>crypto.createHash('sha256').update(JSON.stringify(value)).digest('hex');
-function fixture(){
+function fixture(shaderSource=source){
  const context=vm.createContext({console,performance});
- vm.runInContext(source+'\nconst BIO_NEUTRAL=[1,1,1,1],BIO_DEFAULT=[.5,.5,.5,.5];const SPECIES=[{materialProfile:{roughness:.4,subsurface:.2,patternScale:2,skin:"fish"},motionProfile:{type:"snailfish"}}];globalThis.shaderPairs={program:[VS,FS],shadowProgram:[VS,SHADOW_FS],waterProgram:[WATER_VS,WATER_FS],pointProgram:[POINT_VS,POINT_FS],postProgram:[POST_VS,POST_FS],volumeProgram:[POST_VS,VOLUME_FS],volumeFilterProgram:[POST_VS,VOLUME_FILTER_FS],bubbleProgram:[BUBBLE_VS,BUBBLE_FS],aaProgram:[POST_VS,AA_FS],skyProgram:[POST_VS,SKY_FS]};',context);
+ vm.runInContext(shaderSource+'\nconst BIO_NEUTRAL=[1,1,1,1],BIO_DEFAULT=[.5,.5,.5,.5];const SPECIES=[{materialProfile:{roughness:.4,subsurface:.2,patternScale:2,skin:"fish"},motionProfile:{type:"snailfish"}}];globalThis.shaderPairs={program:[VS,FS],shadowProgram:[VS,SHADOW_FS],waterProgram:[WATER_VS,WATER_FS],pointProgram:[POINT_VS,POINT_FS],postProgram:[POST_VS,POST_FS],volumeProgram:[POST_VS,VOLUME_FS],volumeFilterProgram:[POST_VS,VOLUME_FILTER_FS],bubbleProgram:[BUBBLE_VS,BUBBLE_FS],aaProgram:[POST_VS,AA_FS],skyProgram:[POST_VS,SKY_FS]};',context);
  const Class=vm.runInContext('Renderer',context),calls=[],draws=[],programs={},states=new Map(),lookups=new Map();let pass,current,vao;
  for(const [id,parts] of Object.entries(context.shaderPairs)){
   const names=new Set([...parts.join('\n').matchAll(/uniform\s+(?:(?:lowp|mediump|highp)\s+)?\w+\s+(\w+)/g)].map(m=>m[1]));
@@ -25,8 +30,8 @@ function fixture(){
  const renderer=Object.assign(Object.create(Class.prototype),{gl,batches,mobile:false,quality:2,width:800,height:600,canvas:{width:800,height:600},shadowSize:2048,dynamicShadowSize:1024,lighting:'day',textures:Array.from({length:9},(_,i)=>'texture'+i),shadowFBO:'static',dynamicShadowFBO:'dynamic',sceneFBO:'colour',volumeFBO:'volume',volumeFilteredFBO:'filter',aaFBO:'post',volumeW:400,volumeH:300,frame:0,shadowProgram:programs.shadowProgram,forceShadow:true,postVAO:'post-vao',waterVAO:'water-vao',waterCount:12,particleVAO:'particle-vao',exposure:1.11,clarity:1,fog:[.001,.005,.028],fogDensity:.034,frustum:()=>Array.from({length:6},()=>[0,0,0,1]),...programs});renderer.setupBubbles();
  return {context,renderer,batches,calls,draws,lookups};
 }
-function run(){
- const f=fixture(),frames=[];
+function run(shaderSource=source){
+ const f=fixture(shaderSource),frames=[];
  for(let frame=0;frame<3;frame++){
   const r=f.renderer,deep=frame===2;r.forceShadow=frame!==1;r.lighting=deep?'late':'day';r.lamp=deep;r.photoFov=deep?43:undefined;r.photoAperture=deep?.35:0;r.photoFocus=deep?3:8;
   if(deep){for(const b of f.batches)b.instances[0].p=[766,-7000,-120];vm.runInContext('SPECIES[0].materialProfile.roughness=.85;SPECIES[0].motionProfile.type="vampire"',f.context);}
@@ -37,14 +42,15 @@ function run(){
  return {f,frames};
 }
 const {f,frames}=run();
+const comparable=run(comparableSource).frames;
 const original=JSON.parse(fs.readFileSync(fixturePath,'utf8')),results=[];
 function check(name,fn){try{fn();results.push(true);console.log('PASS '+name);}catch(e){results.push(false);console.error('FAIL '+name+': '+e.message);}}
-check('active uniform values/order and every draw state match the original passes',()=>{
- for(let i=0;i<frames.length;i++){assert.equal(frames[i].activeCalls,original.frames[i].activeCalls);assert.equal(frames[i].activeHash,original.frames[i].activeHash,'Active submission sequence for frame '+i);assert.deepEqual(frames[i].draws,original.frames[i].draws,'Draws and uniform state for frame '+i);}
+check('apart from the authored lamp and removed volume atlas, uniform values/order match frozen passes',()=>{
+ for(let i=0;i<comparable.length;i++){assert.equal(comparable[i].activeCalls,original.frames[i].activeCalls);assert.equal(comparable[i].activeHash,original.frames[i].activeHash,'Active submission sequence for frame '+i);assert.deepEqual(comparable[i].draws,original.frames[i].draws,'Draws and uniform state for frame '+i);assert.deepEqual(frames[i].draws.map(({state,...draw})=>draw),comparable[i].draws.map(({state,...draw})=>draw));}
 });
 check('no shader pass submits inactive uniform locations',()=>{
  console.log('WORK '+JSON.stringify(frames.map((row,i)=>({frame:i,before:original.frames[i].allCalls,after:row.allCalls,removed:original.frames[i].nullCalls}))));
- for(let i=0;i<frames.length;i++){assert.equal(frames[i].nullCalls,0);assert.equal(original.frames[i].allCalls-frames[i].allCalls,original.frames[i].nullCalls);assert.ok(original.frames[i].nullCalls>50,'Reference must expose no-op calls');}
+ for(let i=0;i<frames.length;i++){assert.equal(frames[i].nullCalls,0);assert.equal(original.frames[i].allCalls-frames[i].allCalls,original.frames[i].nullCalls+1,'one additional inactive volume atlas location');assert.ok(original.frames[i].nullCalls>50,'Reference must expose no-op calls');}
 });
 check('active and null uniform locations are looked up only once per program/name',()=>{
  assert(f.lookups.size>100);assert([...f.lookups.values()].every(count=>count===1));

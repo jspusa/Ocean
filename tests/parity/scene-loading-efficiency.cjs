@@ -17,10 +17,10 @@ async function load({body=chunked(packed),streamOnly=false,compression=Decompres
 }
 const tests=[];function check(name,fn){tests.push({name,fn});}
 check('compiled scene shares every byte-identical mesh without merging batches',async()=>{
- const result=await load();assert.equal(result.ok,true);assert.equal(result.calls.length,481);
- const meshes=new Set(result.calls.map(b=>b.geo.indexed));assert.equal(meshes.size,439,'42 duplicate geometry uploads must reuse their canonical mesh');
+ const result=await load();assert.equal(result.ok,true);assert.equal(result.calls.length,495);
+ const meshes=new Set(result.calls.map(b=>b.geo.indexed));assert.equal(meshes.size,447,'48 duplicate geometry uploads must reuse their canonical mesh');
  let bytes=0;for(const mesh of meshes)bytes+=mesh.vertices.byteLength+mesh.indices.byteLength;
- assert.equal(bytes,53444556);assert.equal(result.renderer.sceneLoad.decodedBytes,58493988);
+ assert.equal(bytes,54648876);assert.equal(result.renderer.sceneLoad.decodedBytes,61299488);
  const nodes=new Map();for(const [i,batch]of result.calls.entries()){
   const authored=originalHeader.batches[i],mesh=batch.geo.indexed;
   assert.equal(batch.kind,authored.kind);assert.equal(batch.dynamic,authored.dynamic);assert.equal(batch.geo.material,authored.material);assert.equal(batch.geo.species,authored.species);

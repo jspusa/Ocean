@@ -28,11 +28,11 @@ function motion(reference){
 const original=motion(true),current=motion(false);
 function pair(code){for(const w of [original,current])w.run(code);}
 function equalPoses(times,contextFactory){for(const t of times){for(const w of [original,current])w.step(t,contextFactory?.(w));assert.deepEqual(current.snapshot(),original.snapshot(),'complete actor state at '+t);}}
-check('all actual compiled abyss actors retain exact complete state through random-access time',()=>{assert.equal(current.actors.length,9);equalPoses([0,.016,.055,1,8,120,7000,3,3]);return {actors:current.actors.length,frames:9};});
+check('all actual compiled abyss actors retain exact complete state through random-access time',()=>{assert.equal(current.actors.length,12);equalPoses([0,.016,.055,1,8,120,7000,3,3]);return {actors:current.actors.length,frames:9};});
 check('warm public poses remove repeated envelope and obstacle queries but retain every terrain sample',()=>{
  pair('counts.envelope=counts.queries=counts.floor=counts.roof=0');equalPoses([7,7.016,7.032,7.048]);
  const before=plain(original.ctx.counts),after=plain(current.ctx.counts);
- assert.equal(before.envelope,108);assert.equal(before.queries,108);assert.equal(after.envelope,0);assert.equal(after.queries,0);assert.equal(after.floor,before.floor);assert.equal(after.roof,before.roof);return {before,after};
+ assert.equal(before.envelope,current.actors.length*3*4);assert.equal(before.queries,current.actors.length*3*4);assert.equal(after.envelope,0);assert.equal(after.queries,0);assert.equal(after.floor,before.floor);assert.equal(after.roof,before.roof);return {before,after};
 });
 check('in-place home, scale, radius, model bounds and motion-profile edits invalidate static paths',()=>{
  const changes=['for(const f of actors)f.home[0]+=.17','for(const f of actors)f.home[1]-=.09','for(const f of actors)f.home[2]-=.23','for(const f of actors)f.s[0]*=.95','for(const f of actors)f.radius*=.8','for(const sp of ABYSS_SPECIES)sp.motionProfile.radius*=.7','for(const sp of ABYSS_SPECIES)sp.motionProfile.bob+=.07','for(const sp of ABYSS_SPECIES)sp.modelBounds.min[0]-=.03','for(const sp of ABYSS_SPECIES)sp.modelBounds.min[1]-=.03','for(const sp of ABYSS_SPECIES)sp.modelBounds.min[2]-=.03','for(const sp of ABYSS_SPECIES)sp.modelBounds.max[0]+=.02','for(const sp of ABYSS_SPECIES)sp.modelBounds.max[1]+=.02','for(const sp of ABYSS_SPECIES)sp.modelBounds.max[2]+=.02','for(const sp of ABYSS_SPECIES)sp.traits.motion=sp.traits.motion===\'crawl\'?\'hover\':\'crawl\''];
@@ -87,7 +87,7 @@ function ecology(reference){
 const oldEcology=ecology(true),newEcology=ecology(false);
 function sameEcology(times){for(const t of times){oldEcology.step(t);newEcology.step(t);assert.deepEqual(newEcology.snapshot(),oldEcology.snapshot(),'complete ecology actor/state/node output at '+t);}}
 check('idle public afterLife removes the no-food scan and already-hidden particle writes',()=>{
- sameEcology([0,.016,.032,.048]);const before=plain(oldEcology.counts),after=plain(newEcology.counts);assert.equal(before.traits,301*4);assert.equal(before.foodWrites,48*4);assert.equal(after.traits,0);assert.equal(after.foodWrites,0);return {actors:301,frames:4,before,after};
+ sameEcology([0,.016,.032,.048]);const before=plain(oldEcology.counts),after=plain(newEcology.counts);assert.equal(before.traits,oldEcology.actors.length*4);assert.equal(before.foodWrites,48*4);assert.equal(after.traits,0);assert.equal(after.foodWrites,0);return {actors:oldEcology.actors.length,frames:4,before,after};
 });
 check('food clouds and return-to-route reactions keep exact actors, particles and saved state',()=>{
  for(const w of [oldEcology,newEcology])assert(w.api.feedAt(w.food,500,350));sameEcology([.1,.2,1,7,7.1]);
