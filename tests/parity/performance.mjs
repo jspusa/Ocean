@@ -59,7 +59,7 @@ try{
    const finish=()=>{
     if(done)return;done=true;restore();
     const times=frames.map(f=>f.ms).sort((a,b)=>a-b),sum=times.reduce((a,b)=>a+b,0);
-    const report=adaptive?{version:OPEN_WORLD.version,capturedAt:new Date().toISOString(),durationMs:sum,renderedFrames:frames.length,averageFPS:1000*frames.length/sum,p50FrameMs:times[Math.floor(times.length*.5)],p95FrameMs:times[Math.floor(times.length*.95)],meanCPUFrameMs:frames.reduce((n,f)=>n+f.cpu,0)/frames.length,frameIntervalsMs:frames.map(f=>+f.ms.toFixed(3)),note:'Rendered requestAnimationFrame intervals. Automatic resolution remains active; no benchmark lock, no animation freeze, no GPU timer claim.'}:oceanPerf.lastResult;
+    const report=adaptive?{version:document.documentElement?.dataset?.version||'unknown',worldVersion:OPEN_WORLD.version,capturedAt:new Date().toISOString(),durationMs:sum,renderedFrames:frames.length,averageFPS:1000*frames.length/sum,p50FrameMs:times[Math.floor(times.length*.5)],p95FrameMs:times[Math.floor(times.length*.95)],p99FrameMs:times[Math.floor(times.length*.99)],meanCPUFrameMs:frames.reduce((n,f)=>n+f.cpu,0)/frames.length,frameIntervalsMs:frames.map(f=>+f.ms.toFixed(3)),note:'Rendered requestAnimationFrame intervals. Automatic resolution remains active; no benchmark lock, no animation freeze, no GPU timer claim.'}:oceanPerf.lastResult;
     resolve({report,adaptive,initial,final:snapshot(),samples:frames,allBatchFlagsPreserved:renderer.batches.length===batchFlags.length&&renderer.batches.every((b,i)=>b.visible===batchFlags[i]),gl:renderer.gl.getError()});
    };
    // The app's benchmark intentionally locks resolution. Use its unchanged method
