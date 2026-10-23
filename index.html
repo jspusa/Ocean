@@ -25,15 +25,15 @@ SOFTWARE.
 Scientific accuracy and real-world dive planning are outside this concept
 prototype's scope. External reference pages remain subject to their own terms.
 -->
-<html lang="zh-Hant" data-version="0.18.1">
+<html lang="zh-Hant" data-version="0.18.2">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#031329"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="description" content="重返蔚藍：從珊瑚礁一路游向深海海溝，與巨鯨和深海生物相遇。自由探索的 3D 海洋世界。">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 64 64%27%3E%3Crect width=%2764%27 height=%2764%27 rx=%2715%27 fill=%27%23082f3b%27/%3E%3Cpath d=%27M13 25c12-13 25 13 38 0M13 39c12-13 25 13 38 0%27 fill=%27none%27 stroke=%27%23d1e6cc%27 stroke-width=%274%27 stroke-linecap=%27round%27/%3E%3C/svg%3E">
 <title>重返蔚藍 · 自由入海</title>
-<link rel="stylesheet" href="src/style.css?v=0.18.1">
-<link rel="stylesheet" href="src/mobile-controls.css?v=0.18.1">
-<link rel="manifest" href="ocean.webmanifest?v=0.18.1">
+<link rel="stylesheet" href="src/style.css?v=0.18.2">
+<link rel="stylesheet" href="src/mobile-controls.css?v=0.18.2">
+<link rel="manifest" href="ocean.webmanifest?v=0.18.2">
 </head>
 <body>
 <canvas id="ocean" tabindex="0" aria-label="可互動的三維海底場景" aria-describedby="playInstructions"></canvas>
@@ -74,45 +74,45 @@ prototype's scope. External reference pages remain subject to their own terms.
 <div id="photoViewer" class="hidden" role="dialog" aria-modal="true" aria-label="照片預覽"><button id="closePhoto" class="icon-btn" aria-label="關閉照片">×</button><img id="photoImage" alt="你拍攝的遊戲海底畫面"><div><button id="savePhoto" class="primary">儲存照片 ↗</button><span>遊戲截圖 · 非實景照片</span></div></div>
 <div id="errorBox" class="hidden" role="alert"><h2>這個視窗無法啟動 3D</h2><p id="errorMessage">請使用支援 WebGL 2 的瀏覽器，並開啟硬體加速。</p><p>若正在 ChatGPT 或手機檔案預覽內，請改以一般瀏覽器開啟。GitHub Pages 可直接放入這個 HTML。</p><button onclick="location.reload()" class="primary">重新嘗試</button></div>
 <noscript>此海底漫遊需要 JavaScript。請使用允許執行 JavaScript 的瀏覽器開啟。</noscript>
-<script src="src/config.js?v=0.18.1"></script>
-<script src="src/engine.js?v=0.18.1"></script>
-<script src="src/world.js?v=0.18.1"></script>
-<script src="src/reef_detail.js?v=0.18.1"></script>
-<script src="src/next_reef.js?v=0.18.1"></script>
-<script src="src/individuals.js?v=0.18.1"></script>
-<script src="src/open_world.js?v=0.18.1"></script>
-<script src="src/trench.js?v=0.18.1"></script>
-<script src="src/fauna.js?v=0.18.1"></script>
-<script src="src/cetaceans.js?v=0.18.1"></script>
-<script src="src/abyss_fauna.js?v=0.18.1"></script>
-<script src="src/trench_fauna.js?v=0.18.1"></script>
-<script src="src/fauna_world.js?v=0.18.1"></script>
-<script src="src/cetacean_world.js?v=0.18.1"></script>
-<script src="src/regions.js?v=0.18.1"></script>
-<script src="src/abyss_world.js?v=0.18.1"></script>
-<script src="src/trench_world.js?v=0.18.1"></script>
-<script src="src/pelagic_life.js?v=0.18.1"></script>
-<script src="src/reef_fauna.js?v=0.18.1"></script>
-<script src="src/scene_stream.js?v=0.18.1"></script>
-<script src="src/scene_cache.js?v=0.18.1"></script>
-<script src="src/seasons.js?v=0.18.1"></script>
-<script src="src/audio.js?v=0.18.1"></script>
-<script src="src/performance.js?v=0.18.1"></script>
-<script src="src/selection.js?v=0.18.1"></script>
-<script src="src/app.js?v=0.18.1"></script>
-<script src="src/gamepad_ui.js?v=0.18.1"></script>
-<script src="src/voyage.js?v=0.18.1"></script>
-<script src="src/features.js?v=0.18.1"></script>
-<script src="src/ecology.js?v=0.18.1"></script>
-<script src="src/exploration.js?v=0.18.1"></script>
-<script src="src/expedition.js?v=0.18.1"></script>
-<script src="src/aquarium.js?v=0.18.1"></script>
-<script src="src/photography.js?v=0.18.1"></script>
-<script src="src/navigation.js?v=0.18.1"></script>
-<script src="src/ship.js?v=0.18.1"></script>
-<script src="src/microcosm.js?v=0.18.1"></script>
-<script src="src/story.js?v=0.18.1"></script>
-<script src="src/deepsea.js?v=0.18.1"></script>
-<script src="src/mobile-controls.js?v=0.18.1"></script>
-<script src="src/bootstrap.js?v=0.18.1"></script>
+<script src="src/config.js?v=0.18.2"></script>
+<script src="src/engine.js?v=0.18.2"></script>
+<script src="src/world.js?v=0.18.2"></script>
+<script src="src/reef_detail.js?v=0.18.2"></script>
+<script src="src/next_reef.js?v=0.18.2"></script>
+<script src="src/individuals.js?v=0.18.2"></script>
+<script src="src/open_world.js?v=0.18.2"></script>
+<script src="src/trench.js?v=0.18.2"></script>
+<script src="src/fauna.js?v=0.18.2"></script>
+<script src="src/cetaceans.js?v=0.18.2"></script>
+<script src="src/abyss_fauna.js?v=0.18.2"></script>
+<script src="src/trench_fauna.js?v=0.18.2"></script>
+<script src="src/fauna_world.js?v=0.18.2"></script>
+<script src="src/cetacean_world.js?v=0.18.2"></script>
+<script src="src/regions.js?v=0.18.2"></script>
+<script src="src/abyss_world.js?v=0.18.2"></script>
+<script src="src/trench_world.js?v=0.18.2"></script>
+<script src="src/pelagic_life.js?v=0.18.2"></script>
+<script src="src/reef_fauna.js?v=0.18.2"></script>
+<script src="src/scene_stream.js?v=0.18.2"></script>
+<script src="src/scene_cache.js?v=0.18.2"></script>
+<script src="src/seasons.js?v=0.18.2"></script>
+<script src="src/audio.js?v=0.18.2"></script>
+<script src="src/performance.js?v=0.18.2"></script>
+<script src="src/selection.js?v=0.18.2"></script>
+<script src="src/app.js?v=0.18.2"></script>
+<script src="src/gamepad_ui.js?v=0.18.2"></script>
+<script src="src/voyage.js?v=0.18.2"></script>
+<script src="src/features.js?v=0.18.2"></script>
+<script src="src/ecology.js?v=0.18.2"></script>
+<script src="src/exploration.js?v=0.18.2"></script>
+<script src="src/expedition.js?v=0.18.2"></script>
+<script src="src/aquarium.js?v=0.18.2"></script>
+<script src="src/photography.js?v=0.18.2"></script>
+<script src="src/navigation.js?v=0.18.2"></script>
+<script src="src/ship.js?v=0.18.2"></script>
+<script src="src/microcosm.js?v=0.18.2"></script>
+<script src="src/story.js?v=0.18.2"></script>
+<script src="src/deepsea.js?v=0.18.2"></script>
+<script src="src/mobile-controls.js?v=0.18.2"></script>
+<script src="src/bootstrap.js?v=0.18.2"></script>
 </body></html>
