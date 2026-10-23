@@ -167,7 +167,10 @@ const faunaFloorDirections=Array.from({length:9},(_,i)=>{const a=i*(Math.PI*2)/8
 function abyssEnvelope(f){const sp=SPECIES[f.species],b=sp.modelBounds,s=f.s[0],hx=Math.max(Math.abs(b.min[0]),Math.abs(b.max[0])),hz=Math.max(Math.abs(b.min[2]),Math.abs(b.max[2])),crawl=sp.traits.motion==='crawl',bend=crawl?0:s*(hx*.10+.018);return {horizontal:s*Math.hypot(hx,hz)+.025+s*.02,bottom:Math.max(0,-b.min[1]*s)+bend,top:b.max[1]*s+bend};}
 const abyssPathCache=new WeakMap(),abyssStaticWorlds=new WeakMap();
 function abyssPath(f,context=null){
- const sp=SPECIES[f.species],profile=sp.motionProfile,home=f.home||f.center,b=sp.modelBounds,scale=f.s[0],requested=Number.isFinite(f.radius)?f.radius:profile.radius,crawl=sp.traits.motion==='crawl',exhibit=!!context?.exhibit,world=typeof OceanRegions!=='undefined'?OceanRegions:null;
+ const sp=SPECIES[f.species],profile=sp.motionProfile,home=f.home||f.center,b=sp.modelBounds,scale=f.s[0],requested=Number.isFinite(f.radius)?f.radius:profile.radius,crawl=sp.traits.motion==='crawl',exhibit=!!context?.exhibit;
+ // Preserve the original lazy fallback: isolated contexts/exhibits must not
+ // resolve a region module that may not have been loaded yet.
+ const world=!exhibit&&!context?.solids&&typeof OceanRegions!=='undefined'?OceanRegions:null;
  // Explicit contexts may supply changing solids or callbacks. Only the deeply
  // frozen world catalogue can share its home-centred avoidance calculation.
  let cacheable=!context;

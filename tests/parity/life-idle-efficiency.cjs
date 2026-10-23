@@ -59,6 +59,18 @@ check('changed species and centre fallback preserve the same public pose fields'
  pair('for(const f of actors){f.center=f.home.slice();delete f.home;}actors[0].species=actors[1].species;OceanRegions=regionWorld();');equalPoses([25,25.02]);
  pair('for(const f of actors){f.radius=NaN;f.center[0]+=.03;}');equalPoses([26,26.02]);
 });
+check('warm exhibit poses preserve the real late-loaded region fallback and explicit overrides',()=>{
+ // A fresh process preserves the actual module-loading/JIT order. Recompiling
+ // a new VM script per frame can mask an early missing-global lookup.
+ const filename=path.join(root,'tests/parity/abyss-motion.cjs'),reference=sourceRef<0?null:process.argv[sourceRef+1];
+ const script=`const fs=require('node:fs'),path=require('node:path'),cp=require('node:child_process'),Module=require('node:module');
+  const filename=${JSON.stringify(filename)},root=${JSON.stringify(root)},reference=${JSON.stringify(reference)};
+  globalThis.__testedMotionSource=reference?cp.execFileSync('git',['show',reference+':src/individuals.js'],{cwd:root,encoding:'utf8'}):fs.readFileSync(path.join(root,'src/individuals.js'),'utf8');
+  const source=fs.readFileSync(filename,'utf8').replace("fs.readFileSync(path.join(root,'src',n+'.js'),'utf8')","(n==='individuals'?globalThis.__testedMotionSource:fs.readFileSync(path.join(root,'src',n+'.js'),'utf8'))");
+  const test=new Module(filename,module);test.filename=filename;test.paths=Module._nodeModulePaths(path.dirname(filename));test._compile(source,filename);`;
+ const result=cp.spawnSync(process.execPath,['-e',script],{cwd:root,encoding:'utf8'});
+ assert.equal(result.status,0,(result.stdout||'')+(result.stderr||''));assert.match(result.stdout,/9 abyss motion checks passed/);return {realRegionChecks:9};
+});
 function ecology(reference){
  const elements=new Map(),classes=()=>({add(){},remove(){},toggle(){},contains(){return false;}}),element=()=>({style:{},dataset:{},classList:classes(),setAttribute(){},addEventListener(){},querySelectorAll(){return[];},appendChild(e){if(e.id)elements.set(e.id,e);}});
  const document={createElement:element,getElementById:id=>{if(!elements.has(id))elements.set(id,element());return elements.get(id);},querySelectorAll:()=>[],body:element()};
