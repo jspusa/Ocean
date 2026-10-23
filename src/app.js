@@ -25,10 +25,45 @@ function collide(pos,from=null){
  const bounds=OceanTrench.worldBounds;
  pos[0]=clamp(pos[0],bounds.left+.5,bounds.right-.5);pos[2]=clamp(pos[2],bounds.top+.5,bounds.bottom-.5);
  pos[1]=clamp(pos[1],groundHeight(pos[0],pos[2])+.82,-.65);
- for(const ob of obstacles){const sx=ob.s[0]+.4,sy=ob.s[1]+.4,sz=ob.s[2]+.4;let qx=(pos[0]-ob.p[0])/sx,qy=(pos[1]-ob.p[1])/sy,qz=(pos[2]-ob.p[2])/sz,d2=qx*qx+qy*qy+qz*qz;
-  if(d2<1){if(d2<.0001){pos[1]=ob.p[1]+sy;continue;}const k=1/Math.sqrt(d2);pos[0]=ob.p[0]+qx*k*sx;pos[1]=ob.p[1]+qy*k*sy;pos[2]=ob.p[2]+qz*k*sz;}}
+ let nearby=reefObstacleCandidates(pos);
+ for(let n=0;n<nearby.length;n++){const id=nearby[n],ob=obstacles[id],sx=ob.s[0]+.4,sy=ob.s[1]+.4,sz=ob.s[2]+.4;let qx=(pos[0]-ob.p[0])/sx,qy=(pos[1]-ob.p[1])/sy,qz=(pos[2]-ob.p[2])/sz,d2=qx*qx+qy*qy+qz*qz;
+  if(d2<1){if(d2<.0001)pos[1]=ob.p[1]+sy;else{const k=1/Math.sqrt(d2);pos[0]=ob.p[0]+qx*k*sx;pos[1]=ob.p[1]+qy*k*sy;pos[2]=ob.p[2]+qz*k*sz;}
+   // A push can enter another cell. Preserve the original one-pass order:
+   // discover later obstacles at the new position, never revisit earlier ones.
+   nearby=reefObstacleCandidates(pos,pos,id);n=-1;
+  }}
  pos[1]=clamp(pos[1],groundHeight(pos[0],pos[2])+.82,-.65);if(typeof OceanRegions!=='undefined')OceanRegions.resolve(pos,.4,from);return pos;
 }
+function reefObstacleCandidates(a,b=a,after=-1){
+ // Scene-owned reef obstacles are immutable during play; boat movement changes
+ // render batches, not these rocks. Length changes rebuild after load/generation.
+ // Future same-length edits must call invalidate() before the next query.
+ let cache=reefObstacleCandidates.cache;
+ if(!cache||cache.count!==obstacles.length){
+  const tiles=new Map(),bounds=[],ids=[];
+  for(let i=0;i<obstacles.length;i++){
+   // Expand slightly beyond the largest clearance to cover rounding at cell edges.
+   const ob=obstacles[i],p=ob.p,s=ob.s,lo=p.map((v,k)=>v-s[k]-.40000001),hi=p.map((v,k)=>v+s[k]+.40000001);
+   bounds.push({lo,hi});ids.push(i);
+   for(let x=Math.floor(lo[0]/16);x<=Math.floor(hi[0]/16);x++)for(let y=Math.floor(lo[1]/16);y<=Math.floor(hi[1]/16);y++)for(let z=Math.floor(lo[2]/16);z<=Math.floor(hi[2]/16);z++){
+    const key=x+','+y+','+z;if(!tiles.has(key))tiles.set(key,[]);tiles.get(key).push(i);
+   }
+  }
+  cache=reefObstacleCandidates.cache={count:obstacles.length,tiles,bounds,ids};
+ }
+ const lo=a.map((v,k)=>Math.min(v,b[k])),hi=a.map((v,k)=>Math.max(v,b[k]));
+ if(!lo.every(Number.isFinite)||!hi.every(Number.isFinite))return cache.ids.filter(i=>i>after);
+ const start=lo.map(v=>Math.floor(v/16)),end=hi.map(v=>Math.floor(v/16));
+ let ids;
+ // Huge chart/observation rays must not walk thousands of empty grid cells.
+ if((end[0]-start[0]+1)*(end[1]-start[1]+1)*(end[2]-start[2]+1)>512)ids=cache.ids;
+ else{
+  const found=new Set();for(let x=start[0];x<=end[0];x++)for(let y=start[1];y<=end[1];y++)for(let z=start[2];z<=end[2];z++)for(const id of cache.tiles.get(x+','+y+','+z)||[])found.add(id);
+  ids=Array.from(found).sort((x,y)=>x-y);
+ }
+ return ids.filter(i=>i>after&&cache.bounds[i].lo.every((v,k)=>v<=hi[k]&&cache.bounds[i].hi[k]>=lo[k]));
+}
+reefObstacleCandidates.invalidate=()=>{reefObstacleCandidates.cache=null;};
 function dir(){return [Math.sin(player.yaw)*Math.cos(player.pitch),Math.sin(player.pitch),-Math.cos(player.yaw)*Math.cos(player.pitch)];}
 function startDive(tour=false){if(!ready)return;oceanSwimActions.exit();oceanPerf.pause();oceanPerf.count=0;oceanPerf.cursor=0;
  // AudioContext is resumed directly by this user gesture, before any async work.
@@ -80,7 +115,7 @@ const oceanSwimActions=(()=>{
   const a=player.p,b=head();
   if(typeof OceanRegions!=='undefined'&&(OceanRegions.segmentBlocked(a,b,.22)||OceanRegions.pointBlocked(b,.22)))return false;
   // Sweep the camera's full clearance through deck/rock ellipsoids as well.
-  for(const ob of obstacles){const s=ob.s.map(n=>n+.22),q=a.map((v,i)=>(v-ob.p[i])/s[i]),d=b.map((v,i)=>(v-a[i])/s[i]),length=V.dot(d,d),u=clamp(-V.dot(q,d)/Math.max(.000001,length),0,1),near=V.add(q,V.mul(d,u));if(V.dot(near,near)<1)return false;}
+  for(const id of reefObstacleCandidates(a,b)){const ob=obstacles[id],s=ob.s.map(n=>n+.22),q=a.map((v,i)=>(v-ob.p[i])/s[i]),d=b.map((v,i)=>(v-a[i])/s[i]),length=V.dot(d,d),u=clamp(-V.dot(q,d)/Math.max(.000001,length),0,1),near=V.add(q,V.mul(d,u));if(V.dot(near,near)<1)return false;}
   return true;
  }
  function exit(){const was=surface;surface=false;if(was){cameraCut=true;renderer.dirty=true;renderer.forceShadow=true;}return was;}
@@ -132,7 +167,7 @@ function updateCamera(dt=1/60,renderPosition=null){
    if(typeof OceanRegions!=='undefined')OceanRegions.resolve(anchor,.23);
    const ab=V.sub(desired,anchor);let safeFraction=V.dist(anchor,regionSafe(anchor,desired))/Math.max(.001,V.len(ab));
    // Analytic segment/ellipsoid sweep avoids the old twelve-step snapping camera.
-   for(const ob of obstacles){const sx=ob.s[0]+.20,sy=ob.s[1]+.20,sz=ob.s[2]+.20,x=(anchor[0]-ob.p[0])/sx,y=(anchor[1]-ob.p[1])/sy,z=(anchor[2]-ob.p[2])/sz,dx=ab[0]/sx,dy=ab[1]/sy,dz=ab[2]/sz;
+   for(const id of reefObstacleCandidates(anchor,desired)){const ob=obstacles[id],sx=ob.s[0]+.20,sy=ob.s[1]+.20,sz=ob.s[2]+.20,x=(anchor[0]-ob.p[0])/sx,y=(anchor[1]-ob.p[1])/sy,z=(anchor[2]-ob.p[2])/sz,dx=ab[0]/sx,dy=ab[1]/sy,dz=ab[2]/sz;
     const A=dx*dx+dy*dy+dz*dz,B=2*(x*dx+y*dy+z*dz),C=x*x+y*y+z*z-1,disc=B*B-4*A*C;
     if(A>.00001&&disc>=0&&C>0){const hit=(-B-Math.sqrt(disc))/(2*A);if(hit>0&&hit<safeFraction)safeFraction=Math.max(.14,hit-.055);}}
    for(let i=1;i<=5;i++){const q=V.lerp(anchor,desired,i/5);if(q[1]<groundHeight(q[0],q[2])+.25){safeFraction=Math.min(safeFraction,Math.max(.14,(i-1)/5));break;}}
@@ -145,7 +180,7 @@ function updateCamera(dt=1/60,renderPosition=null){
   lastCameraThird=third;cameraCut=false;
  }else{const l=LANDMARKS[selectedEntry];eye=l.spawn.slice();eye[0]+=settings.reduced?0:Math.sin(t*.032)*.5;const yaw=l.yaw+(settings.reduced?0:Math.sin(t*.019)*.026);target=V.add(eye,[Math.sin(yaw)*10,Math.sin(l.pitch)*10,-Math.cos(yaw)*10]);diverBatch.visible=false;cameraCut=true;}
 }
-function blocked(a,b,clearance=.13){if(typeof OceanRegions!=='undefined'&&OceanRegions.segmentBlocked(a,b,clearance))return true;let ab=V.sub(b,a),d=V.len(ab);for(let o of obstacles){let t=clamp(V.dot(V.sub(o.p,a),ab)/(d*d),0,1),p=V.add(a,V.mul(ab,t)),q=p.map((v,i)=>(v-o.p[i])/(o.s[i]*.93));if(t>.02&&t<.98&&V.dot(q,q)<1)return true;}for(let k=1;k<6;k++){let p=V.lerp(a,b,k/6);if(p[1]<groundHeight(p[0],p[2])+clearance)return true;}return false;}
+function blocked(a,b,clearance=.13){if(typeof OceanRegions!=='undefined'&&OceanRegions.segmentBlocked(a,b,clearance))return true;let ab=V.sub(b,a),d=V.len(ab);for(const id of reefObstacleCandidates(a,b)){const o=obstacles[id];let t=clamp(V.dot(V.sub(o.p,a),ab)/(d*d),0,1),p=V.add(a,V.mul(ab,t)),q=p.map((v,i)=>(v-o.p[i])/(o.s[i]*.93));if(t>.02&&t<.98&&V.dot(q,q)<1)return true;}for(let k=1;k<6;k++){let p=V.lerp(a,b,k/6);if(p[1]<groundHeight(p[0],p[2])+clearance)return true;}return false;}
 function observe(dt){
  const rc=$('reticle'),card=$('focusCard');rc.classList.remove('focusing');
  if(!active||modal||photoOpen||voyage.photoMode||document.hidden||document.body.classList.contains('cinematic')){oceanSelection.suspend();return;}
@@ -174,6 +209,7 @@ function animate(ms){
  const liveFeature=!active&&oceanFeatures.shouldAnimate();
  if((modal||photoOpen)&&!renderer.dirty&&!liveFeature){oceanPerf.pause();simulationAccumulator=0;requestAnimationFrame(animate);return;}
  const begin=performance.now();let renderPosition=null;
+ if(renderer.sceneStream?.waitStarted){updateCamera(0);oceanFeatures.call('afterCamera',0);applyVisualSettings();if(!renderer.sceneStream.update(eye,false)){oceanPerf.pause();simulationAccumulator=0;requestAnimationFrame(animate);return;}}
  if((!modal&&!photoOpen)||liveFeature){
   t+=dt;
   if(active){diveSeconds+=Math.min(realDt,1);simulationAccumulator+=dt;let steps=0;
@@ -183,7 +219,7 @@ function animate(ms){
   updateLife(t);
   if(!active)oceanFeatures.call('idleTick',dt);
  }
- updateCamera(dt,renderPosition);oceanFeatures.call('afterCamera',dt);applyVisualSettings();renderer.render(eye,target,t);
+ updateCamera(dt,renderPosition);oceanFeatures.call('afterCamera',dt);applyVisualSettings();if(renderer.render(eye,target,t)===false){oceanPerf.pause();simulationAccumulator=0;requestAnimationFrame(animate);return;}
  if(active&&!modal&&!photoOpen){observationClock+=dt;hudClock+=dt;if(observationClock>=1/12){observe(observationClock);voyageTick(observationClock);observationClock=0;}if(hudClock>=.12){updateHUD();checkLandmarks();hudClock=0;}}
  if(modal==='map'&&ms-animatedPanelTime>180){drawMap();animatedPanelTime=ms;}
  if(!modal&&!photoOpen){oceanPerf.record(ms,performance.now()-begin);if(ms-(window.__statsAt||0)>400){window.__statsAt=ms;const v=oceanPerf.stats();window.__oceanStats={fps:+v.fps.toFixed(1),p95FrameMs:+v.p95.toFixed(2),cpuMs:renderer.cpuRenderMs,drawCalls:renderer.drawCalls,creatures:life.length+decorLife.length+shoal.length,submittedTriangles:Math.round(renderer.submittedTriangles),submittedVertices:renderer.submittedVertices,position:player.p.slice(),seen:persistent.seen.length,quality:renderer.quality,renderScale:renderer.dynamicScale,resolution:[renderer.canvas.width,renderer.canvas.height],audio:oceanAudio.status};}}
@@ -192,7 +228,7 @@ function animate(ms){
 function initAudio(){return oceanAudio.start();}
 function updateSoundUI(){$('soundIcon').setAttribute('d',settings.sound?'M16 8c3 2 3 6 0 8m3-11c5 4 5 10 0 14':'m16 9 5 6m0-6-5 6');$('soundBtn').setAttribute('aria-label',settings.sound?'關閉配樂與音效':'開啟配樂與音效');$('soundBtn').classList.toggle('audio-active',settings.sound);if($('musicPill'))$('musicPill').classList.toggle('muted',!settings.sound);}
 function toggleSound(){if(settings.sound&&oceanAudio.ctx&&oceanAudio.ctx.state!=='running'){oceanAudio.resume();return;}settings.sound=!settings.sound;if(settings.sound)initAudio().catch(e=>toast(e.message));else oceanAudio.mute();settings.startWithSound=settings.sound;$('welcomeAudio').checked=settings.sound;updateSoundUI();persist();}
-function takePhoto(){if(!active||photoOpen||modal||Date.now()-lastPhoto<900)return;lastPhoto=Date.now();const area=(typeof DeepseaRules!=='undefined'&&DeepseaRules.areaName(player.p))||LANDMARKS[lastArea].name;oceanAudio.cue();updateCamera();oceanFeatures.call('afterCamera',0);renderer.render(eye,target,t);let c=document.createElement('canvas'),maxWidth=1920,ratio=renderer.canvas.height/renderer.canvas.width;c.width=Math.min(maxWidth,renderer.canvas.width);c.height=Math.round(c.width*ratio);let ctx=c.getContext('2d');ctx.drawImage(renderer.canvas,0,0,c.width,c.height);let grad=ctx.createLinearGradient(0,c.height-85,0,c.height);grad.addColorStop(0,'#05263800');grad.addColorStop(1,'#052638b0');ctx.fillStyle=grad;ctx.fillRect(0,c.height-85,c.width,85);ctx.fillStyle='#d9e6d7';ctx.font=`${Math.max(12,c.width*.011)}px sans-serif`;ctx.fillText('重返蔚藍  /  '+area+' · 原創場景',22,c.height-28);ctx.font=`${Math.max(9,c.width*.0075)}px sans-serif`;ctx.fillStyle='#b5cec4';ctx.fillText('RETURN TO THE BLUE · LIVING OCEAN',22,c.height-12);let photo={url:c.toDataURL('image/jpeg',.87),date:nextPhotoDate(),area,species:(focusFish||follow)?SPECIES[(focusFish||follow).species].name:'海底風景',individual:(focusFish||follow)?.uid||null};$('flash').classList.add('on');setTimeout(()=>$('flash').classList.remove('on'),70);return photo;}
+function takePhoto(){if(!active||photoOpen||modal||Date.now()-lastPhoto<900)return;lastPhoto=Date.now();const area=(typeof DeepseaRules!=='undefined'&&DeepseaRules.areaName(player.p))||LANDMARKS[lastArea].name;oceanAudio.cue();updateCamera();oceanFeatures.call('afterCamera',0);if(renderer.render(eye,target,t)===false)return;let c=document.createElement('canvas'),maxWidth=1920,ratio=renderer.canvas.height/renderer.canvas.width;c.width=Math.min(maxWidth,renderer.canvas.width);c.height=Math.round(c.width*ratio);let ctx=c.getContext('2d');ctx.drawImage(renderer.canvas,0,0,c.width,c.height);let grad=ctx.createLinearGradient(0,c.height-85,0,c.height);grad.addColorStop(0,'#05263800');grad.addColorStop(1,'#052638b0');ctx.fillStyle=grad;ctx.fillRect(0,c.height-85,c.width,85);ctx.fillStyle='#d9e6d7';ctx.font=`${Math.max(12,c.width*.011)}px sans-serif`;ctx.fillText('重返蔚藍  /  '+area+' · 原創場景',22,c.height-28);ctx.font=`${Math.max(9,c.width*.0075)}px sans-serif`;ctx.fillStyle='#b5cec4';ctx.fillText('RETURN TO THE BLUE · LIVING OCEAN',22,c.height-12);let photo={url:c.toDataURL('image/jpeg',.87),date:nextPhotoDate(),area,species:(focusFish||follow)?SPECIES[(focusFish||follow).species].name:'海底風景',individual:(focusFish||follow)?.uid||null};$('flash').classList.add('on');setTimeout(()=>$('flash').classList.remove('on'),70);return photo;}
 function viewPhoto(photo){releaseMouseLook();selectedPhoto=photo;photoOpen=true;oceanSelection.suspend();oceanDiveUI.sync();oceanFeatures.call('photoOpened');resetInput();$('photoImage').src=photo.url;$('photoViewer').classList.remove('hidden');prevFocus=document.activeElement;setTimeout(()=>$('closePhoto').focus(),40);}
 function closePhoto(){$('photoViewer').classList.add('hidden');photoOpen=false;oceanDiveUI.sync();prevFocus?.focus?.();}
 function download(data,name){let a=document.createElement('a');a.href=data;a.download=name;document.body.append(a);a.click();a.remove();}
@@ -340,10 +376,11 @@ function setupControls(){initPerformance(); $('viewBtn').onclick=()=>{settings.t
  $('welcomeAudio').checked=settings.startWithSound;
  window.visualViewport?.addEventListener('resize',()=>{if(renderer){renderer.resize();resetInput();}});
  canvas.addEventListener('webglcontextlost',e=>{e.preventDefault();oceanSelection.clear();if(typeof saveVoyage==='function')saveVoyage();persist();oceanAudio.pause();ready=false;handleFailure(new Error('3D 顯示已暫停，已嘗試保存航程。請重新整理；若持續發生，可改用「省電」畫質。'));});canvas.addEventListener('contextmenu',e=>e.preventDefault());window.addEventListener('resize',()=>{if(renderer){renderer.resize();resetInput();}});}
-async function boot(){try{window.__freeze=new URLSearchParams(location.search).has('still');const pause=()=>new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));await pause();renderer=new Renderer($('ocean'),Math.round(settings.quality));renderer.quality=Math.round(settings.quality);renderer.resize();await renderer.loaded;$('loadDetail').textContent='鋪展高密度礁體與材質';await pause();if(!await loadCompiledScene(renderer)){buildReef(renderer);$('loadDetail').textContent='讓魚群與海龜回到水裡';await pause();addLife(renderer);renderer.sceneLoad={compiled:false};}initializeIndividuals(renderer);SPECIES.forEach(makeThumb);setupControls();initIndividualUI();initVoyage();await oceanFeatures.init();oceanSelection.init();oceanDiveUI.init();setCount();updateSoundUI();document.body.classList.toggle('reduced-motion',settings.reduced);if(matchMedia('(pointer:coarse)').matches)$('introControls').textContent='左搖桿游動 · 拖曳環視 · ↑↓ 浮潛';ready=true;updateLife(0);updateCamera();applyVisualSettings();renderer.render(eye,target,0);$('startBtn').disabled=false;$('tourStart').disabled=false;$('loading').classList.add('gone');setTimeout(()=>$('loading').classList.add('hidden'),700);lastTime=performance.now();requestAnimationFrame(animate);
+async function boot(){try{window.__freeze=new URLSearchParams(location.search).has('still');const pause=()=>new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));await pause();renderer=new Renderer($('ocean'),Math.round(settings.quality));renderer.quality=Math.round(settings.quality);renderer.resize();await renderer.loaded;$('loadDetail').textContent='鋪展高密度礁體與材質';await pause();if(!await loadCompiledScene(renderer)){buildReef(renderer);$('loadDetail').textContent='讓魚群與海龜回到水裡';await pause();addLife(renderer);renderer.sceneLoad={compiled:false};}initializeIndividuals(renderer);SPECIES.forEach(makeThumb);setupControls();initIndividualUI();initVoyage();await oceanFeatures.init();oceanSelection.init();oceanDiveUI.init();setCount();updateSoundUI();document.body.classList.toggle('reduced-motion',settings.reduced);if(matchMedia('(pointer:coarse)').matches)$('introControls').textContent='左搖桿游動 · 拖曳環視 · ↑↓ 浮潛';updateLife(0);updateCamera();applyVisualSettings();if(renderer.sceneStream)await renderer.sceneStream.ready(eye);ready=true;renderer.render(eye,target,0);$('startBtn').disabled=false;$('tourStart').disabled=false;$('loading').classList.add('gone');setTimeout(()=>$('loading').classList.add('hidden'),700);lastTime=performance.now();requestAnimationFrame(animate);
  // Read-only diagnostics for browser testing; no network or analytics.
  window.__ocean={get ready(){return ready},get active(){return active},get speciesCount(){return SPECIES.length},get creatureCount(){return life.length+decorLife.length+shoal.length},get position(){return player.p.slice()},get auto(){return auto},get seen(){return persistent.seen.slice()},get photos(){return persistent.photos.length},get modal(){return modal},get view(){return settings.third?'third':'first'},get audio(){return oceanAudio.status},get input(){return {move:stick.slice(),look:lookStick.slice(),vertical:verticalInput}},get lighting(){return settings.lighting}};
  }catch(e){handleFailure(e);}}
 window.addEventListener('error',e=>{if(!ready)handleFailure(e.error||new Error(e.message));});
 
 window.__renderView=(p,aim,time=8)=>{window.__freeze=true;t=time;active=true;player.p=p.slice();let f=V.sub(aim,p);player.yaw=Math.atan2(f[0],-f[2]);player.pitch=Math.atan2(f[1],Math.hypot(f[0],f[2]));updateLife(t);updateCamera();applyVisualSettings();renderer.forceShadow=true;renderer.render(eye,target,t);$('welcome').classList.add('hidden');$('hud').classList.remove('hidden');visited=new Set(LANDMARKS.map(x=>x.id));checkLandmarks();updateHUD();return {submittedTriangles:Math.round(renderer.submittedTriangles||0),batches:renderer.batches.length};};
+window.__prepareView=async(p,aim,time=8)=>{window.__renderView(p,aim,time);if(renderer.sceneStream)await renderer.sceneStream.ready(eye);return window.__renderView(p,aim,time);};

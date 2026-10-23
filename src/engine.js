@@ -49,6 +49,20 @@ function indexGeometry(source){
  }
  return {vertices:new Float32Array(vertex),indices:new Uint32Array(index),radius};
 }
+function meshIndexData(indices){
+ // WebGL2 reserves 0xffff for fixed primitive restart. Keep wide indices when
+ // that value is a real vertex; all smaller values have an exact 16-bit form.
+ if(indices.BYTES_PER_ELEMENT===2)return indices;
+ for(let k=0;k<indices.length;k++)if(indices[k]>=65535)return indices;
+ return new Uint16Array(indices);
+}
+function meshCullBounds(vertices){
+ const min=[Infinity,Infinity,Infinity],max=[-Infinity,-Infinity,-Infinity];
+ for(let k=0;k<vertices.length;k+=12)for(let axis=0;axis<3;axis++){
+  min[axis]=Math.min(min[axis],vertices[k+axis]);max[axis]=Math.max(max[axis],vertices[k+axis]);
+ }
+ return {center:min.map((v,i)=>(v+max[i])*.5),half:min.map((v,i)=>(max[i]-v)*.5)};
+}
 
 const VS=`#version 300 es
 precision highp float;precision highp int;
@@ -823,15 +837,43 @@ class Renderer{
 
  batch(geo,instances,kind=0,dynamic=false){
   const g=this.gl,mesh=geo.indexed||indexGeometry(geo.v),vao=g.createVertexArray();g.bindVertexArray(vao);
-  const vb=g.createBuffer();g.bindBuffer(g.ARRAY_BUFFER,vb);g.bufferData(g.ARRAY_BUFFER,mesh.vertices,g.STATIC_DRAW);
+  // Compiled meshes are immutable. Loader-canonicalized copies may share only
+  // geometry buffers; each draw batch still owns its VAO and instance state.
+  // Weak keys let the large decoded scene storage go after loading finishes.
+  if(!this.meshBuffers)this.meshBuffers=new WeakMap();let stored=this.meshBuffers.get(mesh);
+  if(!stored){
+   const indices=meshIndexData(mesh.indices),vb=g.createBuffer(),eb=g.createBuffer();
+   g.bindBuffer(g.ARRAY_BUFFER,vb);g.bufferData(g.ARRAY_BUFFER,mesh.vertices,g.STATIC_DRAW);
+   g.bindBuffer(g.ELEMENT_ARRAY_BUFFER,eb);g.bufferData(g.ELEMENT_ARRAY_BUFFER,indices,g.STATIC_DRAW);
+   stored={vb,eb,indexType:indices.BYTES_PER_ELEMENT===2?g.UNSIGNED_SHORT:g.UNSIGNED_INT};this.meshBuffers.set(mesh,stored);
+  }
+  const {vb,eb,indexType}=stored;g.bindBuffer(g.ARRAY_BUFFER,vb);
   this.attr(0,3,48,0);this.attr(1,3,48,12);this.attr(2,3,48,24);this.attr(7,2,48,36);this.attr(8,1,48,44);
-  const eb=g.createBuffer();g.bindBuffer(g.ELEMENT_ARRAY_BUFFER,eb);g.bufferData(g.ELEMENT_ARRAY_BUFFER,mesh.indices,g.STATIC_DRAW);
+  g.bindBuffer(g.ELEMENT_ARRAY_BUFFER,eb);
   const ib=g.createBuffer(),data=new Float32Array(instances.length*24);g.bindBuffer(g.ARRAY_BUFFER,ib);g.bufferData(g.ARRAY_BUFFER,data.byteLength,g.DYNAMIC_DRAW);
   this.attr(3,3,96,0,1);this.attr(4,4,96,12,1);this.attr(5,3,96,28,1);this.attr(6,2,96,40,1);this.attr(9,4,96,48,1);this.attr(10,4,96,64,1);this.attr(11,4,96,80,1);
-  const b={vao,vb,eb,ib,count:mesh.indices.length,vertexCount:mesh.vertices.length/12,indexType:g.UNSIGNED_INT,instances,data,kind,dynamic,material:geo.material||0,species:geo.species??-1,visible:true,shadow:geo.shadow!==false,radius:mesh.radius,drawCount:instances.length,_lastVisible:null};
+  const b={vao,vb,eb,ib,count:mesh.indices.length,vertexCount:mesh.vertices.length/12,indexType,instances,data,kind,dynamic,material:geo.material||0,species:geo.species??-1,visible:true,shadow:geo.shadow!==false,radius:mesh.radius,drawCount:instances.length,_lastVisible:null};
+  // Rigid geometry may lie far from its instance pivot (seabed tiles), or be
+  // very thin (trench walls). Keep the existing sphere as a cheap first test,
+  // then reject the tighter box only when it is wholly outside a clip plane.
+  // Coral growth, swaying plants and every animal retain their original bounds.
+  if(!dynamic&&kind===0&&![3,4,7,8].includes(b.material)){
+   const bounds=meshCullBounds(mesh.vertices);
+   // Near-spherical rocks already have a useful cheap bound. Reserve the extra
+   // plane work for offset or thin geometry where the pivot sphere is loose.
+   if(Math.hypot(...bounds.center)>mesh.radius*.25||mesh.radius>2*Math.min(...bounds.half))b.cullBounds=bounds;
+  }
   this.updateBatch(b);this.batches.push(b);g.bindVertexArray(null);return b;
  }
+ deferredBatch(meta,instances){
+  const b={instances,data:new Float32Array(instances.length*24),count:meta.indexCount,vertexCount:meta.vertexFloats/12,kind:meta.kind,dynamic:meta.dynamic,material:meta.material||0,species:meta.species??-1,shadow:meta.shadow!==false,visible:meta.visible!==false,radius:meta.radius,drawCount:0,vao:null,vb:null,eb:null,ib:null};
+  for(const k of ['minDistance','maxDistance','shadowProxy','sceneRole'])if(meta[k]!==undefined)b[k]=meta[k];this.batches.push(b);return b;
+ }
+ attachBatchMesh(b,mesh){
+  const visible=b.visible,replacement=this.batch({indexed:mesh,material:b.material,species:b.species,shadow:b.shadow},b.instances,b.kind,b.dynamic);this.batches.pop();Object.assign(b,replacement);b.visible=visible;
+ }
  updateBatch(b,eye=null,planes=null,shadowPass=false){
+  if(b.streamMesh!==undefined&&!b.vao){b.drawCount=0;return;}
   let j=0;const a=b.data;const lodScale=this.mobile?(this.quality===0?.64:.82):(this.quality===0?.75:1);
   // Terrain LODs have matching edges but different interior heights. Submit
   // exactly one opaque surface; overlapping dithered surfaces fight in depth.
@@ -844,6 +886,20 @@ class Renderer{
     const r=b.radius*Math.max(sc[0],sc[1],sc[2])*((b.kind===8||b.kind===9||b.kind===10||b.kind===11||b.kind===12)?1.15:1);let outside=false;
     for(let n=0;n<6;n++){const pl=planes[n];if(pl[0]*p[0]+pl[1]*p[1]+pl[2]*p[2]+pl[3]<-r){outside=true;break;}}
     if(outside)continue;
+    if(b.cullBounds&&!b.dynamic&&b.kind===0){
+     const center=b.cullBounds.center,half=b.cullBounds.half,yaw=i.yaw||0,pitch=i.pitch||0;
+     const cy=Math.cos(yaw),sy=Math.sin(yaw),cp=Math.cos(pitch),sp=Math.sin(pitch);
+     // Transform each world plane into mesh space, in the shader's order:
+     // pitch, nonuniform scale, yaw, translation. Its box support is exact;
+     // a small outward allowance protects float32 projection at deep origins.
+     for(let n=0;n<6;n++){
+      const pl=planes[n],x=(pl[0]*cy-pl[2]*sy)*sc[0],y=pl[1]*sc[1],z=(pl[0]*sy+pl[2]*cy)*sc[2];
+      const nx=x*cp+y*sp,ny=-x*sp+y*cp;
+      const far=pl[0]*p[0]+pl[1]*p[1]+pl[2]*p[2]+pl[3]+nx*center[0]+ny*center[1]+z*center[2]+Math.abs(nx)*half[0]+Math.abs(ny)*half[1]+Math.abs(z)*half[2];
+      if(far<-.02){outside=true;break;}
+     }
+     if(outside)continue;
+    }
    }
    // No spread, short-lived arrays or typed-array views inside the hot instance loop.
    const origin=this.renderOrigin||[0,0,0];a[j++]=p[0]-origin[0];a[j++]=p[1]-origin[1];a[j++]=p[2]-origin[2];a[j++]=i.yaw||0;
@@ -853,7 +909,18 @@ class Renderer{
    a[j++]=genes[0];a[j++]=genes[1];a[j++]=genes[2];a[j++]=genes[3];
    a[j++]=i.bank||0;a[j++]=i.effort??.7;a[j++]=(b.kind===9||b.kind===7)?clamp(i.partnerFinPulse||0,0,1):(i.finWear||0);a[j++]=b.kind===8?1-clamp(i.faunaVisibility??(1-(i.retreat||0)),0,1):b.kind===9?(i.cetaceanBeat||2.3):b.kind===10?(i.abyssBeat||1.7):b.kind===11?(i.trenchBeat||1.6):0;
   }
-  b.drawCount=j/24;if(j){this.gl.bindBuffer(this.gl.ARRAY_BUFFER,b.ib);this.gl.bufferSubData(this.gl.ARRAY_BUFFER,0,a,0,j);}
+  b.drawCount=j/24;if(!j)return;
+  if(!b.dynamic){
+   // Compare the actual Float32 payload against the last GPU upload, not a
+   // camera key: shadows pack a different visible set, and scene features can
+   // move static instances. The shared buffer must match whichever pass drew last.
+   let uploaded=b._uploadedData,changed=!uploaded||b._uploadSource!==a||b._uploadBuffer!==b.ib||j>b._uploadedLength;
+   if(!changed)for(let k=0;k<j;k++)if(a[k]!==uploaded[k]){changed=true;break;}
+   if(!changed)return;
+   if(!uploaded||uploaded.length!==a.length)uploaded=b._uploadedData=new Float32Array(a.length);
+   uploaded.set(a);b._uploadedLength=j;b._uploadSource=a;b._uploadBuffer=b.ib;
+  }else b._uploadedData=null;
+  this.gl.bindBuffer(this.gl.ARRAY_BUFFER,b.ib);this.gl.bufferSubData(this.gl.ARRAY_BUFFER,0,a,0,j);
  }
  drawBatch(b){this.gl.bindVertexArray(b.vao);this.gl.drawElementsInstanced(this.gl.TRIANGLES,b.count,b.indexType,0,b.drawCount);this.drawCalls++;}
  frustum(vp){let p=[];for(let a=0;a<3;a++)for(let sign of [-1,1]){let q=[vp[3]+sign*vp[a],vp[7]+sign*vp[4+a],vp[11]+sign*vp[8+a],vp[15]+sign*vp[12+a]],n=Math.hypot(q[0],q[1],q[2]);p.push(q.map(x=>x/n));}return p;}
@@ -868,16 +935,20 @@ class Renderer{
   }
   this.waterCount=positions.length/3;this.waterVAO=g.createVertexArray();g.bindVertexArray(this.waterVAO);this.waterBuffer=g.createBuffer();g.bindBuffer(g.ARRAY_BUFFER,this.waterBuffer);g.bufferData(g.ARRAY_BUFFER,new Float32Array(positions),g.STATIC_DRAW);this.attr(0,3,12,0);g.bindVertexArray(null);
  }
- setupBubbles(){const g=this.gl;this.bubbles=[];this.lastBubbleTime=-1;this.bubbleVAO=g.createVertexArray();g.bindVertexArray(this.bubbleVAO);this.bubbleBuffer=g.createBuffer();g.bindBuffer(g.ARRAY_BUFFER,this.bubbleBuffer);g.bufferData(g.ARRAY_BUFFER,512*4*4,g.DYNAMIC_DRAW);this.attr(0,4,16,0);g.bindVertexArray(null);}
- renderBubbles(eye,t){if(this.submersible){this.bubbles=[];this.bubbleTime=t;return;}const g=this.gl;const dt=Math.max(0,Math.min(.1,t-(this.bubbleTime??t)));this.bubbleTime=t;
+ setupBubbles(){const g=this.gl;this.bubbles=[];this.bubbleData=new Float32Array(512*4);this.lastBubbleTime=-1;this.bubbleVAO=g.createVertexArray();g.bindVertexArray(this.bubbleVAO);this.bubbleBuffer=g.createBuffer();g.bindBuffer(g.ARRAY_BUFFER,this.bubbleBuffer);g.bufferData(g.ARRAY_BUFFER,this.bubbleData.byteLength,g.DYNAMIC_DRAW);this.attr(0,4,16,0);g.bindVertexArray(null);}
+ renderBubbles(eye,t){if(this.submersible){this.bubbles.length=0;this.bubbleTime=t;return;}const g=this.gl;const dt=Math.max(0,Math.min(.1,t-(this.bubbleTime??t)));this.bubbleTime=t;
  if(typeof active!=='undefined'&&active){let breathPhase=(typeof oceanAudio!=='undefined'&&oceanAudio.enabled&&oceanAudio.ctx)?((oceanAudio.ctx.currentTime-oceanAudio.startedAt)%7.6)/7.6:(t%7.6)/7.6;
  if(breathPhase>.43&&breathPhase<.82&&t-this.lastBubbleTime>.105){this.lastBubbleTime=t;
  const third=typeof settings!=='undefined'&&settings.third&&!follow;let origin=third?player.p:eye;let f=dir(),right=[Math.cos(player.yaw),0,Math.sin(player.yaw)];
  for(let k=0;k<3;k++){let side=third?0:rr(.34,.60);this.bubbles.push({p:V.add(origin,V.add(V.mul(f,third?.60:.45),V.add(V.mul(right,side),[rr(-.03,.01),third?.05:-.14,0]))),r:rr(.012,.033),a:0,phase:rr(0,6.28)});}}
  }
- let data=[];this.bubbles=this.bubbles.filter(b=>b.a<9&&b.p[1]<-.12).slice(-500);
- for(let b of this.bubbles){b.a+=dt;b.p[1]+=dt*(.30+b.r*6.);b.p[0]+=Math.sin(t*2.1+b.phase)*dt*.035;b.p[2]+=.018*dt;data.push(...b.p,b.r*(1+b.a*.16));}
- if(!data.length)return;g.bindVertexArray(this.bubbleVAO);g.bindBuffer(g.ARRAY_BUFFER,this.bubbleBuffer);g.bufferSubData(g.ARRAY_BUFFER,0,new Float32Array(data));this.common(this.bubbleProgram,eye,this.vp,t);g.uniform1f(this.uniform(this.bubbleProgram,'uHeight'),this.canvas.height);g.drawArrays(g.POINTS,0,data.length/4);}
+ // Preserve filter-before-update and the newest 500 survivors, without making
+ // temporary arrays or a new upload buffer on every underwater frame.
+ const bubbles=this.bubbles,data=this.bubbleData;let kept=0,j=0;
+ for(let i=0;i<bubbles.length;i++){const b=bubbles[i];if(b.a<9&&b.p[1]<-.12)bubbles[kept++]=b;}
+ const start=Math.max(0,kept-500);if(start)for(let i=start;i<kept;i++)bubbles[i-start]=bubbles[i];bubbles.length=kept-start;
+ for(const b of bubbles){b.a+=dt;b.p[1]+=dt*(.30+b.r*6.);b.p[0]+=Math.sin(t*2.1+b.phase)*dt*.035;b.p[2]+=.018*dt;data[j++]=b.p[0];data[j++]=b.p[1];data[j++]=b.p[2];data[j++]=b.r*(1+b.a*.16);}
+ if(!j)return;g.bindVertexArray(this.bubbleVAO);g.bindBuffer(g.ARRAY_BUFFER,this.bubbleBuffer);g.bufferSubData(g.ARRAY_BUFFER,0,data,0,j);this.common(this.bubbleProgram,eye,this.vp,t);g.uniform1f(this.uniform(this.bubbleProgram,'uHeight'),this.canvas.height);g.drawArrays(g.POINTS,0,j/4);}
  setupParticles(){let g=this.gl,a=[];for(let i=0;i<1300;i++)a.push(rr(-45,45),rr(-28,-.2),rr(-55,35),random());this.particleVAO=g.createVertexArray();g.bindVertexArray(this.particleVAO);let b=g.createBuffer();g.bindBuffer(g.ARRAY_BUFFER,b);g.bufferData(g.ARRAY_BUFFER,new Float32Array(a),g.STATIC_DRAW);this.attr(0,4,16,0);g.bindVertexArray(null);}
  setupRays(){let a=[];for(let i=0;i<20;i++){let x=rr(-29,22),z=rr(-42,12),w=rr(.8,1.7),bottom=-rr(13,24),bw=w*rr(2.1,4.5);for(let orient=0;orient<2;orient++){let ox=orient?0:1,oz=orient?1:0,p=[[x-w*ox,-.04,z-w*oz],[x+w*ox,-.04,z+w*oz],[x-bottom*.40+bw*ox,bottom,z+bottom*.27+bw*oz],[x-bottom*.40-bw*ox,bottom,z+bottom*.27-bw*oz]],uv=[[0,0],[1,0],[1,1],[0,1]];for(let k of [0,1,2,0,2,3])a.push(...p[k],...uv[k]);}}this.rayCount=a.length/5;let g=this.gl;this.rayVAO=g.createVertexArray();g.bindVertexArray(this.rayVAO);let b=g.createBuffer();g.bindBuffer(g.ARRAY_BUFFER,b);g.bufferData(g.ARRAY_BUFFER,new Float32Array(a),g.STATIC_DRAW);this.attr(0,3,20,0);this.attr(1,2,20,12);g.bindVertexArray(null);}
  setupShadow(){
@@ -935,8 +1006,17 @@ class Renderer{
  }
  common(p,eye,vp,t){let g=this.gl;g.useProgram(p.p);if(this.textures[8]){this.bindTex(9,this.textures[8]);g.uniform1i(this.uniform(p,'uCaustic'),9);}g.uniformMatrix4fv(this.uniform(p,'uVP'),false,vp===this.vp?this.renderVP:vp===this.lightVP?this.renderLightVP:vp===this.dynamicLightVP?this.renderDynamicLightVP:vp);g.uniformMatrix4fv(this.uniform(p,'uLightVP'),false,this.renderLightVP||this.lightVP);g.uniformMatrix4fv(this.uniform(p,'uDynamicLightVP'),false,this.renderDynamicLightVP||this.renderLightVP||this.lightVP);g.uniform1i(this.uniform(p,'uSamples'),this.msaaSamples||0);g.uniform1i(this.uniform(p,'uQuality'),this.quality);g.uniform3fv(this.uniform(p,'uRenderOrigin'),this.renderOrigin||[0,0,0]);g.uniform4f(this.uniform(p,'uTorchParams'),TorchLightRules.outer,TorchLightRules.inner,TorchLightRules.strength,TorchLightRules.falloff);g.uniform3fv(this.uniform(p,'uCamera'),eye);g.uniform1f(this.uniform(p,'uTorch'),this.lamp?1:0);g.uniform3fv(this.uniform(p,'uViewForward'),this.cameraForward||[0,0,-1]);g.uniform1f(this.uniform(p,'uTime'),t);g.uniform1f(this.uniform(p,'uSwim'),typeof player==='undefined'?.4:Math.min(1,Math.hypot(...player.velocity)/1.6));g.uniform1f(this.uniform(p,'uSun'),this.sun);g.uniform3fv(this.uniform(p,'uFog'),this.fog);g.uniform3fv(this.uniform(p,'uLightDir'),this.lightDir);g.uniform3fv(this.uniform(p,'uAirLightDir'),this.airLightDir||this.lightDir);g.uniform3fv(this.uniform(p,'uLightColor'),this.lightColor);}
  speciesUniforms(p,b){const g=this.gl,sp=typeof SPECIES!=='undefined'?SPECIES[b.species]:null,m=sp?.materialProfile,r=sp?.motionProfile?.type;g.uniform1i(this.uniform(p,'uRigClass'),r==='vampire'?1:r==='sea_pig'?2:r==='snailfish'?3:0);g.uniform4f(this.uniform(p,'uSurfaceProfile'),m?clamp(m.roughness,.12,.98):-1,m?clamp(m.subsurface,0,1):0,m?Math.max(.1,m.patternScale||1):1,m?({fish:0,cetacean:1,cephalopod:2,crustacean:3,shell:4,gelatinous:5}[m.skin]??0):-1);}
+ batchUniforms(p,b,state,kind=b.kind){
+  // State is local to one shader pass, so a new frame, a material edit or a
+  // shadow/colour transition always reinitializes the relevant uniforms.
+  const g=this.gl;
+  if(state.kind!==kind){g.uniform1i(this.uniform(p,'uKind'),kind);state.kind=kind;}
+  if(state.material!==b.material){g.uniform1i(this.uniform(p,'uMat'),b.material);state.material=b.material;}
+  if(state.species!==b.species){g.uniform1i(this.uniform(p,'uSpecies'),b.species);this.speciesUniforms(p,b);state.species=b.species;}
+ }
  bindTex(unit,tex){let g=this.gl;g.activeTexture(g.TEXTURE0+unit);g.bindTexture(g.TEXTURE_2D,tex);}
  render(eye,target,t){
+  if(this.sceneStream&&!this.sceneStream.update(eye)){this.dirty=true;return false;}
   this.dirty=false;const begin=performance.now(),g=this.gl;this.drawCalls=0;this.shadowDraws=0;
   const near=Number.isFinite(this.photoNear)?clamp(this.photoNear,.002,.16):.16;
   this.renderOrigin=eye[1]<-500?eye.map(n=>Math.round(n/64)*64):[0,0,0];const origin=this.renderOrigin,relativeEye=V.sub(eye,origin),relativeTarget=V.sub(target,origin);
@@ -953,25 +1033,27 @@ class Renderer{
   if(this._shadowKey!==key||this.forceShadow){
    this._shadowKey=key;this.forceShadow=false;this.renderLightVP=stableLightMatrix(mm(ortho(-40,40,-40,40,.1,230),lookAt(V.sub(V.add(center,V.mul(this.lightDir,100)),origin),V.sub(center,origin))),this.shadowSize);this.lightVP=origin.some(n=>n!==0)?worldProjection(this.renderLightVP,origin):this.renderLightVP;
    g.bindFramebuffer(g.FRAMEBUFFER,this.shadowFBO);g.viewport(0,0,this.shadowSize,this.shadowSize);g.clear(g.DEPTH_BUFFER_BIT);g.colorMask(false,false,false,false);g.enable(g.POLYGON_OFFSET_FILL);g.polygonOffset(1.2,2.);
-   this.common(this.shadowProgram,eye,this.lightVP,t);const planes=this.frustum(this.lightVP);
+   this.common(this.shadowProgram,eye,this.lightVP,t);const planes=this.frustum(this.lightVP),state={};
    for(const b of this.batches){if(!b.visible||!b.shadow||b.dynamic||b.kind===3)continue;
-    this.updateBatch(b,center,planes,true);if(!b.drawCount)continue;g.uniform1i(this.uniform(this.shadowProgram,'uKind'),0);g.uniform1i(this.uniform(this.shadowProgram,'uMat'),b.material);g.uniform1i(this.uniform(this.shadowProgram,'uSpecies'),b.species);this.speciesUniforms(this.shadowProgram,b);this.drawBatch(b);this.shadowDraws++;}
+    this.updateBatch(b,center,planes,true);if(!b.drawCount)continue;this.batchUniforms(this.shadowProgram,b,state,0);this.drawBatch(b);this.shadowDraws++;}
    g.disable(g.POLYGON_OFFSET_FILL);g.colorMask(true,true,true,true);this.staticShadowUpdates=(this.staticShadowUpdates||0)+1;
   }
   // Small, independent actor map; moving silhouettes do not invalidate the reef cache.
   this.renderDynamicLightVP=stableLightMatrix(mm(ortho(-17,17,-17,17,.1,150),lookAt(V.add(relativeEye,V.mul(this.lightDir,65)),relativeEye)),this.dynamicShadowSize);this.dynamicLightVP=origin.some(n=>n!==0)?worldProjection(this.renderDynamicLightVP,origin):this.renderDynamicLightVP;
   g.bindFramebuffer(g.FRAMEBUFFER,this.dynamicShadowFBO);g.viewport(0,0,this.dynamicShadowSize,this.dynamicShadowSize);g.clear(g.DEPTH_BUFFER_BIT);g.colorMask(false,false,false,false);this.common(this.shadowProgram,eye,this.dynamicLightVP,t);
-  const lightPlanes=this.frustum(this.dynamicLightVP);
-  for(const b of this.batches){if(!b.visible||!b.dynamic||!b.shadow||![0,1,2,4,5,6,7,8,9,10,11,12].includes(b.kind)||(b.minDistance>0&&!b.shadowProxy))continue;this.updateBatch(b,eye,lightPlanes,true);if(!b.drawCount)continue;g.uniform1i(this.uniform(this.shadowProgram,'uKind'),b.kind);g.uniform1i(this.uniform(this.shadowProgram,'uMat'),b.material);g.uniform1i(this.uniform(this.shadowProgram,'uSpecies'),b.species);this.speciesUniforms(this.shadowProgram,b);this.drawBatch(b);this.shadowDraws++;}
+  const lightPlanes=this.frustum(this.dynamicLightVP),shadowState={};
+  for(const b of this.batches){if(!b.visible||!b.dynamic||!b.shadow||![0,1,2,4,5,6,7,8,9,10,11,12].includes(b.kind)||(b.minDistance>0&&!b.shadowProxy))continue;this.updateBatch(b,eye,lightPlanes,true);if(!b.drawCount)continue;this.batchUniforms(this.shadowProgram,b,shadowState);this.drawBatch(b);this.shadowDraws++;}
   g.colorMask(true,true,true,true);
   g.bindFramebuffer(g.FRAMEBUFFER,this.msaaFBO||this.sceneFBO);if(this.msaaSamples)g.enable(g.SAMPLE_ALPHA_TO_COVERAGE);g.viewport(0,0,this.canvas.width,this.canvas.height);g.clearColor(.002,.025,.045,1);g.clear(g.COLOR_BUFFER_BIT|g.DEPTH_BUFFER_BIT);
   g.depthFunc(g.LEQUAL);this.common(this.skyProgram,eye,this.vp,t);g.uniformMatrix4fv(this.uniform(this.skyProgram,'uInvVP'),false,inv);g.bindVertexArray(this.postVAO);g.drawArrays(g.TRIANGLES,0,3);g.depthFunc(g.LESS);this.drawCalls++;
   const p=this.program;this.common(p,eye,this.vp,t);g.uniform1f(this.uniform(p,'uFogDensity'),this.fogDensity);g.uniform1f(this.uniform(p,'uShadowTexel'),1/this.shadowSize);g.uniform1f(this.uniform(p,'uShadows'),1);
   const names=['uSand','uSandN','uRock','uRockN','uShell','uShellN','uCoral','uCoralN'];for(let i=0;i<8;i++){this.bindTex(i,this.textures[i]);g.uniform1i(this.uniform(p,names[i]),i);}this.bindTex(8,this.shadowTexture);g.bindSampler(8,this.shadowSampler);g.uniform1i(this.uniform(p,'uShadow'),8);this.bindTex(10,this.dynamicShadowTexture);g.bindSampler(10,this.shadowSampler);g.uniform1i(this.uniform(p,'uDynamicShadow'),10);
-  this.submittedTriangles=0;this.submittedVertices=0;const planes=this.frustum(this.vp);
+  this.submittedTriangles=0;this.submittedVertices=0;const planes=this.frustum(this.vp),state={},ls=this.mobile?(this.quality===0?.64:.82):(this.quality===0?.75:1);
   for(const b of this.batches){if(!b.visible)continue;this.updateBatch(b,eye,planes);if(!b.drawCount)continue;
    this.submittedTriangles+=b.count/3*b.drawCount;this.submittedVertices+=b.vertexCount*b.drawCount;
-   const ls=this.mobile?(this.quality===0?.64:.82):(this.quality===0?.75:1);g.uniform3f(this.uniform(p,'uLODBounds'),(b.minDistance||0)*ls,(b.maxDistance||220)*ls,b.material!==1&&((b.minDistance||0)>0||(b.maxDistance&&b.maxDistance<180))?.60:0);g.uniform1i(this.uniform(p,'uKind'),b.kind);g.uniform1i(this.uniform(p,'uMat'),b.material);g.uniform1i(this.uniform(p,'uSpecies'),b.species);this.speciesUniforms(p,b);this.drawBatch(b);}
+   const min=(b.minDistance||0)*ls,max=(b.maxDistance||220)*ls,fade=b.material!==1&&((b.minDistance||0)>0||(b.maxDistance&&b.maxDistance<180))?.60:0;
+   if(state.min!==min||state.max!==max||state.fade!==fade){g.uniform3f(this.uniform(p,'uLODBounds'),min,max,fade);state.min=min;state.max=max;state.fade=fade;}
+   this.batchUniforms(p,b,state);this.drawBatch(b);}
   g.disable(g.SAMPLE_ALPHA_TO_COVERAGE);this.common(this.waterProgram,eye,this.vp,t);g.bindVertexArray(this.waterVAO);g.drawArrays(g.TRIANGLES,0,this.waterCount);this.submittedTriangles+=this.waterCount/3;this.submittedVertices+=this.waterCount;this.drawCalls++;
   g.enable(g.BLEND);g.blendFunc(g.SRC_ALPHA,g.ONE_MINUS_SRC_ALPHA);g.depthMask(false);
   this.common(this.pointProgram,eye,this.vp,t);g.uniform1f(this.uniform(this.pointProgram,'uScale'),this.canvas.height*.044);g.bindVertexArray(this.particleVAO);if(eye[1]<-.18){g.drawArrays(g.POINTS,0,this.quality===0?240:520);this.renderBubbles(eye,t);}g.depthMask(true);g.disable(g.BLEND);g.disable(g.DEPTH_TEST);

@@ -1,5 +1,5 @@
 {
-  "version": "0.17.0",
+  "version": "0.17.1",
   "scope": "served game and build sources",
   "files": [
     {
@@ -14,13 +14,13 @@
     },
     {
       "path": "README.md",
-      "bytes": 17660,
-      "sha256": "1657bfcbc36675f5fae70942e20a1d9a56a80a985a6f9067bbe759ecca287907"
+      "bytes": 18445,
+      "sha256": "b83d10a21fe5f7f4142da6f8449463f03f5bb3dd73901fd16211d2481cadf8c1"
     },
     {
       "path": "VERSION",
       "bytes": 7,
-      "sha256": "02d38e98e88f4a8dc2ea40dbb769338601066fc94920b52882a14f21ad97f7ee"
+      "sha256": "cd81ec19767ffb807bada6d48578a18d77a29adb394e09e9cdfcd5ea9eebb6a2"
     },
     {
       "path": "assets/caustics.jpg",
@@ -243,6 +243,896 @@
       "sha256": "783241cd9b1254126881e2781f5d9393c64c930577b8d30c7d81d53d584b53a9"
     },
     {
+      "path": "assets/scene/chunk-005abc37257f3344b354.bin.gz",
+      "bytes": 10717,
+      "sha256": "005abc37257f3344b3548968e70c888eb36afd20c3a6bfd5edf63889484d2fc8"
+    },
+    {
+      "path": "assets/scene/chunk-02fea1647d6317cd6e63.bin.gz",
+      "bytes": 10733,
+      "sha256": "02fea1647d6317cd6e637be1ad0a45cf363e307af6649d249a6fc9dfc8161e2f"
+    },
+    {
+      "path": "assets/scene/chunk-03feb48d5eefe255d4cf.bin.gz",
+      "bytes": 10718,
+      "sha256": "03feb48d5eefe255d4cfcfba606be4a6f173e5f1f254517820c5bf2824b05d03"
+    },
+    {
+      "path": "assets/scene/chunk-052c9cd1e881aa81de43.bin.gz",
+      "bytes": 12676,
+      "sha256": "052c9cd1e881aa81de439b5bd0e4050fdd633ce9d1febd3884c54b6e037f90fc"
+    },
+    {
+      "path": "assets/scene/chunk-077e9c686cf86fb74dae.bin.gz",
+      "bytes": 12704,
+      "sha256": "077e9c686cf86fb74dae26fa3f2108397fcec1bdca38a024c081b57e7b224fb7"
+    },
+    {
+      "path": "assets/scene/chunk-0b02bb42065c0bddec5e.bin.gz",
+      "bytes": 175865,
+      "sha256": "0b02bb42065c0bddec5e4db3a0c522518fdd03f6201b518bd283d8b7089c2d79"
+    },
+    {
+      "path": "assets/scene/chunk-0b76ddd7fb5a00a28997.bin.gz",
+      "bytes": 10733,
+      "sha256": "0b76ddd7fb5a00a28997d671ba3f975bbccd313b4d0e9dd3cbe5e341fcd5f1ee"
+    },
+    {
+      "path": "assets/scene/chunk-0d7f3feb6ba93dd3bad9.bin.gz",
+      "bytes": 165307,
+      "sha256": "0d7f3feb6ba93dd3bad90f8255e2676652cb22f85be040860d3c2472e9f16c8e"
+    },
+    {
+      "path": "assets/scene/chunk-0da09355c1c16a0ea626.bin.gz",
+      "bytes": 129615,
+      "sha256": "0da09355c1c16a0ea626fca06bdc57f1c2ad5e5368d72af783478e903fb32477"
+    },
+    {
+      "path": "assets/scene/chunk-0de75467b6a6597b2789.bin.gz",
+      "bytes": 12631,
+      "sha256": "0de75467b6a6597b278971e6ff033ecaeba8ccbcbaf977f1de9f76c993102430"
+    },
+    {
+      "path": "assets/scene/chunk-0e200536617d673f7077.bin.gz",
+      "bytes": 62777,
+      "sha256": "0e200536617d673f70779a6da3989891959e800160e354d55547eaf525020f0d"
+    },
+    {
+      "path": "assets/scene/chunk-0f814de8a83de25dc185.bin.gz",
+      "bytes": 859753,
+      "sha256": "0f814de8a83de25dc1850f482b6951c03551eb322662f4444401a6a3c6df09fb"
+    },
+    {
+      "path": "assets/scene/chunk-1097b2873c31104657f5.bin.gz",
+      "bytes": 10707,
+      "sha256": "1097b2873c31104657f56082ba561ba7281ad98797757fa2b8575898c2ad4ab0"
+    },
+    {
+      "path": "assets/scene/chunk-131f850375680c56e12b.bin.gz",
+      "bytes": 12835,
+      "sha256": "131f850375680c56e12ba058a708c790b03a89b6531127689ee8be22636e044b"
+    },
+    {
+      "path": "assets/scene/chunk-14c515c6ead2d517b2b3.bin.gz",
+      "bytes": 66698,
+      "sha256": "14c515c6ead2d517b2b3864d44aae3f42fc2756d4d5c5856feff2bf72e3abc79"
+    },
+    {
+      "path": "assets/scene/chunk-1825002a3a65b6467447.bin.gz",
+      "bytes": 93486,
+      "sha256": "1825002a3a65b6467447021d7488b2a3addf5ae7fecee02e4c86538033db0420"
+    },
+    {
+      "path": "assets/scene/chunk-183201151fa6c54db88d.bin.gz",
+      "bytes": 10724,
+      "sha256": "183201151fa6c54db88de84226f09ac58b3f36ae67aebd28e15555d58f91e449"
+    },
+    {
+      "path": "assets/scene/chunk-1b5c4d52a07a51292da3.bin.gz",
+      "bytes": 96818,
+      "sha256": "1b5c4d52a07a51292da32b3de32f4cabc8af56249db6eb8271e8743c2f78932d"
+    },
+    {
+      "path": "assets/scene/chunk-1b6baf3a6f4a88a149b5.bin.gz",
+      "bytes": 10707,
+      "sha256": "1b6baf3a6f4a88a149b5e97de854ca01567607c6c04f87a50733a21313adc40e"
+    },
+    {
+      "path": "assets/scene/chunk-1cf603799d6ae9e0812f.bin.gz",
+      "bytes": 10708,
+      "sha256": "1cf603799d6ae9e0812fb0e88a4048a00d1a59612537b78645042289831792a6"
+    },
+    {
+      "path": "assets/scene/chunk-1f07e711363f17230660.bin.gz",
+      "bytes": 78320,
+      "sha256": "1f07e711363f17230660821958bcc54c7e747a46f96426d6c70b74c46c540548"
+    },
+    {
+      "path": "assets/scene/chunk-1f6b07e45404dc8d9e4e.bin.gz",
+      "bytes": 67293,
+      "sha256": "1f6b07e45404dc8d9e4e7f92a57b9e2248c40feaaf937be96e046b40894cec34"
+    },
+    {
+      "path": "assets/scene/chunk-20242299b998424aaa4b.bin.gz",
+      "bytes": 320099,
+      "sha256": "20242299b998424aaa4b50e266b3c94d82745e8ca8e1f097014560f2c9e7f85d"
+    },
+    {
+      "path": "assets/scene/chunk-20573685d59cc36e61f3.bin.gz",
+      "bytes": 25628,
+      "sha256": "20573685d59cc36e61f33ddfb5bb342858c87ed8c86576cc42fb89daa1d93610"
+    },
+    {
+      "path": "assets/scene/chunk-246c0b68711549fe754d.bin.gz",
+      "bytes": 10708,
+      "sha256": "246c0b68711549fe754dfcace49c04bef2380774eb812dd3614532be92b24bf3"
+    },
+    {
+      "path": "assets/scene/chunk-26b14befba8963813ed4.bin.gz",
+      "bytes": 67296,
+      "sha256": "26b14befba8963813ed4a9facf5d4241b4662ba5db2b58ebe4df2e030e9a2761"
+    },
+    {
+      "path": "assets/scene/chunk-27fee286adecffa2395b.bin.gz",
+      "bytes": 80803,
+      "sha256": "27fee286adecffa2395b2e13d7ea7ce0bd77479c2477ef878b8c420f6152ebce"
+    },
+    {
+      "path": "assets/scene/chunk-28458975eb7953fc52fd.bin.gz",
+      "bytes": 10737,
+      "sha256": "28458975eb7953fc52fd6aca757ba7167d65bf0ed16d60d3f95dfa803ad452b7"
+    },
+    {
+      "path": "assets/scene/chunk-28af20dfc3f16fd80f6e.bin.gz",
+      "bytes": 264561,
+      "sha256": "28af20dfc3f16fd80f6e00343a95972489c988fc3b5e238217dfd358d84b27df"
+    },
+    {
+      "path": "assets/scene/chunk-2aa62d6f22901f531ce5.bin.gz",
+      "bytes": 10773,
+      "sha256": "2aa62d6f22901f531ce53671db0aeb4e7b8bc3a102cde40e2f717982751ad164"
+    },
+    {
+      "path": "assets/scene/chunk-2ca472cd0e26e9ed67a0.bin.gz",
+      "bytes": 1118341,
+      "sha256": "2ca472cd0e26e9ed67a059269c1b7325ce74a2e8043872a60883d99268ec81d1"
+    },
+    {
+      "path": "assets/scene/chunk-2cd5d97fbc493d5ab0f3.bin.gz",
+      "bytes": 90536,
+      "sha256": "2cd5d97fbc493d5ab0f3b3e1278c54ed0c50abd0ddfea1218ce570cf5abcdf6f"
+    },
+    {
+      "path": "assets/scene/chunk-2ec2284edd31e8755014.bin.gz",
+      "bytes": 300512,
+      "sha256": "2ec2284edd31e8755014ee278d4748a6bcd7199b341f92c4f7716d5a712631a6"
+    },
+    {
+      "path": "assets/scene/chunk-2ec895d1e2cbf2293da8.bin.gz",
+      "bytes": 10699,
+      "sha256": "2ec895d1e2cbf2293da8a11d55402e7bd795141450171401ca7466441f8bebfe"
+    },
+    {
+      "path": "assets/scene/chunk-2fd8a41bf81c1aee18ee.bin.gz",
+      "bytes": 15613,
+      "sha256": "2fd8a41bf81c1aee18eea7e9a1f4c00b61df6e0e93ff74ce4f197e6469078bc5"
+    },
+    {
+      "path": "assets/scene/chunk-3299ddb4d08a38aeadb7.bin.gz",
+      "bytes": 19070,
+      "sha256": "3299ddb4d08a38aeadb714ed7142fb6cd38cffce60fafe0427f69dc334d3789d"
+    },
+    {
+      "path": "assets/scene/chunk-33bb4356873a23363e4e.bin.gz",
+      "bytes": 51538,
+      "sha256": "33bb4356873a23363e4ee6edbcec72b61c2daa531c3123dd454629739ae725d1"
+    },
+    {
+      "path": "assets/scene/chunk-34ff0aa773f1b61bdbc0.bin.gz",
+      "bytes": 198767,
+      "sha256": "34ff0aa773f1b61bdbc0f6a28a9229cca5890ae15c379e4d8d76fc66cd234fbf"
+    },
+    {
+      "path": "assets/scene/chunk-36bca38c8b7ee90659fa.bin.gz",
+      "bytes": 123057,
+      "sha256": "36bca38c8b7ee90659fa3b1c93bb935b395999d9f95fe428e08b1c02fd9ddd60"
+    },
+    {
+      "path": "assets/scene/chunk-37b5cc33fb2e1bb507c4.bin.gz",
+      "bytes": 124733,
+      "sha256": "37b5cc33fb2e1bb507c434355e47817c4ae3b607ffad6c5cef67aa8bfa0eab06"
+    },
+    {
+      "path": "assets/scene/chunk-396c2b1cbdffe27fc4c5.bin.gz",
+      "bytes": 10717,
+      "sha256": "396c2b1cbdffe27fc4c5cd7380b0eeda2af5b061551dba5fdcab20aba55f3df4"
+    },
+    {
+      "path": "assets/scene/chunk-39ed3d63ba1102c339b1.bin.gz",
+      "bytes": 14026,
+      "sha256": "39ed3d63ba1102c339b1733b207bf8f4cfd873c68d60403e622a571143e60f56"
+    },
+    {
+      "path": "assets/scene/chunk-3d21e6c0b8e6ba5a23c9.bin.gz",
+      "bytes": 10659,
+      "sha256": "3d21e6c0b8e6ba5a23c95c68360a18070ca1e11974be7618ad862ccc50c548c6"
+    },
+    {
+      "path": "assets/scene/chunk-3d29be20d6900070dd56.bin.gz",
+      "bytes": 64770,
+      "sha256": "3d29be20d6900070dd56320e8e84b8e4c0e7c3856e6fb0a13a49866d080d4a68"
+    },
+    {
+      "path": "assets/scene/chunk-3d29cf91983f00669cbf.bin.gz",
+      "bytes": 433613,
+      "sha256": "3d29cf91983f00669cbf137045ca8ddc803b8c95c3bc6a60c2754b36832066d8"
+    },
+    {
+      "path": "assets/scene/chunk-3db2043c7865601a731b.bin.gz",
+      "bytes": 10681,
+      "sha256": "3db2043c7865601a731b585e51c2a20de17e97d749b97e49e5396b07c91a9914"
+    },
+    {
+      "path": "assets/scene/chunk-3e8e82ffc36b9ecda34d.bin.gz",
+      "bytes": 67056,
+      "sha256": "3e8e82ffc36b9ecda34d283c6c11d4f224adca65818286afe92ebcb51becf8e3"
+    },
+    {
+      "path": "assets/scene/chunk-4009a4167418318944be.bin.gz",
+      "bytes": 12701,
+      "sha256": "4009a4167418318944be5c8d816cb577dd7f3189bdb2aca1bb8536605c209b2a"
+    },
+    {
+      "path": "assets/scene/chunk-400fbe99e49063ea3f79.bin.gz",
+      "bytes": 12707,
+      "sha256": "400fbe99e49063ea3f791c1cabb6ffeb4815df31d1e2c1f85a770921c4a553a7"
+    },
+    {
+      "path": "assets/scene/chunk-40e44179a4a24e5720b4.bin.gz",
+      "bytes": 65780,
+      "sha256": "40e44179a4a24e5720b4da98c72446ffd304e62907e2a41612b982508d7304f1"
+    },
+    {
+      "path": "assets/scene/chunk-413beea0934da2557cac.bin.gz",
+      "bytes": 10749,
+      "sha256": "413beea0934da2557cac04ee9e66d5a19ae027e171410c79dbe213c8fe041642"
+    },
+    {
+      "path": "assets/scene/chunk-4452e1b51474d1bef341.bin.gz",
+      "bytes": 10750,
+      "sha256": "4452e1b51474d1bef341d483446178274c55389e92f88037df7c9dbe71dc3e9d"
+    },
+    {
+      "path": "assets/scene/chunk-4af600c856c5c85391c9.bin.gz",
+      "bytes": 189479,
+      "sha256": "4af600c856c5c85391c9f5345e18e6317399b176bee458c6c53ab2111ef6a4af"
+    },
+    {
+      "path": "assets/scene/chunk-5212c69f4563f67feb18.bin.gz",
+      "bytes": 260059,
+      "sha256": "5212c69f4563f67feb1835a5b2d8c791922200551feeccc6e393b85faf59ad16"
+    },
+    {
+      "path": "assets/scene/chunk-52395456058fae4756fc.bin.gz",
+      "bytes": 345223,
+      "sha256": "52395456058fae4756fcb710db677890a6829e18fe668132fd4efcda6423b8ee"
+    },
+    {
+      "path": "assets/scene/chunk-54a1aafce2e36975c3fd.bin.gz",
+      "bytes": 23343,
+      "sha256": "54a1aafce2e36975c3fd9e77dcc596f74d84f54d1e44fd15ab32f7e399e1b5be"
+    },
+    {
+      "path": "assets/scene/chunk-55f0cae2cb2e5482c6f0.bin.gz",
+      "bytes": 12610,
+      "sha256": "55f0cae2cb2e5482c6f07bc8f6634f6e48745148fc4a33fc16c71b4c816f2025"
+    },
+    {
+      "path": "assets/scene/chunk-563d39d06298138ab367.bin.gz",
+      "bytes": 67015,
+      "sha256": "563d39d06298138ab3677575f8ba4c16259c27c183e6a75e91baee80adbcd2af"
+    },
+    {
+      "path": "assets/scene/chunk-566913b0d1a08a3b3cbe.bin.gz",
+      "bytes": 10705,
+      "sha256": "566913b0d1a08a3b3cbe493ccd9463e0143500892f9478f9850b40d57481edf0"
+    },
+    {
+      "path": "assets/scene/chunk-5764e61807c047f48fd3.bin.gz",
+      "bytes": 861684,
+      "sha256": "5764e61807c047f48fd3448e6dd884bdc024a0ef5becf0431cbab3f7aa28fa3f"
+    },
+    {
+      "path": "assets/scene/chunk-5876f89c1b4defa3195f.bin.gz",
+      "bytes": 104214,
+      "sha256": "5876f89c1b4defa3195fcb2247f3b24fd8c173fd6e88dcd792c02ed6b8d7155f"
+    },
+    {
+      "path": "assets/scene/chunk-5b9fae13d6b97a1b6091.bin.gz",
+      "bytes": 35491,
+      "sha256": "5b9fae13d6b97a1b6091214204ac1289e955ae8fb7bf6ae3f7701b79754ffaf1"
+    },
+    {
+      "path": "assets/scene/chunk-5bfc43cffc674cc624db.bin.gz",
+      "bytes": 10707,
+      "sha256": "5bfc43cffc674cc624dbf28540c49174e860addef808f8386973e0033e97e4fa"
+    },
+    {
+      "path": "assets/scene/chunk-5cc4e82067c8b235e11a.bin.gz",
+      "bytes": 10730,
+      "sha256": "5cc4e82067c8b235e11a34be5414a950c40d58346cb965b56acc809861ab84f7"
+    },
+    {
+      "path": "assets/scene/chunk-60dd725fd772766039f2.bin.gz",
+      "bytes": 859967,
+      "sha256": "60dd725fd772766039f2233fbdcd634bfc37f16171f65a9db02086da9e7b8dfd"
+    },
+    {
+      "path": "assets/scene/chunk-61e05f03427367a8a84a.bin.gz",
+      "bytes": 3198,
+      "sha256": "61e05f03427367a8a84a3c82ba408a205804002cd8bb563df1764fdfae390552"
+    },
+    {
+      "path": "assets/scene/chunk-667a923ce3d9f64405e5.bin.gz",
+      "bytes": 12657,
+      "sha256": "667a923ce3d9f64405e53cde665bbd78ddf3d903cc2b966a86c21b87c121f607"
+    },
+    {
+      "path": "assets/scene/chunk-66ac2a155813f5858ac6.bin.gz",
+      "bytes": 67110,
+      "sha256": "66ac2a155813f5858ac633d5ee0caf5899ae6aef79be135cdafdfc1cf41cec93"
+    },
+    {
+      "path": "assets/scene/chunk-6717a62e11db568a235a.bin.gz",
+      "bytes": 3156,
+      "sha256": "6717a62e11db568a235a5c2e120b7e13a903909e4bd16e46cb613d012c883a78"
+    },
+    {
+      "path": "assets/scene/chunk-69479eb3015129fe057c.bin.gz",
+      "bytes": 12670,
+      "sha256": "69479eb3015129fe057c10a6fd91de48893d578525469def707a8bae04f1d773"
+    },
+    {
+      "path": "assets/scene/chunk-6b68b98a46983ed29044.bin.gz",
+      "bytes": 14968,
+      "sha256": "6b68b98a46983ed29044242c3a597420c2c0b916a76d5a12917329e8d398580d"
+    },
+    {
+      "path": "assets/scene/chunk-6c70b1ed7eb3fda6642a.bin.gz",
+      "bytes": 12808,
+      "sha256": "6c70b1ed7eb3fda6642ac3cbca38e4c0aa89af81474dd4a3dc54a5f67d587d62"
+    },
+    {
+      "path": "assets/scene/chunk-6e476f13b69a882fb654.bin.gz",
+      "bytes": 14736,
+      "sha256": "6e476f13b69a882fb654e450371e4f811a2fd2a9f908895d7939e1d6ca1922cf"
+    },
+    {
+      "path": "assets/scene/chunk-6f47869201c5fb8a9920.bin.gz",
+      "bytes": 66676,
+      "sha256": "6f47869201c5fb8a99209391a2e6b8939c6207e7d7ba4e1823c87c6f777df540"
+    },
+    {
+      "path": "assets/scene/chunk-6fd853605448d8572494.bin.gz",
+      "bytes": 10710,
+      "sha256": "6fd853605448d857249448b717bd48d12f72f3262cb7f88405eb5336c289fd20"
+    },
+    {
+      "path": "assets/scene/chunk-6fec244da550356209c4.bin.gz",
+      "bytes": 129204,
+      "sha256": "6fec244da550356209c428e307d066fd051e39cc18d641529a0aa2cf7ca5293d"
+    },
+    {
+      "path": "assets/scene/chunk-7138c94e88ca691cc1c1.bin.gz",
+      "bytes": 10721,
+      "sha256": "7138c94e88ca691cc1c193bb79d725824e4294088a99654caeaff7257335bbb2"
+    },
+    {
+      "path": "assets/scene/chunk-71c183048973f45d5c57.bin.gz",
+      "bytes": 10721,
+      "sha256": "71c183048973f45d5c57fa3e4f5e93e8a5d0929667e0819a5c2615db936a3a13"
+    },
+    {
+      "path": "assets/scene/chunk-73ece75540180d6437be.bin.gz",
+      "bytes": 18584,
+      "sha256": "73ece75540180d6437be8810d0abac1be06f2dcb14d16f663f4aa8f40662b65f"
+    },
+    {
+      "path": "assets/scene/chunk-75096807e8d3cb11d84a.bin.gz",
+      "bytes": 10782,
+      "sha256": "75096807e8d3cb11d84afa356c795cc0f0f6b2246ea88dcf757cc7686b0c286d"
+    },
+    {
+      "path": "assets/scene/chunk-7713b8c4ece73fdfa093.bin.gz",
+      "bytes": 33066,
+      "sha256": "7713b8c4ece73fdfa093a3847a08068158a525713440cc458c8c5a2f8b367617"
+    },
+    {
+      "path": "assets/scene/chunk-7976fbdfda24046609ce.bin.gz",
+      "bytes": 17684,
+      "sha256": "7976fbdfda24046609cebeafc0c3f0bf74db941c414b1d4b53a6fbadc63f30ba"
+    },
+    {
+      "path": "assets/scene/chunk-7a4e4ec18da1d49bce02.bin.gz",
+      "bytes": 10765,
+      "sha256": "7a4e4ec18da1d49bce025e6aa6c9a19d695201718607980a3da74c9e5397045c"
+    },
+    {
+      "path": "assets/scene/chunk-7bda3c6c80d8cc9f33cc.bin.gz",
+      "bytes": 65789,
+      "sha256": "7bda3c6c80d8cc9f33ccb5993559331c0f0dd500d193b8b53a720a4f35602cdb"
+    },
+    {
+      "path": "assets/scene/chunk-7c0bee899554fa8e863e.bin.gz",
+      "bytes": 132878,
+      "sha256": "7c0bee899554fa8e863e5eee183a049fb56a4159d19f497675ebdc05c96d9815"
+    },
+    {
+      "path": "assets/scene/chunk-7e1387e08e8d08d92539.bin.gz",
+      "bytes": 12760,
+      "sha256": "7e1387e08e8d08d9253971510814887b40dcc1d9ec706586c37dd2e95d694a8f"
+    },
+    {
+      "path": "assets/scene/chunk-7f3311cefa9ac9cacf04.bin.gz",
+      "bytes": 327176,
+      "sha256": "7f3311cefa9ac9cacf0495999cb43b3eb445df5315aa7a0496aada8552a28d13"
+    },
+    {
+      "path": "assets/scene/chunk-7f6fdef5bd4afebe0a28.bin.gz",
+      "bytes": 65924,
+      "sha256": "7f6fdef5bd4afebe0a281361b73824c9d0330ce41810b2121b8e0f33423382a8"
+    },
+    {
+      "path": "assets/scene/chunk-80fdd0abec27105b3d71.bin.gz",
+      "bytes": 205199,
+      "sha256": "80fdd0abec27105b3d71dcb410192f3e8b313a35c0cd7b146e28bb96dfdd3264"
+    },
+    {
+      "path": "assets/scene/chunk-8479b35764f4e3890955.bin.gz",
+      "bytes": 12823,
+      "sha256": "8479b35764f4e38909557a4ccaa89e60191a8857122e3ddffd26901ea7c8e8d5"
+    },
+    {
+      "path": "assets/scene/chunk-85a4296151f8bca64133.bin.gz",
+      "bytes": 12662,
+      "sha256": "85a4296151f8bca641337b35fc4d380d6a681f335e53835c4a243c06d1a95eb0"
+    },
+    {
+      "path": "assets/scene/chunk-87e2e51dcfffc8a413f8.bin.gz",
+      "bytes": 861063,
+      "sha256": "87e2e51dcfffc8a413f8f8c0a91805f1a1b189ba99b48ceca0f919739f4f833c"
+    },
+    {
+      "path": "assets/scene/chunk-88829bb439a43da5719d.bin.gz",
+      "bytes": 3173,
+      "sha256": "88829bb439a43da5719d0e69fa522d3facf66090e1860275a9ae38126ad02aca"
+    },
+    {
+      "path": "assets/scene/chunk-88919e75d45e922d5f5d.bin.gz",
+      "bytes": 10691,
+      "sha256": "88919e75d45e922d5f5d990cdf1ff79e7f3ccbde5fbcddb5ae6535b67d00e97c"
+    },
+    {
+      "path": "assets/scene/chunk-8d4c67e7e15af06dbb90.bin.gz",
+      "bytes": 3126,
+      "sha256": "8d4c67e7e15af06dbb90d41f79766820d37123adedc16e82210ebd1f06267c59"
+    },
+    {
+      "path": "assets/scene/chunk-8dad02808bb93cea9c3f.bin.gz",
+      "bytes": 10704,
+      "sha256": "8dad02808bb93cea9c3f489fd6ec44e2e43b6f32605c5d874bbd2e8b54a8c56c"
+    },
+    {
+      "path": "assets/scene/chunk-8f4bbef2f8f2c9f34379.bin.gz",
+      "bytes": 335730,
+      "sha256": "8f4bbef2f8f2c9f34379d21f63066fd07e8ebba94a25ab6356451cbc2e8ab151"
+    },
+    {
+      "path": "assets/scene/chunk-91b8f3a6fdc1f4f145b5.bin.gz",
+      "bytes": 853674,
+      "sha256": "91b8f3a6fdc1f4f145b5cac065d454098d07d13165ff50fa51a4587629256a46"
+    },
+    {
+      "path": "assets/scene/chunk-92af91f22266370d4bf7.bin.gz",
+      "bytes": 23409,
+      "sha256": "92af91f22266370d4bf7cfe7aca9467428e85aa05642f9ddc4a486b390ffc604"
+    },
+    {
+      "path": "assets/scene/chunk-92f3e27e2ab4cc714374.bin.gz",
+      "bytes": 10709,
+      "sha256": "92f3e27e2ab4cc714374e5900a0f60511bbe46670a22cdd2b295a9a6f13cf70b"
+    },
+    {
+      "path": "assets/scene/chunk-93d4715d34e44c8a7c76.bin.gz",
+      "bytes": 10699,
+      "sha256": "93d4715d34e44c8a7c76921cae0b4fd368af09c1ce7dc450e186f0db2776ac04"
+    },
+    {
+      "path": "assets/scene/chunk-94d393eda8b3e1f94f08.bin.gz",
+      "bytes": 10684,
+      "sha256": "94d393eda8b3e1f94f080b5e7dbabe5164b641763df11e8e8a72da566fbd93ea"
+    },
+    {
+      "path": "assets/scene/chunk-9629ea0b0138012ed28a.bin.gz",
+      "bytes": 33817,
+      "sha256": "9629ea0b0138012ed28aca232a95bc0a1637faeba8d36f39205f288a69348c4a"
+    },
+    {
+      "path": "assets/scene/chunk-97e9adce23dd510b7d85.bin.gz",
+      "bytes": 213532,
+      "sha256": "97e9adce23dd510b7d85cc838d7b106baf2f0bcbabced03a56bb9ba8064c43a3"
+    },
+    {
+      "path": "assets/scene/chunk-98152f8b747aedadf327.bin.gz",
+      "bytes": 12728,
+      "sha256": "98152f8b747aedadf3273726fe30bb7fc6648a75d4917846e1dd7feab6f71be8"
+    },
+    {
+      "path": "assets/scene/chunk-98f276d3c8f4bd339a2d.bin.gz",
+      "bytes": 10713,
+      "sha256": "98f276d3c8f4bd339a2da41ecb2562be568c8c32d9a4606fd66fa9b210d69770"
+    },
+    {
+      "path": "assets/scene/chunk-9ce0e6954f8186412902.bin.gz",
+      "bytes": 293999,
+      "sha256": "9ce0e6954f8186412902a6f95401aebbc60519d2848b87362a5b8c688459f5b5"
+    },
+    {
+      "path": "assets/scene/chunk-9de15103330e6c4cb832.bin.gz",
+      "bytes": 160539,
+      "sha256": "9de15103330e6c4cb832509697ca8db4d557b10f75dded121714278f8578b88b"
+    },
+    {
+      "path": "assets/scene/chunk-9e63e9b76bd79f3b3303.bin.gz",
+      "bytes": 298264,
+      "sha256": "9e63e9b76bd79f3b3303bf34be465cc33c10f10fe0efc45a8d22d333112c2a1c"
+    },
+    {
+      "path": "assets/scene/chunk-9e6d8189f8789d297a32.bin.gz",
+      "bytes": 34937,
+      "sha256": "9e6d8189f8789d297a32af07e9a82d94bf881a3c25e47fb6b01d1df103a42d08"
+    },
+    {
+      "path": "assets/scene/chunk-9e79fa8d38803578420d.bin.gz",
+      "bytes": 10704,
+      "sha256": "9e79fa8d38803578420da5424289d34fbd5bb2259fffcec71da06dda78fd2e58"
+    },
+    {
+      "path": "assets/scene/chunk-9eccdf75440981639772.bin.gz",
+      "bytes": 10736,
+      "sha256": "9eccdf754409816397722801065e54aa11ff8dc2971f7660496a55ba451d44af"
+    },
+    {
+      "path": "assets/scene/chunk-a4c051de7a1635e07ebf.bin.gz",
+      "bytes": 21156,
+      "sha256": "a4c051de7a1635e07ebfda169ca4b2b94cb51e1e8b7d09a3390a9a30ec1e48d2"
+    },
+    {
+      "path": "assets/scene/chunk-a579a014d240898ac4d8.bin.gz",
+      "bytes": 201783,
+      "sha256": "a579a014d240898ac4d8a440dc2dac1749ebc2f30129253e89514fc300f1b779"
+    },
+    {
+      "path": "assets/scene/chunk-a7134329f51a6beca6fe.bin.gz",
+      "bytes": 157534,
+      "sha256": "a7134329f51a6beca6fe82519b1dda1104b440c780eb0fd14debf6b0c895b25a"
+    },
+    {
+      "path": "assets/scene/chunk-a78ecbaab65bc5412093.bin.gz",
+      "bytes": 10669,
+      "sha256": "a78ecbaab65bc5412093be03260b50d4c88992cedde48cda276bfa9037ebdecb"
+    },
+    {
+      "path": "assets/scene/chunk-a8b27a1e49254046ac71.bin.gz",
+      "bytes": 10759,
+      "sha256": "a8b27a1e49254046ac718f2bb74fd85eaff64f115ef6502f29cb12920fb3984f"
+    },
+    {
+      "path": "assets/scene/chunk-a8f8aab94032bdce8264.bin.gz",
+      "bytes": 66933,
+      "sha256": "a8f8aab94032bdce8264879df749106cb75dce2508a1a713eb813be32426c104"
+    },
+    {
+      "path": "assets/scene/chunk-a93d1139eedb1672791c.bin.gz",
+      "bytes": 10702,
+      "sha256": "a93d1139eedb1672791c15e3b592dd2b415dd3b41e791164b5ce0157a56dc7b9"
+    },
+    {
+      "path": "assets/scene/chunk-a9c539765de8fbebdbbc.bin.gz",
+      "bytes": 149193,
+      "sha256": "a9c539765de8fbebdbbcac8f26b70eeb527967deba341049ed6140aca2d2cb3a"
+    },
+    {
+      "path": "assets/scene/chunk-ab30d0d9f7a91b949ab3.bin.gz",
+      "bytes": 182003,
+      "sha256": "ab30d0d9f7a91b949ab31de3b4fba6218d8e44e1ed52b17701785f83280d78d0"
+    },
+    {
+      "path": "assets/scene/chunk-ac020c149a657729e0fa.bin.gz",
+      "bytes": 138836,
+      "sha256": "ac020c149a657729e0fa779597c8b88b4ab11b1abab8613047cb72952613878a"
+    },
+    {
+      "path": "assets/scene/chunk-ac259f92eda6bb6caa04.bin.gz",
+      "bytes": 861339,
+      "sha256": "ac259f92eda6bb6caa04a700092cf02ee1036eb4b14ee0e792240829ddae5370"
+    },
+    {
+      "path": "assets/scene/chunk-aeb4d147ae6c5c7421bb.bin.gz",
+      "bytes": 10701,
+      "sha256": "aeb4d147ae6c5c7421bb67095eefa8f578d243031d31e4d9f9085d2d35858772"
+    },
+    {
+      "path": "assets/scene/chunk-aec3c638c1189f0ba523.bin.gz",
+      "bytes": 19976,
+      "sha256": "aec3c638c1189f0ba52305043d595f9bf466a46ad82fdc145c7eedab4dbe6386"
+    },
+    {
+      "path": "assets/scene/chunk-b02ae416640f7bc5205b.bin.gz",
+      "bytes": 132154,
+      "sha256": "b02ae416640f7bc5205b2120745e6052270e510a333e20fae1f78b2de9033257"
+    },
+    {
+      "path": "assets/scene/chunk-b401c70c7df7790af7ca.bin.gz",
+      "bytes": 12740,
+      "sha256": "b401c70c7df7790af7ca3ec9e3c96ec57108ff54cbfdb6aff3921b964c40a2f6"
+    },
+    {
+      "path": "assets/scene/chunk-b552792490e6c6768190.bin.gz",
+      "bytes": 215748,
+      "sha256": "b552792490e6c6768190e8d4349e647f5b9479f21d6afdd7ccd0f4739d305c17"
+    },
+    {
+      "path": "assets/scene/chunk-b57a13ff636fdc8e1a92.bin.gz",
+      "bytes": 22177,
+      "sha256": "b57a13ff636fdc8e1a9293a4b8e1afe617722d523441c4eb9e640053cb1352ae"
+    },
+    {
+      "path": "assets/scene/chunk-b7893ee16ad64a6171e8.bin.gz",
+      "bytes": 67057,
+      "sha256": "b7893ee16ad64a6171e879151a3084f93f9e2fd81731f0a390436b3918a91057"
+    },
+    {
+      "path": "assets/scene/chunk-b8b82ddf5c1b8e7003aa.bin.gz",
+      "bytes": 65895,
+      "sha256": "b8b82ddf5c1b8e7003aaba74b40948e4a49f0f3ebdcf71ca075a353cd3db5d25"
+    },
+    {
+      "path": "assets/scene/chunk-b95816af83e7e7807d43.bin.gz",
+      "bytes": 200572,
+      "sha256": "b95816af83e7e7807d43906f0048b3d0eec408903163626405397c1e4b4cf43e"
+    },
+    {
+      "path": "assets/scene/chunk-bb14a522627c34501a49.bin.gz",
+      "bytes": 56366,
+      "sha256": "bb14a522627c34501a495435e56d5f2cdf8ef2130066479b2c5a4263ff71c836"
+    },
+    {
+      "path": "assets/scene/chunk-bc290ce5e4deefe24c1b.bin.gz",
+      "bytes": 395973,
+      "sha256": "bc290ce5e4deefe24c1bb520379d65b1189005c7a8eb467fb76da7f3007f6d11"
+    },
+    {
+      "path": "assets/scene/chunk-bd17581e2bdba72d257b.bin.gz",
+      "bytes": 33154,
+      "sha256": "bd17581e2bdba72d257b010a427c67eae1cfb6fdab904bc4c98f5555b707b3c0"
+    },
+    {
+      "path": "assets/scene/chunk-bf7ae726ec90786212f8.bin.gz",
+      "bytes": 39733,
+      "sha256": "bf7ae726ec90786212f81e87410279fe5480d9f5277cea56138c86a2cb29a140"
+    },
+    {
+      "path": "assets/scene/chunk-c04273e13f0f0b91de37.bin.gz",
+      "bytes": 234878,
+      "sha256": "c04273e13f0f0b91de372c847d6baac76e71f454a4a9938b02f54e391867d1fe"
+    },
+    {
+      "path": "assets/scene/chunk-c266f170c376ffab5bda.bin.gz",
+      "bytes": 68356,
+      "sha256": "c266f170c376ffab5bda0126fc6d4c149956b985b022435d5b60bdf9f769fab0"
+    },
+    {
+      "path": "assets/scene/chunk-c787c9432e6a957d153a.bin.gz",
+      "bytes": 129779,
+      "sha256": "c787c9432e6a957d153a917255f06f1ad4e8cbd77f5121f277944b94564ff64e"
+    },
+    {
+      "path": "assets/scene/chunk-c7be0f60cd8897ac891f.bin.gz",
+      "bytes": 12801,
+      "sha256": "c7be0f60cd8897ac891f89c37c353a9fd7db83edcf0f6a17a587d6a63051a376"
+    },
+    {
+      "path": "assets/scene/chunk-c859d64b2a9528d5dc06.bin.gz",
+      "bytes": 160792,
+      "sha256": "c859d64b2a9528d5dc0645e5f3ec573a19742d9ca2a6397455f0ef8350f6bcaf"
+    },
+    {
+      "path": "assets/scene/chunk-cb8edc378e5c8e166675.bin.gz",
+      "bytes": 65954,
+      "sha256": "cb8edc378e5c8e166675d0783fe43e8d623fa6527b19867ed95bb6d3a7f8bf19"
+    },
+    {
+      "path": "assets/scene/chunk-cbe2731c96de620ffd62.bin.gz",
+      "bytes": 10744,
+      "sha256": "cbe2731c96de620ffd621c1dd31a174165de7c7972557e421e44e8afdd05b26d"
+    },
+    {
+      "path": "assets/scene/chunk-ccc48790c92ebb0beb72.bin.gz",
+      "bytes": 154761,
+      "sha256": "ccc48790c92ebb0beb7226d477c639ade7c3c7100ef4bbdc368bf414ae29257f"
+    },
+    {
+      "path": "assets/scene/chunk-cd64c91f66b42ad86703.bin.gz",
+      "bytes": 67199,
+      "sha256": "cd64c91f66b42ad8670313ed78c0ed3c4bf896b091106d0a9e3a0e7022da109e"
+    },
+    {
+      "path": "assets/scene/chunk-cd952f185b4ede5916f8.bin.gz",
+      "bytes": 227961,
+      "sha256": "cd952f185b4ede5916f8c6c450ca203ff472c43242b0a972fac7f8740b0bcd1c"
+    },
+    {
+      "path": "assets/scene/chunk-cf9bb485bb39d04257f3.bin.gz",
+      "bytes": 349077,
+      "sha256": "cf9bb485bb39d04257f3019227e55bf0d1be9dc92cd09bf38619350d286eaaad"
+    },
+    {
+      "path": "assets/scene/chunk-d0f3be0b772677959015.bin.gz",
+      "bytes": 3141,
+      "sha256": "d0f3be0b772677959015a3186887db2b37d6ef196bc7e1c1fe5f336f0bf3bef8"
+    },
+    {
+      "path": "assets/scene/chunk-d342e84158b8d9fdcdc4.bin.gz",
+      "bytes": 10705,
+      "sha256": "d342e84158b8d9fdcdc4e4c7d3b2d4822eb3f4a370f4697a283a706b1eb655a5"
+    },
+    {
+      "path": "assets/scene/chunk-d5e05ff45f545f4f0cce.bin.gz",
+      "bytes": 41281,
+      "sha256": "d5e05ff45f545f4f0cce99bbc53e0130372d629413a703ebfd716cc4cabcd588"
+    },
+    {
+      "path": "assets/scene/chunk-d6b06fda3866cb34a2c6.bin.gz",
+      "bytes": 24816,
+      "sha256": "d6b06fda3866cb34a2c671457899fbea37af24051c2e371bb7d76cb5aa0b642e"
+    },
+    {
+      "path": "assets/scene/chunk-d8948cc43c13a13114c6.bin.gz",
+      "bytes": 12730,
+      "sha256": "d8948cc43c13a13114c6f1ab321cbb74537e53ac28be0538daf51ff2e3bc7e81"
+    },
+    {
+      "path": "assets/scene/chunk-d96eeb77d5bfa5f698d7.bin.gz",
+      "bytes": 33107,
+      "sha256": "d96eeb77d5bfa5f698d7891bbb236f83f5ec5b1024f764468471046283f9a6b2"
+    },
+    {
+      "path": "assets/scene/chunk-ddbeade6dfa0f519a01c.bin.gz",
+      "bytes": 65878,
+      "sha256": "ddbeade6dfa0f519a01c8876fb93a871a9c9a5074bdabc28f2048da8f23b23d0"
+    },
+    {
+      "path": "assets/scene/chunk-de7529523e641684dfc0.bin.gz",
+      "bytes": 27719,
+      "sha256": "de7529523e641684dfc0baed51ff08a81f14f8dba8bf6e291b75142fac0c0a1d"
+    },
+    {
+      "path": "assets/scene/chunk-df32a2d73b4efaa13918.bin.gz",
+      "bytes": 10743,
+      "sha256": "df32a2d73b4efaa13918f53483cebbbd52f5a2d7254f60dc9eb707a1ce747858"
+    },
+    {
+      "path": "assets/scene/chunk-dfbf55553b107decdf02.bin.gz",
+      "bytes": 100397,
+      "sha256": "dfbf55553b107decdf02f316f2b7e2641a9394d009c272a5c4e8a1c6c7f0fbab"
+    },
+    {
+      "path": "assets/scene/chunk-e0b9a9de7df23dcfa08a.bin.gz",
+      "bytes": 67967,
+      "sha256": "e0b9a9de7df23dcfa08aa1b6b4111cc4f9da16cc136f4ab93d118d387e0b76fb"
+    },
+    {
+      "path": "assets/scene/chunk-e22f10154a6db80696b4.bin.gz",
+      "bytes": 33783,
+      "sha256": "e22f10154a6db80696b4d4642513d7ca1c9f5bf91e5ac95a7a39410af42e8ada"
+    },
+    {
+      "path": "assets/scene/chunk-e268dc5b41289f86e354.bin.gz",
+      "bytes": 456636,
+      "sha256": "e268dc5b41289f86e354f91c9d896ec12409b671e65dfc4d6e7b0125debaa445"
+    },
+    {
+      "path": "assets/scene/chunk-e3260527a6e69d2c9834.bin.gz",
+      "bytes": 10773,
+      "sha256": "e3260527a6e69d2c98346b53701ea956478b9a929d9ccde6a3887563ec23afc2"
+    },
+    {
+      "path": "assets/scene/chunk-e46e63cdb730b38c9522.bin.gz",
+      "bytes": 47610,
+      "sha256": "e46e63cdb730b38c9522073b3217a47425575c2ffef1ccccc6903f968ca715bb"
+    },
+    {
+      "path": "assets/scene/chunk-e5821efc96bdf9a45eeb.bin.gz",
+      "bytes": 65790,
+      "sha256": "e5821efc96bdf9a45eebe8248defd58ea7de25eeff44e85a264f336743a59d0f"
+    },
+    {
+      "path": "assets/scene/chunk-e9e93b82dad113d118d2.bin.gz",
+      "bytes": 10716,
+      "sha256": "e9e93b82dad113d118d242c70ce3c0a7148cd3d142e8b2f40acbae89f2f2385e"
+    },
+    {
+      "path": "assets/scene/chunk-eb2249e7c02ade9d05c4.bin.gz",
+      "bytes": 25549,
+      "sha256": "eb2249e7c02ade9d05c4494d7b8debe8f967045acf90e9a87c93df46d95fc5e4"
+    },
+    {
+      "path": "assets/scene/chunk-ebe94ed665960ba7623f.bin.gz",
+      "bytes": 10727,
+      "sha256": "ebe94ed665960ba7623fecbb728e700cc8aa8f9b09c63342eba043a2791e827e"
+    },
+    {
+      "path": "assets/scene/chunk-ecc704e223475614e5d8.bin.gz",
+      "bytes": 11143,
+      "sha256": "ecc704e223475614e5d8b0b8cf0f857c342b6c1b235ddf659dd807c6e8a167e1"
+    },
+    {
+      "path": "assets/scene/chunk-f4d952ae3224883b9ba3.bin.gz",
+      "bytes": 12734,
+      "sha256": "f4d952ae3224883b9ba38927db18cdbf0f4241e2a21d4a7873019e7a9ea157d2"
+    },
+    {
+      "path": "assets/scene/chunk-f67304ce9b0dc5903743.bin.gz",
+      "bytes": 36520,
+      "sha256": "f67304ce9b0dc59037434ebefc1ad6955e5e804d82c33a71d333433cf44d793f"
+    },
+    {
+      "path": "assets/scene/chunk-f980de7e5e82c017c7be.bin.gz",
+      "bytes": 12939,
+      "sha256": "f980de7e5e82c017c7be3a4978a17e83d074690e9836e6458946ccc13dfdb00e"
+    },
+    {
+      "path": "assets/scene/chunk-f9e4e5227bd388015758.bin.gz",
+      "bytes": 12851,
+      "sha256": "f9e4e5227bd388015758c82dc13a5ff58c32f46c29ac9d452f95e46569db8282"
+    },
+    {
+      "path": "assets/scene/chunk-fa059db86a75f8bae17a.bin.gz",
+      "bytes": 162548,
+      "sha256": "fa059db86a75f8bae17a8ed183465145cc77603c7b7fd082b04c560306af202f"
+    },
+    {
+      "path": "assets/scene/chunk-fc00a4b1ce7b3b0aa70a.bin.gz",
+      "bytes": 694166,
+      "sha256": "fc00a4b1ce7b3b0aa70a8d3cbd849282de5ad65634a7b4dc1406c75cfb11d646"
+    },
+    {
+      "path": "assets/scene/chunk-fc537998b8b4d75cbc3f.bin.gz",
+      "bytes": 12847,
+      "sha256": "fc537998b8b4d75cbc3fa61522388e387e644a17edd24bff5fe3c422b0312ceb"
+    },
+    {
+      "path": "assets/scene/chunk-fc63a6b7655ba6c37bb0.bin.gz",
+      "bytes": 10703,
+      "sha256": "fc63a6b7655ba6c37bb083134935ccd2f1da405c6d3666d2093dfabd78f9eb08"
+    },
+    {
+      "path": "assets/scene/chunk-fcdd5a1ff6a8da57698d.bin.gz",
+      "bytes": 10773,
+      "sha256": "fcdd5a1ff6a8da57698d13f9fadb7f44fe319116f0e9d4504cf1dc9ff082ec67"
+    },
+    {
+      "path": "assets/scene/chunk-fe540a3c98072fc4fabb.bin.gz",
+      "bytes": 10737,
+      "sha256": "fe540a3c98072fc4fabb4601e305bb5ecfa0cc79250a5547553ab9b8b480032c"
+    },
+    {
+      "path": "assets/scene/index.json",
+      "bytes": 1707935,
+      "sha256": "539e94408d7ac2b13750a5d37a9476a0a3c7c86b42b050b3e65fef93a64c6030"
+    },
+    {
       "path": "assets/shell_diff.jpg",
       "bytes": 361534,
       "sha256": "d7a1d83ab19ec313bea0bbfa434f92e2ed091ac54f429cd4b7b7ee55bd179e74"
@@ -259,13 +1149,13 @@
     },
     {
       "path": "build.py",
-      "bytes": 3704,
-      "sha256": "5b406d6fd8e07afffa8e0e1e0a32275b70fa211fd1a27005e602462e998b58f6"
+      "bytes": 3894,
+      "sha256": "6d4b6d4d9b247dd6d3ff03008e6c35272a8b34752a0650528d442ec6ed57d101"
     },
     {
       "path": "index.html",
-      "bytes": 12257,
-      "sha256": "4f864063120014da36ce325418caae1604e19c0839cf071c4d84af35ec1b4cd2"
+      "bytes": 12310,
+      "sha256": "fabad6fa621beed51bce0478e293d6d9bf5870b93bfb521b9697d62dd9c946ac"
     },
     {
       "path": "music/blue_silence.mp3",
@@ -288,6 +1178,11 @@
       "sha256": "be10fce6521292b8c7fe3b2dcdda3d45b01d6690826535434c47d695d6701a6e"
     },
     {
+      "path": "partition_scene.cjs",
+      "bytes": 3305,
+      "sha256": "82e90cadec66186a91827ad017d0492043c90121785a63004797c77057128dbb"
+    },
+    {
       "path": "src/abyss_fauna.js",
       "bytes": 21770,
       "sha256": "ff6b1e82a83e2f9e5f5245489ee4b1dc5c3994e3469ec885e2cd187a86ebaca4"
@@ -299,8 +1194,8 @@
     },
     {
       "path": "src/app.js",
-      "bytes": 69551,
-      "sha256": "7db9d93d62aa6747d7c97e91923ec4dea883226018fc0169b50cdc40621ba31b"
+      "bytes": 72434,
+      "sha256": "9485423d2bd4ea46fb2d59b9fbcef169655f0e6c8fa2f932fc89c110a9b9760b"
     },
     {
       "path": "src/aquarium.js",
@@ -329,8 +1224,8 @@
     },
     {
       "path": "src/config.js",
-      "bytes": 2607,
-      "sha256": "cd8fe6116409fbf6aebf6659691cf947dc5a9e0bd455b51d351c9adb6bb710ab"
+      "bytes": 2662,
+      "sha256": "9724f9c8c2f941bc6c6b0743c6a93649b113cf745ba7c9f6cdd9a736f2530032"
     },
     {
       "path": "src/deepsea.js",
@@ -344,8 +1239,8 @@
     },
     {
       "path": "src/engine.js",
-      "bytes": 87618,
-      "sha256": "4bbe62af159909023b79a9d6fea5de68ac9eec654d4eb75efade914f3ea55037"
+      "bytes": 92692,
+      "sha256": "dc8b8a6e1d90265d901ca675e98adbde0a975ca2110dbf8f11904877c95868a5"
     },
     {
       "path": "src/expedition.js",
@@ -374,8 +1269,8 @@
     },
     {
       "path": "src/individuals.js",
-      "bytes": 32766,
-      "sha256": "7840869333f167a6610720a0da9e781d94aba030037e020897504e798e78e0f0"
+      "bytes": 33476,
+      "sha256": "b035517dfa2260f6d732c09651b52a0c608f6e6b7b62ccff45a9ab311b2312d0"
     },
     {
       "path": "src/microcosm.js",
@@ -434,8 +1329,13 @@
     },
     {
       "path": "src/scene_cache.js",
-      "bytes": 2971,
-      "sha256": "e49a818570b4db0d5346b1f8bd24f3e861e49d435601a05809a25b0996b49bee"
+      "bytes": 4104,
+      "sha256": "1e253556aa1057b196858516811b0638291130380e1ddc96cb06266b4a1c13c5"
+    },
+    {
+      "path": "src/scene_stream.js",
+      "bytes": 9298,
+      "sha256": "a3426125365f5333a0965c9faa90a479307640a9b2e8a5b219b823ab7602cae9"
     },
     {
       "path": "src/seasons.js",
@@ -450,7 +1350,7 @@
     {
       "path": "src/shell.html",
       "bytes": 10246,
-      "sha256": "0a1bda976ec6749ce19c3d55ae80dbae816d2c85fe4bf60c913de29dee64d55d"
+      "sha256": "273a21e9d86d86486e6bfc8cabd36b2ecebfcd5a3ecae86dd8c66e96cc152d57"
     },
     {
       "path": "src/ship.js",
@@ -469,8 +1369,8 @@
     },
     {
       "path": "src/trench.js",
-      "bytes": 13344,
-      "sha256": "fa2e491138fcb28e55a1ad0517170cca77e6c42d3cfc671b1cf66d237cf9fe50"
+      "bytes": 13871,
+      "sha256": "7db31084574da566abc740747125fabde960ecb7695a79fbaef4ecccffff0154"
     },
     {
       "path": "src/trench_fauna.js",
@@ -484,8 +1384,8 @@
     },
     {
       "path": "src/voyage.js",
-      "bytes": 37594,
-      "sha256": "b4dabf9dae48c2de6e000491d6cc4486fa627f38543b761b47cff4c297742b81"
+      "bytes": 37748,
+      "sha256": "65e34e801aa8f697cd8a44fa51f748a1b6581187f402a6b6b3b8c1e667058da5"
     },
     {
       "path": "src/world.js",
