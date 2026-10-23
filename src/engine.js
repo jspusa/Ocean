@@ -815,7 +815,7 @@ float lb=L(b);frag=vec4(lb<lo||lb>hi?a:b,1.);
 // These common surfaces keep the original arithmetic while allowing the
 // compiler to remove every unrelated rig and material branch ahead of play.
 function surfaceShaderSource(source,kind,material){
- if(!((kind===0&&(material===2||material===3))||(kind===1&&material===6)))throw new RangeError('Unsupported surface shader');
+ if(!((kind===0&&(material===1||material===2||material===3))||(kind===1&&material===6)))throw new RangeError('Unsupported surface shader');
  for(const [name,value]of [['uKind',kind],['uMat',material]]){
   const declaration='uniform int '+name+';';if(!source.includes(declaration))throw new Error('Missing surface shader uniform: '+name);
   source=source.replace(declaration,'const int '+name+'='+value+';');
@@ -838,13 +838,14 @@ class Renderer{
  setupSurfacePrograms(){
   if(this.surfacePrograms)return this.surfacePrograms;
   const programs=this.surfacePrograms=new Map();this.surfaceProgramFailures=new Map();
-  for(const [kind,material]of [[0,2],[0,3],[1,6]]){const key=kind+':'+material;
+  for(const [kind,material]of [[0,1],[0,2],[0,3],[1,6]]){const key=kind+':'+material;
    try{programs.set(key,this.makeProgram(surfaceShaderSource(VS,kind,material),surfaceShaderSource(FS,kind,material)));}
    catch(error){this.surfaceProgramFailures.set(key,String(error?.message||error));}
   }return programs;
  }
  surfaceProgram(b){
   const programs=this.surfacePrograms;if(!programs)return this.program;
+  if(b.kind===0&&b.material===1)return programs.get('0:1')||this.program;
   if(b.kind===0&&b.material===2)return programs.get('0:2')||this.program;
   if(b.kind===0&&b.material===3)return programs.get('0:3')||this.program;
   if(b.kind===1&&b.material===6)return programs.get('1:6')||this.program;
@@ -1022,8 +1023,11 @@ class Renderer{
  resize(){
   const g=this.gl;this.dirty=true;this.width=innerWidth;this.height=innerHeight;
   const cap=this.quality===2?2:this.quality===1?1.5:1;const dpr=Math.min(devicePixelRatio||1,cap);
-  let scale=(this.quality===0?.82:1)*this.dynamicScale;let w=Math.max(2,Math.round(this.width*dpr*scale)),h=Math.max(2,Math.round(this.height*dpr*scale));
+  const scale=this.quality===0?.82:1;let w=Math.max(2,Math.round(this.width*dpr*scale)),h=Math.max(2,Math.round(this.height*dpr*scale));
   const areaLimit=this.mobile?3000000:8000000;if(w*h>areaLimit){const ratio=Math.sqrt(areaLimit/(w*h));w=Math.floor(w*ratio);h=Math.floor(h*ratio);}const max=this.maxTextureSize;if(w>max||h>max){const s=max/Math.max(w,h);w=Math.floor(w*s);h=Math.floor(h*s);}
+  // Adapt the framebuffer the device can actually draw. Scaling before the
+  // caps leaves large/DPR-heavy views pinned at the same pixel workload.
+  w=Math.max(2,Math.round(w*this.dynamicScale));h=Math.max(2,Math.round(h*this.dynamicScale));
   if(w===this.canvas.width&&h===this.canvas.height&&this.sceneFBO&&this.lastQuality===this.quality)return;
   this.lastQuality=this.quality;this.canvas.width=w;this.canvas.height=h;
   const dispose=(fb,...tx)=>{if(fb)g.deleteFramebuffer(fb);for(const t of tx)if(t)g.deleteTexture(t);};

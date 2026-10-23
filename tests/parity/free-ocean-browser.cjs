@@ -8,7 +8,7 @@ const url=process.argv.find(x=>/^https?:/.test(x))||'http://127.0.0.1:8000/';
 const root=path.resolve(__dirname,'../..'),out=path.join(root,'qa/parity');fs.mkdirSync(out,{recursive:true});const results=[],errors=[];
 const check=(name,value,detail)=>{results.push({name,pass:!!value,detail});console.log((value?'PASS ':'FAIL ')+name);};
 const modes=[{id:'desktop',width:1100,height:740,touch:false},{id:'portrait',width:390,height:844,touch:true},{id:'landscape',width:844,height:390,touch:true}].filter(m=>!process.argv.some(a=>['--desktop','--portrait','--landscape'].includes(a))||process.argv.includes('--'+m.id));
-(async()=>{const browser=await pw.chromium.launch({executablePath:process.env.CHROME_PATH||'/usr/bin/chromium',headless:true,args:['--no-sandbox','--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader']});
+(async()=>{const browser=await pw.chromium.launch(require('./browser-launch.cjs')());
  try{for(const m of modes){
   const context=await browser.newContext({viewport:{width:m.width,height:m.height},deviceScaleFactor:1,isMobile:m.touch,hasTouch:m.touch}),page=await context.newPage();page.setDefaultTimeout(60000);
   page.on('pageerror',e=>errors.push({mode:m.id,message:e.message}));
@@ -57,6 +57,6 @@ const modes=[{id:'desktop',width:1100,height:740,touch:false},{id:'portrait',wid
    check('hadal rendering keeps lamp and no GL error',await page.evaluate(()=>renderer.lamp&&!renderer.submersible&&renderer.gl.getError()===0));
   }
   await context.close();
- }}finally{await browser.close();check('no browser runtime errors',errors.length===0,errors);fs.writeFileSync(path.join(out,'free-ocean-browser.json'),JSON.stringify({results,errors},null,2));}
+ }}finally{await browser.close();check('no browser runtime errors',errors.length===0,errors);fs.writeFileSync(path.join(out,'free-ocean-browser.json'),JSON.stringify({gpuMode:process.env.NATIVE_GPU==='1'?'native':'software',results,errors},null,2));}
  if(results.some(r=>!r.pass))process.exitCode=1;
 })().catch(e=>{console.error(e);process.exitCode=1;});

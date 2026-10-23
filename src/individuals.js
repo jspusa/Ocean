@@ -165,17 +165,28 @@ const abyssAhead=[0,0,0],abyssBehind=[0,0,0];
 // sample. Reuse the exact directions instead of recomputing them per pose.
 const faunaFloorDirections=Array.from({length:9},(_,i)=>{const a=i*(Math.PI*2)/8;return [Math.cos(a),Math.sin(a)];});
 function abyssEnvelope(f){const sp=SPECIES[f.species],b=sp.modelBounds,s=f.s[0],hx=Math.max(Math.abs(b.min[0]),Math.abs(b.max[0])),hz=Math.max(Math.abs(b.min[2]),Math.abs(b.max[2])),crawl=sp.traits.motion==='crawl',bend=crawl?0:s*(hx*.10+.018);return {horizontal:s*Math.hypot(hx,hz)+.025+s*.02,bottom:Math.max(0,-b.min[1]*s)+bend,top:b.max[1]*s+bend};}
-function abyssTrajectory(f,time,out,context=null){
- const sp=SPECIES[f.species],profile=sp.motionProfile,home=f.home||f.center,phase=f.phase??f.bob??0,exhibit=!!context?.exhibit,hull=abyssEnvelope(f),crawl=sp.traits.motion==='crawl';
- let radius=Math.max(0,Math.min(Number.isFinite(f.radius)?f.radius:profile.radius,profile.radius));
+const abyssPathCache=new WeakMap(),abyssStaticWorlds=new WeakMap();
+function abyssPath(f,context=null){
+ const sp=SPECIES[f.species],profile=sp.motionProfile,home=f.home||f.center,b=sp.modelBounds,scale=f.s[0],requested=Number.isFinite(f.radius)?f.radius:profile.radius,crawl=sp.traits.motion==='crawl',exhibit=!!context?.exhibit,world=typeof OceanRegions!=='undefined'?OceanRegions:null;
+ // Explicit contexts may supply changing solids or callbacks. Only the deeply
+ // frozen world catalogue can share its home-centred avoidance calculation.
+ let cacheable=!context;
+ if(cacheable&&world){let fixed=abyssStaticWorlds.get(world);if(fixed===undefined){fixed=Object.isFrozen(world)&&Object.isFrozen(world.solids)&&Array.isArray(world.solids)&&world.solids.every(box=>Object.isFrozen(box)&&Object.isFrozen(box.min)&&Object.isFrozen(box.max));abyssStaticWorlds.set(world,fixed);}cacheable=fixed;}
+ const cached=cacheable&&abyssPathCache.get(f);
+ if(cached&&cached.world===world&&cached.species===sp&&cached.x===home[0]&&cached.y===home[1]&&cached.z===home[2]&&cached.scale===scale&&cached.requested===requested&&cached.limit===profile.radius&&cached.bob===profile.bob&&cached.crawl===crawl&&cached.minX===b.min[0]&&cached.minY===b.min[1]&&cached.minZ===b.min[2]&&cached.maxX===b.max[0]&&cached.maxY===b.max[1]&&cached.maxZ===b.max[2])return cached;
+ const hull=abyssEnvelope(f);let radius=Math.max(0,Math.min(requested,profile.radius));
  if(exhibit)radius=Math.min(radius,crawl?.30:1.15);
  else{
   const reach=Math.max(radius+hull.horizontal+.04,hull.bottom+.04,hull.top+profile.bob+.04);
-  const solids=context?.solids||(typeof OceanRegions!=='undefined'?(OceanRegions.nearbySolids?OceanRegions.nearbySolids(home,reach):OceanRegions.solids):[]);
+  const solids=context?.solids||(world?(world.nearbySolids?world.nearbySolids(home,reach):world.solids):[]);
   // Reserve a circle around the home for every heading, including the entire
   // eight-metre squid. Keeping a single safe radius avoids obstacle teleports.
   for(const box of solids||[]){if(box.max[1]<=home[1]-hull.bottom-.04||box.min[1]>=home[1]+hull.top+profile.bob+.04)continue;const dx=Math.max(box.min[0]-home[0],0,home[0]-box.max[0]),dz=Math.max(box.min[2]-home[2],0,home[2]-box.max[2]);radius=Math.min(radius,Math.max(0,Math.hypot(dx,dz)-hull.horizontal-.04));}
  }
+ const path={world,species:sp,x:home[0],y:home[1],z:home[2],scale,requested,limit:profile.radius,bob:profile.bob,crawl,minX:b.min[0],minY:b.min[1],minZ:b.min[2],maxX:b.max[0],maxY:b.max[1],maxZ:b.max[2],radius,hull};if(cacheable)abyssPathCache.set(f,path);return path;
+}
+function abyssTrajectory(f,time,out,context=null){
+ const sp=SPECIES[f.species],profile=sp.motionProfile,home=f.home||f.center,phase=f.phase??f.bob??0,exhibit=!!context?.exhibit,{hull,radius}=abyssPath(f,context),crawl=sp.traits.motion==='crawl';
  const omega=profile.speed/Math.max(.2,radius)*(exhibit?.40:1),a=time*omega+phase,x=Math.sin(a)*radius,z=Math.sin(a*.73)*radius*.42,yaw=f.homeYaw||0,c=Math.cos(yaw),s=Math.sin(yaw);
  out[0]=home[0]+c*x+s*z;out[2]=home[2]-s*x+c*z;
  let y=home[1]+(crawl?0:Math.sin(a*.61+phase)*profile.bob*(exhibit?.45:1));

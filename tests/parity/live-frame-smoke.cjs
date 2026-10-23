@@ -6,7 +6,7 @@ const fs=require('node:fs'),path=require('node:path'),assert=require('node:asser
 const pw=require(process.env.PLAYWRIGHT_PATH||'playwright');
 const url=process.argv.find(s=>/^https?:/.test(s))||'http://127.0.0.1:8000/';
 (async()=>{
- const browser=await pw.chromium.launch({executablePath:process.env.CHROME_PATH||'/usr/bin/chromium',headless:true,args:['--no-sandbox','--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader']});
+ const browser=await pw.chromium.launch(require('./browser-launch.cjs')());
  const rows=[],errors=[];
  try{for(const touch of [false,true]){
   const context=await browser.newContext({viewport:touch?{width:240,height:320}:{width:320,height:240},deviceScaleFactor:1,isMobile:touch,hasTouch:touch}),page=await context.newPage();page.on('pageerror',e=>errors.push(e.message));
@@ -23,6 +23,6 @@ const url=process.argv.find(s=>/^https?:/.test(s))||'http://127.0.0.1:8000/';
   assert.equal(row.frames.length,6);for(let i=1;i<row.frames.length;i++){assert(row.frames[i].ms>row.frames[i-1].ms);assert(row.frames[i].t>row.frames[i-1].t);assert(row.frames[i].frame>row.frames[i-1].frame);}
   assert(Math.hypot(...row.frames.at(-1).p.map((v,i)=>v-row.start.p[i]))>.01,'Real rendered movement must advance');assert.notDeepEqual(row.frames[0].animal,row.frames.at(-1).animal,'Actual animals must animate');
   rows.push({touch,...row});console.log('PASS '+(touch?'touch profile':'desktop')+' six actual RAF/WebGL frames with continuous swimming and animal motion');await context.close();
- }}finally{await browser.close();const out=path.resolve(__dirname,'../../qa/parity/live-frame-smoke.json');fs.mkdirSync(path.dirname(out),{recursive:true});fs.writeFileSync(out,JSON.stringify({url,method:'Unfrozen application RAF and real renderer, six consecutive frames per profile, held movement fixture, no render spy or forced frame timestamps. Software GPU; not physical-device FPS or touch-input certification.',rows,errors},null,2));}
+ }}finally{await browser.close();const out=path.resolve(__dirname,'../../qa/parity/live-frame-smoke.json');fs.mkdirSync(path.dirname(out),{recursive:true});fs.writeFileSync(out,JSON.stringify({url,gpuMode:process.env.NATIVE_GPU==='1'?'native':'software',method:'Unfrozen application RAF and real renderer, six consecutive frames per profile, held movement fixture, no render spy or forced frame timestamps. Six-frame smoke check; not a device FPS benchmark or touch-input certification.',rows,errors},null,2));}
  assert.deepEqual(errors,[]);
 })().catch(e=>{console.error(e);process.exitCode=1;});

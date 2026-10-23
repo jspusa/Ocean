@@ -9,20 +9,24 @@ const oceanSelection=(()=>{
  const canvas=()=>$('ocean');
  const exclusive=()=>!!(typeof oceanMicrocosm!=='undefined'&&oceanMicrocosm.isViewing())||oceanFeatures.pointerCaptured()||!!(typeof oceanExploration!=='undefined'&&oceanExploration.penMode);
  const allowed=()=>active&&!modal&&!photoOpen&&!voyage.photoMode&&!document.hidden&&!document.body.classList.contains('cinematic');
- function valid(f,fromLife=false){
-  if(!f||!f.uid||(!fromLife&&life.find(x=>x.uid===f.uid)!==f)||f.ecologyPresent===false||f.retreat>.8||(f.faunaVisibility??1)<.8)return false;
-  const sp=SPECIES[f.species];if(!sp)return false;const point=animalFocusPoint(f),traits=speciesTraits(f.species),distance=V.dist(player.p,point),clearance=sp.fauna?.001:.13;
-  if(distance>traits.observeDistance||V.dist(eye,point)>traits.observeDistance+V.dist(eye,player.p)+2||blocked(eye,point,clearance)||blocked(player.p,point,clearance))return false;
-  const p=project(point,renderer.vp);return p.every(Number.isFinite)&&p[2]>0&&Math.abs(p[0])<1&&Math.abs(p[1])<1;
+ function projectedCandidate(f,fromLife=false){
+  if(!f||!f.uid||(!fromLife&&life.find(x=>x.uid===f.uid)!==f)||f.ecologyPresent===false||f.retreat>.8||(f.faunaVisibility??1)<.8)return null;
+  const sp=SPECIES[f.species];if(!sp)return null;const point=animalFocusPoint(f),traits=speciesTraits(f.species),distance=V.dist(eye,point);
+  if(V.dist(player.p,point)>traits.observeDistance||distance>traits.observeDistance+V.dist(eye,player.p)+2)return null;
+  const p=project(point,renderer.vp);if(!p.every(Number.isFinite)||p[2]<=0||Math.abs(p[0])>=1||Math.abs(p[1])>=1)return null;
+  return {point,p,distance,traits,clearance:sp.fauna?.001:.13};
  }
- function disc(f){
-  const bounds=canvas().getBoundingClientRect(),point=animalFocusPoint(f),p=project(point,renderer.vp),distance=Math.max(.005,V.dist(eye,point)),radius=speciesTraits(f.species).targetRadius;
+ function clearSight(view){return !blocked(eye,view.point,view.clearance)&&!blocked(player.p,view.point,view.clearance);}
+ function valid(f,fromLife=false){const view=projectedCandidate(f,fromLife);return !!view&&clearSight(view);}
+ function disc(f,bounds=canvas().getBoundingClientRect(),view=null){
+  const point=view?view.point:animalFocusPoint(f),p=view?view.p:project(point,renderer.vp),distance=Math.max(.005,view?view.distance:V.dist(eye,point)),radius=(view?view.traits:speciesTraits(f.species)).targetRadius;
   const physical=bounds.height*radius/(2*distance*Math.tan((renderer.photoFov||renderer.fov||69)*Math.PI/360));
   return {x:bounds.left+(p[0]*.5+.5)*bounds.width,y:bounds.top+(.5-p[1]*.5)*bounds.height,r:clamp(physical,matchMedia('(pointer:coarse)').matches?22:14,110),distance};
  }
  function pick(x,y){
   if(!allowed()||exclusive())return null;let best=null,score=Infinity;
-  for(const f of life){if(!valid(f,true))continue;const d=disc(f),offset=Math.hypot(x-d.x,y-d.y);if(offset>d.r)continue;const value=offset/d.r+d.distance*.015;if(value<score){best=f;score=value;}}
+  const bounds=canvas().getBoundingClientRect();
+  for(const f of life){const view=projectedCandidate(f,true);if(!view)continue;const d=disc(f,bounds,view),offset=Math.hypot(x-d.x,y-d.y);if(offset>d.r)continue;const value=offset/d.r+d.distance*.015;if(value<score&&clearSight(view)){best=f;score=value;}}
   return best;
  }
  function clear(){selected=null;hovered=null;source=null;focusFish=null;focusId=null;focusSeconds=0;$('focusCard')?.classList.add('hidden');$('selectionMarker')?.classList.add('hidden');}

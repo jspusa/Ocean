@@ -260,14 +260,16 @@ const oceanEcology=(()=>{
  }
  function afterLife(time){
   const dt=clamp(time-(runtime.lastTime??time-1/60),0,.1);runtime.lastTime=time;runtime.now=time;
-  runtime.food=runtime.food.filter(c=>time-c.born<8);
-  for(const f of life){if(!speciesTraits(f.species).feedable)continue;let cloud=null,distance=7;
+  if(runtime.food.length)runtime.food=runtime.food.filter(c=>time-c.born<8);
+  // Without food or a returning animal, this pass has no pose/state effects.
+  // Partner movement and contact responses below still run every update.
+  if(runtime.food.length||runtime.reactions.size)for(const f of life){if(!speciesTraits(f.species).feedable)continue;let cloud=null,distance=7;
    for(const c of runtime.food){const d=V.dist(f.p,c.p);if(d<distance&&!blocked(f.p,c.p)){distance=d;cloud=c;}}
    let current=runtime.reactions.get(f.uid);
    if(cloud){current=current||f.p.slice();const phase=(f.bioSeed||1)%97+time*.7,target=V.add(cloud.p,[Math.sin(phase)*.48,-.08+Math.cos(phase*1.3)*.20,Math.cos(phase)*.48]);const next=moveToward(current,target,1.05,dt);runtime.reactions.set(f.uid,next);const d=V.sub(next,current);f.p=next.slice();if(V.len(d)>.0001)f.yaw=Math.atan2(-d[2],d[0]);f.effort=.82;
    }else if(current){const next=moveToward(current,f.p,1.4,dt);if(V.dist(next,f.p)<.04)runtime.reactions.delete(f.uid);else {runtime.reactions.set(f.uid,next);f.p=next.slice();}}
   }
-  if(runtime.foodBatch){runtime.foodBatch.visible=runtime.food.length>0;for(let i=0;i<runtime.foodNodes.length;i++){const f=runtime.foodNodes[i],c=runtime.food[Math.floor(i/24)];if(!c){f.p=[0,-500,0];continue;}const age=time-c.born,a=i*2.39996+age*.42,r=.06+((i%24)/24)*(.18+age*.038);f.p=[c.p[0]+Math.cos(a)*r,c.p[1]-.026*age+.09*Math.sin(a*1.4),c.p[2]+Math.sin(a)*r];}}
+  if(runtime.foodBatch){runtime.foodBatch.visible=runtime.food.length>0;for(let i=0;i<runtime.foodNodes.length;i++){const f=runtime.foodNodes[i],c=runtime.food[Math.floor(i/24)];if(!c){if(f.p[0]!==0||f.p[1]!==-500||f.p[2]!==0)f.p=[0,-500,0];continue;}const age=time-c.born,a=i*2.39996+age*.42,r=.06+((i%24)/24)*(.18+age*.038);f.p=[c.p[0]+Math.cos(a)*r,c.p[1]-.026*age+.09*Math.sin(a*1.4),c.p[2]+Math.sin(a)*r];}}
   movePartner(time,dt);
   for(const [uid,contact] of runtime.lastContact){const age=time-contact.time,f=fishByUID(uid);if(age>2.4||!f){runtime.lastContact.delete(uid);continue;}if(contact.kind==='stroke'){f.effort=.25;f.bank=Math.sin(age*3)*.06;}else {f.pitch=(f.pitch||0)+Math.sin(age*9)*.12*Math.exp(-age*3);f.effort=.7;}}
 

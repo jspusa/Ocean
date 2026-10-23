@@ -10,6 +10,10 @@ const existingOnly=process.argv.includes('--existing-content-only');
 const unchangedWork=process.argv.includes('--unchanged-work');
 // Specialization may increase uniforms; preserve geometry, pixels and cadence.
 const sameGeometry=process.argv.includes('--same-geometry');
+// Native Metal constant folding can move the final 8-bit result by one step.
+// Explicit opt-in only; historical exact-byte software checks remain exact.
+const compilerRounding=process.argv.includes('--compiler-rounding');
+assert(!compilerRounding||(process.env.NATIVE_GPU==='1'&&sameGeometry),'Compiler rounding requires native GPU and unchanged geometry');
 assert.ok(!(unchangedWork&&sameGeometry),'Choose either unchanged-work or same-geometry');
 const errors=[],profiles=[{id:'desktop',mobile:false,quality:2},{id:'mobile',mobile:true,quality:1}];
 const commonViews=[{id:'reef',p:[0,-8,7],aim:[0,-8,-10]},{id:'offshore',p:[390,-32,-184],aim:[390,-32,-210]},{id:'hadal',p:[766,-7000,-120],aim:[766,-7000,-145]}];
@@ -70,7 +74,7 @@ async function capture(browser,url,label){
  return rows;
 }
 (async()=>{
- const browser=await pw.chromium.launch({executablePath:process.env.CHROME_PATH||'/usr/bin/chromium',headless:true,args:['--no-sandbox','--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader']});
+ const browser=await pw.chromium.launch(require('./browser-launch.cjs')());
  let original,candidate;
  try{
   original=process.argv.includes('--reuse-baseline')?JSON.parse(fs.readFileSync(baselinePath)).rows:await capture(browser,originalURL,'original');
@@ -87,12 +91,13 @@ async function capture(browser,url,label){
   for(let i=0;i<a.length;i++){if(i%4!==3){min=Math.min(min,a[i]);max=Math.max(max,a[i]);}const delta=Math.abs(a[i]-b[i]);if(delta)differingChannels++;maxDifference=Math.max(maxDifference,delta);sumDifference+=delta;}
   return {profile:before.profile,scene:before.scene,before:summarize(before),after:summarize(after),pixels:{differingChannels,maxDifference,meanDifference:sumDifference/a.length,originalRange:max-min}};
  });
- fs.mkdirSync(path.dirname(out),{recursive:true});fs.writeFileSync(out,JSON.stringify({existingContentOnly:existingOnly,unchangedWork,sameGeometry,method:'Same fixed camera/time, quality, MSAA and framebuffer. Exact readPixels comparison on one software WebGL renderer, plus real animate() at controlled 120 Hz with a render spy. Work counts are not FPS or power measurements.'+(existingOnly?' New reef-fish-expansion batches are hidden for the pre-existing content comparison; new fish require separate visual verification.':''),comparisons,errors},null,2));
+ fs.mkdirSync(path.dirname(out),{recursive:true});fs.writeFileSync(out,JSON.stringify({existingContentOnly:existingOnly,unchangedWork,sameGeometry,compilerRounding,gpuMode:process.env.NATIVE_GPU==='1'?'native':'software',method:'Same fixed camera/time, quality, MSAA and framebuffer. Exact readPixels comparison on the selected WebGL renderer, plus real animate() at controlled 120 Hz with a render spy. Work counts are not FPS or power measurements.'+(existingOnly?' New reef-fish-expansion batches are hidden for the pre-existing content comparison; new fish require separate visual verification.':''),comparisons,errors},null,2));
  assert.equal(errors.length,0,errors.join('; '));
  for(const row of comparisons){
   assert.equal(row.before.gl,0);assert.equal(row.after.gl,0);assert.ok(row.pixels.originalRange>20,'Original image must contain visible contrast');
   for(const key of ['profile','scene','quality','msaaSamples','resolution','volumeResolution'])assert.deepEqual(row.after[key],row.before[key],key+' must remain unchanged');
-  assert.equal(row.pixels.differingChannels,0,'Rendered pixels must remain identical: '+row.profile+'/'+row.scene);
+  if(compilerRounding){assert(row.pixels.maxDifference<=1,'Native compiler delta exceeds 1/255');assert(row.pixels.differingChannels/(row.after.resolution[0]*row.after.resolution[1]*4)<.0001,'Native compiler rounding affects too many channels');}
+  else assert.equal(row.pixels.differingChannels,0,'Rendered pixels must remain identical: '+row.profile+'/'+row.scene);
   assert.ok(row.after.uploadCalls<=row.before.uploadCalls,'GPU upload calls must not increase');
   if(!sameGeometry)assert.ok(row.after.uniformCalls<=row.before.uniformCalls,'GPU uniform calls must not increase');
   if(sameGeometry)for(const key of ['triangles','drawCalls','shadowDraws','uploadCalls','uploadBytes'])assert.equal(row.after[key],row.before[key],key+' must remain unchanged for shader specialization');
@@ -106,7 +111,7 @@ async function capture(browser,url,label){
    }
    console.log('PASS unchanged cadence and swimming '+row.profile);
   }
-  console.log('PASS identical pixels '+row.profile+'/'+row.scene+'; uploads '+row.before.uploadCalls+' -> '+row.after.uploadCalls);
+  console.log('PASS '+(compilerRounding?'bounded native rounding ('+row.pixels.differingChannels+' channels)':'identical pixels')+' '+row.profile+'/'+row.scene+'; uploads '+row.before.uploadCalls+' -> '+row.after.uploadCalls);
  }
  if(!unchangedWork&&!sameGeometry)assert.ok(comparisons.some(row=>row.after.uploadCalls<row.before.uploadCalls),'Expected a measured reduction in redundant uploads');
 })().catch(error=>{console.error(error);process.exitCode=1;});
