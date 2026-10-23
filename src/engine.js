@@ -853,7 +853,18 @@ class Renderer{
    a[j++]=genes[0];a[j++]=genes[1];a[j++]=genes[2];a[j++]=genes[3];
    a[j++]=i.bank||0;a[j++]=i.effort??.7;a[j++]=(b.kind===9||b.kind===7)?clamp(i.partnerFinPulse||0,0,1):(i.finWear||0);a[j++]=b.kind===8?1-clamp(i.faunaVisibility??(1-(i.retreat||0)),0,1):b.kind===9?(i.cetaceanBeat||2.3):b.kind===10?(i.abyssBeat||1.7):b.kind===11?(i.trenchBeat||1.6):0;
   }
-  b.drawCount=j/24;if(j){this.gl.bindBuffer(this.gl.ARRAY_BUFFER,b.ib);this.gl.bufferSubData(this.gl.ARRAY_BUFFER,0,a,0,j);}
+  b.drawCount=j/24;if(!j)return;
+  if(!b.dynamic){
+   // Compare the actual Float32 payload against the last GPU upload, not a
+   // camera key: shadows pack a different visible set, and scene features can
+   // move static instances. The shared buffer must match whichever pass drew last.
+   let uploaded=b._uploadedData,changed=!uploaded||b._uploadSource!==a||b._uploadBuffer!==b.ib||j>b._uploadedLength;
+   if(!changed)for(let k=0;k<j;k++)if(a[k]!==uploaded[k]){changed=true;break;}
+   if(!changed)return;
+   if(!uploaded||uploaded.length!==a.length)uploaded=b._uploadedData=new Float32Array(a.length);
+   uploaded.set(a);b._uploadedLength=j;b._uploadSource=a;b._uploadBuffer=b.ib;
+  }else b._uploadedData=null;
+  this.gl.bindBuffer(this.gl.ARRAY_BUFFER,b.ib);this.gl.bufferSubData(this.gl.ARRAY_BUFFER,0,a,0,j);
  }
  drawBatch(b){this.gl.bindVertexArray(b.vao);this.gl.drawElementsInstanced(this.gl.TRIANGLES,b.count,b.indexType,0,b.drawCount);this.drawCalls++;}
  frustum(vp){let p=[];for(let a=0;a<3;a++)for(let sign of [-1,1]){let q=[vp[3]+sign*vp[a],vp[7]+sign*vp[4+a],vp[11]+sign*vp[8+a],vp[15]+sign*vp[12+a]],n=Math.hypot(q[0],q[1],q[2]);p.push(q.map(x=>x/n));}return p;}
@@ -920,10 +931,11 @@ class Renderer{
   const format=this.floatColor?g.RGBA16F:g.RGBA8;
   const color=Array.from(g.getInternalformatParameter(g.RENDERBUFFER,format,g.SAMPLES)||[]);
   const depth=Array.from(g.getInternalformatParameter(g.RENDERBUFFER,g.DEPTH_COMPONENT24,g.SAMPLES)||[]);
-  const preferred=this.quality===2?4:this.quality===1?2:0;
+  // Mobile balanced uses the existing final FXAA pass without an extra
+  // multisampled colour/depth target or resolve. Explicit high keeps 4x MSAA.
+  const preferred=this.quality===2?4:this.quality===1&&!this.mobile?2:0;
   const options=color.filter(n=>n>0&&n<=preferred&&depth.includes(n)).sort((a,b)=>b-a);
-  // Some implementations expose 4x but not 2x; stay at the advertised sample count.
-  if(preferred===2&&!options.length&&color.includes(4)&&depth.includes(4))options.push(4);
+  // Do not silently double the balanced budget when a GPU exposes only 4x.
   for(const samples of options){
    const f=g.createFramebuffer(),c=g.createRenderbuffer(),d=g.createRenderbuffer();g.bindFramebuffer(g.FRAMEBUFFER,f);
    g.bindRenderbuffer(g.RENDERBUFFER,c);g.renderbufferStorageMultisample(g.RENDERBUFFER,samples,format,w,h);g.framebufferRenderbuffer(g.FRAMEBUFFER,g.COLOR_ATTACHMENT0,g.RENDERBUFFER,c);

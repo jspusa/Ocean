@@ -127,8 +127,8 @@ const oceanMobileUI = (() => {
     if (!select || !status) return;
     select.value = settings.adaptive ? 'auto' : String(Math.round(settings.quality));
     status.textContent = settings.adaptive
-      ? '自動模式：依此裝置的實際幀時間調整解析度。'
-      : `${names[Math.round(settings.quality)]}：固定所選畫質，不會自動降低解析度。較高畫質可能增加耗電與發熱。`;
+      ? '自動模式：依流暢度調整解析度與特效，負載降低後逐步恢復。'
+      : `${names[Math.round(settings.quality)]}：固定所選畫質，${settings.quality===0?'最多 30 FPS，降低耗電與發熱':'最多 60 FPS；較高畫質會增加耗電與發熱'}。`;
     if (renderer?.canvas) status.textContent += ` 目前渲染 ${renderer.canvas.width} × ${renderer.canvas.height}。`;
   }
   function applyQuality(value) {

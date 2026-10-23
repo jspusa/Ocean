@@ -1,29 +1,49 @@
 /* Live diagnostics measure rendered requestAnimationFrame intervals, never a promised FPS.
    No telemetry is uploaded. Sampling pauses with menus/background tabs. */
 class OceanPerformance{
- constructor(){this.samples=new Float32Array(240);this.cursor=0;this.count=0;this.previous=0;this.lastUI=0;this.lastAdaptive=0;this.headroom=0;this.benchmark=null;this.lastResult=null;this.visible=false;this.lastCPU=0;this.target=60;this.recoveryAfter=0;}
- pause(){this.previous=0;this.headroom=0;}
- resetSamples(){this.cursor=0;this.count=0;this.previous=0;this.headroom=0;}
+ constructor(){this.samples=new Float32Array(240);this.cursor=0;this.count=0;this.previous=0;this.lastUI=0;this.lastAdaptive=0;this.headroom=0;this.benchmark=null;this.lastResult=null;this.visible=false;this.lastCPU=0;this.target=60;this.sampleTarget=60;this.wasActive=null;this.activeTime=0;this.adaptiveTime=0;this.adaptiveCount=0;this.recoveryAfter=0;this.recoveryDelay=8000;this.probe=null;}
+ pause(){this.previous=0;this.headroom=0;this.adaptiveTime=0;this.adaptiveCount=0;}
+ resetSamples(preserveProbe=false){this.cursor=0;this.count=0;this.pause();if(!preserveProbe)this.probe=null;}
  record(ms,cpu){
   if(!Number.isFinite(ms))return;
+  if(this.wasActive!==active){this.wasActive=active;this.resetSamples(true);}
+  if(this.sampleTarget!==this.target){this.sampleTarget=this.target;this.resetSamples(true);}
   if(this.benchmark){const b=this.benchmark;if(renderer.quality!==b.startQuality||renderer.dynamicScale!==b.startScale||renderer.canvas.width!==b.resolution[0]||renderer.canvas.height!==b.resolution[1]){this.benchmark=null;toast('畫面尺寸或品質已改變，這次量測已取消。請以新設定重新量測。');}}
-  if(this.previous){const dt=ms-this.previous;if(dt>0&&Number.isFinite(dt)){this.samples[this.cursor]=dt;this.cursor=(this.cursor+1)%240;this.count=Math.min(240,this.count+1);if(this.benchmark){this.benchmark.frames.push({ms:dt,cpu:Number.isFinite(cpu)?cpu:0,scale:renderer.dynamicScale});this.benchmark.activeMs+=dt;}}}
+  if(this.previous){const dt=ms-this.previous;if(dt>0&&Number.isFinite(dt)){this.samples[this.cursor]=dt;this.cursor=(this.cursor+1)%240;this.count=Math.min(240,this.count+1);if(active){this.activeTime+=dt;this.adaptiveTime+=dt;this.adaptiveCount++;if(this.benchmark){this.benchmark.frames.push({ms:dt,cpu:Number.isFinite(cpu)?cpu:0,scale:renderer.dynamicScale});this.benchmark.activeMs+=dt;}}}}
   this.previous=ms;this.lastCPU=cpu;
   if(this.benchmark&&this.benchmark.activeMs>=20000)this.finish();
   if(ms-this.lastUI>350){this.lastUI=ms;this.paint();}
-  if(active&&settings.adaptive&&!this.benchmark&&this.count>=90&&ms-this.lastAdaptive>2200){
-   this.lastAdaptive=ms;const stat=this.stats(),budget=1000/this.target;
-   // A 60 Hz display cannot report the old >78 FPS recovery threshold.
-   // Probe upward only after several stable windows at the display budget.
-   // No CPU duration is presented as GPU headroom; a failed probe backs off.
-   if(stat.mean>budget*1.17&&renderer.dynamicScale>.64){
-    renderer.dynamicScale=Math.max(.64,renderer.dynamicScale-.065);renderer.resize();this.resetSamples();this.recoveryAfter=ms+8000;
-   }else if(ms>=this.recoveryAfter&&stat.mean<=budget*1.04&&stat.p95<=budget*1.22&&renderer.dynamicScale<1){
-    if(++this.headroom>=3){renderer.dynamicScale=Math.min(1,renderer.dynamicScale+.035);renderer.resize();this.resetSamples();this.recoveryAfter=ms+5500;}
-   }else this.headroom=0;
+  if(!active||!settings.adaptive||this.benchmark){this.adaptiveTime=0;this.adaptiveCount=0;this.headroom=0;return;}
+  // Elapsed active time matters: waiting for 90 frames took 18 seconds at 5 FPS.
+  // A median guard keeps a single loading/GC hitch from lowering the whole scene.
+  if(this.adaptiveTime<1200||this.adaptiveCount<6)return;
+  this.lastAdaptive=ms;const stat=this.stats(this.adaptiveCount),budget=1000/this.target,windowTime=this.adaptiveTime;
+  this.adaptiveTime=0;this.adaptiveCount=0;
+  if(this.probe&&this.activeTime>this.probe.until)this.probe=null;
+  let quality=renderer.quality,scale=renderer.dynamicScale,trial=null;
+  if(stat.mean>budget*1.17&&stat.p50>budget*1.17){
+   if(this.probe){quality=this.probe.quality;scale=this.probe.scale;this.recoveryDelay=Math.min(60000,Math.max(16000,this.recoveryDelay*2));}
+   else {this.recoveryDelay=8000;if(scale>.64001)scale=Math.max(.64,scale-(stat.mean>budget*1.8?.18:.08));else if(quality>0)quality--;}
+   this.recoveryAfter=this.activeTime+this.recoveryDelay;this.headroom=0;
+  }else if(this.activeTime>=this.recoveryAfter&&stat.mean<=budget*1.04&&stat.p50<=budget*1.35&&stat.p95<=Math.min(budget*2,budget+stat.p10)){
+   // Restore detail slowly. A failed probe restores the previous safe settings
+   // and waits longer; frame timing is never described as measured GPU headroom.
+   // Capped frames land on display ticks: healthy 60 FPS on 75/90/144 Hz has
+   // mixed intervals. Allow one observed short interval of quantization, while
+   // requiring a healthy mean/median and rejecting repeated long stalls.
+   this.headroom+=windowTime;
+   if(this.headroom>=6000){
+    if(scale<.99999)scale=Math.min(1,scale+.035);
+    else if(quality<Math.min(2,Math.round(settings.quality)))quality++;
+    if(quality!==renderer.quality||scale!==renderer.dynamicScale)trial={quality:renderer.quality,scale:renderer.dynamicScale,until:this.activeTime+8000};
+   }
+  }else this.headroom=0;
+  if(quality!==renderer.quality||scale!==renderer.dynamicScale){
+   renderer.quality=quality;renderer.dynamicScale=scale;renderer.dirty=true;renderer.forceShadow=true;renderer.resize();this.resetSamples();this.probe=trial;
+   if(trial)this.recoveryAfter=this.activeTime+6000;
   }
  }
- stats(){if(!this.count)return {fps:0,p95:0,mean:0};const a=Array.from(this.samples.subarray(0,this.count)).sort((a,b)=>a-b),mean=a.reduce((s,v)=>s+v,0)/a.length;return {fps:1000/mean,p95:a[Math.floor(a.length*.95)],mean};}
+ stats(count=this.count){count=Math.min(count,this.count);if(!count)return {fps:0,p95:0,p50:0,p10:0,mean:0};const a=Array.from({length:count},(_,i)=>this.samples[(this.cursor-i-1+240)%240]).sort((a,b)=>a-b),mean=a.reduce((s,v)=>s+v,0)/a.length;return {fps:1000/mean,p95:a[Math.floor(a.length*.95)],p50:a[Math.floor(a.length*.5)],p10:a[Math.floor(a.length*.1)],mean};}
  toggle(){this.visible=!this.visible;const panel=$('perfPanel');panel.classList.toggle('hidden',!this.visible);$('fpsChip')?.setAttribute('aria-expanded',String(this.visible));this.paint();}
  start(){
   if(!active){toast('先開始潛水，再進行實際裝置量測。');return;}
@@ -49,7 +69,7 @@ class OceanPerformance{
 }
 const oceanPerf=new OceanPerformance();
 function initPerformance(){
- const box=document.createElement('aside');box.id='perfPanel';box.className='hidden';box.setAttribute('aria-label','裝置效能量測');box.innerHTML=`<div class="perf-title">DEVICE PERFORMANCE <button id="perfClose" aria-label="關閉效能面板">×</button></div><div class="perf-numbers"><span><b id="perfFPS">—</b><small>實測平均 FPS</small></span><span><b id="perfP95">—</b><small>P95 幀時間</small></span></div><canvas id="frameGraph" width="240" height="56" aria-label="最近幀時間"></canvas><p id="perfResolution"></p><p id="perfWork"></p><div class="perf-buttons"><button id="perfBench">量測 20 秒</button><button id="perfExport" disabled>匯出</button></div><small class="perf-foot">此裝置即時數值。60 FPS 為品質預算目標，不是保證。P95 越低越穩定。</small>`;document.body.appendChild(box);
+ const box=document.createElement('aside');box.id='perfPanel';box.className='hidden';box.setAttribute('aria-label','裝置效能量測');box.innerHTML=`<div class="perf-title">DEVICE PERFORMANCE <button id="perfClose" aria-label="關閉效能面板">×</button></div><div class="perf-numbers"><span><b id="perfFPS">—</b><small>實測平均 FPS</small></span><span><b id="perfP95">—</b><small>P95 幀時間</small></span></div><canvas id="frameGraph" width="240" height="56" aria-label="最近幀時間"></canvas><p id="perfResolution"></p><p id="perfWork"></p><div class="perf-buttons"><button id="perfBench">量測 20 秒</button><button id="perfExport" disabled>匯出</button></div><small class="perf-foot">此裝置即時數值。省電模式上限 30 FPS，其餘模式上限 60 FPS；不是流暢度保證。P95 越低越穩定。</small>`;document.body.appendChild(box);
  const chip=document.createElement('button');chip.id='fpsChip';chip.textContent='FPS';chip.title='效能與幀時間（F8）';chip.setAttribute('aria-label','查看裝置效能');chip.setAttribute('aria-controls','perfPanel');chip.setAttribute('aria-expanded','false');$('hud').appendChild(chip);chip.onclick=()=>oceanPerf.toggle();$('perfClose').onclick=()=>oceanPerf.toggle();$('perfBench').onclick=()=>oceanPerf.start();$('perfExport').onclick=()=>oceanPerf.export();
  window.addEventListener('keydown',e=>{if(e.code==='F8'&&!e.repeat&&!['INPUT','TEXTAREA','SELECT'].includes(document.activeElement?.tagName)){e.preventDefault();oceanPerf.toggle();}});
 }

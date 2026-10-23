@@ -14,8 +14,8 @@
     },
     {
       "path": "README.md",
-      "bytes": 17660,
-      "sha256": "1657bfcbc36675f5fae70942e20a1d9a56a80a985a6f9067bbe759ecca287907"
+      "bytes": 18206,
+      "sha256": "a2d4ef4062e7540e1afd823c64126330f5e46c4c2d14977a4a3db4dbe8e0eb36"
     },
     {
       "path": "VERSION",
@@ -299,8 +299,8 @@
     },
     {
       "path": "src/app.js",
-      "bytes": 69551,
-      "sha256": "7db9d93d62aa6747d7c97e91923ec4dea883226018fc0169b50cdc40621ba31b"
+      "bytes": 70180,
+      "sha256": "9cadfe06b8551fa88645ef620f0cf7f9859de272766d7ed7643fdb9ece5d52f4"
     },
     {
       "path": "src/aquarium.js",
@@ -344,8 +344,8 @@
     },
     {
       "path": "src/engine.js",
-      "bytes": 87618,
-      "sha256": "4bbe62af159909023b79a9d6fea5de68ac9eec654d4eb75efade914f3ea55037"
+      "bytes": 88374,
+      "sha256": "a41ab000d0f38c8358f099bb6caea00bd664f96bca24e1d12ef6f8c518deb0f4"
     },
     {
       "path": "src/expedition.js",
@@ -389,8 +389,8 @@
     },
     {
       "path": "src/mobile-controls.js",
-      "bytes": 12837,
-      "sha256": "68a284dae58af8c6b7dcc116ec6f9a14f9ef27b3ce0d19a401d6cf140ac8665a"
+      "bytes": 12907,
+      "sha256": "1f22fd2f7cebdb8eb01b2d2cc47f2985472ae5088f38b95ab12839b02e202528"
     },
     {
       "path": "src/navigation.js",
@@ -414,8 +414,8 @@
     },
     {
       "path": "src/performance.js",
-      "bytes": 7606,
-      "sha256": "ac40aa1253ce098f1ca18cc7f5da88163d653c629fddcebcd8caaaeed21732f4"
+      "bytes": 9593,
+      "sha256": "103121f77c87ac828ddee4c16efbae7c3127f43290b2b9c5cfdc89835682fb5d"
     },
     {
       "path": "src/photography.js",

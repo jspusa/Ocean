@@ -165,14 +165,22 @@ function turnCamera(dx,dy){stopAuto();player.yaw+=dx*.0037*settings.sensitivity;
 function mouseLookUnavailable(){if(!settings.lookLock)return;settings.lookLock=false;persist();toast('自由環視未獲瀏覽器允許；已恢復按住畫面拖曳。');}
 async function lockMouseLook(){if(!active||modal||photoOpen||!settings.lookLock||!$('ocean').requestPointerLock)return;try{await $('ocean').requestPointerLock();}catch(_){mouseLookUnavailable();}}
 let simulationAccumulator=0,previousPhysicsPosition=null,hudClock=0,observationClock=0;
+let nextRenderAt=0,renderRate=0;
 function animate(ms){
  if(!ready)return;
- if(window.__freeze){lastTime=ms;oceanPerf.pause();requestAnimationFrame(animate);return;}
- const realDt=Math.max(0,(ms-lastTime)/1000||1/60),dt=Math.min(realDt,.10);lastTime=ms;
- if(document.hidden||(document.hasFocus&&!document.hasFocus())){oceanPerf.pause();simulationAccumulator=0;requestAnimationFrame(animate);return;}
+ if(window.__freeze){lastTime=ms;nextRenderAt=0;oceanPerf.pause();requestAnimationFrame(animate);return;}
+ if(document.hidden||(document.hasFocus&&!document.hasFocus())){lastTime=ms;nextRenderAt=0;oceanPerf.pause();simulationAccumulator=0;requestAnimationFrame(animate);return;}
  pollGamepad();
  const liveFeature=!active&&oceanFeatures.shouldAnimate();
- if((modal||photoOpen)&&!renderer.dirty&&!liveFeature){oceanPerf.pause();simulationAccumulator=0;requestAnimationFrame(animate);return;}
+ if((modal||photoOpen)&&!renderer.dirty&&!liveFeature){lastTime=ms;nextRenderAt=0;oceanPerf.pause();simulationAccumulator=0;requestAnimationFrame(animate);return;}
+ // Keep high-refresh screens from multiplying simulation and GPU work. Time
+ // advances only on rendered frames, so a 30 Hz budget retains normal swim speed.
+ const rate=active?(renderer.quality===0?30:60):(liveFeature?30:15),interval=1000/rate;
+ if(rate!==renderRate||ms<lastTime){renderRate=rate;nextRenderAt=ms;oceanPerf.pause();}
+ oceanPerf.target=active?rate:60;
+ if(!renderer.dirty&&ms+.5<nextRenderAt){requestAnimationFrame(animate);return;}
+ nextRenderAt=ms>nextRenderAt+interval?ms+interval:nextRenderAt+interval;
+ const realDt=Math.max(0,(ms-lastTime)/1000||1/rate),dt=Math.min(realDt,.10);lastTime=ms;
  const begin=performance.now();let renderPosition=null;
  if((!modal&&!photoOpen)||liveFeature){
   t+=dt;
