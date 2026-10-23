@@ -820,6 +820,15 @@ class Renderer{
  }
  makeProgram(v,f){let g=this.gl;const shader=(type,src)=>{let s=g.createShader(type);g.shaderSource(s,src);g.compileShader(s);if(!g.getShaderParameter(s,g.COMPILE_STATUS))throw Error(g.getShaderInfoLog(s));return s;};let p=g.createProgram(),vs=shader(g.VERTEX_SHADER,v),fs=shader(g.FRAGMENT_SHADER,f);g.attachShader(p,vs);g.attachShader(p,fs);g.linkProgram(p);g.deleteShader(vs);g.deleteShader(fs);if(!g.getProgramParameter(p,g.LINK_STATUS))throw Error(g.getProgramInfoLog(p));return {p,u:{}};}
  uniform(p,n){if(!(n in p.u))p.u[n]=this.gl.getUniformLocation(p.p,n);return p.u[n];}
+ // Programs omit uniforms they do not use. Their cached null locations are
+ // WebGL no-ops; skip those calls while forwarding active values unchanged.
+ set1i(p,n,x){const u=this.uniform(p,n);if(u!==null)this.gl.uniform1i(u,x);}
+ set1f(p,n,x){const u=this.uniform(p,n);if(u!==null)this.gl.uniform1f(u,x);}
+ set2f(p,n,x,y){const u=this.uniform(p,n);if(u!==null)this.gl.uniform2f(u,x,y);}
+ set3f(p,n,x,y,z){const u=this.uniform(p,n);if(u!==null)this.gl.uniform3f(u,x,y,z);}
+ set4f(p,n,x,y,z,w){const u=this.uniform(p,n);if(u!==null)this.gl.uniform4f(u,x,y,z,w);}
+ set3fv(p,n,v){const u=this.uniform(p,n);if(u!==null)this.gl.uniform3fv(u,v);}
+ setMatrix4fv(p,n,transpose,v){const u=this.uniform(p,n);if(u!==null)this.gl.uniformMatrix4fv(u,transpose,v);}
  attr(index,size,stride,offset,divisor=0){let g=this.gl;g.enableVertexAttribArray(index);g.vertexAttribPointer(index,size,g.FLOAT,false,stride,offset);g.vertexAttribDivisor(index,divisor);}
  async loadTextures(forceFull=false){
   const g=this.gl,pending=[],names=['sand_diff','sand_nor_gl','rock_diff','rock_nor_gl','shell_diff','shell_nor_gl','coral_diff','coral_nor_gl','caustics'];const full=forceFull||!this.mobile||this.quality===2;
@@ -948,7 +957,7 @@ class Renderer{
  for(let i=0;i<bubbles.length;i++){const b=bubbles[i];if(b.a<9&&b.p[1]<-.12)bubbles[kept++]=b;}
  const start=Math.max(0,kept-500);if(start)for(let i=start;i<kept;i++)bubbles[i-start]=bubbles[i];bubbles.length=kept-start;
  for(const b of bubbles){b.a+=dt;b.p[1]+=dt*(.30+b.r*6.);b.p[0]+=Math.sin(t*2.1+b.phase)*dt*.035;b.p[2]+=.018*dt;data[j++]=b.p[0];data[j++]=b.p[1];data[j++]=b.p[2];data[j++]=b.r*(1+b.a*.16);}
- if(!j)return;g.bindVertexArray(this.bubbleVAO);g.bindBuffer(g.ARRAY_BUFFER,this.bubbleBuffer);g.bufferSubData(g.ARRAY_BUFFER,0,data,0,j);this.common(this.bubbleProgram,eye,this.vp,t);g.uniform1f(this.uniform(this.bubbleProgram,'uHeight'),this.canvas.height);g.drawArrays(g.POINTS,0,j/4);}
+ if(!j)return;g.bindVertexArray(this.bubbleVAO);g.bindBuffer(g.ARRAY_BUFFER,this.bubbleBuffer);g.bufferSubData(g.ARRAY_BUFFER,0,data,0,j);this.common(this.bubbleProgram,eye,this.vp,t);this.set1f(this.bubbleProgram,'uHeight',this.canvas.height);g.drawArrays(g.POINTS,0,j/4);}
  setupParticles(){let g=this.gl,a=[];for(let i=0;i<1300;i++)a.push(rr(-45,45),rr(-28,-.2),rr(-55,35),random());this.particleVAO=g.createVertexArray();g.bindVertexArray(this.particleVAO);let b=g.createBuffer();g.bindBuffer(g.ARRAY_BUFFER,b);g.bufferData(g.ARRAY_BUFFER,new Float32Array(a),g.STATIC_DRAW);this.attr(0,4,16,0);g.bindVertexArray(null);}
  setupRays(){let a=[];for(let i=0;i<20;i++){let x=rr(-29,22),z=rr(-42,12),w=rr(.8,1.7),bottom=-rr(13,24),bw=w*rr(2.1,4.5);for(let orient=0;orient<2;orient++){let ox=orient?0:1,oz=orient?1:0,p=[[x-w*ox,-.04,z-w*oz],[x+w*ox,-.04,z+w*oz],[x-bottom*.40+bw*ox,bottom,z+bottom*.27+bw*oz],[x-bottom*.40-bw*ox,bottom,z+bottom*.27-bw*oz]],uv=[[0,0],[1,0],[1,1],[0,1]];for(let k of [0,1,2,0,2,3])a.push(...p[k],...uv[k]);}}this.rayCount=a.length/5;let g=this.gl;this.rayVAO=g.createVertexArray();g.bindVertexArray(this.rayVAO);let b=g.createBuffer();g.bindBuffer(g.ARRAY_BUFFER,b);g.bufferData(g.ARRAY_BUFFER,new Float32Array(a),g.STATIC_DRAW);this.attr(0,3,20,0);this.attr(1,2,20,12);g.bindVertexArray(null);}
  setupShadow(){
@@ -1004,15 +1013,14 @@ class Renderer{
   }
   g.bindRenderbuffer(g.RENDERBUFFER,null);g.bindFramebuffer(g.FRAMEBUFFER,null);
  }
- common(p,eye,vp,t){let g=this.gl;g.useProgram(p.p);if(this.textures[8]){this.bindTex(9,this.textures[8]);g.uniform1i(this.uniform(p,'uCaustic'),9);}g.uniformMatrix4fv(this.uniform(p,'uVP'),false,vp===this.vp?this.renderVP:vp===this.lightVP?this.renderLightVP:vp===this.dynamicLightVP?this.renderDynamicLightVP:vp);g.uniformMatrix4fv(this.uniform(p,'uLightVP'),false,this.renderLightVP||this.lightVP);g.uniformMatrix4fv(this.uniform(p,'uDynamicLightVP'),false,this.renderDynamicLightVP||this.renderLightVP||this.lightVP);g.uniform1i(this.uniform(p,'uSamples'),this.msaaSamples||0);g.uniform1i(this.uniform(p,'uQuality'),this.quality);g.uniform3fv(this.uniform(p,'uRenderOrigin'),this.renderOrigin||[0,0,0]);g.uniform4f(this.uniform(p,'uTorchParams'),TorchLightRules.outer,TorchLightRules.inner,TorchLightRules.strength,TorchLightRules.falloff);g.uniform3fv(this.uniform(p,'uCamera'),eye);g.uniform1f(this.uniform(p,'uTorch'),this.lamp?1:0);g.uniform3fv(this.uniform(p,'uViewForward'),this.cameraForward||[0,0,-1]);g.uniform1f(this.uniform(p,'uTime'),t);g.uniform1f(this.uniform(p,'uSwim'),typeof player==='undefined'?.4:Math.min(1,Math.hypot(...player.velocity)/1.6));g.uniform1f(this.uniform(p,'uSun'),this.sun);g.uniform3fv(this.uniform(p,'uFog'),this.fog);g.uniform3fv(this.uniform(p,'uLightDir'),this.lightDir);g.uniform3fv(this.uniform(p,'uAirLightDir'),this.airLightDir||this.lightDir);g.uniform3fv(this.uniform(p,'uLightColor'),this.lightColor);}
- speciesUniforms(p,b){const g=this.gl,sp=typeof SPECIES!=='undefined'?SPECIES[b.species]:null,m=sp?.materialProfile,r=sp?.motionProfile?.type;g.uniform1i(this.uniform(p,'uRigClass'),r==='vampire'?1:r==='sea_pig'?2:r==='snailfish'?3:0);g.uniform4f(this.uniform(p,'uSurfaceProfile'),m?clamp(m.roughness,.12,.98):-1,m?clamp(m.subsurface,0,1):0,m?Math.max(.1,m.patternScale||1):1,m?({fish:0,cetacean:1,cephalopod:2,crustacean:3,shell:4,gelatinous:5}[m.skin]??0):-1);}
+ common(p,eye,vp,t){let g=this.gl;g.useProgram(p.p);if(this.textures[8]){this.bindTex(9,this.textures[8]);this.set1i(p,'uCaustic',9);}this.setMatrix4fv(p,'uVP',false,vp===this.vp?this.renderVP:vp===this.lightVP?this.renderLightVP:vp===this.dynamicLightVP?this.renderDynamicLightVP:vp);this.setMatrix4fv(p,'uLightVP',false,this.renderLightVP||this.lightVP);this.setMatrix4fv(p,'uDynamicLightVP',false,this.renderDynamicLightVP||this.renderLightVP||this.lightVP);this.set1i(p,'uSamples',this.msaaSamples||0);this.set1i(p,'uQuality',this.quality);this.set3fv(p,'uRenderOrigin',this.renderOrigin||[0,0,0]);this.set4f(p,'uTorchParams',TorchLightRules.outer,TorchLightRules.inner,TorchLightRules.strength,TorchLightRules.falloff);this.set3fv(p,'uCamera',eye);this.set1f(p,'uTorch',this.lamp?1:0);this.set3fv(p,'uViewForward',this.cameraForward||[0,0,-1]);this.set1f(p,'uTime',t);this.set1f(p,'uSwim',typeof player==='undefined'?.4:Math.min(1,Math.hypot(...player.velocity)/1.6));this.set1f(p,'uSun',this.sun);this.set3fv(p,'uFog',this.fog);this.set3fv(p,'uLightDir',this.lightDir);this.set3fv(p,'uAirLightDir',this.airLightDir||this.lightDir);this.set3fv(p,'uLightColor',this.lightColor);}
+ speciesUniforms(p,b){const sp=typeof SPECIES!=='undefined'?SPECIES[b.species]:null,m=sp?.materialProfile,r=sp?.motionProfile?.type;this.set1i(p,'uRigClass',r==='vampire'?1:r==='sea_pig'?2:r==='snailfish'?3:0);this.set4f(p,'uSurfaceProfile',m?clamp(m.roughness,.12,.98):-1,m?clamp(m.subsurface,0,1):0,m?Math.max(.1,m.patternScale||1):1,m?({fish:0,cetacean:1,cephalopod:2,crustacean:3,shell:4,gelatinous:5}[m.skin]??0):-1);}
  batchUniforms(p,b,state,kind=b.kind){
   // State is local to one shader pass, so a new frame, a material edit or a
   // shadow/colour transition always reinitializes the relevant uniforms.
-  const g=this.gl;
-  if(state.kind!==kind){g.uniform1i(this.uniform(p,'uKind'),kind);state.kind=kind;}
-  if(state.material!==b.material){g.uniform1i(this.uniform(p,'uMat'),b.material);state.material=b.material;}
-  if(state.species!==b.species){g.uniform1i(this.uniform(p,'uSpecies'),b.species);this.speciesUniforms(p,b);state.species=b.species;}
+  if(state.kind!==kind){this.set1i(p,'uKind',kind);state.kind=kind;}
+  if(state.material!==b.material){this.set1i(p,'uMat',b.material);state.material=b.material;}
+  if(state.species!==b.species){this.set1i(p,'uSpecies',b.species);this.speciesUniforms(p,b);state.species=b.species;}
  }
  bindTex(unit,tex){let g=this.gl;g.activeTexture(g.TEXTURE0+unit);g.bindTexture(g.TEXTURE_2D,tex);}
  render(eye,target,t){
@@ -1045,30 +1053,30 @@ class Renderer{
   for(const b of this.batches){if(!b.visible||!b.dynamic||!b.shadow||![0,1,2,4,5,6,7,8,9,10,11,12].includes(b.kind)||(b.minDistance>0&&!b.shadowProxy))continue;this.updateBatch(b,eye,lightPlanes,true);if(!b.drawCount)continue;this.batchUniforms(this.shadowProgram,b,shadowState);this.drawBatch(b);this.shadowDraws++;}
   g.colorMask(true,true,true,true);
   g.bindFramebuffer(g.FRAMEBUFFER,this.msaaFBO||this.sceneFBO);if(this.msaaSamples)g.enable(g.SAMPLE_ALPHA_TO_COVERAGE);g.viewport(0,0,this.canvas.width,this.canvas.height);g.clearColor(.002,.025,.045,1);g.clear(g.COLOR_BUFFER_BIT|g.DEPTH_BUFFER_BIT);
-  g.depthFunc(g.LEQUAL);this.common(this.skyProgram,eye,this.vp,t);g.uniformMatrix4fv(this.uniform(this.skyProgram,'uInvVP'),false,inv);g.bindVertexArray(this.postVAO);g.drawArrays(g.TRIANGLES,0,3);g.depthFunc(g.LESS);this.drawCalls++;
-  const p=this.program;this.common(p,eye,this.vp,t);g.uniform1f(this.uniform(p,'uFogDensity'),this.fogDensity);g.uniform1f(this.uniform(p,'uShadowTexel'),1/this.shadowSize);g.uniform1f(this.uniform(p,'uShadows'),1);
-  const names=['uSand','uSandN','uRock','uRockN','uShell','uShellN','uCoral','uCoralN'];for(let i=0;i<8;i++){this.bindTex(i,this.textures[i]);g.uniform1i(this.uniform(p,names[i]),i);}this.bindTex(8,this.shadowTexture);g.bindSampler(8,this.shadowSampler);g.uniform1i(this.uniform(p,'uShadow'),8);this.bindTex(10,this.dynamicShadowTexture);g.bindSampler(10,this.shadowSampler);g.uniform1i(this.uniform(p,'uDynamicShadow'),10);
+  g.depthFunc(g.LEQUAL);this.common(this.skyProgram,eye,this.vp,t);this.setMatrix4fv(this.skyProgram,'uInvVP',false,inv);g.bindVertexArray(this.postVAO);g.drawArrays(g.TRIANGLES,0,3);g.depthFunc(g.LESS);this.drawCalls++;
+  const p=this.program;this.common(p,eye,this.vp,t);this.set1f(p,'uFogDensity',this.fogDensity);this.set1f(p,'uShadowTexel',1/this.shadowSize);this.set1f(p,'uShadows',1);
+  const names=['uSand','uSandN','uRock','uRockN','uShell','uShellN','uCoral','uCoralN'];for(let i=0;i<8;i++){this.bindTex(i,this.textures[i]);this.set1i(p,names[i],i);}this.bindTex(8,this.shadowTexture);g.bindSampler(8,this.shadowSampler);this.set1i(p,'uShadow',8);this.bindTex(10,this.dynamicShadowTexture);g.bindSampler(10,this.shadowSampler);this.set1i(p,'uDynamicShadow',10);
   this.submittedTriangles=0;this.submittedVertices=0;const planes=this.frustum(this.vp),state={},ls=this.mobile?(this.quality===0?.64:.82):(this.quality===0?.75:1);
   for(const b of this.batches){if(!b.visible)continue;this.updateBatch(b,eye,planes);if(!b.drawCount)continue;
    this.submittedTriangles+=b.count/3*b.drawCount;this.submittedVertices+=b.vertexCount*b.drawCount;
    const min=(b.minDistance||0)*ls,max=(b.maxDistance||220)*ls,fade=b.material!==1&&((b.minDistance||0)>0||(b.maxDistance&&b.maxDistance<180))?.60:0;
-   if(state.min!==min||state.max!==max||state.fade!==fade){g.uniform3f(this.uniform(p,'uLODBounds'),min,max,fade);state.min=min;state.max=max;state.fade=fade;}
+   if(state.min!==min||state.max!==max||state.fade!==fade){this.set3f(p,'uLODBounds',min,max,fade);state.min=min;state.max=max;state.fade=fade;}
    this.batchUniforms(p,b,state);this.drawBatch(b);}
   g.disable(g.SAMPLE_ALPHA_TO_COVERAGE);this.common(this.waterProgram,eye,this.vp,t);g.bindVertexArray(this.waterVAO);g.drawArrays(g.TRIANGLES,0,this.waterCount);this.submittedTriangles+=this.waterCount/3;this.submittedVertices+=this.waterCount;this.drawCalls++;
   g.enable(g.BLEND);g.blendFunc(g.SRC_ALPHA,g.ONE_MINUS_SRC_ALPHA);g.depthMask(false);
-  this.common(this.pointProgram,eye,this.vp,t);g.uniform1f(this.uniform(this.pointProgram,'uScale'),this.canvas.height*.044);g.bindVertexArray(this.particleVAO);if(eye[1]<-.18){g.drawArrays(g.POINTS,0,this.quality===0?240:520);this.renderBubbles(eye,t);}g.depthMask(true);g.disable(g.BLEND);g.disable(g.DEPTH_TEST);
+  this.common(this.pointProgram,eye,this.vp,t);this.set1f(this.pointProgram,'uScale',this.canvas.height*.044);g.bindVertexArray(this.particleVAO);if(eye[1]<-.18){g.drawArrays(g.POINTS,0,this.quality===0?240:520);this.renderBubbles(eye,t);}g.depthMask(true);g.disable(g.BLEND);g.disable(g.DEPTH_TEST);
   if(this.msaaFBO){
    g.bindFramebuffer(g.READ_FRAMEBUFFER,this.msaaFBO);g.bindFramebuffer(g.DRAW_FRAMEBUFFER,this.sceneFBO);
    g.blitFramebuffer(0,0,this.canvas.width,this.canvas.height,0,0,this.canvas.width,this.canvas.height,g.COLOR_BUFFER_BIT|g.DEPTH_BUFFER_BIT,g.NEAREST);
   }
   const postUniforms=pp=>{g.useProgram(pp.p);this.bindTex(0,this.sceneColor);this.bindTex(1,this.sceneDepth);this.bindTex(2,this.shadowTexture);this.bindTex(3,this.volumeColor);
-   g.uniform1i(this.uniform(pp,'uScene'),0);g.uniform1i(this.uniform(pp,'uDepth'),1);g.uniform1i(this.uniform(pp,'uVolumeShadow'),2);g.uniform1i(this.uniform(pp,'uVolume'),3);
-   this.bindTex(9,this.textures[8]);g.uniform1i(this.uniform(pp,'uCaustic'),9);
-   g.uniform2f(this.uniform(pp,'uResolution'),this.canvas.width,this.canvas.height);g.uniform2f(this.uniform(pp,'uVolumeResolution'),this.volumeW,this.volumeH);g.uniform1f(this.uniform(pp,'uTime'),t);g.uniform1i(this.uniform(pp,'uQuality'),this.quality);g.uniform1f(this.uniform(pp,'uExposure'),this.exposure);g.uniform1f(this.uniform(pp,'uPhotoAperture'),this.photoAperture||0);g.uniform1f(this.uniform(pp,'uPhotoFocus'),this.photoFocus||8);
-   g.uniformMatrix4fv(this.uniform(pp,'uInvVP'),false,inv);g.uniformMatrix4fv(this.uniform(pp,'uLightVP'),false,this.renderLightVP);g.uniform3fv(this.uniform(pp,'uEye'),relativeEye);g.uniform3fv(this.uniform(pp,'uRenderOrigin'),origin);g.uniform3fv(this.uniform(pp,'uLightDir'),this.lightDir);g.uniform3fv(this.uniform(pp,'uLightColor'),this.lightColor);g.uniform1f(this.uniform(pp,'uSun'),this.sun);g.uniform1f(this.uniform(pp,'uClarity'),this.clarity);g.uniform1f(this.uniform(pp,'uLamp'),this.lamp?1:0);g.bindVertexArray(this.postVAO);};
+   this.set1i(pp,'uScene',0);this.set1i(pp,'uDepth',1);this.set1i(pp,'uVolumeShadow',2);this.set1i(pp,'uVolume',3);
+   this.bindTex(9,this.textures[8]);this.set1i(pp,'uCaustic',9);
+   this.set2f(pp,'uResolution',this.canvas.width,this.canvas.height);this.set2f(pp,'uVolumeResolution',this.volumeW,this.volumeH);this.set1f(pp,'uTime',t);this.set1i(pp,'uQuality',this.quality);this.set1f(pp,'uExposure',this.exposure);this.set1f(pp,'uPhotoAperture',this.photoAperture||0);this.set1f(pp,'uPhotoFocus',this.photoFocus||8);
+   this.setMatrix4fv(pp,'uInvVP',false,inv);this.setMatrix4fv(pp,'uLightVP',false,this.renderLightVP);this.set3fv(pp,'uEye',relativeEye);this.set3fv(pp,'uRenderOrigin',origin);this.set3fv(pp,'uLightDir',this.lightDir);this.set3fv(pp,'uLightColor',this.lightColor);this.set1f(pp,'uSun',this.sun);this.set1f(pp,'uClarity',this.clarity);this.set1f(pp,'uLamp',this.lamp?1:0);g.bindVertexArray(this.postVAO);};
   g.bindFramebuffer(g.FRAMEBUFFER,this.volumeFBO);g.viewport(0,0,this.volumeW,this.volumeH);postUniforms(this.volumeProgram);this.bindTex(3,null);g.drawArrays(g.TRIANGLES,0,3);
   g.bindFramebuffer(g.FRAMEBUFFER,this.volumeFilteredFBO);postUniforms(this.volumeFilterProgram);g.drawArrays(g.TRIANGLES,0,3);
   g.bindFramebuffer(g.FRAMEBUFFER,this.aaFBO);g.viewport(0,0,this.canvas.width,this.canvas.height);postUniforms(this.postProgram);this.bindTex(3,this.volumeFilteredColor);g.drawArrays(g.TRIANGLES,0,3);
-  g.bindFramebuffer(g.FRAMEBUFFER,null);g.useProgram(this.aaProgram.p);this.bindTex(0,this.aaColor);g.uniform1i(this.uniform(this.aaProgram,'uImage'),0);g.uniform2f(this.uniform(this.aaProgram,'uPixel'),1/this.canvas.width,1/this.canvas.height);g.drawArrays(g.TRIANGLES,0,3);g.bindVertexArray(null);this.drawCalls+=4;this.frame++;this.cpuRenderMs=performance.now()-begin;
+  g.bindFramebuffer(g.FRAMEBUFFER,null);g.useProgram(this.aaProgram.p);this.bindTex(0,this.aaColor);this.set1i(this.aaProgram,'uImage',0);this.set2f(this.aaProgram,'uPixel',1/this.canvas.width,1/this.canvas.height);g.drawArrays(g.TRIANGLES,0,3);g.bindVertexArray(null);this.drawCalls+=4;this.frame++;this.cpuRenderMs=performance.now()-begin;
  }
 }

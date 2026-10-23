@@ -273,7 +273,8 @@ function voyageTick(dt){
 }
 function pollGamepad(){
  let g;try{g=navigator.getGamepads?.()?.find(p=>p?.connected);}catch(_){return;}
- if(!g){if(voyage.gamepadAttached||voyage.gamepadDepth){resetInput();voyage.gamepadAttached=false;voyage.gamepadDepth=false;}voyage.gamepadButtons=[];return;}
+ if(!g){if(typeof oceanGamepadUI!=='undefined')oceanGamepadUI.disconnect();if(voyage.gamepadAttached||voyage.gamepadDepth){resetInput();voyage.gamepadAttached=false;voyage.gamepadDepth=false;}voyage.gamepadButtons=[];return;}
+ if(typeof oceanGamepadUI!=='undefined'&&oceanGamepadUI.poll(g,voyage.gamepadButtons)){voyage.gamepadButtons=g.buttons.map(b=>b.pressed);return;}
  const dead=v=>Math.abs(v)<.15?0:Math.sign(v)*(Math.abs(v)-.15)/.85;
  if(active&&!modal&&!photoOpen){const move=[dead(g.axes[0]||0),dead(g.axes[1]||0)],look=[dead(g.axes[2]||0),dead(g.axes[3]||0)];if(move.some(v=>v)||look.some(v=>v)){stopAuto();voyage.gamepadAttached=true;stick=move;lookStick=look;}else if(voyage.gamepadAttached){stick=move;lookStick=look;}
   const vertical=(g.buttons[7]?.value||0)-(g.buttons[6]?.value||0);if(Math.abs(vertical)>.04||voyage.gamepadDepth){verticalInput=vertical;voyage.gamepadDepth=Math.abs(vertical)>.04;}

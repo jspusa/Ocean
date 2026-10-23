@@ -1,5 +1,7 @@
 /* Public ecology follow/whistle regression seam. Real catalogue, geometry,
- * projection, blocked() and collide(); explicit roster and flat-seabed fixtures.
+ * production OceanTrench world bounds, projection, blocked() and collide();
+ * explicit roster and flat-seabed fixtures. Regional solids are not loaded:
+ * these cases isolate following around the specified ellipsoid rock.
  * No browser/GPU or natural encounter/recruitment claim.
  * Optional red baseline: --ecology-ref <git-ref> loads that ecology module only. */
 'use strict';
@@ -9,7 +11,7 @@ const refAt=process.argv.indexOf('--ecology-ref'),ref=refAt<0?null:process.argv[
 if(refAt>=0&&!ref)throw Error('--ecology-ref requires a git revision');
 let state,now=0,saves=0,whistles=0;
 const viewport={width:1440,height:900},context=vm.createContext({console,active:true,modal:null,photoOpen:false,focusFish:null,t:0,collisionNotice:0,eye:[0,-12,0],player:{p:[0,-12,0],yaw:0,pitch:0,velocity:[0,0,0]},renderer:{width:1440,height:900,canvas:{getBoundingClientRect:()=>({left:0,top:0,...viewport})},fov:69},settings:{fov:69,speed:.85},persistent:{seen:[]},voyage:{state:{},sessionDistance:0},saveVoyage(){saves++;return true},toast(){},releaseMouseLook(){},stopAuto(){},keys:new Set(),stick:[0,0],verticalInput:0,document:{getElementById:()=>null,body:{classList:{remove(){},contains:()=>false}}},oceanAudio:{cue(name){if(name==='whistle')whistles++}},oceanFeatures:{register(){},state:()=>state}});
-for(const n of ['engine','world','reef_detail','next_reef','open_world','fauna','cetaceans','fauna_world'])vm.runInContext(source(n),context,{filename:n+'.js'});
+for(const n of ['engine','world','reef_detail','next_reef','open_world','trench','fauna','cetaceans','fauna_world'])vm.runInContext(source(n),context,{filename:n+'.js'});
 const app=source('app');
 vm.runInContext(app.slice(app.indexOf('function collide('),app.indexOf('function startDive(')),context,{filename:'app-collision-direction.js'});
 vm.runInContext(app.slice(app.indexOf('function blocked('),app.indexOf('function observe(')),context,{filename:'app-line-of-sight.js'});
@@ -18,7 +20,7 @@ vm.runInContext(ref?cp.execFileSync('git',['show',ref+':src/ecology.js'],{cwd:ro
 const api=vm.runInContext('oceanEcology',context),species=vm.runInContext('SPECIES',context),actors=vm.runInContext('life',context),obstacles=vm.runInContext('obstacles',context),focus=vm.runInContext('animalFocusPoint',context),mesh=vm.runInContext('faunaGeometry',context),traits=vm.runInContext('partnerTraits',context);
 const distance=(a,b)=>Math.hypot(...a.map((v,k)=>v-b[k])),plain=v=>JSON.parse(JSON.stringify(v));
 function camera(){context.eye=context.player.p.slice();context.innerWidth=viewport.width;context.innerHeight=viewport.height;context.renderer.width=viewport.width;context.renderer.height=viewport.height;vm.runInContext('renderer.vp=mm(perspective(renderer.fov*Math.PI/180,renderer.width/renderer.height,.1,1000),lookAt(eye,V.add(eye,dir())))',context);}
-function fresh(width=1440,height=900){state=api.initial();api.hooks.reset();actors.length=0;obstacles.length=0;now=0;saves=0;whistles=0;context.active=true;context.modal=null;context.player.p=[0,-12,0];context.player.yaw=0;context.player.pitch=0;context.player.velocity=[0,0,0];viewport.width=width;viewport.height=height;camera();api.afterLife(0);}
+function fresh(width=1440,height=900){state=api.initial();api.hooks.reset();actors.length=0;obstacles.length=0;context.reefObstacleCandidates.invalidate();now=0;saves=0;whistles=0;context.active=true;context.modal=null;context.player.p=[0,-12,0];context.player.yaw=0;context.player.pitch=0;context.player.velocity=[0,0,0];viewport.width=width;viewport.height=height;camera();api.afterLife(0);}
 function actor(sp,position=[0,-12,-2]){const bounds=sp.modelBounds,f={uid:sp.id+'-001',species:species.indexOf(sp),fauna:true,p:position.slice(),home:position.slice(),s:[sp.size,sp.size,sp.size],yaw:0,pitch:0,bank:0,modelCenter:bounds.min.map((v,k)=>(v+bounds.max[k])*.5),retreat:0,faunaVisibility:1};actors.push(f);state.partners=[{uid:f.uid,name:sp.name,mastery:{},lastPerformance:null}];state.selected=f.uid;state.accompany=true;state.individuals[f.uid]={trust:30,seconds:8,strokes:5,feeds:0};return f;}
 function tick(dt=.05){now+=dt;context.t=now;api.afterLife(now);camera();}
 const results=[];
@@ -56,5 +58,5 @@ check('reset during a detour clears transient steering before the opposite-side 
  for(let i=0;i<1800;i++){const old=f.p.slice();tick();maxStep=Math.max(maxStep,distance(old,f.p));assert(obstacleQ(f.p,rock)>=1-1e-5,'restored actor crossed the same rock');}
  assert(maxStep<=traits(sp).approachSpeed*.05+1e-5,'cleanup must not cause a jump');assert(api.inRange(f,true),'old detour direction leaked across reset');return {maxStep,finalDistance:distance(context.player.p,focus(f))};
 });
-console.log(JSON.stringify({scope:'CPU public API; explicit roster/flat-seabed fixtures; no GPU',ecologySource:ref||'working tree',passed:results.filter(r=>r.pass).length,total:results.length,results},null,2));
+console.log(JSON.stringify({scope:'CPU public API; production finite world bounds; explicit roster, flat seabed and ellipsoid rocks; no regional solids or GPU',ecologySource:ref||'working tree',passed:results.filter(r=>r.pass).length,total:results.length,results},null,2));
 if(results.some(r=>!r.pass))process.exitCode=1;

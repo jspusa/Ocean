@@ -5,7 +5,7 @@ Python 3.10+ and Node.js 18+; standard libraries only, no npm dependencies.
 from pathlib import Path
 import base64,hashlib,json,subprocess,sys
 ROOT=Path(__file__).resolve().parent
-JS_FILES=['engine.js','world.js','reef_detail.js','next_reef.js','individuals.js','open_world.js','trench.js','fauna.js','cetaceans.js','abyss_fauna.js','trench_fauna.js','fauna_world.js','cetacean_world.js','regions.js','abyss_world.js','trench_world.js','pelagic_life.js','scene_stream.js','scene_cache.js','seasons.js','audio.js','performance.js','selection.js','app.js','voyage.js','features.js','ecology.js','exploration.js','expedition.js','aquarium.js','photography.js','navigation.js','ship.js','microcosm.js','story.js','deepsea.js','mobile-controls.js','bootstrap.js']
+JS_FILES=['engine.js','world.js','reef_detail.js','next_reef.js','individuals.js','open_world.js','trench.js','fauna.js','cetaceans.js','abyss_fauna.js','trench_fauna.js','fauna_world.js','cetacean_world.js','regions.js','abyss_world.js','trench_world.js','pelagic_life.js','reef_fauna.js','scene_stream.js','scene_cache.js','seasons.js','audio.js','performance.js','selection.js','app.js','gamepad_ui.js','voyage.js','features.js','ecology.js','exploration.js','expedition.js','aquarium.js','photography.js','navigation.js','ship.js','microcosm.js','story.js','deepsea.js','mobile-controls.js','bootstrap.js']
 def main():
     version=(ROOT/'VERSION').read_text().strip()
     if '--pack-only' not in sys.argv:
@@ -13,6 +13,9 @@ def main():
     subprocess.run(['node', str(ROOT/'partition_scene.cjs')], check=True)
     shell=(ROOT/'src/shell.html').read_text('utf-8')
     assert '/*__CSS__*/' in shell and '/*__JS__*/' in shell
+    license_notice=(ROOT/'LICENSE').read_text('utf-8').rstrip()
+    assert '-->' not in license_notice
+    shell=shell.replace('<!doctype html>', '<!doctype html>\n<!--\n'+license_notice+'\n-->', 1)
     images=sorted((ROOT/'assets').glob('*.jpg')); tracks=sorted((ROOT/'music').glob('*.mp3'))
     assets={p.stem:'data:image/jpeg;base64,'+base64.b64encode(p.read_bytes()).decode() for p in images}
     music={p.stem:'data:audio/mpeg;base64,'+base64.b64encode(p.read_bytes()).decode() for p in tracks}
@@ -30,7 +33,7 @@ def main():
     site=site.replace('<script>/*__JS__*/</script>',tags)
     (ROOT/'index.html').write_text(site,'utf-8')
     # Integrity manifest covers the served game and source, not archived releases or QA captures.
-    files=[ROOT/n for n in ['index.html','.nojekyll','VERSION','README.md','CREDITS.md','build.py','bake_scene.cjs','partition_scene.cjs','ocean.webmanifest']]
+    files=[ROOT/n for n in ['index.html','.nojekyll','VERSION','README.md','CREDITS.md','LICENSE','build.py','bake_scene.cjs','partition_scene.cjs','ocean.webmanifest']]
     for folder in ['src','assets','music']:
         files.extend(p for p in (ROOT/folder).rglob('*') if p.is_file())
     records=[{'path':str(p.relative_to(ROOT)),'bytes':p.stat().st_size,'sha256':hashlib.sha256(p.read_bytes()).hexdigest()} for p in sorted(files)]
