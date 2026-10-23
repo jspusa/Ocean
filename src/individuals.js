@@ -52,7 +52,7 @@ function initializeIndividuals(r){
 }
 // A continuously differentiable path, with a different route and pace per animal.
 // No per-frame random numbers: revisiting time t produces exactly the same transform.
-function animalTrajectory(f,t,out){
+function animalTrajectory(f,t,out,includeHeight=true){
  const id=f.bioSeed||1,s0=f.routeShape?f.routeShape[0]:bioValue(id,12),s1=f.routeShape?f.routeShape[1]:bioValue(id,13),phase=f.orbit;
  // Analytically integrated burst/glide pace is continuous and never reverses a route.
  const cadence=.30+s0*.18,burst=f.species<8?(f.species===0?.67:.48):.13;
@@ -61,9 +61,12 @@ function animalTrajectory(f,t,out){
  const radius=f.radius*(.88+.13*Math.sin(a*1.71+s0*6.3)+.08*Math.sin(t*.063+s1*7));
  let x=f.center[0]+Math.cos(a)*radius+Math.sin(a*2.31+s1*6.3)*f.radius*.085;
  let z=f.center[2]+Math.sin(a)*radius*(.57+s1*.25)+Math.cos(a*1.83+s0*3)*f.radius*.11;
- let y=f.species===0?f.center[1]+f.height+Math.sin(t*(.50+s1*.18)+f.bob)*.075:
+ // Banking reads only the previous sample's x/z. Its height and vertical
+ // obstacle avoidance cannot affect either horizontal coordinate.
+ if(!includeHeight){out[0]=x;out[2]=z;return;}
+ let y=f.fixedDepth!==undefined?f.fixedDepth+Math.sin(t*(.19+s0*.09)+f.bob)*.20:
+  f.species===0?f.center[1]+f.height+Math.sin(t*(.50+s1*.18)+f.bob)*.075:
   groundHeight(x,z)+f.height+Math.sin(t*(.24+s1*.10)+f.bob)*.16;
- if(f.fixedDepth!==undefined)y=f.fixedDepth+Math.sin(t*(.19+s0*.09)+f.bob)*.20;
  if(f.species!==0){
   // Smoothly anticipates a reef obstacle instead of suddenly jumping up at its edge.
   for(const ob of (fishObstacleBuckets.get(Math.floor(x/12)+','+Math.floor(z/12))||NO_FISH_OBSTACLES)){const dx=(x-ob.p[0])/(ob.s[0]+.9),dz=(z-ob.p[2])/(ob.s[2]+.9),d=dx*dx+dz*dz;
@@ -254,7 +257,7 @@ function updateLife(t){
  for(const f of allLife){
   if(f.fauna){faunaMotionPose(f,t,f.p);continue;}
   f.partnerFinPulse=0;
-  animalTrajectory(f,t,f.p);animalTrajectory(f,t+.055,trajectoryTmp);animalTrajectory(f,t-.055,trajectoryPrev);
+  animalTrajectory(f,t,f.p);animalTrajectory(f,t+.055,trajectoryTmp);animalTrajectory(f,t-.055,trajectoryPrev,false);
   const dx=trajectoryTmp[0]-f.p[0],dy=trajectoryTmp[1]-f.p[1],dz=trajectoryTmp[2]-f.p[2];
   f.yaw=Math.atan2(-dz,dx);f.pitch=clamp(Math.atan2(dy,Math.hypot(dx,dz)),-.29,.29);
   const px=f.p[0]-trajectoryPrev[0],pz=f.p[2]-trajectoryPrev[2];
