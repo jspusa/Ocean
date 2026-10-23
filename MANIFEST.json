@@ -1,5 +1,5 @@
 {
-  "version": "0.18.2",
+  "version": "0.18.3",
   "scope": "served game and build sources",
   "files": [
     {
@@ -19,13 +19,13 @@
     },
     {
       "path": "README.md",
-      "bytes": 21694,
-      "sha256": "c10957f7d8589a6a0a966ce2e93204672dc8cff001d1b810ee06ab1c1adc949f"
+      "bytes": 22196,
+      "sha256": "1c13ec19930be3a857d2e6bd9504ace4cdf720b2eaf9de4b0637f8f8417e3c62"
     },
     {
       "path": "VERSION",
       "bytes": 7,
-      "sha256": "39be4fc0749ae78834e31efb93c0b657412b78a172deb31ad5e4dba1bcd009f3"
+      "sha256": "0f006a55b47a70e58f4f05e6ee2b8b86139bd8ce9f31485cc13b2cc570dd9b17"
     },
     {
       "path": "assets/caustics.jpg",
@@ -1160,7 +1160,7 @@
     {
       "path": "index.html",
       "bytes": 13663,
-      "sha256": "6900e23e430335f23eb4ec1109bbeb535dd49f591d24b8e8d540a76a6024b4a2"
+      "sha256": "4fac65b77bab8df0b9bfa9c44674477917f9f022643ff6ddc728e930ee027b78"
     },
     {
       "path": "music/blue_silence.mp3",
@@ -1230,7 +1230,7 @@
     {
       "path": "src/config.js",
       "bytes": 2662,
-      "sha256": "0050d41fbca4a2c6334e5a4ad5be37b463779f90267fd1c471a360542f7cae36"
+      "sha256": "b4d79c7a8972fc6baea98fdafd40725aa922988ee497e2775524af08e51d2d3f"
     },
     {
       "path": "src/deepsea.js",
@@ -1319,8 +1319,8 @@
     },
     {
       "path": "src/performance.js",
-      "bytes": 7606,
-      "sha256": "ac40aa1253ce098f1ca18cc7f5da88163d653c629fddcebcd8caaaeed21732f4"
+      "bytes": 7712,
+      "sha256": "a0a26131e4e491fc817ccc06c8ee57cd674137499cdb069295acc94b47a869d7"
     },
     {
       "path": "src/photography.js",
@@ -1365,7 +1365,7 @@
     {
       "path": "src/shell.html",
       "bytes": 10246,
-      "sha256": "1eccb78b0e6ad1a67b114e0aebd03db2cee9880691729ad6d4a534612b3d0fc0"
+      "sha256": "76ac9a891d4e46636599f5aee1bd700c833e126c2d3ffb3f743f84287dbdac72"
     },
     {
       "path": "src/ship.js",

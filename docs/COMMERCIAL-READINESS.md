@@ -1,6 +1,6 @@
 # 商用授權與素材來源紀錄
 
-稽核日期：2026-10-23。基準為 `98d788f889e2b4aa2fedcd4d8526c5f065b6cd14`（0.17.1）。本紀錄只把程式庫內可核對的授權、來源及發布條件列明；不把作者聲明當成獨立權利清查，也不把功能試玩版標為已完成商業發售驗收。
+稽核日期：2026-10-23。範圍更新至已發布的 `cb65e02`（0.18.2），涵蓋 0.18 的新魚／授權包裝及後續 CPU／GPU 優化的庫內紀錄。本紀錄只列明可核對的授權、來源及發布條件；不把作者聲明當成獨立權利清查，也不把功能試玩版標為已完成商業發售驗收。
 
 現有 [LICENSE](../LICENSE) 是 MIT，明文允許使用、修改、發布、再授權及銷售副本。散布本作或其重要部分時，必須保留其中的版權及許可文字。[CREDITS](../CREDITS.md) 另明示原創程式、程序幾何、貼圖與音樂按該授權提供。這些是目前可用的商用許可依據；授權中的免保證條款仍適用。
 
@@ -9,7 +9,7 @@
 | 發布內容 | 可核對的建立方式與證據 | 授權／來源界線 |
 | --- | --- | --- |
 | 遊戲程式、介面、故事、存檔與即時著色器 | `src/`、`CREDITS.md`、`LICENSE` | 本庫以 MIT 提供；未發現發布包內的第三方 JavaScript 程式庫或 CDN 執行依賴 |
-| 地形、珊瑚、動物與船的幾何 | `src/world.js`、`reef_detail.js`、`individuals.js`、各 `*_fauna.js`／`*_world.js`；`bake_scene.cjs`、`partition_scene.cjs` | 程序原始碼與編譯流程在庫內；`CREDITS.md` 聲明沒有擷取 Nintendo 或外部模型 |
+| 地形、珊瑚、動物與船的幾何 | `src/world.js`、`reef_detail.js`、`individuals.js`、`reef_fauna.js`、各 `*_fauna.js`／`*_world.js`；`bake_scene.cjs`、`partition_scene.cjs` | 程序原始碼與編譯流程在庫內；`CREDITS.md` 聲明沒有擷取 Nintendo 或外部模型 |
 | 沙、岩石、珊瑚、龜殼 diffuse／normal 與光紋 | `make_textures.py`、`assets/*_diff.jpg`、`*_nor_gl.jpg`、`caustics.jpg` | 產生器標示為原創程序素材；不是取得外部攝影掃描授權的證據 |
 | 融合珊瑚資料 | `tools/sculpt_coral.py` → `assets/coral_forms.json` | 原始場函數、亂數種子及等值面產生方式可讀；未附外部掃描資料 |
 | 圖鑑影像與後備圖 | `assets/guide_*.jpg`、`tests/parity/*guide*`／模型渲染工具、各物種模組的 SVG 後備圖 | `CREDITS.md` 記錄 JPEG 由本作模型的 WebGL 棚景製作；SVG 定義在本庫。這是來源紀錄，尚未逐張獨立重製或做影像權利鑑識 |
@@ -20,9 +20,11 @@
 
 外部工具只用於開發：基本網站建置使用 Node.js／Python 標準函式庫；重製貼圖、音樂或珊瑚的選用工具會使用 NumPy、SciPy、Pillow、scikit-image、SoundFile 與 ffmpeg。這些套件或執行檔沒有隨網頁載入。若日後另售含工具或執行環境的套件，應依實際附帶版本保留其授權，不把本庫 MIT 當成第三方工具的授權。
 
-## 本輪可直接補齊的散布事項
+## 散布包裝與發布證據
 
 0.18 的建置已把既有 `LICENSE` 完整原文放入 `index.html`／`standalone.html` 註解，完整性清單也記錄 `LICENSE`。`commercial-packaging.cjs` 驗證兩種散布成品與授權檔雜湊，避免單檔被單獨轉交後遺失授權；沒有改寫版權人或另創授權。
+
+[0.18 報告](TEST_REPORT-v018.md) 記錄新魚與包裝檢查，新增 SVG 的原創來源聲明見 [CREDITS](../CREDITS.md)；[0.18.1](TEST_REPORT-v0181.md) 及 [0.18.2](TEST_REPORT-v0182.md) 記錄後續 CPU／GPU 優化、完整內容畫面對照及包裝回歸。CPU 隔離量測、SwiftShader 相對 GPU 計時與觸控模擬各有明示界線，不能作為實體裝置 FPS、耗電或完整真人遊玩驗收。
 
 新模型、文字或音樂應在 `CREDITS.md` 留下自己的來源與產生方式，並隨本庫保留原始碼；加入任何外部資產前，先記錄來源網址、作者、具體授權版本與必要標示。歷史發行 ZIP 保留原樣，不表示其中每一項檔案已完成獨立權利查驗。
 
@@ -37,3 +39,5 @@ GitHub Pages 的 [官方使用限制](https://docs.github.com/en/pages/getting-s
 ## 尚缺的外部證據
 
 版本庫沒有個別貢獻者的權利歸屬／移轉文件、品牌核名結果、獨立美術／音樂權利審查或實體裝置發售驗收結果。這些項目未能從程式碼自行補造。對現有 MIT 授權可作事實陳述；目前不能據此聲稱「全部權利已獨立審核」或「已通過所有付費發售條件」。
+
+這些證據缺口不改寫既有 MIT 許可；程式優化、合併與免費試玩版發布可持續進行。實際採用的商店、付費代管及營運條件，應依選定的交付方式另行確認。
