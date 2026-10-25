@@ -1,6 +1,6 @@
 # Wii 第一代 Endless Ocean 功能對等追蹤
 
-目標：完整 feature parity，維持桌機／手機及自動畫質。**目標持續進行；0.18.10 已發布並驗證公開檔案與桌機／觸控入海，訪客與深海渲染修復不表示對等完成。** 歷史盤點：[0.14](docs/FEATURE_PARITY-v014.md)、[0.13](docs/FEATURE_PARITY-v013.md)、[0.12](docs/FEATURE_PARITY-v012.md)、[0.11](docs/FEATURE_PARITY-v011.md)、[0.10](docs/FEATURE_PARITY-v010.md)、[0.9](docs/FEATURE_PARITY-v09.md)、[0.8](docs/FEATURE_PARITY-v08.md)。
+目標：完整 feature parity，維持桌機／手機及自動畫質。**目標持續進行；0.18.11 已發布並驗證 287 個公開檔案與桌機／觸控入海，新增皇帶魚與觀察修正不表示對等完成。** 歷史盤點：[0.14](docs/FEATURE_PARITY-v014.md)、[0.13](docs/FEATURE_PARITY-v013.md)、[0.12](docs/FEATURE_PARITY-v012.md)、[0.11](docs/FEATURE_PARITY-v011.md)、[0.10](docs/FEATURE_PARITY-v010.md)、[0.9](docs/FEATURE_PARITY-v09.md)、[0.8](docs/FEATURE_PARITY-v08.md)。
 
 依據：[官方功能研究](docs/WII-PARITY-REFERENCE.md)、[內容與圖鑑盤點](docs/WII-CONTENT-INVENTORY.md)、[完整玩家故事規格](docs/parity/SPEC.md)、[分項工作](docs/parity/issues)。
 
@@ -37,4 +37,4 @@
 
 公開程式提交 `e4a5985088c2eeabaaf1a805e73d3412c4a7a22e` 已由 Pages 建置發布，285 個公開檔案雜湊及兩種 profile 的預設自動畫質入海均通過。新版公開 20 分鐘探索已完成，全程 59.503 FPS、22 段／54.63 km，P95／P99 為 16.7／16.8 ms；完整任務、多人外網、真人全流程與實體裝置缺口保留，既有星級不因此提升。
 
-[0.18.11 報告](docs/TEST_REPORT-v01811.md) 記錄原創皇帶魚、9 m 寬側接近、頭尾及局部可見選取與觀察的一致性。CPU 81/81、靜態 61/61、原生桌機／觸控尺寸自然流程及新模型 GPU 成本分別記錄；公開交付狀態見該報告。完整項目星級及缺口不因新增一種生物而提高。
+[0.18.11 報告](docs/TEST_REPORT-v01811.md) 記錄原創皇帶魚、9 m 寬側接近、頭尾及局部可見選取與觀察的一致性。CPU 81/81、靜態 61/61、原生桌機／觸控尺寸自然流程及新模型 GPU 成本分別記錄；公開 287 個檔案雜湊與預設入海通過，公開桌機／觸控完整皇帶魚流程各 36/36；詳細交付狀態見該報告。完整項目星級及缺口不因新增一種生物而提高。
