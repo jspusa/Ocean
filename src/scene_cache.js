@@ -5,12 +5,15 @@ async function loadCompiledScene(renderer){
  if(typeof DecompressionStream==='undefined'||typeof WORLD==='undefined')return false;
  const started=performance.now();let bytes,header,base;
  try{
-  const response=await fetch(WORLD);if(!response.ok)throw new Error('scene HTTP '+response.status);
   // Bound both sides while streaming. Avoid retaining the compressed archive
   // and a Blob copy alongside the decoded scene during startup on phones.
   const bounded=(limit,message)=>{let length=0;return new TransformStream({transform(chunk,controller){length+=chunk.byteLength;if(length>limit)throw new Error(message);controller.enqueue(chunk);}});};
-  const stream=response.body.pipeThrough(bounded(24*1024*1024,'scene archive is oversized')).pipeThrough(new DecompressionStream('gzip')).pipeThrough(bounded(80*1024*1024,'decoded scene is oversized'));
-  bytes=await new Response(stream).arrayBuffer();const view=new DataView(bytes);
+  // The complete archive is larger than a region. Its one-minute budget also
+  // covers body consumption and decompression, not only response headers.
+  bytes=await fetchSceneData(WORLD,response=>{
+   const stream=response.body.pipeThrough(bounded(24*1024*1024,'scene archive is oversized')).pipeThrough(new DecompressionStream('gzip')).pipeThrough(bounded(80*1024*1024,'decoded scene is oversized'));
+   return new Response(stream).arrayBuffer();
+  },undefined,60000);const view=new DataView(bytes);
   if(bytes.byteLength<8||bytes.byteLength>80*1024*1024||view.getUint32(0,true)!==0x35424652)throw new Error('invalid scene header');
   const length=view.getUint32(4,true);base=8+length;if(base>bytes.byteLength||base%4)throw new Error('invalid scene offsets');
   header=JSON.parse(new TextDecoder().decode(new Uint8Array(bytes,8,length)));

@@ -6,7 +6,7 @@ const pw=require(process.env.PLAYWRIGHT_PATH||'playwright');
 const url=process.argv.find(x=>/^https?:/.test(x))||'http://127.0.0.1:8000/';
 const rows=[],errors=[],digest=s=>crypto.createHash('sha256').update(Buffer.from(s,'base64')).digest('hex');
 (async()=>{
- const browser=await pw.chromium.launch({executablePath:process.env.CHROME_PATH||'/usr/bin/chromium',headless:true,args:['--no-sandbox','--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader']});
+ const browser=await pw.chromium.launch(require('./browser-launch.cjs')());
  try{for(const mobile of [false,true]){
   const context=await browser.newContext({viewport:{width:320,height:240},deviceScaleFactor:1,isMobile:mobile,hasTouch:mobile}),page=await context.newPage();
   page.on('pageerror',e=>errors.push(e.message));let phase='boot';const requests=[],releases=[];

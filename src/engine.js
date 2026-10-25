@@ -888,34 +888,36 @@ class Renderer{
  setMatrix4fv(p,n,transpose,v){const u=this.uniform(p,n);if(u!==null)this.gl.uniformMatrix4fv(u,transpose,v);}
  attr(index,size,stride,offset,divisor=0){let g=this.gl;g.enableVertexAttribArray(index);g.vertexAttribPointer(index,size,g.FLOAT,false,stride,offset);g.vertexAttribDivisor(index,divisor);}
  async loadTextures(forceFull=false){
-  const g=this.gl,pending=[],images=new Set(),timers=new Set(),names=['sand_diff','sand_nor_gl','rock_diff','rock_nor_gl','shell_diff','shell_nor_gl','coral_diff','coral_nor_gl','caustics'];const full=forceFull||!this.mobile||this.quality===2;
+  const g=this.gl,pending=[],images=new Map(),timers=new Set(),names=['sand_diff','sand_nor_gl','rock_diff','rock_nor_gl','shell_diff','shell_nor_gl','coral_diff','coral_nor_gl','caustics'];const full=forceFull||!this.mobile||this.quality===2;
   const retryToken=Date.now().toString(36)+'-'+(this._textureRequestSequence=(this._textureRequestSequence||0)+1),retryDelays=[150,400];let aborted=false;
-  const cancel=()=>{aborted=true;for(const timer of timers)clearTimeout(timer);timers.clear();for(const image of images){image.onload=null;image.onerror=null;}images.clear();};
+  const cancel=()=>{aborted=true;for(const timer of timers)clearTimeout(timer);timers.clear();for(const image of images.keys()){image.onload=null;image.onerror=null;image.removeAttribute('src');}images.clear();};
   try{await Promise.all(names.map((name,i)=>new Promise((resolve,reject)=>{
    const tex=g.createTexture();pending[i]=tex;const asset=ASSETS[name],network=!/^(?:data|blob):/i.test(asset);let current=null,settled=false;
-   const detach=img=>{img.onload=null;img.onerror=null;images.delete(img);if(current===img)current=null;};
+   const detach=(img,cancelSource=false)=>{const timer=images.get(img);clearTimeout(timer);timers.delete(timer);img.onload=null;img.onerror=null;images.delete(img);if(current===img)current=null;if(cancelSource)img.removeAttribute('src');};
    const fail=error=>{settled=true;reject(error);};
    const load=attempt=>{
     if(aborted||settled)return;
-    try{const img=new Image();current=img;images.add(img);
+    try{const img=new Image(),expiresAt=performance.now()+12000;current=img;images.set(img,null);
      img.onload=()=>{
       if(aborted||settled||current!==img)return;
+      if(performance.now()>=expiresAt){img.onerror();return;}
       try{g.bindTexture(g.TEXTURE_2D,tex);g.pixelStorei(g.UNPACK_FLIP_Y_WEBGL,false);let source=img;
        if(!full&&name!=='caustics'&&img.width>1024){const c=document.createElement('canvas');c.width=c.height=1024;c.getContext('2d').drawImage(img,0,0,1024,1024);source=c;}
        g.texImage2D(g.TEXTURE_2D,0,g.RGBA8,g.RGBA,g.UNSIGNED_BYTE,source);g.generateMipmap(g.TEXTURE_2D);g.texParameteri(g.TEXTURE_2D,g.TEXTURE_MIN_FILTER,g.LINEAR_MIPMAP_LINEAR);g.texParameteri(g.TEXTURE_2D,g.TEXTURE_MAG_FILTER,g.LINEAR);g.texParameteri(g.TEXTURE_2D,g.TEXTURE_WRAP_S,g.REPEAT);g.texParameteri(g.TEXTURE_2D,g.TEXTURE_WRAP_T,g.REPEAT);
        if(this.aniso)g.texParameterf(g.TEXTURE_2D,this.aniso.TEXTURE_MAX_ANISOTROPY_EXT,Math.min(8,g.getParameter(this.aniso.MAX_TEXTURE_MAX_ANISOTROPY_EXT)));settled=true;detach(img);resolve();
-      }catch(error){detach(img);fail(error);}
+      }catch(error){detach(img,true);fail(error);}
      };
      img.onerror=()=>{
-      if(aborted||settled||current!==img)return;detach(img);
+      if(aborted||settled||current!==img)return;detach(img,true);
       if(network&&attempt<retryDelays.length){
        try{const timer=setTimeout(()=>{timers.delete(timer);if(!aborted&&!settled)load(attempt+1);},retryDelays[attempt]);timers.add(timer);}catch(error){fail(error);}
       }else fail(new Error('無法載入材質 '+name));
      };
+     const timer=setTimeout(()=>{timers.delete(timer);img.onerror?.();},12000);images.set(img,timer);timers.add(timer);
      let url=asset;if(attempt){const hash=asset.indexOf('#'),base=hash<0?asset:asset.slice(0,hash),suffix=hash<0?'':asset.slice(hash);url=base+(base.includes('?')?'&':'?')+'_ocean_retry='+retryToken+'-'+attempt+suffix;}img.src=url;
-    }catch(error){if(current)detach(current);fail(error);}
+    }catch(error){if(current)detach(current,true);fail(error);}
    };load(0);
-  })));}catch(e){cancel();pending.forEach(tex=>g.deleteTexture(tex));throw e;}
+  })));}catch(e){cancel();pending.forEach(tex=>g.deleteTexture(tex));const error=new Error(e?.message||String(e));error.code='OCEAN_ASSET_UNAVAILABLE';error.cause=e;throw error;}
   const old=this.textures;this.textures=pending;this.textureFull=full;this.dirty=true;old.forEach(tex=>g.deleteTexture(tex));
  }
  upgradeTextures(){if(this.textureFull)return Promise.resolve();if(!this._textureUpgrade)this._textureUpgrade=this.loadTextures(true).finally(()=>this._textureUpgrade=null);return this._textureUpgrade;}

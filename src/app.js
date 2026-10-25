@@ -71,7 +71,13 @@ function persist(){
 function log(text){persistent.log.push({text,date:Date.now()});persistent.log=persistent.log.slice(-60);persist();}
 function setCount(){$('seenCount').textContent=persistent.seen.length+'/'+SPECIES.length;}
 function resetInput(){cameraCut=true;simulationAccumulator=0;previousPhysicsPosition=null;keys.clear();stick=[0,0];lookStick=[0,0];verticalInput=0;inputCleanup.forEach(f=>f());if($('lookKnob'))$('lookKnob').style.transform='translate(0,0)';player.velocity=[0,0,0];$('stickKnob').style.transform='translate(0,0)';}
-function handleFailure(e,{contextLost=false,saved=false}={}){console.error(e);$('loading').classList.add('hidden');$('errorBox').classList.remove('hidden');$('errorTitle').textContent=contextLost?'顯示暫時中斷':'這個視窗無法啟動 3D';$('errorMessage').textContent=contextLost?(saved?'航程已保存。可以先匯出備份，再以省電畫質重新啟動。':'航程尚未完整保存。請先匯出備份，再重新啟動。'):(e?.message||String(e));$('errorExportSave').hidden=!contextLost;$('errorSafeRestart').focus();}
+function handleFailure(e,{contextLost=false,saved=false}={}){
+ console.error(e);const assetFailure=!contextLost&&e?.code==='OCEAN_ASSET_UNAVAILABLE';
+ $('loading').classList.add('hidden');$('errorBox').classList.remove('hidden');
+ $('errorTitle').textContent=contextLost?'顯示暫時中斷':assetFailure?'海洋素材未能載入':'這個視窗無法啟動 3D';
+ $('errorMessage').textContent=contextLost?(saved?'航程已保存。可以先匯出備份，再以省電畫質重新啟動。':'航程尚未完整保存。請先匯出備份，再重新啟動。'):assetFailure?'部分素材未能完整下載或讀取。請確認網路連線，再按「重新嘗試」。':(e?.message||String(e));
+ $('errorExportSave').hidden=!contextLost;$(assetFailure?'errorRetry':'errorSafeRestart').focus();
+}
 function restartLowPower(){const url=new URL(location.href);url.searchParams.set('safeGraphics','1');location.assign(url.href);}
 async function exportRecoverySave(){
  const button=$('errorExportSave'),status=$('errorRecoveryStatus');button.disabled=true;status.textContent='正在整理航程與照片備份…';

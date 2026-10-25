@@ -3,14 +3,21 @@
 // Bound the whole response, including a body that stalls after its headers.
 // Race the deadline as well as aborting: cancellation must release a job even
 // when a browser/network adapter never settles the original read.
-async function fetchSceneData(url,read,signal){
- const controller=new AbortController();let timer,cancel;
+async function fetchSceneData(url,read,signal,timeoutMs=12000){
+ const controller=new AbortController(),expiresAt=performance.now()+timeoutMs;let timer,cancel;
+ const timeout=()=>{controller.abort();return new Error('region request timed out');};
+ // A suspended timer queue must not let late headers or decoded bytes win.
+ const checkDeadline=()=>{if(performance.now()>=expiresAt)throw timeout();};
  const stopped=new Promise((_,reject)=>{
   cancel=()=>{controller.abort();reject(new Error('region request cancelled'));};
   if(signal?.aborted)cancel();else signal?.addEventListener('abort',cancel,{once:true});
-  timer=setTimeout(()=>{controller.abort();reject(new Error('region request timed out'));},12000);
+  timer=setTimeout(()=>reject(timeout()),timeoutMs);
  });
- try{return await Promise.race([stopped,(async()=>{const response=await fetch(url,{signal:controller.signal});if(!response.ok)throw Error('region HTTP '+response.status);return read(response);})()]);}
+ try{return await Promise.race([stopped,(async()=>{
+  const response=await fetch(url,{signal:controller.signal});checkDeadline();
+  if(!response.ok)throw Error('region HTTP '+response.status);
+  const value=await read(response);checkDeadline();return value;
+ })()]);}
  finally{clearTimeout(timer);signal?.removeEventListener('abort',cancel);}
 }
 function waitForSceneUploadFrame(signal){
