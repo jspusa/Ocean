@@ -37,6 +37,10 @@ const oceanEcology=(()=>{
  const playAllowed=()=>active&&!modal&&!photoOpen&&!voyage.photoMode&&!document.body.classList.contains?.('cinematic');
  function inRange(f,contact=false){
   if(!f||f.ecologyPresent===false||!f.uid||f.species<0||!SPECIES[f.species])return false;
+  // A long ribbonfish can remain visibly selected while its centre is outside
+  // the frame or behind a rock. Observation and photo credit share the same
+  // revalidated body sightline; touching still requires the original limits.
+  if(!contact&&SPECIES[f.species].id==='oarfish'&&typeof oceanSelection!=='undefined')return oceanSelection.valid(f);
   const point=animalFocusPoint(f);const traits=speciesTraits(f.species),limit=contact?traits.contactDistance:traits.observeDistance;if(f.retreat>.8||f.faunaVisibility<.8)return false;
   if(V.dist(player.p,point)>limit||V.dist(eye,point)>limit+V.dist(eye,player.p)+2||blocked(eye,point,SPECIES[f.species].fauna?.001:.13)||blocked(player.p,point,SPECIES[f.species].fauna?.001:.13))return false;
   const p=project(point,renderer.vp);return p.every(Number.isFinite)&&p[2]>0&&Math.abs(p[0])<.96&&Math.abs(p[1])<.92;

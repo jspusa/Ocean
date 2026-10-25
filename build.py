@@ -5,7 +5,7 @@ Python 3.10+ and Node.js 18+; standard libraries only, no npm dependencies.
 from pathlib import Path
 import base64,hashlib,json,subprocess,sys
 ROOT=Path(__file__).resolve().parent
-JS_FILES=['engine.js','world.js','reef_detail.js','next_reef.js','individuals.js','open_world.js','trench.js','fauna.js','cetaceans.js','abyss_fauna.js','trench_fauna.js','fauna_world.js','cetacean_world.js','regions.js','abyss_world.js','trench_world.js','pelagic_life.js','reef_fauna.js','scene_stream.js','scene_cache.js','seasons.js','audio.js','performance.js','selection.js','save_session.js','app.js','gamepad_ui.js','voyage.js','features.js','ecology.js','exploration.js','expedition.js','aquarium.js','photography.js','navigation.js','ship.js','microcosm.js','story.js','deepsea.js','mobile-controls.js','save_session_ui.js','bootstrap.js']
+JS_FILES=['engine.js','world.js','reef_detail.js','next_reef.js','individuals.js','open_world.js','trench.js','fauna.js','cetaceans.js','abyss_fauna.js','trench_fauna.js','fauna_world.js','cetacean_world.js','regions.js','abyss_world.js','trench_world.js','pelagic_life.js','reef_fauna.js','oarfish.js','scene_stream.js','scene_cache.js','seasons.js','audio.js','performance.js','selection.js','save_session.js','app.js','gamepad_ui.js','voyage.js','features.js','ecology.js','exploration.js','expedition.js','aquarium.js','photography.js','navigation.js','ship.js','microcosm.js','story.js','deepsea.js','mobile-controls.js','save_session_ui.js','bootstrap.js']
 def main():
     version=(ROOT/'VERSION').read_text().strip()
     if '--pack-only' not in sys.argv:

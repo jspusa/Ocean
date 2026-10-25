@@ -1,5 +1,7 @@
 /* One connected ocean. The old deployment field is retained only so existing
  * save files load; depth and position determine the underwater environment. */
+// Compose runtime additions without mutating the immutable baked trench.
+const deepseaEncounters=Object.freeze([...(OceanTrench.encounters||[]),...(typeof OarfishWorld==='undefined'?[]:[OarfishWorld.encounter])]);
 const DeepseaRules=(()=>{
  const initial=()=>({schema:1,deployed:false,station:'midwater',visited:[]});
  const station=id=>OceanTrench.stations.find(s=>s.id===id);
@@ -22,7 +24,7 @@ const DeepseaRules=(()=>{
   const depth=Math.max(0,-p[1]),floor=groundHeight(p[0],p[2]),clearance=Math.max(0,p[1]-floor);
   let nearest=clearance;
   for(const habitat of Object.values(OceanTrench.habitats))for(const home of habitat.homes)nearest=Math.min(nearest,V.dist(p,home));
-  for(const encounter of OceanTrench.encounters||[])nearest=Math.min(nearest,V.dist(p,encounter.home));
+  for(const encounter of deepseaEncounters)nearest=Math.min(nearest,V.dist(p,encounter.home));
   if(typeof AbyssWorldRules!=='undefined')for(const habitat of Object.values(AbyssWorldRules.sites))for(const home of habitat.homes)nearest=Math.min(nearest,V.dist(p,home));
   const open=smooth01((nearest-12)/145),deep=smooth01((depth-80)/500);
   return mix(2.2,72,open*deep);
@@ -65,12 +67,15 @@ const oceanDeepsea=(()=>{
  }
  function approachRoute(id,fish=observationTarget(id)){
   if(!fish)return null;
-  const point=animalFocusPoint(fish),traits=speciesTraits(fish.species),size=SPECIES[fish.species].size;
+  const point=animalFocusPoint(fish),traits=speciesTraits(fish.species),sp=SPECIES[fish.species],size=sp.size,ribbon=sp.id==='oarfish';
   const drift=Number.isFinite(fish.radius)?Math.max(0,fish.radius):Math.max(0,SPECIES[fish.species].motionProfile?.radius||0);
   // Leave room for both sides of the natural orbit in a narrow portrait view.
-  const distance=Math.min(traits.observeDistance*.72,Math.max(traits.viewDistance,size*2,drift*7,traits.micro?1.05:1.5));
-  const away=V.sub(player.p,point),angle=Math.atan2(away[0],away[2]);
-  for(const turn of [0,.55,-.55,1.1,-1.1,Math.PI]){
+  const distance=Math.min(traits.observeDistance*.72,Math.max(traits.viewDistance,size*2,ribbon?size*2.25:drift*7,traits.micro?1.05:1.5));
+  const away=V.sub(player.p,point),normal=[Math.sin(fish.yaw||0),0,Math.cos(fish.yaw||0)];
+  // A compressed ribbon is almost invisible end-on. Approach the nearer wide
+  // side at real swimming speed; the animal keeps its own position and pose.
+  const angle=ribbon?(fish.yaw||0)+(V.dot(away,normal)<0?Math.PI:0):Math.atan2(away[0],away[2]);
+  for(const turn of ribbon?[0,Math.PI,.22,-.22]:[0,.55,-.55,1.1,-1.1,Math.PI]){
    const a=angle+turn,p=[point[0]+Math.sin(a)*distance,point[1]+Math.max(.15,Math.min(.45,distance*.18)),point[2]+Math.cos(a)*distance];
    const floor=OceanTrench.floorAt(p[0],p[2],p[1]+.1);if(Number.isFinite(floor))p[1]=Math.max(p[1],floor+.82);
    if(V.dist(p,point)>traits.observeDistance*.9||OceanRegions.pointBlocked(p,.4)||!OceanRegions.pathClear(player.p,p,.4)||blocked(p,point,.001))continue;
@@ -105,7 +110,7 @@ const oceanDeepsea=(()=>{
   const route=OceanTrench.route(state().station,id,player.p);
   if(!Array.isArray(route)||route.length<2){toast('先游到開闊水域，再跟著海流前往。');return false;}
   closePanel();clearMotion();if(typeof oceanSelection!=='undefined')oceanSelection.clear();
-  journey={target:id,legs:R.itinerary(route,OceanTrench.encounters||[],(a,b)=>OceanRegions.pathClear(a,b,.4))};nextLeg();auto=true;setAutoUI();renderer.dirty=true;paintHUD();return true;
+  journey={target:id,legs:R.itinerary(route,deepseaEncounters,(a,b)=>OceanRegions.pathClear(a,b,.4))};nextLeg();auto=true;setAutoUI();renderer.dirty=true;paintHUD();return true;
  }
  function cancelTravel(){if(!transit&&!patrol)return;clearMotion();paintHUD();toast('自由游動中。');}
  function constrain(p,from=null){

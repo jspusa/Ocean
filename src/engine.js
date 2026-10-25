@@ -204,6 +204,12 @@ void main(){vec3 p=aPosition,n=aNormal;vLocal=p;vUV=aUV;vTag=aTag;
   }else if(uRigClass==3){
    float w=1.-smoothstep(-.5,.10,p.x),wave=beat+p.x*5.;p.z+=sin(wave)*.033*w*w;n.x-=cos(wave)*.165*w*w*n.z;
    if(fin&&p.x>.05){float span=smoothstep(.10,.25,abs(p.z));p.y+=sin(beat*.72+sign(p.z)*1.8)*.016*span;}
+  }else if(uRigClass==4&&fin){
+   // Ribbonfish swim with their long dorsal fin. UV carries its attachment
+   // height and slope; displacement vanishes at the body, including the crest.
+   float height=max(0.,p.y-aUV.x),wave=beat+p.x*35.,bend=sin(wave)*.30;
+   p.z+=bend*height;
+   if(height>0.){n.x-=(cos(wave)*10.5*height-bend*aUV.y)*n.z;n.y-=bend*n.z;}
   }
  }
  if(uKind==5){
@@ -560,6 +566,9 @@ void main(){
  float gv=NoL*sqrt(NoV*NoV*(1.-a2)+a2),gl=NoV*sqrt(NoL*NoL*(1.-a2)+a2);
  float G=.5/max(gv+gl,.0001);
  float F0=(uMat==6||uMat==5)?(vTag>3.5?.018:.006):uMat==11?.019:.005;
+ // Silver guanine skin reflects the available light; fins and eyes retain
+ // their existing response. Nothing is added when the environment is dark.
+ if(uSurfaceProfile.w>5.5&&vTag>.5&&vTag<1.5)F0=.12;
  float F=F0+(1.-F0)*pow(1.-VoH,5.);
  col+=uLightColor*waterAbsorb*D*G*F*NoL*sh*irradiance;
  // This rim is reflected environmental light, not an emissive rock edge.
@@ -1108,7 +1117,7 @@ class Renderer{
   g.bindRenderbuffer(g.RENDERBUFFER,null);g.bindFramebuffer(g.FRAMEBUFFER,null);
  }
  common(p,eye,vp,t){let g=this.gl;g.useProgram(p.p);if(this.textures[8]){this.bindTex(9,this.textures[8]);this.set1i(p,'uCaustic',9);}this.setMatrix4fv(p,'uVP',false,vp===this.vp?this.renderVP:vp===this.lightVP?this.renderLightVP:vp===this.dynamicLightVP?this.renderDynamicLightVP:vp);this.setMatrix4fv(p,'uLightVP',false,this.renderLightVP||this.lightVP);this.setMatrix4fv(p,'uDynamicLightVP',false,this.renderDynamicLightVP||this.renderLightVP||this.lightVP);this.set1i(p,'uSamples',this.msaaSamples||0);this.set1i(p,'uQuality',this.quality);this.set3fv(p,'uRenderOrigin',this.renderOrigin||[0,0,0]);this.set4f(p,'uTorchParams',TorchLightRules.outer,TorchLightRules.inner,TorchLightRules.strength,TorchLightRules.falloff);this.set3fv(p,'uCamera',eye);this.set1f(p,'uTorch',this.lamp?1:0);this.set3fv(p,'uViewForward',this.cameraForward||[0,0,-1]);this.set1f(p,'uTime',t);this.set1f(p,'uSwim',typeof player==='undefined'?.4:Math.min(1,Math.hypot(...player.velocity)/1.6));this.set1f(p,'uSun',this.sun);this.set3fv(p,'uFog',this.fog);this.set3fv(p,'uLightDir',this.lightDir);this.set3fv(p,'uAirLightDir',this.airLightDir||this.lightDir);this.set3fv(p,'uLightColor',this.lightColor);}
- speciesUniforms(p,b){const sp=typeof SPECIES!=='undefined'?SPECIES[b.species]:null,m=sp?.materialProfile,r=sp?.motionProfile?.type;this.set1i(p,'uRigClass',r==='vampire'?1:r==='sea_pig'?2:r==='snailfish'?3:0);this.set4f(p,'uSurfaceProfile',m?clamp(m.roughness,.12,.98):-1,m?clamp(m.subsurface,0,1):0,m?Math.max(.1,m.patternScale||1):1,m?({fish:0,cetacean:1,cephalopod:2,crustacean:3,shell:4,gelatinous:5}[m.skin]??0):-1);}
+ speciesUniforms(p,b){const sp=typeof SPECIES!=='undefined'?SPECIES[b.species]:null,m=sp?.materialProfile,r=sp?.motionProfile?.type;this.set1i(p,'uRigClass',r==='vampire'?1:r==='sea_pig'?2:r==='snailfish'?3:r==='oarfish'?4:0);this.set4f(p,'uSurfaceProfile',m?clamp(m.roughness,.12,.98):-1,m?clamp(m.subsurface,0,1):0,m?Math.max(.1,m.patternScale||1):1,m?({fish:0,cetacean:1,cephalopod:2,crustacean:3,shell:4,gelatinous:5,silver:6}[m.skin]??0):-1);}
  batchUniforms(p,b,state,kind=b.kind){
   // State is local to one shader pass, so a new frame, a material edit or a
   // shadow/colour transition always reinitializes the relevant uniforms.
