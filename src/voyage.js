@@ -158,7 +158,7 @@ findSpecies=function(index,specific=null){
  const deep=typeof oceanDeepsea!=='undefined'&&oceanDeepsea.isActive();
  const candidates=life.filter(f=>f.species===index&&f.ecologyPresent!==false);let fish=specific||candidates.reduce((a,f)=>!a||V.dist(f.p,player.p)<V.dist(a.p,player.p)?f:a,null);
  if(!fish||fish.ecologyPresent===false){const sp=SPECIES[index];if(sp.fauna&&sp.wildHabitat!==false)markPlace('habitat:'+sp.id);toast(oceanSeasons.hint(sp.id));return;}
- if(V.dist(animalFocusPoint(fish),player.p)>speciesTraits(index).observeDistance){markPlace('habitat:'+SPECIES[index].id);toast('已標記棲地，直接游近就能觀察。');return;}
+ if(!active||V.dist(animalFocusPoint(fish),player.p)>speciesTraits(index).observeDistance){markPlace('habitat:'+SPECIES[index].id);toast('已標記棲地，直接游近就能觀察。');return;}
  if(SPECIES[index].traits?.micro){closePanel();if(typeof oceanMicrocosm!=='undefined'&&V.dist(animalFocusPoint(fish),player.p)<=speciesTraits(index).observeDistance){oceanMicrocosm.enter(fish.uid);}else{markPlace('habitat:'+SPECIES[index].id);toast('已標記棲地；游近後開啟微觀探索，尋找細小的身影。');}return;}
  if(voyage.state.mode==='journey'&&V.dist(fish.p,player.p)>(index===10?85:20)){
   const sp=SPECIES[index],place=sp.fauna?'habitat:'+sp.id:LANDMARKS[sp.zone].id;markPlace(place);toast('已標記棲地。先親自游近，再觀察這位訪客。');return;}

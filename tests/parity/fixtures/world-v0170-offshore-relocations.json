@@ -1,0 +1,116 @@
+{
+  "sourceCommit": "948c046a67fb5b7c7b8f77466b4b24171e75be9d",
+  "sourceVersion": "0.17.0",
+  "meshSha256": "719cee472608b570784271d4004ea47cf3d5c4427eff84d86d00bed72f6d96a6",
+  "description": "Immutable released 0.17.0 offshore relocation coordinates. Extracted with git show <sourceCommit>:assets/reef.mesh.gz, gunzip, decode the RFB5 JSON header, then select exactly orca-001..003 and false_killer_whale-001..003. Only home, center and initial p replace 0.12.1 coordinate expectations; every other historical field remains checked against the original fixture. Never generate from the current worktree.",
+  "actors": [
+    {
+      "uid": "orca-001",
+      "home": [
+        445,
+        -18,
+        -305
+      ],
+      "center": [
+        445,
+        -18,
+        -305
+      ],
+      "p": [
+        497,
+        -3.7332,
+        -305
+      ]
+    },
+    {
+      "uid": "orca-002",
+      "home": [
+        447,
+        -18,
+        -303
+      ],
+      "center": [
+        447,
+        -18,
+        -303
+      ],
+      "p": [
+        428.475774208361,
+        -16.791506886691575,
+        -261.2862651510062
+      ]
+    },
+    {
+      "uid": "orca-003",
+      "home": [
+        449,
+        -18,
+        -301
+      ],
+      "center": [
+        449,
+        -18,
+        -301
+      ],
+      "p": [
+        407.34922107914906,
+        -19.220206081379022,
+        -309.9152454197048
+      ]
+    },
+    {
+      "uid": "false_killer_whale-001",
+      "home": [
+        510,
+        -17,
+        85
+      ],
+      "center": [
+        510,
+        -17,
+        85
+      ],
+      "p": [
+        570,
+        -2.02,
+        85
+      ]
+    },
+    {
+      "uid": "false_killer_whale-002",
+      "home": [
+        512,
+        -17,
+        87
+      ],
+      "center": [
+        512,
+        -17,
+        87
+      ],
+      "p": [
+        489.6292124213215,
+        -15.964148760021352,
+        131.90923413515858
+      ]
+    },
+    {
+      "uid": "false_killer_whale-003",
+      "home": [
+        514,
+        -17,
+        89
+      ],
+      "center": [
+        514,
+        -17,
+        89
+      ],
+      "p": [
+        464.606175272513,
+        -18.045890926896305,
+        76.76147272539508
+      ]
+    }
+  ]
+}

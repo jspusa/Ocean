@@ -20,7 +20,7 @@ const median=values=>values.slice().sort((a,b)=>a-b)[Math.floor(values.length/2)
    await __prepareView([0,-8,7],[0,-8,-10],8);
    const g=renderer.gl,ext=g.getExtension('EXT_disjoint_timer_query_webgl2'),debug=g.getExtension('WEBGL_debug_renderer_info');
    window.__surfaceGPU={ext,programs:renderer.surfacePrograms,pixels:null,query:null};
-   if(!renderer.surfacePrograms||renderer.surfacePrograms.size!==4)throw Error('Expected the four production surface programs');
+   if(!renderer.surfacePrograms||renderer.surfacePrograms.size!==6)throw Error('Expected the six production surface programs');
    return {timer:!!ext,renderer:debug?g.getParameter(debug.UNMASKED_RENDERER_WEBGL):'',quality:renderer.quality,resolution:[renderer.canvas.width,renderer.canvas.height],volumeResolution:[renderer.volumeW,renderer.volumeH],msaaSamples:renderer.msaaSamples,programs:renderer.surfacePrograms.size};
   });
   // ready() covers required geometry; allow all already-requested preloads to

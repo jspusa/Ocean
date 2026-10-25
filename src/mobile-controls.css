@@ -66,4 +66,9 @@ body.mobile-controls-v1 #fullscreenBtn svg { width: 19px; height: 19px; }
 @media (pointer: coarse) and (orientation: landscape) and (max-height: 420px) {
   body.mobile-controls-v1 #hud { --hud-top: max(6px, env(safe-area-inset-top)); }
   body.mobile-controls-v1 #selectionPanel { top: 104px; }
+  body.mobile-controls-v1.dive-active #toast {
+    left: max(168px, calc(env(safe-area-inset-left) + 158px));
+    max-width: calc(100vw - max(168px, calc(env(safe-area-inset-left) + 158px)) - max(12px, calc(env(safe-area-inset-right) + 10px)) - 119px);
+    bottom: 18px;
+  }
 }

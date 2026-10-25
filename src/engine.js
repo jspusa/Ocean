@@ -829,7 +829,7 @@ float lb=L(b);frag=vec4(lb<lo||lb>hi?a:b,1.);
 // These common surfaces keep the original arithmetic while allowing the
 // compiler to remove every unrelated rig and material branch ahead of play.
 function surfaceShaderSource(source,kind,material){
- if(!((kind===0&&(material===1||material===2||material===3))||(kind===1&&material===6)))throw new RangeError('Unsupported surface shader');
+ if(!((kind===0&&(material===1||material===2||material===3||material===16||material===17))||(kind===1&&material===6)))throw new RangeError('Unsupported surface shader');
  for(const [name,value]of [['uKind',kind],['uMat',material]]){
   const declaration='uniform int '+name+';';if(!source.includes(declaration))throw new Error('Missing surface shader uniform: '+name);
   source=source.replace(declaration,'const int '+name+'='+value+';');
@@ -852,8 +852,8 @@ class Renderer{
  setupSurfacePrograms(){
   if(this.surfacePrograms)return this.surfacePrograms;
   const programs=this.surfacePrograms=new Map();this.surfaceProgramFailures=new Map();
-  for(const [kind,material]of [[0,1],[0,2],[0,3],[1,6]]){const key=kind+':'+material;
-   try{programs.set(key,this.makeProgram(surfaceShaderSource(VS,kind,material),surfaceShaderSource(FS,kind,material)));}
+  for(const [kind,material]of [[0,1],[0,2],[0,3],[1,6],[0,16],[0,17]]){const key=kind+':'+material;
+   try{programs.set(key,this.makeProgram(kind===0&&(material===16||material===17)?VS:surfaceShaderSource(VS,kind,material),surfaceShaderSource(FS,kind,material)));}
    catch(error){this.surfaceProgramFailures.set(key,String(error?.message||error));}
   }return programs;
  }
@@ -863,6 +863,8 @@ class Renderer{
   if(b.kind===0&&b.material===2)return programs.get('0:2')||this.program;
   if(b.kind===0&&b.material===3)return programs.get('0:3')||this.program;
   if(b.kind===1&&b.material===6)return programs.get('1:6')||this.program;
+  if(b.kind===0&&b.material===16)return programs.get('0:16')||this.program;
+  if(b.kind===0&&b.material===17)return programs.get('0:17')||this.program;
   return this.program;
  }
  uniform(p,n){if(!(n in p.u))p.u[n]=this.gl.getUniformLocation(p.p,n);return p.u[n];}

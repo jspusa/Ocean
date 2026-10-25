@@ -9,3 +9,4 @@ __pycache__/
 qa/parity/*.log
 qa/parity/v0186-cpu/
 qa/parity/pelagic-anatomy/
+qa/parity/*.cpuprofile
