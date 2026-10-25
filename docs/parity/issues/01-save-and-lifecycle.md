@@ -21,3 +21,7 @@
 ### 0.18.7 bounded reliability slice
 
 Validated primary snapshots alone may rotate into the voyage backup. Optional backup quota failure no longer blocks a successful primary replacement; failed primary writes still report failure. Regression: `tests/parity/save-backup.cjs`. Context-loss recovery offers a full export and displays export failure within its recovery screen. This does not complete stale-tab protection, journal backups, crash-atomic cross-store import or the entire ticket.
+
+### 0.18.8 session ownership and rescue exports
+
+Current builds acquire an exclusive browser lock before loading/migrating saves or allocating the renderer. Duplicate tabs wait for a fresh reload. Voyage, journal and photographic writes are guarded; exports no longer save or adopt external library state. Photo initialization and full imports drain before release. Failed durable rollback retains a coherent pre-import voyage and original-image cache for explicit rescue export. Real two-tab Chrome, touch layouts, native storage fault injection and 43 photography checks are recorded in [the report](../../TEST_REPORT-v0188.md). Pre-0.18.8 tabs do not obey this cooperative lock; external storage detection stops this build, not already-issued legacy writes. Journal backups and crash-atomic cross-store import remain incomplete; do not close this whole ticket.

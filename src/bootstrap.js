@@ -1,2 +1,2 @@
 // Start after every scene and gameplay module is registered.
-boot();
+(async()=>{if(await oceanSaveGuard.start())await boot();})();

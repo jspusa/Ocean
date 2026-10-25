@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="zh-Hant" data-version="0.18.7">
+<html lang="zh-Hant" data-version="0.18.8">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#031329"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="description" content="重返蔚藍：從珊瑚礁一路游向深海海溝，與巨鯨和深海生物相遇。自由探索的 3D 海洋世界。">
@@ -46,5 +46,6 @@
 <div id="photoViewer" class="hidden" role="dialog" aria-modal="true" aria-label="照片預覽"><button id="closePhoto" class="icon-btn" aria-label="關閉照片">×</button><img id="photoImage" alt="你拍攝的遊戲海底畫面"><div><button id="savePhoto" class="primary">儲存照片 ↗</button><span>遊戲截圖 · 非實景照片</span></div></div>
 <div id="errorBox" class="hidden" role="alert"><h2 id="errorTitle">這個視窗無法啟動 3D</h2><p id="errorMessage">請使用支援 WebGL 2 的瀏覽器，並開啟硬體加速。</p><p>省電模式會減少畫面負擔，仍會自動調整解析度。若在應用程式內預覽，請改用一般瀏覽器開啟。</p><div class="recovery-actions"><button id="errorSafeRestart" onclick="restartLowPower()" class="primary">以省電畫質重新啟動</button><button id="errorRetry" onclick="location.reload()">重新嘗試</button><button id="errorExportSave" onclick="exportRecoverySave()" hidden>匯出航程備份</button></div><p id="errorRecoveryStatus" role="status" aria-live="polite"></p></div>
 <noscript>此海底漫遊需要 JavaScript。請使用允許執行 JavaScript 的瀏覽器開啟。</noscript>
+<dialog id="saveSessionGate" aria-labelledby="saveSessionTitle" aria-describedby="saveSessionMessage"><h2 id="saveSessionTitle">航程正在另一個分頁使用</h2><p id="saveSessionMessage"></p><div class="recovery-actions"><button id="saveSessionRetry" class="primary">重新讀取航程</button><button id="saveSessionExport" hidden>匯出本頁備份</button></div><p id="saveSessionStatus" role="status" aria-live="polite"></p></dialog>
 <script>/*__JS__*/</script>
 </body></html>

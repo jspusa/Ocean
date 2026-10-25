@@ -1,5 +1,5 @@
 {
-  "version": "0.18.7",
+  "version": "0.18.8",
   "scope": "served game and build sources",
   "files": [
     {
@@ -19,13 +19,13 @@
     },
     {
       "path": "README.md",
-      "bytes": 24654,
-      "sha256": "4c410e9276bffa6c02b7f3a4db377458c43d8598dfba3f95f7c501f9efd07751"
+      "bytes": 25378,
+      "sha256": "cdb4aa45914c24b128e1c6e6c71f18ebc5459d1cbc51eb7b2e5e24e7af229972"
     },
     {
       "path": "VERSION",
       "bytes": 7,
-      "sha256": "6e70bba3c46b7472eba79c76dd55ac51c2315fc607b23810767ee870fc582a9c"
+      "sha256": "5fa9f83fb0135ac28a82dd70f1bfab91944955eecbb98b8c176c30c06ea89612"
     },
     {
       "path": "assets/caustics.jpg",
@@ -1164,13 +1164,13 @@
     },
     {
       "path": "build.py",
-      "bytes": 4135,
-      "sha256": "407455f67e2dc7dcf46955e2698a4872d765a3d24de41b79b89287bfee928604"
+      "bytes": 4174,
+      "sha256": "cf0686448bc0495d4bcff9ee5e64f8fee6bd55aef7837e84ed8667035ba07ae6"
     },
     {
       "path": "index.html",
-      "bytes": 13993,
-      "sha256": "3bec3c4b13c1563fad1e9b4a46d9a846b00d3a8e855ed527808bac60fdc4cf55"
+      "bytes": 14546,
+      "sha256": "831462471854e1cc6929762d8e57475075bab9748542d4077cf07c86fbfc4b40"
     },
     {
       "path": "music/blue_silence.mp3",
@@ -1209,8 +1209,8 @@
     },
     {
       "path": "src/app.js",
-      "bytes": 76870,
-      "sha256": "61d8dcde6c950a678d0f46dc2b4fe9f9af0859c5b36f08f8865b00cacbe377e4"
+      "bytes": 77109,
+      "sha256": "39ae4135634aacd2d7dcaf6eeb194ea7e32c3d5d3454b8d63676a579b4176dce"
     },
     {
       "path": "src/aquarium.js",
@@ -1224,8 +1224,8 @@
     },
     {
       "path": "src/bootstrap.js",
-      "bytes": 70,
-      "sha256": "602fc043b81dbfa67ff43bac0e6f0e14d9d102b3ff3b8836b72f183e151a8e20"
+      "bytes": 124,
+      "sha256": "668d96f8379080b2dd34846484600a602c8b205b6ed3b2bc26ec4bab79c224aa"
     },
     {
       "path": "src/cetacean_world.js",
@@ -1240,7 +1240,7 @@
     {
       "path": "src/config.js",
       "bytes": 2662,
-      "sha256": "a68404a1f5c7c1d1d619f843132bc40341fb5c2527e988250142bf3f52013c57"
+      "sha256": "b737f90aee22c12d166be8551fd3ec71f2b2c54418b32b47764759ae5096bfd9"
     },
     {
       "path": "src/deepsea.js",
@@ -1334,8 +1334,8 @@
     },
     {
       "path": "src/photography.js",
-      "bytes": 23828,
-      "sha256": "3b73bc457872604a3b475ded68d7d0bccf453db285e23e2ea2030dbbd4a5b44e"
+      "bytes": 25081,
+      "sha256": "93d643b56189b74c1a895267a72c71b737f4a86fabcee416c1780ceb3ca9298b"
     },
     {
       "path": "src/reef_detail.js",
@@ -1351,6 +1351,16 @@
       "path": "src/regions.js",
       "bytes": 27408,
       "sha256": "d85819a29daaff13143d7082fafba04829e491e02233c40bd92e97030dba6038"
+    },
+    {
+      "path": "src/save_session.js",
+      "bytes": 2411,
+      "sha256": "b571650b9ec71da47154f1307fce73620fde80563bf544691ecf4b398e7720ca"
+    },
+    {
+      "path": "src/save_session_ui.js",
+      "bytes": 4499,
+      "sha256": "e32766654368ed4b7d990430f9ee664dd5e0902e09011f4359aa87339037be9e"
     },
     {
       "path": "src/scene_cache.js",
@@ -1374,8 +1384,8 @@
     },
     {
       "path": "src/shell.html",
-      "bytes": 10576,
-      "sha256": "0f6e82ebe9f162896761a6cc3ac8fd6fc212d754f620f98c186f1ff8f7e30be1"
+      "bytes": 11020,
+      "sha256": "07cf5b5e5afa66bb582ab7eefa6c7f6f1b3612498b2f75cdf5d65ec90833b836"
     },
     {
       "path": "src/ship.js",
@@ -1389,8 +1399,8 @@
     },
     {
       "path": "src/style.css",
-      "bytes": 53498,
-      "sha256": "320261cd315d31648bc75a440cb83133494ec8c2212fdd138488286b40721f4f"
+      "bytes": 54213,
+      "sha256": "37524355f106450b9631ab706491bbfccaebb384c6058735b2b66b0951734adc"
     },
     {
       "path": "src/trench.js",
@@ -1409,8 +1419,8 @@
     },
     {
       "path": "src/voyage.js",
-      "bytes": 38205,
-      "sha256": "1164ad47951d279698bbf4df53c21b02064b3cde844b3d6ed7424166ef12e991"
+      "bytes": 39136,
+      "sha256": "b22c96a0bdfcdc70a2bd63af2667025d9464d2475a185e964065b873dcfc758f"
     },
     {
       "path": "src/world.js",

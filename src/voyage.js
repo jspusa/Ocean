@@ -34,12 +34,12 @@ const voyage={state:initialVoyage(),storageOK:true,loaded:false,lastSave:0,lastT
 function saveVoyage(){
  if(active)voyage.state.resume={p:player.p.slice(),yaw:player.yaw,pitch:player.pitch,seconds:diveSeconds};
  try{
-  const value=JSON.stringify(voyage.state);let old=localStorage.getItem(VOYAGE_KEY);
+  oceanSaveGuard.check();const value=JSON.stringify(voyage.state);let old=localStorage.getItem(VOYAGE_KEY);
   // A recovered good backup must survive even if replacing a corrupt primary fails.
   if(old){try{readVoyage(JSON.parse(old));}catch(_){old=null;}}
   // Backup capacity is optional; Storage.setItem keeps the old primary on failure.
-  if(old){try{localStorage.setItem(VOYAGE_KEY+'.backup',old);}catch(_){}}
-  localStorage.setItem(VOYAGE_KEY,value);voyage.storageOK=true;return true;
+  if(old){try{oceanSaveGuard.write(VOYAGE_KEY+'.backup',old);}catch(_){}}
+  oceanSaveGuard.write(VOYAGE_KEY,value);voyage.storageOK=true;return true;
  }
  catch(e){voyage.storageOK=false;$('saveStatus')&&($('saveStatus').textContent='本機儲存受限 · 請匯出存檔');return false;}
 }
@@ -203,8 +203,11 @@ function renderVoyagePanel(){
  $('panelBody').querySelectorAll('[data-dest]').forEach(b=>b.onclick=()=>markPlace(b.dataset.dest));$('voyageHome').onclick=goHome;$('exportSave').onclick=exportSave;$('importSave').onchange=e=>importSaveFile(e.target.files[0]);
 }
 async function exportSave(){
- try{const photography=await oceanPhotography.exportArchive();saveVoyage();const data={format:'return-blue/save',version:1,exported:new Date().toISOString(),voyage:voyage.state,journal:oceanPhotography.journalSnapshot(persistent),photography};const url=URL.createObjectURL(new Blob([JSON.stringify(data)],{type:'application/json'}));download(url,'Return-to-the-Blue-save.json');setTimeout(()=>URL.revokeObjectURL(url),10000);return true;}
+ if(voyage.importing||voyage.exporting){toast('存檔正在處理中，請完成後再匯出備份。');return false;}
+ voyage.exporting=true;
+ try{const photography=await oceanPhotography.exportArchive();const snapshot=JSON.parse(JSON.stringify(voyage.state));if(active)snapshot.resume={p:player.p.slice(),yaw:player.yaw,pitch:player.pitch,seconds:diveSeconds};const data={format:'return-blue/save',version:1,exported:new Date().toISOString(),voyage:snapshot,journal:oceanPhotography.journalSnapshot(persistent),photography};const url=URL.createObjectURL(new Blob([JSON.stringify(data)],{type:'application/json'}));download(url,'Return-to-the-Blue-save.json');setTimeout(()=>URL.revokeObjectURL(url),10000);return true;}
  catch(error){toast('無法匯出完整存檔：'+error.message);return false;}
+ finally{voyage.exporting=false;}
 }
 function readPhotoMetadata(raw){
  const result={};if(typeof raw.knowledgeEligible==='boolean')result.knowledgeEligible=raw.knowledgeEligible;
@@ -230,26 +233,33 @@ function validateImport(data){
  return {state,seen,photos,settings:importedSettings,log:entries};
 }
 async function importSaveFile(file){
- if(!file||voyage.importing)return;if(file.size>144*1024*1024){toast('存檔超過 144 MiB 上限。');return;}
- voyage.importing=true;let prepared,backup,storageBackup,applied=false;
+ if(!file||voyage.importing)return;if(voyage.exporting){toast('正在匯出備份，請完成後再匯入存檔。');return;}if(file.size>144*1024*1024){toast('存檔超過 144 MiB 上限。');return;}
+ voyage.importing=true;let finishImport;voyage.importDone=new Promise(resolve=>{finishImport=resolve;});let prepared,backup,storageBackup,applied=false;
  try{
-  const data=JSON.parse(await file.text()),checked=validateImport(data);
+  oceanSaveGuard.check();const data=JSON.parse(await file.text()),checked=validateImport(data);oceanSaveGuard.check();
   if(!confirm('匯入後會替換目前航程、圖鑑、底片與相簿。確定繼續？'))return;
   prepared=await oceanPhotography.prepareImport(data.photography,checked.photos,checked.state.features.photography,Object.values(checked.state.features.expedition.mail).filter(m=>m.status==='complete'&&m.photoDate>0).map(m=>m.photoDate));
   if(data.photography){const developed=new Set(prepared.state.album.map(p=>p.date));for(const mail of Object.values(checked.state.features.expedition.mail))if(mail.status==='complete'&&mail.photoDate>0&&!developed.has(mail.photoDate))throw new Error('存檔缺少已投稿的相簿附件');}
-  if(active){closePanel();goHome();$('debrief').classList.add('hidden');}
+  oceanSaveGuard.check();if(active){closePanel();goHome();$('debrief').classList.add('hidden');}
   backup={state:JSON.parse(JSON.stringify(voyage.state)),journal:{...persistent,seen:persistent.seen.slice(),photos:persistent.photos.slice(),log:persistent.log.slice(),settings:{...settings}}};
   storageBackup=[STORE_KEY,VOYAGE_KEY,VOYAGE_KEY+'.backup'].map(key=>[key,localStorage.getItem(key)]);
-  await prepared.commit();applied=true;
+  await prepared.commit();applied=true;oceanSaveGuard.check();
   checked.state.features.photography=prepared.state;voyage.state=checked.state;persistent.seen=checked.seen;persistent.photos=prepared.photos;persistent.log=checked.log;Object.assign(settings,checked.settings);
   oceanFeatures.reset();renderer.quality=settings.quality;renderer.resize();applyVisualSettings();oceanAudio.tick();
   if(!persist()||!saveVoyage())throw new Error('瀏覽器無法保存匯入的航程');
   renderShip();setCount();toast('存檔已匯入。');
  }catch(error){
   let restored=true;
-  if(applied){try{await prepared.rollback();voyage.state=backup.state;persistent.seen=backup.journal.seen;persistent.photos=backup.journal.photos;persistent.log=backup.journal.log;Object.assign(settings,backup.journal.settings);for(const[key,value]of storageBackup)value===null?localStorage.removeItem(key):localStorage.setItem(key,value);oceanFeatures.reset();renderer.quality=settings.quality;renderer.resize();applyVisualSettings();renderShip();setCount();}catch(rollbackError){restored=false;console.error('Save restoration failed',rollbackError);}}
+  if(applied){
+   try{await prepared.rollback();}catch(rollbackError){restored=false;console.error('Photo restoration failed',rollbackError);}
+   // The rescue export must describe one coherent pre-import snapshot even if
+   // durable rollback failed. Photography retains its matching original cache.
+   voyage.state=backup.state;persistent.seen=backup.journal.seen;persistent.photos=backup.journal.photos;persistent.log=backup.journal.log;Object.assign(settings,backup.journal.settings);
+   try{if(restored&&oceanSaveSession.writable)for(const[key,value]of storageBackup)oceanSaveGuard.write(key,value);oceanFeatures.reset();renderer.quality=settings.quality;renderer.resize();applyVisualSettings();renderShip();setCount();}catch(rollbackError){restored=false;console.error('Save restoration failed',rollbackError);}
+   if(!restored)oceanSaveGuard.recoveryFailed();
+  }
   toast(restored?'未套用新存檔：'+error.message:'還原存檔時儲存失敗，請保留此視窗並下載備份。');
- }finally{voyage.importing=false;}
+ }finally{voyage.importing=false;finishImport();voyage.importDone=null;}
 }
 function renderPause(){panelTitle('PAUSE / CONTINUE','在海裡，休息一下');$('panelBody').innerHTML=`<div class="pause-actions"><button class="primary" id="resumeBtn">繼續潛水 ↗</button><button class="muted-btn" id="pauseChart">海域地圖</button><button class="muted-btn" id="pauseVoyage">航程與存檔</button><button class="muted-btn" id="pauseSettings">畫面與聲音</button><button class="muted-btn" id="pauseBoat">儲存並回首頁</button></div><p class="panel-note">此時已暫停游動、動物與航程計時；音樂可以繼續播放。</p>`;$('resumeBtn').onclick=closePanel;$('pauseChart').onclick=()=>openPanel('map');$('pauseVoyage').onclick=()=>openPanel('voyage');$('pauseSettings').onclick=()=>openPanel('settings');$('pauseBoat').onclick=goHome;}
 const legacyPanel=openPanel;
@@ -304,6 +314,6 @@ function initVoyage(){
   if(e.code==='Escape'&&active&&!modal&&!photoOpen){e.preventDefault();e.stopImmediatePropagation();openPanel('pause');}
   if(active&&!modal&&!photoOpen&&!e.repeat){if(e.code==='KeyF'&&!$('interactBtn').classList.contains('hidden')){e.preventDefault();e.stopImmediatePropagation();readLogger();}if(e.code==='KeyC'){toggleCruise();}if(e.code==='KeyX'){togglePhotoMode();}if(e.code==='KeyB'){openPanel('voyage');}}
  },true);
- window.addEventListener('pagehide',saveVoyage);document.addEventListener('visibilitychange',()=>{if(document.hidden)saveVoyage();});
+ document.addEventListener('visibilitychange',()=>{if(document.hidden&&!voyage.importing)saveVoyage();});
  window.__voyage={get state(){return JSON.parse(JSON.stringify(voyage.state))},get objectives(){return ORDERS.map(o=>({id:o.id,complete:o.test(voyage.state)}))},validateImport,gradePhoto,exportSave};
 }

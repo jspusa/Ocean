@@ -23,17 +23,17 @@ const PhotographyRules=(()=>{
 const oceanPhotography=(()=>{
  'use strict';
  const R=PhotographyRules,DB_NAME='return-blue.photographs.1',STORE='records';
- let db=null,initialized=false,durable=false,busy=false,pending=0,lastError='',recovery=null,selection=new Set(),tab='film',queue=Promise.resolve(),cache=new Map();
+ let db=null,initialized=false,initializing=null,durable=false,busy=false,pending=0,lastError='',recovery=null,selection=new Set(),tab='film',queue=Promise.resolve(),cache=new Map();
  const state=()=>oceanFeatures.state('photography'),copy=value=>JSON.parse(JSON.stringify(value));
  const entries=s=>[...s.film,...s.album];
  const describe=error=>error?.name==='QuotaExceededError'?'裝置儲存空間不足':error?.name==='SecurityError'?'瀏覽器禁止照片資料庫':error?.message||'照片資料庫暫時無法使用';
  const serialize=fn=>{pending++;busy=true;const next=queue.then(fn).finally(()=>{pending--;busy=pending>0;});queue=next.catch(()=>{});return next;};
- function openDB(){return new Promise((resolve,reject)=>{if(!globalThis.indexedDB){reject(new Error('瀏覽器不支援照片資料庫'));return;}const request=indexedDB.open(DB_NAME,1);request.onupgradeneeded=()=>{if(!request.result.objectStoreNames.contains(STORE))request.result.createObjectStore(STORE,{keyPath:'id'});};request.onerror=()=>reject(request.error);request.onblocked=()=>reject(new Error('其他分頁正在使用照片資料庫，請關閉後重試'));request.onsuccess=()=>{db=request.result;db.onversionchange=()=>{db.close();db=null;durable=false;lastError='照片資料庫已在另一分頁更新，請重新載入';};resolve(db);};});}
+ function openDB(){return new Promise((resolve,reject)=>{if(!globalThis.indexedDB){reject(new Error('瀏覽器不支援照片資料庫'));return;}const request=indexedDB.open(DB_NAME,1);request.onupgradeneeded=()=>{try{oceanSaveSession.assertWritable();if(!request.result.objectStoreNames.contains(STORE))request.result.createObjectStore(STORE,{keyPath:'id'});}catch(error){request.transaction.abort();reject(error);}};request.onerror=()=>reject(request.error);request.onblocked=()=>reject(new Error('其他分頁正在使用照片資料庫，請關閉後重試'));request.onsuccess=()=>{db=request.result;db.onversionchange=()=>{db.close();db=null;durable=false;lastError='照片資料庫已在另一分頁更新，請重新載入';};resolve(db);};});}
  async function database(){if(!db)await openDB();return db;}
  async function readAll(){const connection=await database();return new Promise((resolve,reject)=>{const tx=connection.transaction(STORE,'readonly'),req=tx.objectStore(STORE).getAll();req.onsuccess=()=>resolve(req.result);req.onerror=()=>reject(req.error);tx.onabort=()=>reject(tx.error||new Error('照片讀取已取消'));});}
- async function write(s,puts=[],deletes=[],replace=false,expected=state().revision){const connection=await database();return new Promise((resolve,reject)=>{
+ async function write(s,puts=[],deletes=[],replace=false,expected=state().revision,rollback=false){const assertOwnership=()=>rollback?oceanSaveSession.assertHeld():oceanSaveSession.assertWritable();assertOwnership();const connection=await database();assertOwnership();return new Promise((resolve,reject)=>{
   const tx=connection.transaction(STORE,'readwrite'),store=tx.objectStore(STORE),request=store.get('@library');let failure=null;
-  request.onsuccess=()=>{const revision=request.result?.state?.revision??null;if(revision!==expected){failure=new Error('另一個分頁已更新相簿；請重新連接照片資料庫後重試');failure.name='PhotoConflictError';durable=false;tx.abort();return;}if(replace)store.clear();for(const id of deletes)store.delete(id);for(const record of puts)store.put(record);store.put({id:'@library',state:copy(s)});};
+  request.onsuccess=()=>{try{assertOwnership();}catch(error){failure=error;tx.abort();return;}const revision=request.result?.state?.revision??null;if(revision!==expected){failure=new Error('另一個分頁已更新相簿；請重新連接照片資料庫後重試');failure.name='PhotoConflictError';durable=false;tx.abort();return;}if(replace)store.clear();for(const id of deletes)store.delete(id);for(const record of puts)store.put(record);store.put({id:'@library',state:copy(s)});};
   tx.oncomplete=()=>resolve();tx.onabort=()=>reject(failure||tx.error||new Error('照片保存已取消'));tx.onerror=()=>{};
  });}
  function toBlob(url){
@@ -47,8 +47,11 @@ const oceanPhotography=(()=>{
  function saved(){const ok=saveVoyage();persist();if(!ok)toast('照片已保存在資料庫；航程存檔受限，請匯出備份。');}
  function report(error){lastError=describe(error);toast(lastError+'。照片未被刪除；可在沖印桌重試或下載救援照片。');refresh();}
  function journalSnapshot(journal){return durable?{...journal,photos:state().album.map(p=>({...p}))}:journal;}
- async function init(){
-  if(initialized)return;initialized=true;installUI();const legacy=persistent.photos.filter(p=>p?.url),s=state();for(const p of legacy){const m=R.metadata(p);if(m)cache.set(m.date,{...m,url:p.url});}
+ function init(){
+  if(initializing)return initializing;if(initialized)return Promise.resolve();
+  // Migration and hydration participate in the same drain as captures, so the
+  // session cannot release its lock while initialization still owns a write.
+  initializing=serialize(async()=>{initialized=true;installUI();const legacy=persistent.photos.filter(p=>p?.url),s=state();for(const p of legacy){const m=R.metadata(p);if(m)cache.set(m.date,{...m,url:p.url});}
   try{const records=await readAll(),stored=records.find(r=>r.id==='@library')?.state;let next=stored?R.sanitize(stored):R.sanitize(s),changed=false,puts=[];const ids=new Set(entries(next).map(p=>p.date)),storedImages=new Set(records.filter(r=>r.blob instanceof Blob).map(r=>r.id));
    // Old developed photographs stay developed, including all submitted attachments.
    for(const p of legacy){if(ids.has(p.date)){if(!storedImages.has('p-'+p.date)){const blob=toBlob(p.url),existing=entries(next).find(m=>m.date===p.date);if(R.total(next)-existing.bytes+blob.size>R.limits.bytes)throw new Error('舊相簿超過儲存上限，尚未搬移');existing.bytes=blob.size;puts.push({id:'p-'+p.date,blob});changed=true;}continue;}if(next.album.length>=R.limits.album)throw new Error('舊相簿超過容量，尚未搬移；請先匯出舊存檔');const blob=toBlob(p.url),m=R.metadata({...p,bytes:blob.size});if(!m)continue;if(R.total(next)+blob.size>R.limits.bytes)throw new Error('舊相簿超過儲存上限，尚未搬移');next.album.push(m);puts.push({id:'p-'+m.date,blob});ids.add(m.date);changed=true;}
@@ -56,6 +59,7 @@ const oceanPhotography=(()=>{
    if(changed||!stored){next.revision++;await write(next,puts,[],false,stored?.revision??null);}
    const images=await hydrate([...records.filter(r=>!puts.some(p=>p.id===r.id)),...puts],next);adopt(next,images);lastError=entries(next).some(p=>!images.has(p.date))?'有照片原檔遺失；請匯入包含原圖的備份，缺失紀錄仍保留。':'';saved();
   }catch(error){durable=false;lastError=describe(error);if(!entries(state()).length&&legacy.length)voyage.state.features.photography=R.sanitize({album:legacy});toast('舊照片保留原樣；'+lastError+'。');}
+  }).finally(()=>{initializing=null;});return initializing;
  }
  function nextDate(){let date=Date.now();const used=new Set([...entries(state()).map(p=>p.date),...(recovery?[recovery.date]:[])]);while(used.has(date))date++;return date;}
  function blockedReason(){return recovery?'上一張照片尚未保存，請先到沖印桌救援':!durable?'照片資料庫未就緒，請到沖印桌重試保存':state().film.length>=R.limits.film?'20 張底片已滿，請回船沖印或整理':R.total(state())>=R.limits.bytes?'照片儲存容量已滿，請先整理':'';}
@@ -70,7 +74,12 @@ const oceanPhotography=(()=>{
  async function develop(dates){return serialize(async()=>{if(active){toast('回到研究船後才能沖印。');return false;}const s=R.developed(state(),dates);if(!s){toast('請選擇底片，並確認相簿有足夠空位。');return false;}if(dates.some(date=>!cache.has(date))){toast('選取照片缺少原檔，請先還原備份。');return false;}try{await write(s);adopt(s);selection.clear();lastError='';saved();toast('沖印完成 · 已收入相簿，可用於投稿');refresh();return true;}catch(error){report(error);return false;}});}
  function pin(date){return serialize(async()=>{if(!state().album.some(p=>p.date===date)||!cache.has(date)){toast('投稿照片缺少已沖印原檔。');return false;}const s={...state(),revision:state().revision+1,album:state().album.map(p=>p.date===date?{...p,pinned:true}:p)};try{await write(s);adopt(s);saved();return true;}catch(error){report(error);return false;}});}
  function erase(date){return serialize(async()=>{const s=R.removed(state(),date,oceanFeatures.retainedPhotoDates());if(!s){toast('已投稿的照片會保留為信件附件，不能刪除。');return false;}try{await write(s,[],['p-'+date]);cache.delete(date);adopt(s);selection.delete(date);saved();refresh();return true;}catch(error){report(error);return false;}});}
- function exportArchive(){return serialize(async()=>{if(durable){const records=await readAll(),manifest=records.find(r=>r.id==='@library')?.state;if(!manifest)throw new Error('照片資料庫缺少索引，請重新連接後重試');if(manifest.revision!==state().revision){const latest=R.sanitize(manifest);adopt(latest,await hydrate(records,latest));saved();}}const s=copy(state()),images=[];for(const p of entries(s)){const photo=cache.get(p.date);if(!photo)throw new Error('照片 '+p.date+' 缺少原檔，無法產生完整備份');images.push({date:p.date,url:photo.url});}return {schema:1,state:s,images,recovery:recovery?{...recovery}:null};});}
+ function exportArchive(){return serialize(async()=>{
+  // Export this document's coherent snapshot; a retired document must never
+  // replace its remaining originals with another session's library.
+  if(durable&&oceanSaveSession.writable){const records=await readAll(),manifest=records.find(r=>r.id==='@library')?.state;if(!manifest)throw new Error('照片資料庫缺少索引，請重新連接後重試');if(manifest.revision!==state().revision)throw new Error('另一個分頁已更新相簿；目前照片仍保留在此分頁，請先下載需要的原圖，再重新載入。');}
+  const s=copy(state()),images=[];for(const p of entries(s)){const photo=cache.get(p.date);if(!photo)throw new Error('照片 '+p.date+' 缺少原檔，無法產生完整備份');images.push({date:p.date,url:photo.url});}return {schema:1,state:s,images,recovery:recovery?{...recovery}:null};
+ });}
  async function prepareImport(archive,legacy=[],expected=null,requiredPins=[]){
   await queue;if(recovery)throw new Error('請先下載或保存待救援照片，再匯入存檔');let s,photos;
   if(archive){if(archive.schema!==1||!archive.state||!Array.isArray(archive.state.film)||!Array.isArray(archive.state.album)||!Array.isArray(archive.images))throw new Error('照片備份版本不相容');if(archive.images.length>R.limits.film+R.limits.album||archive.state.film?.length>R.limits.film||archive.state.album?.length>R.limits.album)throw new Error('照片備份超過本作容量');s=R.sanitize(archive.state);if(entries(s).length!==(archive.state.film?.length||0)+(archive.state.album?.length||0))throw new Error('照片備份含重複或無效識別');photos=archive.images;
@@ -80,7 +89,16 @@ const oceanPhotography=(()=>{
   if(byDate.size!==entries(s).length)throw new Error('照片索引與原圖數量不符');const puts=[],images=new Map();for(const p of entries(s)){const source=byDate.get(p.date);if(!source)throw new Error('照片備份缺少原圖');const blob=toBlob(source.url);if(globalThis.createImageBitmap){let decoded;try{decoded=await createImageBitmap(blob);if(!decoded.width||!decoded.height)throw new Error('empty');}catch{throw new Error('照片原圖無法解碼');}finally{decoded?.close();}}p.bytes=blob.size;puts.push({id:'p-'+p.date,blob});images.set(p.date,{...p,url:source.url});}if(R.total(s)>R.limits.bytes)throw new Error('照片備份超過 96 MiB 上限');
   let incomingRecovery=null;if(archive?.recovery){toBlob(archive.recovery.url);const m=R.metadata(archive.recovery);if(!m)throw new Error('救援照片識別無效');incomingRecovery={...m,url:archive.recovery.url};}
   const oldRecords=await readAll(),oldState=copy(state()),oldCache=new Map(cache),oldDurable=durable,oldManifest=oldRecords.find(r=>r.id==='@library')?.state;const expectedRevision=oldManifest?.revision??null;if(durable&&expectedRevision!==state().revision){durable=false;lastError='另一個分頁已更新相簿；請重新連接後再匯入';throw new Error(lastError);}s.revision=(expectedRevision??0)+1;let committed=false;
-  return {state:s,photos:s.album.map(p=>images.get(p.date)),async commit(){await write(s,puts,[],true,expectedRevision);committed=true;adopt(s,images);recovery=incomingRecovery;selection.clear();lastError='';},async rollback(){if(!committed)return;await write(oldManifest||oldState,oldRecords.filter(r=>r.id!=='@library'),[],true,s.revision);adopt(oldState,oldCache);durable=oldDurable;recovery=null;committed=false;}};
+  return {state:s,photos:s.album.map(p=>images.get(p.date)),async commit(){await write(s,puts,[],true,expectedRevision);committed=true;adopt(s,images);recovery=incomingRecovery;selection.clear();lastError='';},async rollback(){
+   if(!committed)return;let restored=false;
+   try{await write(oldManifest||oldState,oldRecords.filter(r=>r.id!=='@library'),[],true,s.revision,true);restored=true;}
+   finally{
+    // The pre-import originals must remain exportable even when durable rollback
+    // fails. Propagate that failure without mixing the old voyage with new photos.
+    adopt(oldState,oldCache);durable=restored&&oldDurable;recovery=null;committed=false;
+    if(!restored)lastError='照片資料庫未能還原；原有照片仍保留在此分頁，請匯出備份後再重新載入。';
+   }
+  }};
  }
  async function retryStorage(){if(busy)return false;initialized=false;await init();refresh();return durable;}
  function refresh(){if(modal==='photography')render();}
@@ -102,5 +120,5 @@ const oceanPhotography=(()=>{
  }
  const feature={id:'photography',retainPhotos(dates){for(const p of state().album)if(p.pinned)dates.push(p.date);},initial:R.initial,sanitize:R.sanitize,init,renderPanel(type){if(type!=='photography')return false;tab='film';render();return true;},endDive(){if(state().film.length)toast('回船了 · '+state().film.length+' 張底片等待選片沖印');},reset(){selection.clear();},};
  oceanFeatures.register(feature);
- return {feature,rules:R,capture,canCapture,blockedReason,nextDate,develop,pin,erase,view,saveImage,exportArchive,prepareImport,journalSnapshot,whenIdle:()=>queue,snapshot:()=>({durable,error:lastError,recovery:!!recovery,film:state().film.length,album:state().album.length,images:cache.size}),get databaseName(){return DB_NAME}};
+ return {feature,rules:R,capture,canCapture,blockedReason,nextDate,develop,pin,erase,view,saveImage,exportArchive,prepareImport,journalSnapshot,whenIdle:()=>queue,snapshot:()=>({durable,busy,error:lastError,recovery:!!recovery,film:state().film.length,album:state().album.length,images:cache.size}),get databaseName(){return DB_NAME}};
 })();

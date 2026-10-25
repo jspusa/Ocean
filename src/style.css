@@ -524,3 +524,6 @@ body.dive-paused #ecologyHUD,body.cinematic #ecologyHUD,body:has(#cameraFrame:no
  .ocean-welcome .intro-controls{margin-top:15px}
 }
 @media(prefers-reduced-motion:reduce){.ocean-welcome .primary{transition:none}.ocean-welcome .primary:hover{transform:none}}
+
+/* Exclusive voyage session notice: native dialog keeps underlying tools inert. */
+#saveSessionGate{color:#d9e9de;background:#082630;border:1px solid #84acaa55;border-radius:16px;box-sizing:border-box;width:min(92vw,480px);max-height:90dvh;padding:clamp(22px,5vw,38px);overflow:auto;text-align:left}#saveSessionGate::backdrop{background:#041b25ee}#saveSessionGate h2{font:500 24px var(--serif);line-height:1.5;margin:0 0 16px}#saveSessionGate p{font-size:14px;line-height:1.9}#saveSessionGate button{min-height:48px;padding:12px 18px;font-size:14px;border:1px solid #96b8af55;border-radius:8px}#saveSessionGate button:focus-visible{outline:3px solid #e0cb8e;outline-offset:4px}#saveSessionStatus{min-height:1.9em}
