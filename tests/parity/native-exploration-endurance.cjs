@@ -9,6 +9,7 @@ const option=(name,fallback)=>process.argv.find(v=>v.startsWith('--'+name+'='))?
 const url=option('url','https://jspusa.github.io/Ocean/'),seconds=Number(option('seconds','1200')),touch=option('profile','desktop')==='touch';
 assert(Number.isFinite(seconds)&&seconds>=30&&seconds<=3600,'Duration must be 30–3600 seconds');
 const root=path.resolve(__dirname,'../..'),output=path.resolve(root,option('out','qa/parity/native-exploration-endurance-'+(touch?'touch':'desktop')+'.json'));
+const expectedVersion=option('expected-version',fs.readFileSync(path.join(root,'VERSION'),'utf8').trim());
 const errors=[],journeys=[],samples=[];let result=null,metadata=null;
 function summary(values){if(!values.length)return null;const a=values.slice().sort((a,b)=>a-b),sum=a.reduce((n,x)=>n+x,0);return {count:a.length,mean:sum/a.length,p50:a[Math.floor(a.length*.5)],p95:a[Math.floor(a.length*.95)],p99:a[Math.floor(a.length*.99)],max:a.at(-1)};}
 (async()=>{
@@ -19,8 +20,8 @@ function summary(values){if(!values.length)return null;const a=values.slice().so
   await page.goto(url);await page.waitForFunction(()=>window.__ocean?.ready,null,{timeout:120000});await page.locator('#loading').waitFor({state:'hidden'});
   const press=selector=>touch?page.locator(selector).tap():page.locator(selector).click();
   await press('#startBtn');await page.waitForFunction(()=>active&&!modal);await page.bringToFront();
-  metadata=await page.evaluate(()=>{const g=renderer.gl,e=g.getExtension('WEBGL_debug_renderer_info');return {version:document.documentElement.dataset.version,userAgent:navigator.userAgent,renderer:e?g.getParameter(e.UNMASKED_RENDERER_WEBGL):null,adaptive:settings.adaptive,quality:renderer.quality,resolution:[renderer.canvas.width,renderer.canvas.height],msaa:renderer.msaaSamples,position:player.p.slice(),species:SPECIES.length,compiled:renderer.sceneLoad.compiled};});
-  assert(metadata.renderer&&!/swiftshader|llvmpipe|software/i.test(metadata.renderer),'Native hardware GPU required');assert.equal(metadata.adaptive,true);assert.equal(metadata.compiled,true);
+  metadata=await page.evaluate(()=>{const g=renderer.gl,e=g.getExtension('WEBGL_debug_renderer_info');return {version:document.documentElement.dataset.version,userAgent:navigator.userAgent,renderer:e?g.getParameter(e.UNMASKED_RENDERER_WEBGL):null,adaptive:settings.adaptive,quality:renderer.quality,resolution:[renderer.canvas.width,renderer.canvas.height],msaa:renderer.msaaSamples,position:player.p.slice(),species:SPECIES.length,compiled:renderer.sceneLoad.compiled,stations:OceanTrench.stations.map(s=>({id:s.id,p:s.p.slice()}))};});
+  assert(metadata.renderer&&!/swiftshader|llvmpipe|software/i.test(metadata.renderer),'Native hardware GPU required');assert.equal(metadata.version,expectedVersion,'The intended release must actually be served');assert.equal(metadata.adaptive,true);assert.equal(metadata.compiled,true);
   await page.evaluate(()=>{
    const original=oceanPerf.record,first=performance.now();
    window.__endurance={first,previous:0,frames:[],distance:0,previousPosition:player.p.slice()};
@@ -40,7 +41,17 @@ function summary(values){if(!values.length)return null;const a=values.slice().so
    if(Math.floor(state.elapsed/10)>lastSample){lastSample=Math.floor(state.elapsed/10);samples.push(state);}
    if(Math.floor(state.elapsed/60)>lastMinute){lastMinute=Math.floor(state.elapsed/60);console.log(JSON.stringify({minute:lastMinute,depth:Math.round(-state.p[1]),frames:state.frames,scale:state.scale,fps:state.stats?.fps,heap:state.heap,travel:state.deep.travelTarget}));}
    if(!state.deep.travelTarget&&!state.modal&&!state.streamWaiting){
-    if(travelStarted){journeys.at(-1).arrivedAtSeconds=state.elapsed;journeys.at(-1).arrival=state.p;assert(state.elapsed-travelStarted<420,'A guide route must finish rather than silently stop moving');travelStarted=0;}
+    if(travelStarted){
+     const trip=journeys.at(-1),target=metadata.stations.find(s=>s.id===trip.station);
+     assert(target,'Requested station must exist in the loaded world');
+     const arrivalDistance=Math.hypot(...state.p.map((v,i)=>v-target.p[i]));
+     // The nearest-station label changes during transit; it alone is not proof
+     // of arrival. Require the actual position inside the 45 m station area.
+     assert.equal(state.deep.station,trip.station,'The arrival station classification must match the requested station');
+     assert(arrivalDistance<45,'A cleared route must reach the requested observation area, not stop or cancel en route');
+     trip.arrivedAtSeconds=state.elapsed;trip.arrival=state.p;trip.arrivalStation=state.deep.station;trip.arrivalDistance=arrivalDistance;
+     assert(state.elapsed-travelStarted<420,'A guide route must finish rather than silently stop moving');travelStarted=0;
+    }
     const id=stations[station++%stations.length];
     await press('#fieldToolsBtn');await press('#diveRecords [data-feature="deepsea"]');await press('[data-deepsea-station="'+id+'"]');
     await page.waitForFunction(id=>oceanDeepsea.snapshot().travelTarget===id&&!modal,id);
@@ -50,13 +61,13 @@ function summary(values){if(!values.length)return null;const a=values.slice().so
    await page.waitForTimeout(1000);
   }
   const raw=await page.evaluate(()=>({elapsedMs:performance.now()-__endurance.first,frames:__endurance.frames,distance:__endurance.distance,position:player.p.slice(),adaptive:settings.adaptive,gl:renderer.gl.getError(),lost:renderer.gl.isContextLost()}));
-  const continuous=raw.frames.filter(f=>f[3]).map(f=>f[1]);
-  result={...raw,continuousFrameMs:summary(continuous),visibleIntervalMs:summary(raw.frames.map(f=>f[1])),cpuFrameMs:summary(raw.frames.map(f=>f[2])),averageContinuousFPS:continuous.length?1000/(continuous.reduce((a,b)=>a+b,0)/continuous.length):null,completedRoutes:journeys.filter(j=>j.arrivedAtSeconds!==undefined).length};
+  const continuous=raw.frames.filter(f=>f[3]).map(f=>f[1]),visible=raw.frames.map(f=>f[1]);
+  result={...raw,continuousFrameMs:summary(continuous),visibleIntervalMs:summary(visible),recordedFrameIntervalsPerSecond:raw.frames.length*1000/raw.elapsedMs,averageVisibleFPS:visible.length?visible.length*1000/visible.reduce((a,b)=>a+b,0):null,cpuFrameMs:summary(raw.frames.map(f=>f[2])),averageContinuousFPS:continuous.length?1000/(continuous.reduce((a,b)=>a+b,0)/continuous.length):null,completedRoutes:journeys.filter(j=>j.arrivedAtSeconds!==undefined).length};
   assert(result.elapsedMs>=seconds*1000);assert(result.frames.length>seconds*5,'Too few actually rendered frames');assert(result.distance>100,'The player must actually travel through the world');assert(result.adaptive);assert.equal(result.gl,0);assert.equal(result.lost,false);assert.deepEqual(errors,[]);
   if(seconds>=1200){assert(result.completedRoutes>=3,'Twenty-minute run must traverse all three depth bands');assert(samples.some(s=>s.p[1]<-6900),'The real route must reach the hadal zone');}
   await page.screenshot({path:output.replace(/\.json$/,'.png')});
   console.log('STABLE '+seconds+' seconds of real native exploration (no FPS target asserted): '+result.frames.length+' rendered frames, '+result.completedRoutes+' completed guide routes');
  }finally{
-  await browser.close();fs.mkdirSync(path.dirname(output),{recursive:true});fs.writeFileSync(output,JSON.stringify({url,requestedSeconds:seconds,touchEmulation:touch,method:'Installed Chrome native GPU; isolated new save; visible start/guide controls and unmodified real RAF/simulation. No coordinate or clock advancement. Continuous frame intervals exclude explicit app pause/reset boundaries; visible intervals include menu and streaming gaps. Focus, visibility and stream failures are sampled about once per second; GL errors are read at the final boundary only. Successful completion asserts continuity, not a smoothness/FPS target. No input-latency, temperature, battery or physical-phone claim.',metadata,journeys,samples,result,errors},null,2));
+  await browser.close();fs.mkdirSync(path.dirname(output),{recursive:true});fs.writeFileSync(output,JSON.stringify({url,requestedSeconds:seconds,touchEmulation:touch,method:'Installed Chrome native GPU; isolated new save; visible start/guide controls and unmodified real RAF/simulation. No coordinate or clock advancement. Continuous frame intervals exclude explicit app pause and sampling reset boundaries, including adaptive-resolution resets; visible intervals include menu and streaming gaps. Focus, visibility and stream failures are sampled about once per second; GL errors are read at the final boundary only. Successful completion asserts continuity, not a smoothness/FPS target. No input-latency, temperature, battery or physical-phone claim.',metadata,journeys,samples,result,errors},null,2));
  }
 })().catch(error=>{console.error(error);process.exitCode=1;});
