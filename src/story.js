@@ -1,13 +1,13 @@
 /* An original field investigation. Progress records actions, not map proximity. */
 const StoryRules=(()=>{
  const chapters=[
-  {id:'stone-light',title:'石頭裡的光',region:'cave',brief:'澄：眠海號手記提到西側洞裡有一道與海床不同的層理。從洞口進入，先看側室，再找天窗。我們需要兩份現地記錄。',reply:'澄：層理在同一方向中斷，而天窗下的碎石有人工切面。東南遺跡可能曾與洞道相連。我已把東南研究泊位加入航海圖。',steps:[
+  {id:'stone-light',title:'石頭裡的光',region:'cave',brief:'澄：眠海號手記提到西側洞裡有一道與海床不同的層理。從洞口進入，先看側室，再找天窗。我們需要兩份現地記錄。',reply:'澄：層理在同一方向中斷，而天窗下的碎石有人工切面。東南遺跡可能曾與洞道相連。接著可到東南遺跡繼續比對。',steps:[
    {point:'cave-strata',kind:'inspect',seconds:6,title:'記錄側室的層理',note:'淡色礦層被一道規則切面截斷；記下切面的方向。'},
    {point:'cave-light',kind:'inspect',seconds:5,title:'觀察天窗下的切石',note:'陽光落在三條平行凹槽上。它們並不是水流沖刷形成的。'}]},
   {id:'tidal-script',title:'潮汐留下的字',region:'ruins',brief:'澄：到遺跡有頂的檔案室讀取石板，再到中庭的刻盤比對。別搬動任何石塊，留下位置與圖形就好。',reply:'澄：三個圖形是讀取順序：潮紋、月輪、星點。刻盤沒有開門，它讓我們知道石板該從哪一端開始讀。帶著這個順序再看一次。',steps:[
    {point:'ruin-tablet',kind:'inspect',seconds:6,title:'記錄檔案室石板',note:'由下而上的三行：海先升起，月照在海上，星在月的遠方。線索是「潮紋 → 月輪 → 星點」。'},
    {point:'ruin-dial',kind:'cipher',title:'依石板線索解讀刻盤',note:'依剛才的線索，選擇三個圖形；選錯可重新比對。'}]},
-  {id:'return-reading',title:'重新讀一次',region:'ruins',brief:'澄：同一塊石板，換一個方向就有不同的意思。回去重新記錄，再到洞中確認切面；這次找的是舊觀測站指向深水的線索。',reply:'澄：兩處記錄的方向交會在西南裂谷。我們將三台水聲觀測器帶下去，分別放在上、中、下層。西南深水泊位現在開放。',steps:[
+  {id:'return-reading',title:'重新讀一次',region:'ruins',brief:'澄：同一塊石板，換一個方向就有不同的意思。回去重新記錄，再到洞中確認切面；這次找的是舊觀測站指向深水的線索。',reply:'澄：兩處記錄的方向交會在西南裂谷。我們將三台水聲觀測器帶下去，分別放在上、中、下層。接下來沿西南裂谷逐層記錄。',steps:[
    {point:'ruin-tablet',kind:'inspect',seconds:6,title:'依新順序重讀石板',note:'交錯凹痕不是裝飾，而是由淺入深的三個水層記號。'},
    {point:'cave-strata',kind:'inspect',seconds:6,title:'回洞中核對方向',note:'切面與深水層的記號一致。裂谷不是終點，而是另一條曾經被記錄的路。'}]},
   {id:'listening-line',title:'三個深度的回聲',region:'abyss',brief:'澄：沿裂谷逐層下降。把觀測器放上三處平台後，留在中層完成一段連續記錄。四周很暗，潛水燈會自動補光。',reply:'澄：水聲裡有緩慢的節律，也有短促的擾動。我們不憑聲音斷言是什麼生物；下一次用眼睛去確認。',steps:[
@@ -63,6 +63,11 @@ const StoryRules=(()=>{
 const oceanStory=(()=>{
  const R=StoryRules,state=()=>oceanFeatures.state('story');let recording=false,subject=null,sensorBatch=null;
  function destination(step=R.current(state())){return step?.point?'study:'+step.point:step?.species?'habitat:'+step.species:null;}
+ // This is a presentation of the saved investigation, never another progress store.
+ function activity(){
+  const s=state(),chapter=R.chapter(s),step=R.current(s),ready=R.ready(s);
+  return {id:'story',panel:'story',status:!s.started?'available':!chapter?'complete':ready?'ready':'active',title:chapter?chapter.title:'回聲潮譜',detail:!s.started?'六章原創調查，從洞中的層理開始。可自由選擇接下。':!chapter?'六章調查已整理完成；可以重讀記錄，也可以繼續自由探索。':ready?'本章現地記錄齊備。'+(active?'儲存並回首頁，再打開調查冊回報。':'打開調查冊，回報記錄並聽澄的解讀。'):step.title,progress:s.started?'已回報 '+s.reports+' / '+R.chapters.length+' 章'+(chapter?' · 本章記錄 '+s.step+' / '+chapter.steps.length:''):'',destination:s.started&&!ready&&step?destination(step):null};
+ }
  function context(allowStoryPanel=false){
   const step=R.current(state());let targetPoint=step?.point?OceanRegions.points[step.point]?.p.slice():null,minimum=0,maximum=28,animalFramed=true;
   if(targetPoint&&step.point.startsWith('abyss-'))targetPoint[1]+=.55;
@@ -96,18 +101,18 @@ const oceanStory=(()=>{
  function paintHUD(){
   const s=state(),chapter=R.chapter(s),step=R.current(s),button=$('storyAction');
   if(button){const shown=active&&!modal&&!photoOpen&&!document.body.classList.contains('cinematic')&&!!step&&(recording||R.eligible(s,context()));button.classList.toggle('hidden',!shown);button.textContent=recording?'記錄中 '+s.elapsed.toFixed(1)+' / '+step.seconds+' 秒 · 點此取消':step?.kind==='cipher'?'解讀刻盤 ↗':step?.title+' ↗';}
-  if(s.started&&voyage.state.mode==='journey'){
+  if(s.started){
    $('objectiveName').textContent=chapter?chapter.title:'回聲潮譜 · 調查完成';$('objectiveCount').textContent='調查 '+s.reports+' / '+R.chapters.length;
    $('objectiveDetail').textContent=R.ready(s)?'現地記錄已齊備。返回研究船，在「回聲潮譜」整理回報。':step?step.title+' · 開啟調查冊查看路線與線索。':'儀器已回收，調查冊保留了整段原創故事。';
   }
  }
  function shipRender(){
   let card=$('storyShipCard');if(!card){const board=document.querySelector('.ship-board');if(!board)return;card=document.createElement('section');card.id='storyShipCard';card.className='feature-section';board.append(card);}
-  const s=state(),chapter=R.chapter(s);card.innerHTML=`<small>FIELD JOURNAL / 回聲潮譜</small><h3>${s.started?chapter?safe(chapter.title):'把回聲帶回家':'眠海號之後，還有一段路'}</h3><p>${s.started?R.ready(s)?'本章調查已完成，帶回的線索等你解讀。':`${s.reports} / ${R.chapters.length} 章已回報 · ${chapter?safe(chapter.steps[s.step]?.title||'回船整理'):'原創調查完成，可重讀研究記錄。'}`:'在眠海號讀取記錄器後，回船接下洞窟、遺跡與深淵的調查。'}</p><button class="muted-btn" id="storyShipOpen">打開調查冊 ↗</button>`;$('storyShipOpen').onclick=()=>openPanel('story');
+  const s=state(),chapter=R.chapter(s);card.innerHTML=`<small>FIELD JOURNAL / 回聲潮譜</small><h3>${s.started?chapter?safe(chapter.title):'把回聲帶回家':'眠海號之後，還有一段路'}</h3><p>${s.started?R.ready(s)?'本章調查已完成，帶回的線索等你解讀。':`${s.reports} / ${R.chapters.length} 章已回報 · ${chapter?safe(chapter.steps[s.step]?.title||'回船整理'):'原創調查完成，可重讀研究記錄。'}`:voyage.state.mode==='free'?'隨時可選擇接下洞窟、遺跡與深淵的調查，或繼續自由探索。':'在眠海號讀取記錄器後，回船接下洞窟、遺跡與深淵的調查。'}</p><button class="muted-btn" id="storyShipOpen">打開調查冊 ↗</button>`;$('storyShipOpen').onclick=()=>openPanel('story');
  }
  function render(){
-  const s=state(),chapter=R.chapter(s),step=R.current(s),can=!!step&&R.eligible(s,context(true));panelTitle('ECHOES / FIELD JOURNAL','回聲潮譜');
-  $('panelBody').innerHTML=`<p class="panel-note">眠海號之後的原創調查 · ${s.reports} / ${R.chapters.length} 章回報。現地記錄需要停穩、保持距離與視線；中斷可重試。</p>${!s.started?`<section class="feature-section"><h3>澄的邀請</h3><p>手記的最後幾行指向西側洞道。我們一起把這片海未讀完的頁面找回來。</p><button id="storyBegin" class="primary" ${active||(!voyage.state.reading&&voyage.state.mode!=='free')?'disabled':''}>接下調查</button><p class="feature-muted">先親自讀取眠海號記錄器，再回船開始。自由重遊也可選擇接下。</p></section>`:chapter?`<section class="feature-section"><span class="feature-badge">第 ${s.reports+1} 章</span><h3>${safe(chapter.title)}</h3><p>${safe(chapter.brief)}</p>${chapter.steps.map((a,i)=>`<p class="story-step ${i===s.step?'current':''}">${i<s.step?'✓':i===s.step?'→':'○'} ${safe(a.title)}${i<s.step?'<br><small>'+safe(a.note)+'</small>':''}</p>`).join('')}${R.ready(s)?`<button class="primary" id="storyReport" ${active?'disabled':''}>回報記錄 · 聽澄的解讀</button>${active?'<p>請先返回研究船。</p>':''}`:step?`<div class="feature-toolbar"><button class="muted-btn" id="storyMark">標記調查位置 ↗</button><button class="muted-btn" id="storyNavigation">選擇研究船泊位 ↗</button><button class="primary" id="storyRecord" ${can?'':'disabled'}>${step.kind==='cipher'?'在此解讀':'開始現地記錄'}</button></div><p class="feature-muted">${can?'目標已在視線與距離內。':'先游到標記附近，面向目標。洞窟與檔案室須從入口進入。'}${step.seconds?'需要連續 '+step.seconds+' 秒。':''}</p>${step.kind==='cipher'?`<p>石板線索：海先升起，月照在海上，星在月的遠方。</p><p>已比對 ${s.symbols} / 3 個圖形</p><div class="feature-toolbar">${[['wave','≋ 潮紋'],['moon','◐ 月輪'],['star','✦ 星點']].map(([id,label])=>`<button class="muted-btn" data-story-symbol="${id}" ${can?'':'disabled'}>${label}</button>`).join('')}</div>`:''}`:''}</section>`:'<section class="feature-section"><h3>調查已整理完畢</h3><p>三台觀測器已回收。洞窟、遺跡與裂谷仍可隨時重遊；研究桌保存著每一次解讀。</p></section>'}${R.chapters.slice(0,s.reports).map((a,i)=>`<details class="feature-section"><summary>✓ ${i+1} · ${safe(a.title)}</summary><p>${safe(a.reply)}</p>${a.steps.map(b=>`<p><b>${safe(b.title)}</b><br>${safe(b.note)}</p>`).join('')}</details>`).join('')}`;
+  const s=state(),chapter=R.chapter(s),step=R.current(s),lastReport=s.reports?R.chapters[s.reports-1]:null,can=!!step&&R.eligible(s,context(true));panelTitle('ECHOES / FIELD JOURNAL','回聲潮譜');
+  $('panelBody').innerHTML=`<p class="panel-note">眠海號之後的原創調查 · ${s.reports} / ${R.chapters.length} 章回報。現地記錄需要停穩、保持距離與視線；中斷可重試。</p>${lastReport?`<section id="storyLastReport" class="feature-section story-report"><small>最近的回報 · ${safe(lastReport.title)}</small><h3>澄的解讀</h3><p>${safe(lastReport.reply)}</p></section>`:''}${!s.started?`<section class="feature-section"><h3>澄的邀請</h3><p>手記的最後幾行指向西側洞道。我們一起把這片海未讀完的頁面找回來。</p><button id="storyBegin" class="primary" ${active||(!voyage.state.reading&&voyage.state.mode!=='free')?'disabled':''}>接下調查</button><p class="feature-muted">${voyage.state.mode==='free'?'自由探索可直接選擇接下調查；準備好後，再依自己的步調出發。':'先親自讀取眠海號記錄器，再回船開始。'}</p></section>`:chapter?`<section class="feature-section"><span class="feature-badge">第 ${s.reports+1} 章</span><h3>${safe(chapter.title)}</h3><p>${safe(chapter.brief)}</p>${chapter.steps.map((a,i)=>`<p class="story-step ${i===s.step?'current':''}">${i<s.step?'✓':i===s.step?'→':'○'} ${safe(a.title)}${i<s.step?'<br><small>'+safe(a.note)+'</small>':''}</p>`).join('')}${R.ready(s)?`<button class="primary" id="storyReport" ${active?'disabled':''}>回報記錄 · 聽澄的解讀</button>${active?'<p>請先返回研究船。</p>':''}`:step?`<div class="feature-toolbar"><button class="muted-btn" id="storyMark">標記調查位置 ↗</button><button class="muted-btn" id="storyNavigation">選擇研究船泊位 ↗</button><button class="primary" id="storyRecord" ${can?'':'disabled'}>${step.kind==='cipher'?'在此解讀':'開始現地記錄'}</button></div><p class="feature-muted">${can?'目標已在視線與距離內。':'先游到標記附近，面向目標。洞窟與檔案室須從入口進入。'}${step.seconds?'需要連續 '+step.seconds+' 秒。':''}</p>${step.kind==='cipher'?`<p>石板線索：海先升起，月照在海上，星在月的遠方。</p><p>已比對 ${s.symbols} / 3 個圖形</p><div class="feature-toolbar">${[['wave','≋ 潮紋'],['moon','◐ 月輪'],['star','✦ 星點']].map(([id,label])=>`<button class="muted-btn" data-story-symbol="${id}" ${can?'':'disabled'}>${label}</button>`).join('')}</div>`:''}`:''}</section>`:'<section class="feature-section"><h3>調查已整理完畢</h3><p>三台觀測器已回收。洞窟、遺跡與裂谷仍可隨時重遊；研究桌保存著每一次解讀。</p></section>'}${R.chapters.slice(0,s.reports).map((a,i)=>`<details class="feature-section"><summary>✓ ${i+1} · ${safe(a.title)}</summary><p>${safe(a.reply)}</p>${a.steps.map(b=>`<p><b>${safe(b.title)}</b><br>${safe(b.note)}</p>`).join('')}</details>`).join('')}`;
   if($('storyBegin'))$('storyBegin').onclick=begin;if($('storyReport'))$('storyReport').onclick=report;if($('storyRecord'))$('storyRecord').onclick=startRecording;
   if($('storyMark'))$('storyMark').onclick=()=>markPlace(destination());if($('storyNavigation'))$('storyNavigation').onclick=()=>openPanel('navigation');
   $('panelBody').querySelectorAll('[data-story-symbol]').forEach(b=>b.onclick=()=>choose(b.dataset.storySymbol));
@@ -119,8 +124,25 @@ const oceanStory=(()=>{
   const b=document.createElement('button');b.id='storyAction';b.className='pill-btn hidden';b.onclick=()=>recording?cancel():startRecording();$('hud').append(b);
   const style=document.createElement('style');style.textContent='#storyAction{position:fixed;left:50%;top:66%;transform:translateX(-50%);max-width:min(460px,82vw);white-space:normal;min-height:44px;background:#10353beb;z-index:12}.story-step{padding:10px 0;border-bottom:1px solid #a6c9bc22}.story-step.current{color:#e4ddb7}.story-step small{font-size:12px;color:#a9c5bd}#storyShipCard small{font-size:10px;letter-spacing:.1em}#storyShipCard p{font-size:12px}#storyShipCard h3{font-size:21px}@media(pointer:coarse){#storyAction{top:57%;font-size:11px;max-width:70vw}}@media(max-height:550px) and (orientation:landscape){#storyAction{top:52%;max-width:48vw}}';document.head.append(style);
   window.addEventListener('blur',cancel);document.addEventListener('visibilitychange',()=>{if(document.hidden)cancel();});
-  oceanFeatures.addMenu({id:'story',label:'回聲潮譜 · 調查冊',panel:'story'});shipRender();
+  oceanFeatures.addMenu({id:'story',label:'回聲潮譜 · 調查冊',panel:'story'});oceanActivities.init();shipRender();
  }
- const feature={id:'story',initial:R.initial,sanitize:R.sanitize,init,tick,paintHUD,shipRender,photoOpened:cancel,panelChanged:cancel,endDive:cancel,reset(){cancel();syncSensors();shipRender();},startDive(){cancel();if(state().started&&R.chapter(state()))radio(R.chapter(state()).brief);},renderPanel(type){if(type!=='story')return false;render();return true;}};oceanFeatures.register(feature);
- return {rules:R,feature,begin,startRecording,choose,report,context,destination,snapshot:()=>JSON.parse(JSON.stringify(state()))};
+ const feature={id:'story',initial:R.initial,sanitize:R.sanitize,init,tick,paintHUD,shipRender,photoOpened:cancel,panelChanged:cancel,endDive:cancel,reset(){cancel();syncSensors();shipRender();},startDive(){cancel();if(state().started&&R.chapter(state()))radio(R.chapter(state()).brief);},renderPanel(type){if(type==='activities'){oceanActivities.render();return true;}if(type!=='story')return false;render();return true;}};oceanFeatures.register(feature);
+ return {rules:R,feature,activity,begin,startRecording,choose,report,context,destination,snapshot:()=>JSON.parse(JSON.stringify(state()))};
+})();
+
+
+/* A shared, stateless entry to the existing investigation and commissions.
+ * The registered story lifecycle owns the panel; saved feature data stays put. */
+const oceanActivities=(()=>{
+ const labels={available:'未接下',active:'進行中',ready:'待回報',complete:'已完成'};
+ function list(){return [oceanStory.activity(),...oceanExpedition.activities()];}
+ function render(){
+  panelTitle('FIELD WORK','調查與委託');
+  $('panelBody').innerHTML='<p class="panel-note">選一段想繼續的探索。所有工作都可自行選擇；沒有倒數，也不會限制你游向別處。</p><div class="activities-list">'+list().map(a=>`<article class="activity-card" data-activity-state="${safe(a.status)}"><span class="feature-badge">${labels[a.status]}</span><h3>${safe(a.title)}</h3><p>${safe(a.detail)}</p>${a.progress?`<small>${safe(a.progress)}</small>`:''}<div class="feature-toolbar"><button class="muted-btn" data-activity-open="${safe(a.panel)}" data-activity-id="${safe(a.id)}">${a.panel==='mail'?'打開這封信':a.status==='available'?'了解這項調查':a.status==='complete'?'重讀調查冊':'打開調查冊'} ↗</button>${a.destination?`<button class="muted-btn" data-activity-mark="${safe(a.id)}">標記目前目標 ↗</button>`:''}${a.kind==='photo'&&['active','ready'].includes(a.status)?'<button class="muted-btn" data-activity-photos>沖印與相簿 ↗</button>':''}</div></article>`).join('')+'</div>';
+  $('panelBody').querySelectorAll('[data-activity-open]').forEach(button=>button.onclick=()=>{if(button.dataset.activityOpen==='mail')oceanExpedition.openMail(button.dataset.activityId);else openPanel('story');});
+  $('panelBody').querySelectorAll('[data-activity-photos]').forEach(button=>button.onclick=()=>openPanel('photography'));
+  $('panelBody').querySelectorAll('[data-activity-mark]').forEach(button=>button.onclick=()=>{const activity=list().find(a=>a.id===button.dataset.activityMark);if(activity?.destination)markPlace(activity.destination);});
+ }
+ function init(){const button=$('welcomeActivities');if(button)button.onclick=()=>openPanel('activities');}
+ return {init,render};
 })();

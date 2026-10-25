@@ -89,10 +89,10 @@ kbd{font:8px var(--mono);border:1px solid #cde7dc55;background:#05263240;padding
 #scrim{position:fixed;inset:0;z-index:19;background:#02162266;backdrop-filter:blur(5px);touch-action:none}
 #panel{position:fixed;top:0;bottom:0;right:0;width:min(530px,94vw);z-index:20;background:#06222cf7;border-left:1px solid var(--line);box-shadow:-10px 0 65px #02172250;display:flex;flex-direction:column;touch-action:pan-y;animation:slide .3s ease-out;padding-top:env(safe-area-inset-top)}
 @keyframes slide{from{transform:translateX(30px);opacity:0}}
-.panel-head{display:flex;justify-content:space-between;align-items:center;padding:32px 28px 24px;gap:18px;border-bottom:1px solid var(--line);flex-shrink:0}
+.panel-head{display:flex;justify-content:space-between;align-items:center;padding:32px max(28px,env(safe-area-inset-right)) 24px max(28px,env(safe-area-inset-left));gap:18px;border-bottom:1px solid var(--line);flex-shrink:0}
 .panel-head h2{font:400 28px var(--serif);letter-spacing:.08em;margin:9px 0 0}
 .panel-head .eyebrow{font-size:8px}
-#panelBody{padding:26px 28px max(36px,env(safe-area-inset-bottom));min-height:0;overflow:auto;overscroll-behavior:contain;touch-action:pan-y;scrollbar-width:thin;scrollbar-color:#547870 transparent}
+#panelBody{padding:26px max(28px,env(safe-area-inset-right)) max(36px,env(safe-area-inset-bottom)) max(28px,env(safe-area-inset-left));min-height:0;overflow:auto;overscroll-behavior:contain;touch-action:pan-y;scrollbar-width:thin;scrollbar-color:#547870 transparent}
 .panel-note{font-size:11px;line-height:1.95;color:#b1cbc5;margin:0 0 22px}
 .inset-note{margin:13px 0 0}
 .tabs{display:flex;gap:22px;border-bottom:1px solid var(--line);margin-bottom:24px}
@@ -277,9 +277,9 @@ body.cinematic #interactBtn{visibility:hidden;pointer-events:none!important}
 .welcome-bottom{position:static;display:flex;flex-direction:column;align-items:flex-start;gap:7px;font-size:8px;flex-shrink:0;margin-top:0;padding:8px 0 max(10px,env(safe-area-inset-bottom))}
 .welcome-bottom button{font-size:8px}
 #panel{width:100%}
-.panel-head{padding:23px 22px 20px}
+.panel-head{padding:23px max(22px,env(safe-area-inset-right)) 20px max(22px,env(safe-area-inset-left))}
 .panel-head h2{font-size:26px}
-#panelBody{padding:23px 22px max(32px,env(safe-area-inset-bottom))}
+#panelBody{padding:23px max(22px,env(safe-area-inset-right)) max(32px,env(safe-area-inset-bottom)) max(22px,env(safe-area-inset-left))}
 .setting-row{font-size:11px;gap:14px}
 .setting-row input[type=range]{width:110px;min-width:98px}
 .audio-settings{padding:19px 15px}
@@ -527,3 +527,21 @@ body.dive-paused #ecologyHUD,body.cinematic #ecologyHUD,body:has(#cameraFrame:no
 
 /* Exclusive voyage session notice: native dialog keeps underlying tools inert. */
 :is(#saveSessionGate,#saveImportProgress){color:#d9e9de;background:#082630;border:1px solid #84acaa55;border-radius:16px;box-sizing:border-box;width:min(92vw,480px);max-height:90dvh;padding:clamp(22px,5vw,38px);overflow:auto;text-align:left}:is(#saveSessionGate,#saveImportProgress)::backdrop{background:#041b25ee}:is(#saveSessionGate,#saveImportProgress) h2{font:500 24px var(--serif);line-height:1.5;margin:0 0 16px}:is(#saveSessionGate,#saveImportProgress) p{font-size:14px;line-height:1.9}#saveSessionGate button{min-height:48px;padding:12px 18px;font-size:14px;border:1px solid #96b8af55;border-radius:8px}#saveSessionGate button:focus-visible{outline:3px solid #e0cb8e;outline-offset:4px}#saveSessionStatus{min-height:1.9em}
+
+/* Optional work stays in a readable panel, leaving the swimming view clear. */
+.activities-list{display:grid;gap:0}.activity-card{min-width:0;padding:20px 0;border-top:1px solid var(--line)}.activity-card h3{margin:10px 0;font:22px var(--serif);line-height:1.4}.activity-card p{font-size:13px;line-height:1.85;color:#c2d8d3;margin:10px 0}.activity-card>small{display:block;font-size:11px;line-height:1.7;color:#a9c7c3}.activity-card .feature-toolbar{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}.activity-card button{min-height:44px;max-width:100%;white-space:normal;text-align:left}.activity-card[data-activity-state="ready"] .feature-badge{color:#eadfac}
+.ocean-welcome .welcome-bottom nav{flex-wrap:wrap;justify-content:flex-end;gap:0 20px;min-width:0}.ocean-welcome .welcome-bottom button{min-width:44px}
+@media(max-width:700px){.ocean-welcome .welcome-bottom>span{max-width:38%}.ocean-welcome .welcome-bottom nav{flex:1;gap:0 12px}.activity-card h3{font-size:20px}.activity-card p{font-size:12px}}
+@media(max-height:600px) and (orientation:landscape){.ocean-welcome{padding:max(18px,env(safe-area-inset-top)) max(6vw,calc(env(safe-area-inset-right) + 12px)) max(10px,env(safe-area-inset-bottom)) max(6vw,calc(env(safe-area-inset-left) + 12px))}.ocean-welcome .ship-continue{position:static;margin:2px 0;min-height:44px}.ocean-welcome .hero{margin:0}.ocean-welcome .hero h1{margin:6px 0 9px;font-size:42px}.ocean-welcome .hero-actions{margin-top:10px}}
+
+/* Keep the resumed dive and all secondary actions visible on short phones. */
+@media(max-width:700px) and (max-height:650px) and (orientation:portrait){
+ .ocean-welcome{gap:12px}
+ .ocean-welcome .hero{margin:8px 0 10px}
+ .ocean-welcome .hero h1{margin:12px 0 14px}
+ .ocean-welcome .hero-actions{margin-top:16px}
+ .ocean-welcome .intro-controls{margin-top:8px}
+ .ocean-welcome .welcome-bottom{flex-direction:column;align-items:flex-start;gap:4px}
+ .ocean-welcome .welcome-bottom>span{max-width:100%}
+ .ocean-welcome .welcome-bottom nav{flex:none;justify-content:flex-start;gap:0 16px}
+}

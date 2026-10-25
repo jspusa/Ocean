@@ -10,6 +10,7 @@ function fixture({lifecycle=false}={}){
  function node(id,tagName='DIV',parentElement=null){
   const el={id,tagName,parentElement,isContentEditable:false,classList:classes(),style:{},dataset:{},disabled:false,checked:false,
    addEventListener:(type,fn,capture)=>listen(id,type,fn,capture),setAttribute(){},querySelector:()=>({textContent:''}),querySelectorAll:()=>[],
+   contains(other){for(let p=other;p;p=p.parentElement)if(p===this)return true;return false;},
    closest(selector){for(let p=this;p;p=p.parentElement){if(p.isContentEditable&&selector.includes('contenteditable'))return p;if(selector.split(',').some(s=>s.trim().toUpperCase()===p.tagName||s.trim()==='a[href]'&&p.tagName==='A'&&p.href))return p;}return null;},
    focus(){document.activeElement=this;dispatch('focusin',null,this);},click(){for(const {fn}of handlers.get(id+':click')||[])fn({target:this});this.onclick?.();}
   };nodes.set(id,el);return el;
