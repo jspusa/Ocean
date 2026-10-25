@@ -2,50 +2,120 @@
  * APIs. Controlled browser boundaries provide IndexedDB/LockManager scheduling;
  * native browser transactions are covered by the browser suite. */
 const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/strict');
-const source=fs.readFileSync('src/photography.js','utf8'),sessionSource=fs.readFileSync('src/save_session.js','utf8');
+const source=fs.readFileSync('src/photography.js','utf8'),sessionSource=fs.readFileSync('src/save_session.js','utf8'),guardSource=fs.readFileSync('src/save_session_ui.js','utf8');
+const appSource=fs.readFileSync('src/app.js','utf8'),voyageSource=fs.readFileSync('src/voyage.js','utf8'),featureSource=fs.readFileSync('src/features.js','utf8'),engineSource=fs.readFileSync('src/engine.js','utf8'),worldSource=fs.readFileSync('src/world.js','utf8');
+// These production declarations validate archives without allocating WebGL.
+const readers=[engineSource.slice(0,engineSource.indexOf('class Geometry')),worldSource.slice(0,worldSource.indexOf('const obstacles=')),appSource.slice(appSource.indexOf('const defaults='),appSource.indexOf('function nextPhotoDate(')),appSource.slice(appSource.indexOf('function readJournal('),appSource.indexOf('function applyJournal(')),voyageSource.slice(voyageSource.indexOf('const ORDERS='),voyageSource.indexOf('const LAYOUT_BOUNDS=')),voyageSource.slice(voyageSource.indexOf('const initialVoyage='),voyageSource.indexOf('const voyage=')),featureSource].join('\n');
 const plain=value=>JSON.parse(JSON.stringify(value));
 const jpeg='data:image/jpeg;base64,/9j/2Q==';
 const photo=date=>({date,url:jpeg,area:'海溝',species:'深海訪客',individual:'test-'+date,grade:82});
 const metadata=date=>({date,area:'海溝',species:'深海訪客',individual:'test-'+date,grade:82,bytes:4});
+const STORE_KEY='return-blue.shilang.v1',VOYAGE_KEY='return-blue.voyage.1';
+const saveKeys=[STORE_KEY,STORE_KEY+'.backup',VOYAGE_KEY,VOYAGE_KEY+'.backup'];
+function plan(f){const before=saveKeys.map(key=>[key,f.context.localStorage.getItem(key)]),after=before.map(([key,value])=>[key,key===STORE_KEY?JSON.stringify({seen:['new'],photos:[],log:[],settings:{quality:0}}):key===VOYAGE_KEY?JSON.stringify({schema:1,distance:900,features:{photography:{schema:1,revision:5,film:[],album:[]}}}):value]);return{before,after};}
 const tick=()=>new Promise(resolve=>setImmediate(resolve));
 function boundary(initial){
- let records=new Map(initial.map(record=>[record.id,record])),created=initial.length>0;
+ let stores=new Map([['records',new Map(initial.map(record=>[record.id,record]))]]),version=initial.length?1:0;
  const counts={opens:0,reads:0,transactions:0,commits:0,aborts:0,upgrades:0},hooks={};
- const connection={objectStoreNames:{contains:()=>created},createObjectStore(){counts.upgrades++;created=true;},close(){},transaction(name,mode){
-  counts.transactions++;const writable=mode==='readwrite',working=new Map(records);let aborted=false;
+ const connection={objectStoreNames:{contains:name=>stores.has(name)},createObjectStore(name){counts.upgrades++;stores.set(name,new Map());},close(){},transaction(names,mode){
+  counts.transactions++;const writable=mode==='readwrite',selected=Array.isArray(names)?names:[names],working=new Map(selected.map(name=>{if(!stores.has(name))throw new Error('unknown store '+name);return[name,new Map(stores.get(name))];}));let aborted=false,settled=false,pending=0,scheduled=false;
   if(writable&&hooks.writeFailure)throw new Error('injected write failure');
-  const tx={error:null,abort(){if(aborted)return;aborted=true;counts.aborts++;queueMicrotask(()=>tx.onabort?.());}};
-  const finish=()=>{const complete=()=>queueMicrotask(()=>{if(aborted)return;if(writable){records=working;counts.commits++;}tx.oncomplete?.();});if(writable&&hooks.holdCommit)hooks.holdCommit(complete);else complete();};
-  const request=operation=>{const req={};queueMicrotask(()=>{if(aborted)return;hooks.beforeRequest?.(mode,operation);
-   if(operation==='getAll'&&hooks.readFailure){req.error=new Error('injected read failure');req.onerror?.();return;}
-   req.result=operation==='getAll'?[...working.values()]:working.get('@library');req.onsuccess?.();finish();
+  const tx={error:null,abort(){if(aborted||settled)return;aborted=true;counts.aborts++;queueMicrotask(()=>tx.onabort?.());}};
+  const finish=()=>{if(pending||scheduled||aborted||settled)return;scheduled=true;const complete=()=>queueMicrotask(()=>{scheduled=false;if(pending||aborted||settled)return;settled=true;if(writable){for(const[name,rows]of working)stores.set(name,rows);counts.commits++;}tx.oncomplete?.();});if(writable&&hooks.holdCommit)hooks.holdCommit(complete);else complete();};
+  const request=(name,operation,key)=>{pending++;const req={};queueMicrotask(()=>{if(aborted)return;hooks.beforeRequest?.(mode,operation);
+   if(hooks.readFailure){req.error=new Error('injected read failure');req.onerror?.();tx.error=req.error;tx.abort();return;}
+   req.result=operation==='getAll'?[...working.get(name).values()]:working.get(name).get(key);req.onsuccess?.();pending--;finish();
   });return req;};
-  tx.objectStore=()=>({get(){counts.reads++;return request('get');},getAll(){counts.reads++;return request('getAll');},put(record){working.set(record.id,record);},delete(id){working.delete(id);},clear(){working.clear();}});
-  return tx;
+  tx.objectStore=name=>({get(key){counts.reads++;return request(name,'get',key);},getAll(){counts.reads++;return request(name,'getAll');},put(record){working.get(name).set(record.id,record);finish();},delete(id){working.get(name).delete(id);finish();},clear(){working.get(name).clear();finish();}});
+  queueMicrotask(finish);return tx;
  }};
- return {counts,hooks,records:()=>records,replace(recordsToUse){records=new Map(recordsToUse.map(r=>[r.id,r]));},indexedDB:{open(){counts.opens++;const request={result:connection};queueMicrotask(()=>{
-  if(!created){let aborted=false;request.transaction={abort(){aborted=true;counts.aborts++;}};hooks.beforeUpgrade?.();request.onupgradeneeded?.();if(aborted){request.error=new Error('upgrade aborted');request.onerror?.();return;}}
+ return {counts,hooks,records:()=>stores.get('records'),recovery:()=>stores.get('recovery'),replace(recordsToUse){stores.set('records',new Map(recordsToUse.map(r=>[r.id,r])));},indexedDB:{open(name,requestedVersion){counts.opens++;const request={result:connection};queueMicrotask(()=>{
+  if(requestedVersion<version){request.error=new Error('VersionError');request.onerror?.();return;}
+  if(requestedVersion>version){let aborted=false;request.transaction={abort(){aborted=true;counts.aborts++;}};hooks.beforeUpgrade?.();request.onupgradeneeded?.();if(aborted){request.error=new Error('upgrade aborted');request.onerror?.();return;}version=requestedVersion;}
   request.onsuccess?.();
  });return request;}}};
 }
-async function fixture({empty=false,initialize=true}={}){
- const state={schema:1,revision:4,film:[metadata(101)],album:[]},db=boundary(empty?[]:[{id:'@library',state:plain(state)},{id:'p-101',blob:new Blob([new Uint8Array([255,216,255,217])],{type:'image/jpeg'})}]);
+async function fixture({empty=false,initialize=true,backing=null}={}){
+ const state={schema:1,revision:4,film:[metadata(101)],album:[]},db=backing||boundary(empty?[]:[{id:'@library',state:plain(state)},{id:'p-101',blob:new Blob([new Uint8Array([255,216,255,217])],{type:'image/jpeg'})}]);
  const locks={request(name,options,callback){return Promise.resolve().then(()=>callback({name,mode:options.mode}));}};
  const calls={save:0,persist:0,progress:0},messages=[],elements=new Map(),element=id=>{if(!elements.has(id))elements.set(id,{innerHTML:'',textContent:'',querySelectorAll:()=>[]});return elements.get(id);};
- const context={console,Blob,Uint8Array,atob,queueMicrotask,setTimeout,clearTimeout,indexedDB:db.indexedDB,navigator:{locks},
+ const storage=backing?.storage||new Map([[STORE_KEY,JSON.stringify({seen:['old'],photos:[],log:[{text:'original journal',date:1}],settings:{quality:1}})],[VOYAGE_KEY,JSON.stringify({schema:1,distance:72,features:{photography:state,expedition:{mail:{submission:{status:'complete',photoDate:101}}}}})]]);
+ const localStorage={getItem:key=>storage.get(key)??null,setItem(key,value){storage.set(key,String(value));},removeItem(key){storage.delete(key);}};
+ const context={STORE_KEY,VOYAGE_KEY,localStorage,matchMedia:()=>({matches:false}),confirm:()=>true,crypto:require('node:crypto').webcrypto,console,Blob,Uint8Array,atob,queueMicrotask,setTimeout,clearTimeout,indexedDB:db.indexedDB,navigator:{locks},
   FileReader:class{readAsDataURL(blob){blob.arrayBuffer().then(bytes=>{const complete=()=>{this.result='data:'+blob.type+';base64,'+Buffer.from(bytes).toString('base64');this.onload?.();};if(db.hooks.holdHydration)db.hooks.holdHydration(complete);else complete();},error=>{this.error=error;this.onerror?.();});}},
   voyage:{state:{features:{photography:empty?{schema:1,revision:0,film:[],album:[]}:plain(state)}}},persistent:{photos:[]},active:false,modal:null,
-  document:{getElementById:element},$:element,panelTitle(){},safe:String,dateText:String,renderJournal(){},toast:message=>messages.push(message),saveVoyage(){calls.save++;return true;},persist(){calls.persist++;return true;},recordPhotoProgress(){calls.progress++;},
-  oceanFeatures:{register(feature){context.feature=feature;},state(){return context.voyage.state.features.photography;},retainedPhotoDates:()=>new Set()}
+  document:{getElementById:element},$:element,panelTitle(){},safe:String,dateText:String,renderJournal(){},toast:message=>messages.push(message),saveVoyage(){calls.save++;return true;},persist(){calls.persist++;return true;},recordPhotoProgress(){calls.progress++;}
  };
- vm.createContext(context);vm.runInContext(sessionSource+'\n'+source+'\nthis.api=oceanPhotography;this.session=oceanSaveSession;',context);
+ vm.createContext(context);vm.runInContext(sessionSource+'\n'+readers+'\n'+source+'\n'+guardSource+'\nthis.api=oceanPhotography;this.session=oceanSaveSession;this.guard=oceanSaveGuard;this.feature=oceanPhotography.feature;',context);
  const session=context.session;assert.equal(await session.acquire(),true);assert.equal(session.holdsLock,true);
- const result={...db,session,calls,messages,elements,context,api:context.api,state:()=>plain(context.voyage.state.features.photography)};
+ const result={...db,storage,session,calls,messages,elements,context,api:context.api,state:()=>plain(context.voyage.state.features.photography)};
  if(initialize)await context.feature.init();return result;
 }
 let checks=0,failures=0;
 async function check(name,fn){try{await fn();checks++;console.log('PASS '+name);}catch(error){failures++;console.error('FAIL '+name+'\n'+error.stack);}}
 (async()=>{
+ await check('startup recovery without a pending import leaves originals untouched',async()=>{
+  const f=await fixture({initialize:false});assert.equal(await f.api.recoverImport(),false);await f.context.feature.init();assert.equal((await f.api.exportArchive()).images[0].url,jpeg);
+ });
+ await check('staged import retains a complete durable backup independent of current runtime',async()=>{
+  const f=await fixture(),prepared=await f.api.prepareImport({schema:1,state:{schema:1,revision:0,film:[],album:[]},images:[]});await prepared.commit(plan(f));
+  f.context.voyage.state={features:{photography:{schema:1,revision:0,film:[],album:[]}}};f.context.persistent.photos=[];
+  const archive=await f.api.recoveryArchive();assert.equal(archive.voyage.distance,72);assert.equal(archive.journal.log[0].text,'original journal');assert.equal(archive.photography.images[0].url,jpeg);assert.equal(archive.photography.state.film[0].date,101);
+ });
+ await check('pending import prevents ordinary photo mutations from consuming recovery data',async()=>{
+  const f=await fixture(),prepared=await f.api.prepareImport({schema:1,state:{schema:1,revision:0,film:[],album:[]},images:[]});await prepared.commit(plan(f));
+  assert.equal(await f.api.capture(photo(202)),false);assert.equal((await f.api.recoveryArchive()).photography.images[0].url,jpeg);
+ });
+ await check('import completion requires all new local snapshots before discarding durable rescue',async()=>{
+  const f=await fixture(),prepared=await f.api.prepareImport({schema:1,state:{schema:1,revision:0,film:[],album:[]},images:[]}),snapshots=plan(f);await prepared.commit(snapshots);
+  await assert.rejects(prepared.finish(),/航程|快照|完成/);assert.equal((await f.api.recoveryArchive()).photography.images[0].url,jpeg);
+  for(const[key,value]of snapshots.after)f.context.guard.write(key,value);await prepared.finish();assert.equal(await f.api.recoverImport(),false);assert.equal((await f.api.exportArchive()).images.length,0);
+ });
+ await check('new runtime restores old local state and original images after interrupted import',async()=>{
+  const old=await fixture(),prepared=await old.api.prepareImport({schema:1,state:{schema:1,revision:0,film:[],album:[]},images:[]}),snapshots=plan(old);await prepared.commit(snapshots);old.context.guard.write(...snapshots.after[0]);old.session.close();
+  const reopened=await fixture({initialize:false,backing:old});assert.equal(await reopened.api.recoverImport(),true);assert.deepEqual(saveKeys.map(key=>[key,reopened.context.localStorage.getItem(key)]),snapshots.before);assert.equal(await reopened.api.recoverImport(),false);await reopened.context.feature.init();assert.equal((await reopened.api.exportArchive()).images[0].url,jpeg);
+ });
+ await check('durable export refuses corrupt original snapshots instead of inventing an empty voyage',async()=>{
+  const f=await fixture();f.context.localStorage.setItem(VOYAGE_KEY,'{broken');f.context.localStorage.setItem(VOYAGE_KEY+'.backup','{also-broken');const prepared=await f.api.prepareImport({schema:1,state:{schema:1,revision:0,film:[],album:[]},images:[]});await prepared.commit(plan(f));await assert.rejects(f.api.recoveryArchive(),/航程|快照|備份/);
+ });
+ await check('external photo revision blocks recovery before any local snapshot changes',async()=>{
+  const f=await fixture(),prepared=await f.api.prepareImport({schema:1,state:{schema:1,revision:0,film:[],album:[]},images:[]}),snapshots=plan(f);await prepared.commit(snapshots);for(const[key,value]of snapshots.after)f.context.guard.write(key,value);f.replace([{id:'@library',state:{schema:1,revision:99,film:[],album:[]}}]);await assert.rejects(f.api.recoverImport(),/另一個分頁/);assert.deepEqual(saveKeys.map(key=>[key,f.context.localStorage.getItem(key)]),snapshots.after);assert.equal((await f.api.recoveryArchive()).photography.images[0].url,jpeg);
+ });
+ await check('imported pending rescue image survives commit and a fresh runtime',async()=>{
+  const old=await fixture(),prepared=await old.api.prepareImport({schema:1,state:{schema:1,revision:0,film:[],album:[]},images:[],recovery:photo(202)}),snapshots=plan(old);await prepared.commit(snapshots);for(const[key,value]of snapshots.after)old.context.guard.write(key,value);await prepared.finish();old.session.close();
+  const reopened=await fixture({initialize:false,backing:old});assert.equal(await reopened.api.recoverImport(),false);await reopened.context.feature.init();assert.equal(reopened.api.snapshot().recovery,true);assert.equal((await reopened.api.exportArchive()).recovery.url,jpeg);
+ });
+ await check('saving an imported rescue image removes its durable pending copy',async()=>{
+  const f=await fixture(),prepared=await f.api.prepareImport({schema:1,state:{schema:1,revision:0,film:[],album:[]},images:[],recovery:photo(202)}),snapshots=plan(f);await prepared.commit(snapshots);for(const[key,value]of snapshots.after)f.context.guard.write(key,value);await prepared.finish();f.context.feature.renderPanel('photography');await f.elements.get('photoRecoverRetry').onclick();assert.equal(f.state().film[0].date,202);f.session.close();
+  const reopened=await fixture({backing:f});assert.equal(reopened.api.snapshot().recovery,false);assert.equal((await reopened.api.exportArchive()).images[0].date,202);
+ });
+ await check('discarding an imported rescue image stays discarded after reopening',async()=>{
+  const f=await fixture(),prepared=await f.api.prepareImport({schema:1,state:{schema:1,revision:0,film:[],album:[]},images:[],recovery:photo(202)}),snapshots=plan(f);await prepared.commit(snapshots);for(const[key,value]of snapshots.after)f.context.guard.write(key,value);await prepared.finish();f.context.feature.renderPanel('photography');await f.elements.get('photoRecoverDiscard').onclick();f.session.close();const reopened=await fixture({backing:f});assert.equal(reopened.api.snapshot().recovery,false);
+ });
+ await check('staging rejects a stale local snapshot without replacing existing originals',async()=>{
+  const f=await fixture(),prepared=await f.api.prepareImport({schema:1,state:{schema:1,revision:0,film:[],album:[]},images:[]}),snapshots=plan(f);f.context.localStorage.setItem(STORE_KEY,'external-progress');await assert.rejects(prepared.commit(snapshots),/快照|航程|變更/);assert.equal((await f.api.exportArchive()).images[0].url,jpeg);assert.equal(await f.api.recoverImport(),false);
+ });
+ await check('corrupt undo metadata blocks recovery without normalizing away damaged entries',async()=>{
+  const f=await fixture(),prepared=await f.api.prepareImport({schema:1,state:{schema:1,revision:0,film:[],album:[]},images:[]}),snapshots=plan(f);await prepared.commit(snapshots);for(const[key,value]of snapshots.after)f.context.guard.write(key,value);f.recovery().get('@import').records.find(r=>r.id==='@library').state.film.push(metadata(101));await assert.rejects(f.api.recoverImport(),/索引|識別|復原/);await assert.rejects(f.api.recoveryArchive(),/索引|識別|復原/);assert.deepEqual(saveKeys.map(key=>[key,f.context.localStorage.getItem(key)]),snapshots.after);
+ });
+ await check('failed startup rollback retains durable rescue for a second restart',async()=>{
+  const f=await fixture(),prepared=await f.api.prepareImport({schema:1,state:{schema:1,revision:0,film:[],album:[]},images:[]}),snapshots=plan(f);await prepared.commit(snapshots);for(const[key,value]of snapshots.after)f.context.guard.write(key,value);f.session.close();
+  const first=await fixture({initialize:false,backing:f});first.hooks.writeFailure=true;await assert.rejects(first.api.recoverImport(),/injected write failure/);assert.equal((await first.api.recoveryArchive()).photography.images[0].url,jpeg);first.session.close();first.hooks.writeFailure=false;
+  const second=await fixture({initialize:false,backing:first});assert.equal(await second.api.recoverImport(),true);assert.deepEqual(saveKeys.map(key=>[key,second.context.localStorage.getItem(key)]),snapshots.before);await second.context.feature.init();assert.equal((await second.api.exportArchive()).images[0].url,jpeg);
+ });
+ await check('recovery lookup failure propagates before changing original local state',async()=>{
+  const f=await fixture({initialize:false}),before=saveKeys.map(key=>[key,f.context.localStorage.getItem(key)]);f.hooks.readFailure=true;await assert.rejects(f.api.recoverImport(),/injected read failure/);assert.deepEqual(saveKeys.map(key=>[key,f.context.localStorage.getItem(key)]),before);
+ });
+ await check('shared JPEG validator preserves accepted bytes and rejects prefix-only malformed input',async()=>{
+  const f=await fixture({initialize:false}),blob=f.api.rules.jpegBlob(jpeg);assert.deepEqual([...new Uint8Array(await blob.arrayBuffer())],[255,216,255,217]);assert.throws(()=>f.api.rules.jpegBlob('data:image/jpeg;base64,broken'),/JPEG/);
+ });
+ await check('durable recovery export skips an unsupported journal primary and preserves valid raw backup',async()=>{
+  const f=await fixture(),backup={schema:1,seen:['chromis'],photos:[],log:[{text:'backup journal',date:2}],settings:{quality:1},originalNote:'preserve this field'};f.context.localStorage.setItem(STORE_KEY,JSON.stringify({...backup,schema:999,log:[{text:'unsupported primary',date:3}]}));f.context.localStorage.setItem(STORE_KEY+'.backup',JSON.stringify(backup));
+  const prepared=await f.api.prepareImport({schema:1,state:{schema:1,revision:0,film:[],album:[]},images:[]});await prepared.commit(plan(f));assert.deepEqual(plain((await f.api.recoveryArchive()).journal),backup);
+ });
+ await check('a malformed legacy row cannot prevent valid stored and neighboring originals from loading',async()=>{
+  const f=await fixture({initialize:false});f.context.persistent.photos.push(photo(202),{...photo(303),url:'data:image/jpeg;base64,broken'});await f.context.feature.init();assert.equal(f.api.snapshot().durable,true);const archive=await f.api.exportArchive();assert.deepEqual(plain(archive.images.map(p=>p.date)),[101,202]);assert.ok(archive.images.every(p=>p.url===jpeg));assert.match(f.api.snapshot().error,/舊照片|損壞/);
+ });
  await check('owned export reads original bytes without saving or replacing in-memory state',async()=>{
   const f=await fixture(),before={...f.calls},identity=f.context.voyage.state.features.photography;
   const archive=await f.api.exportArchive();assert.equal(archive.images[0].url,jpeg);assert.deepEqual(f.calls,before);assert.equal(f.context.voyage.state.features.photography,identity);
@@ -79,22 +149,22 @@ async function check(name,fn){try{await fn();checks++;console.log('PASS '+name);
  });
  await check('prepared import commit refuses retirement and rollback refuses a released lock',async()=>{
   const f=await fixture(),prepared=await f.api.prepareImport({schema:1,state:{schema:1,revision:0,film:[],album:[]},images:[]});
-  f.session.retire();const before={...f.counts};await assert.rejects(prepared.commit(),{name:'SaveSessionError',status:'retiring'});assert.deepEqual(f.counts,before);
-  const closed=await fixture(),replacement=await closed.api.prepareImport({schema:1,state:{schema:1,revision:0,film:[],album:[]},images:[]});await replacement.commit();closed.session.close();const committed={...closed.counts};await assert.rejects(replacement.rollback(),{name:'SaveSessionError',status:'closed'});assert.deepEqual(closed.counts,committed);assert.equal(closed.records().get('@library').state.film.length,0);
+  f.session.retire();const before={...f.counts};await assert.rejects(prepared.commit(plan(f)),{name:'SaveSessionError',status:'retiring'});assert.deepEqual(f.counts,before);
+  const closed=await fixture(),replacement=await closed.api.prepareImport({schema:1,state:{schema:1,revision:0,film:[],album:[]},images:[]});await replacement.commit(plan(closed));closed.session.close();const committed={...closed.counts};await assert.rejects(replacement.rollback(),{name:'SaveSessionError',status:'closed'});assert.deepEqual(closed.counts,committed);assert.equal(closed.records().get('@library').state.film.length,0);
   assert.equal(closed.state().film[0]?.date,101);assert.equal(closed.api.snapshot().durable,false);assert.match(closed.api.snapshot().error,/未能還原/);assert.equal((await closed.api.exportArchive()).images[0].url,jpeg);
  });
  await check('retiring import rollback restores originals while the exclusive lock is still held',async()=>{
-  const f=await fixture(),before=f.state(),prepared=await f.api.prepareImport({schema:1,state:{schema:1,revision:0,film:[],album:[]},images:[]});await prepared.commit();assert.equal(f.records().has('p-101'),false);
+  const f=await fixture(),before=f.state(),prepared=await f.api.prepareImport({schema:1,state:{schema:1,revision:0,film:[],album:[]},images:[]});await prepared.commit(plan(f));assert.equal(f.records().has('p-101'),false);
   f.session.retire();await prepared.rollback();assert.deepEqual(f.state(),before);assert.equal(f.records().has('p-101'),true);assert.equal((await f.api.exportArchive()).images[0].url,jpeg);
  });
  await check('retiring rollback retains revision protection against an external library update',async()=>{
-  const f=await fixture(),prepared=await f.api.prepareImport({schema:1,state:{schema:1,revision:0,film:[],album:[]},images:[]});await prepared.commit();f.session.retire();
+  const f=await fixture(),prepared=await f.api.prepareImport({schema:1,state:{schema:1,revision:0,film:[],album:[]},images:[]});await prepared.commit(plan(f));f.session.retire();
   const external={schema:1,revision:prepared.state.revision+1,film:[metadata(303)],album:[]};f.replace([{id:'@library',state:external},{id:'p-303',blob:new Blob([new Uint8Array([255,216,255,217])])}]);
   const commits=f.counts.commits;await assert.rejects(prepared.rollback(),/另一個分頁/);assert.equal(f.counts.commits,commits);assert.equal(f.records().get('@library').state,external);assert.equal(f.records().has('p-303'),true);
   assert.equal(f.state().film[0]?.date,101);assert.equal(f.api.snapshot().durable,false);assert.equal((await f.api.exportArchive()).images[0].url,jpeg);
  });
  await check('failed database rollback retains coherent prior originals for rescue export',async()=>{
-  const f=await fixture(),before=f.state(),prepared=await f.api.prepareImport({schema:1,state:{schema:1,revision:0,film:[],album:[]},images:[],recovery:photo(202)});await prepared.commit();assert.equal(f.api.snapshot().recovery,true);
+  const f=await fixture(),before=f.state(),prepared=await f.api.prepareImport({schema:1,state:{schema:1,revision:0,film:[],album:[]},images:[],recovery:photo(202)});await prepared.commit(plan(f));assert.equal(f.api.snapshot().recovery,true);
   f.hooks.writeFailure=true;const commits=f.counts.commits;await assert.rejects(prepared.rollback(),/injected write failure/);f.session.retire();assert.equal(f.counts.commits,commits);assert.equal(f.records().has('p-101'),false);
   assert.deepEqual(f.state(),before);assert.equal(f.api.snapshot().durable,false);assert.equal(f.api.snapshot().recovery,false);assert.match(f.api.snapshot().error,/未能還原/);const reads=f.counts.reads,archive=await f.api.exportArchive();assert.equal(f.counts.reads,reads);assert.equal(archive.images[0].url,jpeg);assert.equal(archive.state.film[0].date,101);
  });

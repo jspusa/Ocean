@@ -202,10 +202,11 @@ function renderVoyagePanel(){
  $('panelBody').innerHTML=`<p class="panel-note">你是這趟研究航程的攝影記錄者。沒有評分倒數，也不必依順序完成；一個地標、一位訪客，慢慢留下六段記憶。</p><div class="order-list">${ORDERS.map((o,i)=>`<article class="order ${s.completed.includes(o.id)?'done':''}"><header><small>${String(i+1).padStart(2,'0')} / ${o.en}</small><b>${s.completed.includes(o.id)?'✓ 已記錄':'待完成'}</b></header><h3>${o.title}</h3><p>${o.description}</p><button data-dest="${o.place}" class="muted-btn">標記航向 ↗</button></article>`).join('')}</div><section class="order"><h3>把海帶回去</h3><p>六段記憶完成後返回研究船，完成第一航程。已發現的海域仍能自由重遊。</p><button class="muted-btn" id="voyageHome">返回研究船</button></section><div class="save-actions"><button class="muted-btn" id="exportSave">匯出完整存檔</button><label class="muted-btn">匯入存檔<input id="importSave" type="file" accept="application/json,.json" hidden></label></div><p class="panel-note">存檔包含航程、設定、圖鑑、全部底片及相簿原圖；只在本機處理。不會上傳資料。新存檔匯入後會替換此瀏覽器的進度。</p>`;
  $('panelBody').querySelectorAll('[data-dest]').forEach(b=>b.onclick=()=>markPlace(b.dataset.dest));$('voyageHome').onclick=goHome;$('exportSave').onclick=exportSave;$('importSave').onchange=e=>importSaveFile(e.target.files[0]);
 }
+function downloadSaveArchive(data){const url=URL.createObjectURL(new Blob([JSON.stringify(data)],{type:'application/json'}));download(url,'Return-to-the-Blue-save.json');setTimeout(()=>URL.revokeObjectURL(url),10000);}
 async function exportSave(){
  if(voyage.importing||voyage.exporting){toast('存檔正在處理中，請完成後再匯出備份。');return false;}
  voyage.exporting=true;
- try{const photography=await oceanPhotography.exportArchive();const snapshot=JSON.parse(JSON.stringify(voyage.state));if(active)snapshot.resume={p:player.p.slice(),yaw:player.yaw,pitch:player.pitch,seconds:diveSeconds};const data={format:'return-blue/save',version:1,exported:new Date().toISOString(),voyage:snapshot,journal:oceanPhotography.journalSnapshot(persistent),photography};const url=URL.createObjectURL(new Blob([JSON.stringify(data)],{type:'application/json'}));download(url,'Return-to-the-Blue-save.json');setTimeout(()=>URL.revokeObjectURL(url),10000);return true;}
+ try{const photography=await oceanPhotography.exportArchive();const snapshot=JSON.parse(JSON.stringify(voyage.state));if(active)snapshot.resume={p:player.p.slice(),yaw:player.yaw,pitch:player.pitch,seconds:diveSeconds};downloadSaveArchive({format:'return-blue/save',version:1,exported:new Date().toISOString(),voyage:snapshot,journal:oceanPhotography.journalSnapshot(persistent),photography});return true;}
  catch(error){toast('無法匯出完整存檔：'+error.message);return false;}
  finally{voyage.exporting=false;}
 }
@@ -234,32 +235,44 @@ function validateImport(data){
 }
 async function importSaveFile(file){
  if(!file||voyage.importing)return;if(voyage.exporting){toast('正在匯出備份，請完成後再匯入存檔。');return;}if(file.size>144*1024*1024){toast('存檔超過 144 MiB 上限。');return;}
- voyage.importing=true;let finishImport;voyage.importDone=new Promise(resolve=>{finishImport=resolve;});let prepared,backup,storageBackup,applied=false;
+ voyage.importing=true;let finishImport;voyage.importDone=new Promise(resolve=>{finishImport=resolve;});let prepared,backup,applied=false,committed=false;
  try{
   oceanSaveGuard.check();const data=JSON.parse(await file.text()),checked=validateImport(data);oceanSaveGuard.check();
   if(!confirm('匯入後會替換目前航程、圖鑑、底片與相簿。確定繼續？'))return;
+  if(active){closePanel();goHome();$('debrief').classList.add('hidden');}
+  $('saveImportProgress').oncancel=event=>event.preventDefault();$('saveImportProgress').showModal();$('saveImportMessage').focus();
   prepared=await oceanPhotography.prepareImport(data.photography,checked.photos,checked.state.features.photography,Object.values(checked.state.features.expedition.mail).filter(m=>m.status==='complete'&&m.photoDate>0).map(m=>m.photoDate));
   if(data.photography){const developed=new Set(prepared.state.album.map(p=>p.date));for(const mail of Object.values(checked.state.features.expedition.mail))if(mail.status==='complete'&&mail.photoDate>0&&!developed.has(mail.photoDate))throw new Error('存檔缺少已投稿的相簿附件');}
-  oceanSaveGuard.check();if(active){closePanel();goHome();$('debrief').classList.add('hidden');}
+  oceanSaveGuard.check();
   backup={state:JSON.parse(JSON.stringify(voyage.state)),journal:{...persistent,seen:persistent.seen.slice(),photos:persistent.photos.slice(),log:persistent.log.slice(),settings:{...settings}}};
-  storageBackup=[STORE_KEY,VOYAGE_KEY,VOYAGE_KEY+'.backup'].map(key=>[key,localStorage.getItem(key)]);
-  await prepared.commit();applied=true;oceanSaveGuard.check();
-  checked.state.features.photography=prepared.state;voyage.state=checked.state;persistent.seen=checked.seen;persistent.photos=prepared.photos;persistent.log=checked.log;Object.assign(settings,checked.settings);
+  const before=oceanSaveGuard.snapshot(),after=new Map(before);
+  checked.state.features.photography=prepared.state;
+  const journal={seen:checked.seen,photos:prepared.state.album.map(p=>({...p})),log:checked.log,settings:checked.settings};
+  // Declare exact old/new values before the photo transaction. Recovery can then
+  // distinguish any interrupted prefix from unrelated legacy-tab changes.
+  for(const [key,read]of [[STORE_KEY,readJournal],[VOYAGE_KEY,readVoyage]]){const old=after.get(key);if(old!==null)try{read(JSON.parse(old));after.set(key+'.backup',old);}catch(_){}}
+  after.set(STORE_KEY,JSON.stringify(journal));after.set(VOYAGE_KEY,JSON.stringify(checked.state));
+  await prepared.commit({before,after:[...after]});applied=true;
+  for(const [key,value]of after)oceanSaveGuard.write(key,value);
+  await prepared.finish();committed=true;
+  voyage.state=checked.state;applyJournal(journal);persistent.photos=prepared.photos;voyage.storageOK=true;voyage.loaded=true;
   oceanFeatures.reset();renderer.quality=settings.quality;renderer.resize();applyVisualSettings();oceanAudio.tick();
-  if(!persist()||!saveVoyage())throw new Error('瀏覽器無法保存匯入的航程');
   renderShip();setCount();toast('存檔已匯入。');
  }catch(error){
+  // The durable commit point has passed. A display failure must not roll an
+  // already-complete import back to stale memory.
+  if(committed){ready=false;active=false;resetInput();oceanAudio.pause();handleFailure(error,{contextLost:true,saved:true});return;}
   let restored=true;
   if(applied){
    try{await prepared.rollback();}catch(rollbackError){restored=false;console.error('Photo restoration failed',rollbackError);}
    // The rescue export must describe one coherent pre-import snapshot even if
    // durable rollback failed. Photography retains its matching original cache.
    voyage.state=backup.state;persistent.seen=backup.journal.seen;persistent.photos=backup.journal.photos;persistent.log=backup.journal.log;Object.assign(settings,backup.journal.settings);
-   try{if(restored&&oceanSaveSession.writable)for(const[key,value]of storageBackup)oceanSaveGuard.write(key,value);oceanFeatures.reset();renderer.quality=settings.quality;renderer.resize();applyVisualSettings();renderShip();setCount();}catch(rollbackError){restored=false;console.error('Save restoration failed',rollbackError);}
+   try{oceanFeatures.reset();renderer.quality=settings.quality;renderer.resize();applyVisualSettings();renderShip();setCount();}catch(rollbackError){restored=false;console.error('Save restoration failed',rollbackError);}
    if(!restored)oceanSaveGuard.recoveryFailed();
   }
   toast(restored?'未套用新存檔：'+error.message:'還原存檔時儲存失敗，請保留此視窗並下載備份。');
- }finally{voyage.importing=false;finishImport();voyage.importDone=null;}
+ }finally{$('saveImportProgress').close();voyage.importing=false;finishImport();voyage.importDone=null;}
 }
 function renderPause(){panelTitle('PAUSE / CONTINUE','在海裡，休息一下');$('panelBody').innerHTML=`<div class="pause-actions"><button class="primary" id="resumeBtn">繼續潛水 ↗</button><button class="muted-btn" id="pauseChart">海域地圖</button><button class="muted-btn" id="pauseVoyage">航程與存檔</button><button class="muted-btn" id="pauseSettings">畫面與聲音</button><button class="muted-btn" id="pauseBoat">儲存並回首頁</button></div><p class="panel-note">此時已暫停游動、動物與航程計時；音樂可以繼續播放。</p>`;$('resumeBtn').onclick=closePanel;$('pauseChart').onclick=()=>openPanel('map');$('pauseVoyage').onclick=()=>openPanel('voyage');$('pauseSettings').onclick=()=>openPanel('settings');$('pauseBoat').onclick=goHome;}
 const legacyPanel=openPanel;
@@ -289,6 +302,7 @@ function voyageTick(dt){
  if(t-voyage.lastSave>8){voyage.lastSave=t;saveVoyage();}
 }
 function pollGamepad(){
+ if(voyage.importing)return;
  let g;try{g=navigator.getGamepads?.()?.find(p=>p?.connected);}catch(_){return;}
  if(!g){if(typeof oceanGamepadUI!=='undefined')oceanGamepadUI.disconnect();if(voyage.gamepadAttached||voyage.gamepadDepth){resetInput();voyage.gamepadAttached=false;voyage.gamepadDepth=false;}voyage.gamepadButtons=[];return;}
  if(typeof oceanGamepadUI!=='undefined'&&oceanGamepadUI.poll(g,voyage.gamepadButtons)){voyage.gamepadButtons=g.buttons.map(b=>b.pressed);return;}

@@ -22,7 +22,8 @@ async function session(storage,failWrite=()=>false){
   localStorage:{getItem:key=>storage.get(key)??null,setItem(key,value){writes.push(key);if(failWrite(key))throw Object.assign(new Error('Storage is full'),{name:'QuotaExceededError'});storage.set(key,String(value));}}
  });
  vm.runInContext(sessionSource,context);vm.runInContext(saveSource,context);vm.runInContext(guardSource,context);
- assert.equal(await vm.runInContext('oceanSaveGuard.start()',context),true);
+ // This suite covers voyage save/load, not bootstrap's IndexedDB preflight.
+ assert.equal(await vm.runInContext('oceanSaveSession.acquire()',context),true);
  return {run:code=>vm.runInContext(code,context),status,writes};
 }
 let checks=0;

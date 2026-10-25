@@ -5,8 +5,44 @@ const defaults={quality:matchMedia('(pointer:coarse)').matches?1:2,speed:1.15,se
 function uniquePhotos(photos){const seen=new Set();return photos.filter(p=>{if(!p||!Number.isFinite(p.date)||p.date<=0||seen.has(p.date))return false;seen.add(p.date);return true;});}
 function nextPhotoDate(){return oceanPhotography.nextDate();}
 let persistent={seen:[],photos:[],log:[],settings:{...defaults}},storageOK=true;
+const journalStorage={loaded:false,source:null,recovered:false,error:null};
+function readJournal(raw){
+ if(!raw||typeof raw!=='object'||Array.isArray(raw))throw new Error('日誌資料格式無法讀取');
+ if(raw.schema!==undefined&&raw.schema!==1)throw new Error('日誌版本不相容');
+ if(!['seen','photos','log','settings'].some(key=>Object.hasOwn(raw,key)))throw new Error('日誌缺少可讀取的紀錄');
+ for(const key of ['seen','photos','log'])if(raw[key]!==undefined&&!Array.isArray(raw[key]))throw new Error('日誌紀錄格式無法讀取');
+ if(raw.settings!==undefined&&(!raw.settings||typeof raw.settings!=='object'||Array.isArray(raw.settings)))throw new Error('日誌設定格式無法讀取');
+ const journal={seen:[],photos:[],log:[],settings:{...defaults}};
+ journal.seen=Array.isArray(raw.seen)?raw.seen.filter(x=>SPECIES.some(s=>s.id===x)):[];
+ journal.photos=Array.isArray(raw.photos)?uniquePhotos(raw.photos.map(p=>{
+  if(!p||typeof p!=='object'||Array.isArray(p))return null;
+  const metadata=PhotographyRules.metadata(p);if(!metadata)return null;
+  if(p.url!==undefined){try{PhotographyRules.jpegBlob(p.url);}catch(_){return null;}}
+  return {...metadata,...(p.url===undefined?{}:{url:p.url})};
+ })).slice(-PhotographyRules.limits.album):[];
+ journal.log=Array.isArray(raw.log)?raw.log.filter(e=>e&&typeof e.text==='string'&&Number.isFinite(e.date)).slice(-60).map(e=>({text:e.text.slice(0,250),date:e.date})):[];
+ for(let k of ['quality','speed','sensitivity'])if(Number.isFinite(raw.settings?.[k]))journal.settings[k]=clamp(raw.settings[k],k==='quality'?0:.4,k==='quality'?2:2.4);
+ for(let k of ['master','music','ambience','breath'])if(Number.isFinite(raw.settings?.[k]))journal.settings[k]=clamp(raw.settings[k],0,1);
+ for(const [key,min,max] of [['clarity',.5,1.5],['fov',55,90]])if(Number.isFinite(raw.settings?.[key]))journal.settings[key]=clamp(raw.settings[key],min,max);
+ if(['day','late','blue'].includes(raw.settings?.lighting))journal.settings.lighting=raw.settings.lighting;
+ for(let k of ['hints','third','reduced','lamp','adaptive','startWithSound','lookLock'])if(typeof raw.settings?.[k]==='boolean')journal.settings[k]=raw.settings[k];
+ return journal;
+}
+function applyJournal(raw,source='import'){
+ const journal=readJournal(raw);
+ persistent.seen=journal.seen;persistent.photos=journal.photos.filter(p=>typeof p.url==='string').slice(-8);persistent.log=journal.log;Object.assign(settings,journal.settings);
+ Object.assign(journalStorage,{loaded:true,source,recovered:source==='backup',error:null});storageOK=true;
+ return journal;
+}
 function loadJournal(){
-try{let raw=JSON.parse(localStorage.getItem(STORE_KEY)||'null');if(raw&&typeof raw==='object'){persistent.seen=Array.isArray(raw.seen)?raw.seen.filter(x=>SPECIES.some(s=>s.id===x)):[];persistent.photos=Array.isArray(raw.photos)?uniquePhotos(raw.photos.filter(p=>p&&typeof p.url==='string'&&p.url.startsWith('data:image/jpeg;base64,'))).slice(-8):[];persistent.log=Array.isArray(raw.log)?raw.log.filter(e=>typeof e.text==='string'&&typeof e.date==='number').slice(-60):[];for(let k of ['quality','speed','sensitivity'])if(Number.isFinite(raw.settings?.[k]))persistent.settings[k]=clamp(raw.settings[k],k==='quality'?0:.4,k==='quality'?2:2.4);for(let k of ['master','music','ambience','breath'])if(Number.isFinite(raw.settings?.[k]))persistent.settings[k]=clamp(raw.settings[k],0,1);for(const [key,min,max] of [['clarity',.5,1.5],['fov',55,90]])if(Number.isFinite(raw.settings?.[key]))persistent.settings[key]=clamp(raw.settings[key],min,max);if(['day','late','blue'].includes(raw.settings?.lighting))persistent.settings.lighting=raw.settings.lighting;for(let k of ['hints','third','reduced','lamp','adaptive','startWithSound','lookLock'])if(typeof raw.settings?.[k]==='boolean')persistent.settings[k]=raw.settings[k];}}catch(_){storageOK=false;}
+ let failure=null;
+ for(const [key,source]of [[STORE_KEY,'primary'],[STORE_KEY+'.backup','backup']]){
+  try{const raw=localStorage.getItem(key);if(raw===null)continue;applyJournal(JSON.parse(raw),source);return journalStorage;}
+  catch(error){failure=error;}
+ }
+ if(failure){Object.assign(journalStorage,{loaded:false,source:'unavailable',recovered:false,error:failure.message});storageOK=false;}
+ else applyJournal({seen:[],photos:[],log:[],settings:{}},'new');
+ return journalStorage;
 }
 
 const settings=persistent.settings;settings.sound=false;
@@ -21,7 +57,17 @@ const safe=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;
 const dateText=n=>new Date(n).toLocaleString('zh-TW',{month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'});
 const timeText=n=>Math.floor(n/60).toString().padStart(2,'0')+':'+Math.floor(n%60).toString().padStart(2,'0');
 function toast(s){clearTimeout(toastTimer);$('toast').textContent=s;$('toast').classList.add('show');toastTimer=setTimeout(()=>$('toast').classList.remove('show'),3500);}
-function persist(){try{oceanSaveGuard.write(STORE_KEY,JSON.stringify(oceanPhotography.journalSnapshot(persistent)));storageOK=true;return true;}catch(_){storageOK=false;if(!saveWarned&&active){saveWarned=true;toast('此視窗無法保存更多資料；請下載照片或匯出日誌。');}return false;}}
+function persist(){
+ try{
+  if(!journalStorage.loaded)throw new Error(journalStorage.error||'日誌尚未安全讀取，請先還原備份');
+  oceanSaveGuard.check();const value=JSON.stringify(oceanPhotography.journalSnapshot(persistent));let old=localStorage.getItem(STORE_KEY);
+  if(old!==null){try{readJournal(JSON.parse(old));}catch(_){old=null;}}
+  // Only a readable primary may replace the fallback. A full optional backup
+  // must not prevent Storage.setItem from preserving the latest primary.
+  if(old!==null){try{oceanSaveGuard.write(STORE_KEY+'.backup',old);}catch(_){}}
+  oceanSaveGuard.write(STORE_KEY,value);storageOK=true;journalStorage.error=null;return true;
+ }catch(error){storageOK=false;journalStorage.error=error.message;if(!saveWarned&&active){saveWarned=true;toast('此視窗無法保存更多資料；請下載照片或匯出日誌。');}return false;}
+}
 function log(text){persistent.log.push({text,date:Date.now()});persistent.log=persistent.log.slice(-60);persist();}
 function setCount(){$('seenCount').textContent=persistent.seen.length+'/'+SPECIES.length;}
 function resetInput(){cameraCut=true;simulationAccumulator=0;previousPhysicsPosition=null;keys.clear();stick=[0,0];lookStick=[0,0];verticalInput=0;inputCleanup.forEach(f=>f());if($('lookKnob'))$('lookKnob').style.transform='translate(0,0)';player.velocity=[0,0,0];$('stickKnob').style.transform='translate(0,0)';}

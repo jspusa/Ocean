@@ -26,7 +26,8 @@ let count=0;
 function check(name,test){test();count++;console.log('PASS '+name)}
 function fresh(p=[0,-.8,23]){actions.exit();c.active=true;c.modal=null;c.photoOpen=false;c.capture=false;c.auto=false;c.follow=null;c.player.p=p.slice();c.player.yaw=.2;c.player.pitch=-.1;c.player.velocity=[0,0,0];c.settings.third=true;c.resetInput();get('obstacles.length=0;voyage.gamepadButtons=[];');}
 (async()=>{
-assert.equal(await get('oceanSaveGuard.start()'),true);
+// Camera/save tests need ownership, not the separate startup IDB recovery flow.
+assert.equal(await get('oceanSaveSession.acquire()'),true);
 check('deep water rejects surface view without teleporting or cancelling a route',()=>{fresh([0,-8,23]);c.auto=true;c.follow={p:[0,-8,24]};const p=clone(c.player.p);assert.equal(actions.toggleSurface(),false);assert.deepEqual(clone(c.player.p),p);assert(c.auto);assert(c.follow);assert(!actions.isSurface());});
 check('surface view changes the real camera above water without moving the diver or changing preferred view',()=>{fresh();const p=clone(c.player.p);assert(actions.toggleSurface());assert.deepEqual(clone(c.player.p),p);assert(c.eye[1]>0);assert.equal(c.target[1],c.eye[1]);assert.equal(c.settings.third,true);assert.equal(get('diverBatch.visible'),false);});
 check('right-stick look changes surface direction while position remains fixed',()=>{fresh();actions.toggleSurface();const p=clone(c.player.p),yaw=c.player.yaw;c.lookStick=[.5,-.25];c.updatePlayer(.2);c.updateCamera();assert(c.player.yaw>yaw);assert(c.target[1]>c.eye[1]);assert.deepEqual(clone(c.player.p),p);assert(actions.isSurface());});
