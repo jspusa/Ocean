@@ -21,7 +21,7 @@ const oceanFeatures=(()=>{
   if(initialized)return;voyage.state.features=read(voyage.state.features);initialized=true;
   for(const module of systems)await module.init?.();renderMenus();
   const oldLife=updateLife;updateLife=function(time){oldLife(time);call('afterLife',time)};
-  window.addEventListener('keydown',event=>{if(['INPUT','TEXTAREA','SELECT'].includes(document.activeElement?.tagName))return;
+  window.addEventListener('keydown',event=>{if(oceanKeyboard.reserved(event))return;
    if(event.code==='Escape'&&some('escape')){event.preventDefault();event.stopImmediatePropagation();return;}
    if(event.code==='KeyT'&&active&&!modal&&!photoOpen&&!event.repeat){event.preventDefault();event.stopImmediatePropagation();open('fieldTools');}
   },true);

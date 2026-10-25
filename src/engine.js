@@ -1046,29 +1046,44 @@ class Renderer{
   // Adapt the framebuffer the device can actually draw. Scaling before the
   // caps leaves large/DPR-heavy views pinned at the same pixel workload.
   w=Math.max(2,Math.round(w*this.dynamicScale));h=Math.max(2,Math.round(h*this.dynamicScale));
-  if(w===this.canvas.width&&h===this.canvas.height&&this.sceneFBO&&this.lastQuality===this.quality)return;
-  this.lastQuality=this.quality;this.canvas.width=w;this.canvas.height=h;
-  const dispose=(fb,...tx)=>{if(fb)g.deleteFramebuffer(fb);for(const t of tx)if(t)g.deleteTexture(t);};
-  const texture=(width,height,format,linear=true)=>{const tex=g.createTexture();g.bindTexture(g.TEXTURE_2D,tex);g.texStorage2D(g.TEXTURE_2D,1,format,width,height);
+  if(w===this.canvas.width&&h===this.canvas.height&&this.sceneFBO&&this.lastQuality===this.quality){this.resizeFailure=null;return true;}
+  const requestKey=w+':'+h+':'+this.quality;
+  if(this.resizeFailure?.requestKey===requestKey&&performance.now()<this.resizeFailure.retryAfter)return false;
+  const next={};
+  const texture=(name,width,height,format,linear=true)=>{const tex=next[name]=g.createTexture();if(!tex)throw Error('無法配置畫面材質');g.bindTexture(g.TEXTURE_2D,tex);g.texStorage2D(g.TEXTURE_2D,1,format,width,height);
    g.texParameteri(g.TEXTURE_2D,g.TEXTURE_MIN_FILTER,linear?g.LINEAR:g.NEAREST);g.texParameteri(g.TEXTURE_2D,g.TEXTURE_MAG_FILTER,linear?g.LINEAR:g.NEAREST);g.texParameteri(g.TEXTURE_2D,g.TEXTURE_WRAP_S,g.CLAMP_TO_EDGE);g.texParameteri(g.TEXTURE_2D,g.TEXTURE_WRAP_T,g.CLAMP_TO_EDGE);return tex;};
-  const target=(tex,depth=null)=>{const f=g.createFramebuffer();g.bindFramebuffer(g.FRAMEBUFFER,f);g.framebufferTexture2D(g.FRAMEBUFFER,g.COLOR_ATTACHMENT0,g.TEXTURE_2D,tex,0);if(depth)g.framebufferTexture2D(g.FRAMEBUFFER,g.DEPTH_ATTACHMENT,g.TEXTURE_2D,depth,0);
-   if(g.checkFramebufferStatus(g.FRAMEBUFFER)!==g.FRAMEBUFFER_COMPLETE)throw Error('畫面配置超出裝置支援，請重新載入並選流暢');return f;};
-  dispose(this.sceneFBO,this.sceneColor,this.sceneDepth);this.sceneColor=texture(w,h,this.floatColor?g.RGBA16F:g.RGBA8);this.sceneDepth=texture(w,h,g.DEPTH_COMPONENT24,false);this.sceneFBO=target(this.sceneColor,this.sceneDepth);
-  this.setupMultisampling(w,h);
-
-  dispose(this.aaFBO,this.aaColor);this.aaColor=texture(w,h,g.RGBA8);this.aaFBO=target(this.aaColor);
-  // Volumetrics/AO are soft phenomena: evaluate fewer pixels, reconstruct with depth weights.
-  const fraction=this.quality===2?.5:this.quality===1?.4:.3;this.volumeW=Math.max(2,Math.ceil(w*fraction));this.volumeH=Math.max(2,Math.ceil(h*fraction));
-  dispose(this.volumeFBO,this.volumeColor);this.volumeColor=texture(this.volumeW,this.volumeH,this.floatColor?g.RGBA16F:g.RGBA8);this.volumeFBO=target(this.volumeColor);
-  dispose(this.volumeFilteredFBO,this.volumeFilteredColor);this.volumeFilteredColor=texture(this.volumeW,this.volumeH,this.floatColor?g.RGBA16F:g.RGBA8);this.volumeFilteredFBO=target(this.volumeFilteredColor);
-  g.bindFramebuffer(g.FRAMEBUFFER,null);
+  const target=(name,tex,depth=null)=>{const f=next[name]=g.createFramebuffer();if(!f)throw Error('無法配置畫面緩衝區');g.bindFramebuffer(g.FRAMEBUFFER,f);g.framebufferTexture2D(g.FRAMEBUFFER,g.COLOR_ATTACHMENT0,g.TEXTURE_2D,tex,0);if(depth)g.framebufferTexture2D(g.FRAMEBUFFER,g.DEPTH_ATTACHMENT,g.TEXTURE_2D,depth,0);
+   if(g.checkFramebufferStatus(g.FRAMEBUFFER)!==g.FRAMEBUFFER_COMPLETE)throw Error('裝置暫時無法配置所需畫面空間');return f;};
+  try{
+   // Keep the complete old frame until every replacement is usable. A failed
+   // allocation must never clear the canvas or dispose the only working target.
+   target('sceneFBO',texture('sceneColor',w,h,this.floatColor?g.RGBA16F:g.RGBA8),texture('sceneDepth',w,h,g.DEPTH_COMPONENT24,false));
+   this.setupMultisampling(w,h,next);
+   target('aaFBO',texture('aaColor',w,h,g.RGBA8));
+   // Volumetrics/AO are soft phenomena: evaluate fewer pixels, reconstruct with depth weights.
+   const fraction=this.quality===2?.5:this.quality===1?.4:.3;next.volumeW=Math.max(2,Math.ceil(w*fraction));next.volumeH=Math.max(2,Math.ceil(h*fraction));
+   target('volumeFBO',texture('volumeColor',next.volumeW,next.volumeH,this.floatColor?g.RGBA16F:g.RGBA8));
+   target('volumeFilteredFBO',texture('volumeFilteredColor',next.volumeW,next.volumeH,this.floatColor?g.RGBA16F:g.RGBA8));
+  }catch(error){
+   this.disposeRenderTargets(next);
+   this.resizeFailure={message:String(error?.message||error),requestKey,requested:[w,h],retained:[this.canvas.width,this.canvas.height],quality:this.quality,retryAfter:performance.now()+10000};
+   if(!this.sceneFBO)throw error;
+   return false;
+  }finally{g.bindRenderbuffer(g.RENDERBUFFER,null);g.bindFramebuffer(g.FRAMEBUFFER,null);}
+  this.canvas.width=w;this.canvas.height=h;this.disposeRenderTargets(this);Object.assign(this,next);this.lastQuality=this.quality;this.resizeFailure=null;return true;
  }
- setupMultisampling(w,h){
+ disposeRenderTargets(targets){
   const g=this.gl;
-  if(this.msaaFBO)g.deleteFramebuffer(this.msaaFBO);
-  if(this.msaaColor)g.deleteRenderbuffer(this.msaaColor);
-  if(this.msaaDepth)g.deleteRenderbuffer(this.msaaDepth);
-  this.msaaFBO=null;this.msaaColor=null;this.msaaDepth=null;this.msaaSamples=0;
+  for(const key of ['sceneFBO','aaFBO','volumeFBO','volumeFilteredFBO','msaaFBO'])if(targets[key])g.deleteFramebuffer(targets[key]);
+  for(const key of ['sceneColor','sceneDepth','aaColor','volumeColor','volumeFilteredColor'])if(targets[key])g.deleteTexture(targets[key]);
+  for(const key of ['msaaColor','msaaDepth'])if(targets[key])g.deleteRenderbuffer(targets[key]);
+ }
+ setupMultisampling(w,h,targets=this){
+  const g=this.gl;
+  if(targets.msaaFBO)g.deleteFramebuffer(targets.msaaFBO);
+  if(targets.msaaColor)g.deleteRenderbuffer(targets.msaaColor);
+  if(targets.msaaDepth)g.deleteRenderbuffer(targets.msaaDepth);
+  targets.msaaFBO=null;targets.msaaColor=null;targets.msaaDepth=null;targets.msaaSamples=0;
   const format=this.floatColor?g.RGBA16F:g.RGBA8;
   const color=Array.from(g.getInternalformatParameter(g.RENDERBUFFER,format,g.SAMPLES)||[]);
   const depth=Array.from(g.getInternalformatParameter(g.RENDERBUFFER,g.DEPTH_COMPONENT24,g.SAMPLES)||[]);
@@ -1077,11 +1092,16 @@ class Renderer{
   // Some implementations expose 4x but not 2x; stay at the advertised sample count.
   if(preferred===2&&!options.length&&color.includes(4)&&depth.includes(4))options.push(4);
   for(const samples of options){
-   const f=g.createFramebuffer(),c=g.createRenderbuffer(),d=g.createRenderbuffer();g.bindFramebuffer(g.FRAMEBUFFER,f);
-   g.bindRenderbuffer(g.RENDERBUFFER,c);g.renderbufferStorageMultisample(g.RENDERBUFFER,samples,format,w,h);g.framebufferRenderbuffer(g.FRAMEBUFFER,g.COLOR_ATTACHMENT0,g.RENDERBUFFER,c);
-   g.bindRenderbuffer(g.RENDERBUFFER,d);g.renderbufferStorageMultisample(g.RENDERBUFFER,samples,g.DEPTH_COMPONENT24,w,h);g.framebufferRenderbuffer(g.FRAMEBUFFER,g.DEPTH_ATTACHMENT,g.RENDERBUFFER,d);
-   if(g.checkFramebufferStatus(g.FRAMEBUFFER)===g.FRAMEBUFFER_COMPLETE&&g.getError()===g.NO_ERROR){this.msaaFBO=f;this.msaaColor=c;this.msaaDepth=d;this.msaaSamples=samples;break;}
-   g.deleteFramebuffer(f);g.deleteRenderbuffer(c);g.deleteRenderbuffer(d);
+   let f=null,c=null,d=null,complete=false;
+   try{
+    f=g.createFramebuffer();c=g.createRenderbuffer();d=g.createRenderbuffer();if(!f||!c||!d)continue;
+    g.bindFramebuffer(g.FRAMEBUFFER,f);
+    g.bindRenderbuffer(g.RENDERBUFFER,c);g.renderbufferStorageMultisample(g.RENDERBUFFER,samples,format,w,h);g.framebufferRenderbuffer(g.FRAMEBUFFER,g.COLOR_ATTACHMENT0,g.RENDERBUFFER,c);
+    g.bindRenderbuffer(g.RENDERBUFFER,d);g.renderbufferStorageMultisample(g.RENDERBUFFER,samples,g.DEPTH_COMPONENT24,w,h);g.framebufferRenderbuffer(g.FRAMEBUFFER,g.DEPTH_ATTACHMENT,g.RENDERBUFFER,d);
+    const status=g.checkFramebufferStatus(g.FRAMEBUFFER),error=g.getError();complete=status===g.FRAMEBUFFER_COMPLETE&&error===g.NO_ERROR;
+    if(complete){targets.msaaFBO=f;targets.msaaColor=c;targets.msaaDepth=d;targets.msaaSamples=samples;break;}
+   }catch(_){/* Optional antialiasing may fall back to the complete single-sample target. */}
+   finally{if(!complete){if(f)g.deleteFramebuffer(f);if(c)g.deleteRenderbuffer(c);if(d)g.deleteRenderbuffer(d);}}
   }
   g.bindRenderbuffer(g.RENDERBUFFER,null);g.bindFramebuffer(g.FRAMEBUFFER,null);
  }

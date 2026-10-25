@@ -33,7 +33,14 @@ function readVoyage(raw){
 const voyage={state:initialVoyage(),storageOK:true,loaded:false,lastSave:0,lastTick:0,sessionDistance:0,sessionSeen:0,sessionStart:0,sessionFirst:true,hasFinished:false,previousPosition:null,awaitingResume:false,gamepadButtons:[],gamepadAttached:false,photoMode:false,radioTimer:null,lastWhale:0,goalFlash:0};
 function saveVoyage(){
  if(active)voyage.state.resume={p:player.p.slice(),yaw:player.yaw,pitch:player.pitch,seconds:diveSeconds};
- try{const value=JSON.stringify(voyage.state),old=localStorage.getItem(VOYAGE_KEY);if(old)localStorage.setItem(VOYAGE_KEY+'.backup',old);localStorage.setItem(VOYAGE_KEY,value);voyage.storageOK=true;return true;}
+ try{
+  const value=JSON.stringify(voyage.state);let old=localStorage.getItem(VOYAGE_KEY);
+  // A recovered good backup must survive even if replacing a corrupt primary fails.
+  if(old){try{readVoyage(JSON.parse(old));}catch(_){old=null;}}
+  // Backup capacity is optional; Storage.setItem keeps the old primary on failure.
+  if(old){try{localStorage.setItem(VOYAGE_KEY+'.backup',old);}catch(_){}}
+  localStorage.setItem(VOYAGE_KEY,value);voyage.storageOK=true;return true;
+ }
  catch(e){voyage.storageOK=false;$('saveStatus')&&($('saveStatus').textContent='本機儲存受限 · 請匯出存檔');return false;}
 }
 function loadVoyage(){
@@ -196,8 +203,8 @@ function renderVoyagePanel(){
  $('panelBody').querySelectorAll('[data-dest]').forEach(b=>b.onclick=()=>markPlace(b.dataset.dest));$('voyageHome').onclick=goHome;$('exportSave').onclick=exportSave;$('importSave').onchange=e=>importSaveFile(e.target.files[0]);
 }
 async function exportSave(){
- try{const photography=await oceanPhotography.exportArchive();saveVoyage();const data={format:'return-blue/save',version:1,exported:new Date().toISOString(),voyage:voyage.state,journal:oceanPhotography.journalSnapshot(persistent),photography};const url=URL.createObjectURL(new Blob([JSON.stringify(data)],{type:'application/json'}));download(url,'Return-to-the-Blue-save.json');setTimeout(()=>URL.revokeObjectURL(url),10000);}
- catch(error){toast('無法匯出完整存檔：'+error.message);}
+ try{const photography=await oceanPhotography.exportArchive();saveVoyage();const data={format:'return-blue/save',version:1,exported:new Date().toISOString(),voyage:voyage.state,journal:oceanPhotography.journalSnapshot(persistent),photography};const url=URL.createObjectURL(new Blob([JSON.stringify(data)],{type:'application/json'}));download(url,'Return-to-the-Blue-save.json');setTimeout(()=>URL.revokeObjectURL(url),10000);return true;}
+ catch(error){toast('無法匯出完整存檔：'+error.message);return false;}
 }
 function readPhotoMetadata(raw){
  const result={};if(typeof raw.knowledgeEligible==='boolean')result.knowledgeEligible=raw.knowledgeEligible;
@@ -292,7 +299,7 @@ function initVoyage(){
  $('debriefClose').onclick=()=>$('debrief').classList.add('hidden');$('debriefExport').onclick=exportSave;
  $('companionBtn').onclick=()=>{voyage.state.companion=!voyage.state.companion;saveVoyage();paintVoyageHUD();toast(voyage.state.companion?'海豚會保持距離，與你一起游動。':'海豚回到自己的航線。');};
  // Capture shortcuts before the old nearest-animal shortcut; no duplicate input actions.
- window.addEventListener('keydown',e=>{if(['INPUT','TEXTAREA','SELECT'].includes(document.activeElement?.tagName))return;
+ window.addEventListener('keydown',e=>{if(oceanKeyboard.reserved(e))return;
   if(e.code==='Escape'&&oceanFeatures.some('escape')){e.preventDefault();e.stopImmediatePropagation();return;}
   if(e.code==='Escape'&&active&&!modal&&!photoOpen){e.preventDefault();e.stopImmediatePropagation();openPanel('pause');}
   if(active&&!modal&&!photoOpen&&!e.repeat){if(e.code==='KeyF'&&!$('interactBtn').classList.contains('hidden')){e.preventDefault();e.stopImmediatePropagation();readLogger();}if(e.code==='KeyC'){toggleCruise();}if(e.code==='KeyX'){togglePhotoMode();}if(e.code==='KeyB'){openPanel('voyage');}}

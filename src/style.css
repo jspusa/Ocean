@@ -199,6 +199,12 @@ kbd{font:8px var(--mono);border:1px solid #cde7dc55;background:#05263240;padding
 .debrief-actions .primary{min-width:210px}
 #errorBox{position:fixed;inset:0;z-index:110;display:flex;flex-direction:column;justify-content:center;align-items:center;background:#06232e;padding:35px;text-align:center}
 #errorBox h2{font-weight:400;font-family:var(--serif)}
+.recovery-actions{display:flex;flex-wrap:wrap;justify-content:center;gap:12px;max-width:650px}
+.recovery-actions button,#sceneStreamingStatus button{min-height:44px;padding:10px 16px;border:1px solid var(--line);border-radius:8px}
+#sceneStreamingStatus{position:fixed;bottom:calc(18px + env(safe-area-inset-bottom));left:50%;transform:translateX(-50%);width:min(420px,calc(100% - 24px));padding:14px;border:1px solid var(--line);border-radius:12px;background:#062b39f5;color:var(--ink);font:13px var(--sans);z-index:70;box-shadow:0 8px 30px #0004}
+#sceneStreamingStatus p{margin:0 0 10px;line-height:1.6}
+#sceneStreamingStatus div{display:flex;flex-wrap:wrap;gap:8px}
+#sceneStreamingStatus[hidden],#sceneStreamingStatus button[hidden],.recovery-actions button[hidden]{display:none}
 #errorBox p{max-width:500px;font-size:13px;color:#bed8c5;line-height:2}
 #errorBox button{margin-top:20px}
 #perfPanel{position:fixed;left:var(--edge);top:245px;width:280px;max-height:calc(100dvh - 275px);overflow:auto;z-index:22;background:#062632f5;border:1px solid var(--line);border-radius:4px;box-shadow:0 8px 40px #0005;padding:17px 18px;touch-action:pan-y;backdrop-filter:blur(12px)}
