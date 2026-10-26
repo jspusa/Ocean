@@ -152,3 +152,5 @@ Pages 建置時間為 `2026-10-26T00:04:56Z`，見 `qa/parity/v01814-pages-runti
 下一項優先診斷為正常礁區游泳的慢幀。重用 `startup-performance-browser.cjs` 的透明 CPU／GPU 觀測及 `render-cadence-browser.cjs` 的原生游泳輸入，保持自然串流、自動畫質與真時間，先連續 30 秒及輕記錄控制。需補上 frame 外 `attachBatchMesh` 上傳事件、resize request→commit、被動 RAF 與最後完成畫面停留時間；目前 `cpuRenderMs` 起點在 stream.update／resize 之後，串流等待又會重置效能時間戳，現有欄位不足以定位卡頓。這是量測盲點，尚未證明某個上傳或 pass 就是瓶頸。
 
 若整幀 GPU 訊號值得追查，再做獨立受控單 pass 計時；不可省略正常 draw、同時跑其他 GPU 工作或把可能含 tile flush 的分段時間相加宣稱自然整幀占比。最後仍須正常完整 frame 比對。完整 33 項、內容、實體手機／耗電、外網多人及商用目標保持 in-progress。
+
+上述自然游泳診斷已完成四輪 full／light 正常去返及單次 Chrome trace，證據見 [診斷紀錄](../NATURAL-SWIM-v01830-DIAGNOSIS.md)。中途取回資料的量測干擾已另列並改成結束收取；桌機在約 `[-12.8,-6.3,8]` 的同一視域重現慢簇，短主執行緒工作與長 GPU process 交換畫面等待分開記錄。下一步先量該視域完整 renderer 的 GPU elapsed，再決定是否需要 pass 歸因；沒有以此診斷宣稱已修復卡頓，也沒有改動公開 runtime。

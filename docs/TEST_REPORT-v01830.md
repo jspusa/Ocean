@@ -91,3 +91,5 @@ alpha-to-coverage 關閉仍無條件執行；MSAA resolve、後製、光照、�
 正式網址的桌機與觸控模擬均經正常開始按鈕進入自由探索，預設自動畫質啟用、quality 2／1、44 類生物、8 個表面程式編譯、GL 0、無 context loss／page error，觸控操作區均在畫面內且不小於 44 px。公開啟動收據為 `qa/parity/published-v0.18.30-delivery.json`，Pages 與來源聯結收據為 `qa/parity/v01830-deep-water/public-release-runtime.json`。
 
 本輪長程海溝調查為本機驗收，公開另核對檔案與正常入海；不混稱公開全航程或實體手機驗收。完整商用目標保持進行中，下一項為正常礁區游泳慢幀診斷。
+
+發布後已補上 [正常游泳診斷](parity/NATURAL-SWIM-v01830-DIAGNOSIS.md)：四輪原生完整去返及一輪 Chrome trace 分開取證，定位同一礁區的桌機慢簇；目前只縮小待查範圍，沒有新增正式程式修改或宣稱卡頓解決。
