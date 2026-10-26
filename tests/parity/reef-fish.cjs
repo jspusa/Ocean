@@ -9,14 +9,19 @@ function world(expansion=true,compiled=false){
  // these animals. The separate compiled route below must never append again.
  const input=JSON.parse(JSON.stringify(header));if(!compiled)input.life=input.life.filter(i=>!input.nodes[i].reefFish);
  const ctx=vm.createContext({console,header:input});for(const n of modules)vm.runInContext(read(n),ctx,{filename:n});if(expansion)vm.runInContext(read('reef_fauna'),ctx,{filename:'reef_fauna'});
+ // Retain the original four-species registration comparison. Both archive
+ // readers then register the complete current catalogue in production order;
+ // otherwise the already-baked later actors have unresolved species indexes.
+ const catalogue=JSON.parse(vm.runInContext('JSON.stringify(SPECIES.map(s=>s.id))',ctx));
+ for(const n of [...(expansion?[]:['reef_fauna']),'oarfish','frilled_shark','frilled_shark_world','barreleye','barreleye_world'])vm.runInContext(read(n),ctx,{filename:n});
  vm.runInContext('obstacles.push(...header.obstacles);reefPatches.push(...header.reefPatches);life.push(...header.life.map(i=>header.nodes[i]));decorLife.push(...header.decorLife.map(i=>header.nodes[i]));shoal.push(...header.shoal.map(i=>header.nodes[i]));allLife=life.concat(decorLife);initializeIndividuals({batches:[]});',ctx);
  const renderer={batches:[],batch(g,instances,kind,dynamic){const b={g,instances,kind,dynamic};this.batches.push(b);return b;}};
  if(expansion){ctx.renderer=renderer;vm.runInContext('ensureReefFish(renderer);initializeIndividuals(renderer);',ctx);}
- return {ctx,renderer,get:s=>vm.runInContext(s,ctx),step:vm.runInContext('updateLife',ctx)};
+ return {ctx,renderer,catalogue,get:s=>vm.runInContext(s,ctx),step:vm.runInContext('updateLife',ctx)};
 }
 const current=world(),original=world(false),entries=current.get('REEF_FISH_SPECIES'),fish=current.get('life.filter(f=>f.reefFish)');
-assert.equal(current.get('SPECIES.length'),original.get('SPECIES.length')+4);assert.equal(entries.length,4);assert.equal(fish.length,64);assert.equal(current.renderer.batches.length,8);
-assert.equal(current.get('JSON.stringify(SPECIES.slice(0,SPECIES.length-REEF_FISH_SPECIES.length).map(s=>s.id))'),original.get('JSON.stringify(SPECIES.map(s=>s.id))'));
+assert.equal(current.catalogue.length,original.catalogue.length+4);assert.equal(entries.length,4);assert.equal(fish.length,64);assert.equal(current.renderer.batches.length,8);
+assert.equal(JSON.stringify(current.catalogue.slice(0,-entries.length)),JSON.stringify(original.catalogue));
 assert.equal(new Set(fish.map(f=>f.uid)).size,64);
 const initialCount=current.get('life.length');assert.equal(current.get('ensureReefFish(renderer)'),false);assert.equal(current.get('life.length'),initialCount);assert.equal(current.renderer.batches.length,8);
 console.log('PASS four usable species, 64 unique actors and eight shared LOD batches append idempotently');

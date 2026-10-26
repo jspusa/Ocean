@@ -65,20 +65,37 @@ const oceanDeepsea=(()=>{
   const candidates=typeof life==='undefined'?[]:life.filter(f=>f.ecologyPresent!==false&&(f.faunaVisibility??1)>=.8&&(f.retreat||0)<.8&&species[f.species]?.trench&&OceanTrench.habitats[species[f.species].id]?.station===id);
   return candidates.reduce((best,f)=>!best||V.dist(player.p,f.p)<V.dist(player.p,best.p)?f:best,null);
  }
+ const approachSpeed=remaining=>remaining>4?mix(.85,2.2,smooth01((remaining-4)/8)):mix(.28,.85,smooth01((remaining-.3)/3.7));
+ function approachSeconds(distance){
+  // Integrate the same slowing approach once when choosing an endpoint. This
+  // bounded midpoint estimate includes the final metres at observation speed.
+  const step=distance/128;let seconds=0;for(let i=0;i<128;i++)seconds+=step/approachSpeed((i+.5)*step);return seconds;
+ }
  function approachRoute(id,fish=observationTarget(id)){
   if(!fish)return null;
   const point=animalFocusPoint(fish),traits=speciesTraits(fish.species),sp=SPECIES[fish.species],size=sp.size,ribbon=sp.id==='oarfish',frilled=sp.id==='frilled_shark',barreleye=sp.id==='barreleye',sideView=ribbon||frilled||barreleye;
   const drift=Number.isFinite(fish.radius)?Math.max(0,fish.radius):Math.max(0,SPECIES[fish.species].motionProfile?.radius||0);
-  // Leave room for both sides of the natural orbit in a narrow portrait view.
-  const distance=Math.min(traits.observeDistance*.72,Math.max(traits.viewDistance,size*2,ribbon?size*2.25:frilled?drift*2.6:drift*7,barreleye?.80:traits.micro?1.05:1.5));
+  // Leave room for the natural orbit in portrait view. The shark's four-second
+  // dwell needs a closer side view so its slowly turning body stays readable.
+  const distance=Math.min(traits.observeDistance*.72,Math.max(traits.viewDistance,size*2,ribbon?size*2.25:frilled?drift*2.2:drift*7,barreleye?.80:traits.micro?1.05:1.5));
   const away=V.sub(player.p,point),normal=[Math.sin(fish.yaw||0),0,Math.cos(fish.yaw||0)];
   // Approach elongated animals from their nearer broad side. The frilled
   // shark's framing also reserves its slow circuit during the normal dwell;
   // only the swimmer moves, and the animal keeps its own position and pose.
   const angle=sideView?(fish.yaw||0)+(V.dot(away,normal)<0?Math.PI:0):Math.atan2(away[0],away[2]);
   for(const turn of sideView?[0,Math.PI,.22,-.22]:[0,.55,-.55,1.1,-1.1,Math.PI]){
-   const a=angle+turn,p=[point[0]+Math.sin(a)*distance,point[1]+Math.max(.15,Math.min(.45,distance*.18)),point[2]+Math.cos(a)*distance];
-   const floor=OceanTrench.floorAt(p[0],p[2],p[1]+.1);if(Number.isFinite(floor))p[1]=Math.max(p[1],floor+.82);
+   const endpoint=(focus,a)=>{const p=[focus[0]+Math.sin(a)*distance,focus[1]+Math.max(.15,Math.min(.45,distance*.18)),focus[2]+Math.cos(a)*distance],floor=OceanTrench.floorAt(p[0],p[2],p[1]+.1);if(Number.isFinite(floor))p[1]=Math.max(p[1],floor+.82);return p;};
+   let p=endpoint(point,angle+turn);
+   if(frilled&&typeof frilledSharkMotionPose==='function'){
+    // A fixed observation point must fit the shark when we arrive, not its
+    // heading at the gate. Predict the middle of the four-second dwell on a
+    // detached pose; the real animal and the resulting route never retarget.
+    const predicted={...fish,p:fish.p.slice()},side=V.dot(away,normal)<0?Math.PI:0;let eta=approachSeconds(V.dist(player.p,p));
+    for(let i=0;i<10;i++){frilledSharkMotionPose(predicted,t+eta+2);p=endpoint(animalFocusPoint(predicted),predicted.yaw+side+turn);eta=approachSeconds(V.dist(player.p,p));}
+    let readable=true;
+    for(const seconds of [0,2,4]){frilledSharkMotionPose(predicted,t+eta+seconds);const focus=animalFocusPoint(predicted),view=V.norm(V.sub(p,focus));if(Math.abs(V.dot([Math.sin(predicted.yaw),0,Math.cos(predicted.yaw)],view))<.9||blocked(p,focus,.001))readable=false;}
+    if(!readable)continue;
+   }
    if(V.dist(p,point)>traits.observeDistance*.9||OceanRegions.pointBlocked(p,.4)||!OceanRegions.pathClear(player.p,p,.4)||blocked(p,point,.001))continue;
    const resolved=collide(p.slice());if(V.dist(resolved,p)>.01)continue;
    return {target:id,route:[player.p.slice(),p],index:1,approaching:true,observationUID:fish.uid};
@@ -150,7 +167,7 @@ const oceanDeepsea=(()=>{
     if(!transit&&!patrol){const route=current().route||[current().p,current().look,current().p];patrol={route:[player.p.slice(),...route.map(p=>p.slice())],index:1};}
     if(transit?.hold>0){const trip=transit;trip.hold=Math.max(0,trip.hold-dt);player.velocity=[0,0,0];const f=life.find(f=>f.uid===trip.observationUID);if(f)aimAt(animalFocusPoint(f));if(trip.hold===0){transit={target:trip.target,route:[player.p.slice(),trip.returnTo],index:1,returning:true};paintHUD();}return;}
     const trip=transit||patrol,before=player.p.slice(),remaining=V.dist(before,trip.route.at(-1));
-    const speed=transit?.approaching?(remaining>4?mix(.85,2.2,smooth01((remaining-4)/8)):mix(.28,.85,smooth01((remaining-.3)/3.7))):transit?.returning?3.2:transit?mix(8,260,smooth01((remaining-12)/180)):2.2,next=R.advance(before,trip.route,trip.index,dt*speed);
+    const speed=transit?.approaching?approachSpeed(remaining):transit?.returning?3.2:transit?mix(8,260,smooth01((remaining-12)/180)):2.2,next=R.advance(before,trip.route,trip.index,dt*speed);
     player.p=collide(next.p,before);const d=V.sub(player.p,before);player.velocity=V.mul(d,1/Math.max(.0001,dt));
     if(V.len(d)>.001){player.yaw=lerpAngle(player.yaw,Math.atan2(d[0],-d[2]),1-Math.exp(-dt*3));player.pitch=mix(player.pitch,clamp(Math.atan2(d[1],Math.hypot(d[0],d[2])),-1.2,1.2),1-Math.exp(-dt*3));}
     if(V.dist(player.p,next.p)>.25){clearMotion();toast('前方有岩壁，請自行游過。');return;}

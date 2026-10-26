@@ -11,7 +11,7 @@ function world(reference=false){
  const ctx=vm.createContext({console,header:JSON.parse(JSON.stringify(header)),active:false,player:{p:[0,-8,7],velocity:[0,0,0]}});
  for(const name of ['engine','world','reef_detail','next_reef'])vm.runInContext(read(name),ctx,{filename:name});
  vm.runInContext(reference?fs.readFileSync(path.join(__dirname,'fixtures/individuals-motion-v017.js'),'utf8'):candidateSource,ctx,{filename:'individuals'});
- for(const name of ['open_world','trench','fauna','cetaceans','abyss_fauna','trench_fauna','fauna_world','cetacean_world','regions','abyss_world','trench_world','pelagic_life','reef_fauna'])vm.runInContext(read(name),ctx,{filename:name});
+ for(const name of ['open_world','trench','fauna','cetaceans','abyss_fauna','trench_fauna','fauna_world','cetacean_world','regions','abyss_world','trench_world','pelagic_life','reef_fauna','oarfish','frilled_shark','frilled_shark_world','barreleye','barreleye_world'])vm.runInContext(read(name),ctx,{filename:name});
  vm.runInContext(`obstacles.push(...header.obstacles);life.push(...header.life.map(i=>header.nodes[i]));decorLife.push(...header.decorLife.map(i=>header.nodes[i]));shoal.push(...header.shoal.map(i=>header.nodes[i]));allLife=life.concat(decorLife);
   const motionRenderer={batches:[],batch(g,instances){const b={instances};this.batches.push(b);return b;}};ensureReefFish(motionRenderer);initializeIndividuals(motionRenderer);`,ctx);
  return {ctx,step:vm.runInContext('updateLife',ctx),snapshot:()=>structuredClone(vm.runInContext('[allLife,shoal]',ctx))};

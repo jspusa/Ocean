@@ -9,7 +9,12 @@ function world(expansion=true,input=header,compiled=false){
  const ctx=vm.createContext({console,header:data});for(const n of modules)vm.runInContext(source(n),ctx,{filename:n});
  if(expansion&&fs.existsSync(path.join(root,'src/oarfish.js')))vm.runInContext(source('oarfish'),ctx,{filename:'oarfish'});
  const renderer={batches:[],batch(g,instances,kind,dynamic){const b={g,instances,kind,dynamic};this.batches.push(b);return b;}};ctx.renderer=renderer;
- return {ctx,renderer,get:s=>vm.runInContext(s,ctx)};
+ // Historical registration assertions run before loading the current archive.
+ // Complete its species dependencies in the same order as index.html, without
+ // removing later actors or changing their saved numeric species indexes.
+ const loaded=new Set([...modules,...(expansion?['oarfish']:[])]);
+ const loadArchiveSpecies=()=>{for(const name of ['oarfish','frilled_shark','frilled_shark_world','barreleye','barreleye_world'])if(!loaded.has(name)){vm.runInContext(source(name),ctx,{filename:name});loaded.add(name);}};
+ return {ctx,renderer,loadArchiveSpecies,get:s=>vm.runInContext(s,ctx)};
 }
 const current=world(),previous=world(false),species=current.get('SPECIES.find(s=>s.id==="oarfish")');
 assert(species,'The field guide must register the original oarfish model');
@@ -47,7 +52,7 @@ for(const g of [high,low]){
 }
 assert(high.v.length/36<=12000);assert(low.v.length<high.v.length*.6);assert(bytes<1024*1024);
 console.log('PASS 42nd species retains all prior indexes; original 4 m near/far meshes are finite, nondegenerate and bounded: '+high.v.length/36+'/'+low.v.length/36+' triangles, '+bytes+' indexed bytes');
-function loadScene(w){w.get('obstacles.push(...header.obstacles);reefPatches.push(...header.reefPatches);life.push(...header.life.map(i=>header.nodes[i]));decorLife.push(...header.decorLife.map(i=>header.nodes[i]));shoal.push(...header.shoal.map(i=>header.nodes[i]));allLife=life.concat(decorLife);initializeIndividuals(renderer);');}
+function loadScene(w){w.loadArchiveSpecies();w.get('obstacles.push(...header.obstacles);reefPatches.push(...header.reefPatches);life.push(...header.life.map(i=>header.nodes[i]));decorLife.push(...header.decorLife.map(i=>header.nodes[i]));shoal.push(...header.shoal.map(i=>header.nodes[i]));allLife=life.concat(decorLife);initializeIndividuals(renderer);');}
 loadScene(previous);loadScene(current);const beforeCount=current.get('life.length');
 assert.equal(current.get('typeof ensureOarfish'),'function','A compiled scene can append the encounter through its ordinary population entry point');
 assert.equal(current.get('ensureOarfish(renderer)'),true);current.get('initializeIndividuals(renderer)');

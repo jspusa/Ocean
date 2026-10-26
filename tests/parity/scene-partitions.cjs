@@ -10,7 +10,9 @@ const chunks=index.chunks.map(chunk=>{
  assert.match(chunk.url,/^chunk-[a-f0-9]{20}\.bin\.gz$/);const packed=fs.readFileSync(path.join(folder,chunk.url));assert.equal(packed.length,chunk.bytes);assert.equal(sha(packed),chunk.sha256);const bytes=zlib.gunzipSync(packed);assert.equal(bytes.length,chunk.decodedBytes);return bytes;
 });
 for(let i=0;i<chunks.length;i++)if(chunks[i].length>1024*1024)assert.equal(index.meshes.filter(mesh=>mesh.chunk===i).length,1,'Only a single indivisible authored mesh may exceed the chunk target');
-assert.equal(index.batches.length,legacy.batches.length);assert.equal(index.meshes.length,447);
+// The full v0.18.27 bake includes high/low meshes for oarfish, frilled shark
+// and barreleye, previously appended by their normal runtime population paths.
+assert.equal(index.batches.length,legacy.batches.length);assert.equal(index.meshes.length,453);
 for(let i=0;i<legacy.batches.length;i++){
  const before=legacy.batches[i],after=index.batches[i],mesh=index.meshes[after.meshID],bytes=chunks[mesh.chunk];
  const {vertexOffset,indexOffset,...meta}=before,{meshID,...actualMeta}=after;assert.deepEqual(actualMeta,meta,'batch ordering, materials, species, LOD and instances');

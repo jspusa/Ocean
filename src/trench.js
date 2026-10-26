@@ -72,17 +72,32 @@ const OceanTrench=(()=>{
  function floorAt(x,z,fromY=Infinity){let y=groundHeight(x,z);if(y===null)return null;for(const s of surfaceCells.get(Math.floor(x/10)+','+Math.floor(z/10))||[]){if(s.y>fromY+.002||x<s.minX||x>s.maxX||z<s.minZ||z>s.maxZ)continue;const h=heightInTriangle(s.p,x,z);if(h!==null&&h<=fromY+.002)y=Math.max(y,h);}return y;}
  const chunkHeight=128;
  function group(y,material){const slice=Math.floor((-y-580)/chunkHeight),key=slice+':'+material;if(!groups.has(key)){const origin=[760,-580-(slice+.5)*chunkHeight,-90],g=new Geometry();g.material=material;g.tag=material===17?31:30;groups.set(key,{g,origin,slice,material});}return groups.get(key);}
+ const sedimentNormals=new Map(),sedimentCorners=new Map();
  function emit(face,normal,material){const center=face.reduce((a,p)=>a.map((n,i)=>n+p[i]/face.length),[0,0,0]),{g,origin}=group(center[1],material),base=material===17?[.43,.39,.34]:[.39,.41,.42];
-  for(let i=1;i<face.length-1;i++)for(const p of [face[0],face[i],face[i+1]]){const local=V.sub(p,origin),bed=p[1]+.13*p[0]+.045*p[2],tone=.91+.07*Math.sin(bed*.9)+.025*Math.sin(bed*4.1);g.vertex(local,normal,base.map(c=>c*tone),[material===17?.93:.72,bed]);}
+  for(let i=1;i<face.length-1;i++){
+   const triangle=[face[0],face[i],face[i+1]],weight=material===17&&normal[1]>0?V.len(V.cross(V.sub(triangle[1],triangle[0]),V.sub(triangle[2],triangle[0]))):0;
+   for(const p of triangle){
+    const offset=g.v.length+3,local=V.sub(p,origin),bed=p[1]+.13*p[0]+.045*p[2],tone=material===17?1:.91+.07*Math.sin(bed*.9)+.025*Math.sin(bed*4.1);g.vertex(local,normal,base.map(c=>c*tone),[material===17?.93:.72,bed]);
+    if(weight){const key=p.join(','),sum=sedimentNormals.get(key)||[0,0,0];for(let k=0;k<3;k++)sum[k]+=normal[k]*weight;sedimentNormals.set(key,sum);let corners=sedimentCorners.get(g);if(!corners)sedimentCorners.set(g,corners=[]);corners.push(offset,sum);}
+   }
+  }
  }
  // Extruded triangles are convex. All rendered faces are the exact collider
  // planes; narrow joints use real edges rather than dark rectangles in a map.
+ const exposedFaces=new Map();
+ function expose(face,normal,material){
+  // Only exact, oppositely oriented shared faces are internal. Do not weld
+  // nearby points: thin gaps, outer backs and free terrace edges stay real.
+  const key=face.map(p=>p.join(',')).sort().join('|'),owners=exposedFaces.get(key)||[],opposite=owners.findIndex(f=>V.dot(f.normal,normal)<-.999999);
+  if(opposite>=0){owners.splice(opposite,1);if(!owners.length)exposedFaces.delete(key);}
+  else{owners.push({face,normal,material});exposedFaces.set(key,owners);}
+ }
  function prism(id,triangle,axis,thickness,material=16,role='wall'){
   const back=triangle.map(p=>p.map((n,k)=>n+(k===axis?thickness:0))),vertices=triangle.concat(back),center=[0,1,2].map(k=>vertices.reduce((n,p)=>n+p[k],0)/6),faces=[triangle.slice(),back.slice()];
   for(let i=0;i<3;i++)faces.push([triangle[i],back[i],back[(i+1)%3],triangle[(i+1)%3]]);
   const planes=faces.map(face=>{let n=faceNormal(face[0],face[1],face[2]);if(V.dot(n,V.sub(center,face[0]))>0){face.reverse();n=V.mul(n,-1);}return [...n,V.dot(n,face[0])];});
   const s={id:'trench-'+id,region:'trench',role,min:[0,1,2].map(k=>Math.min(...vertices.map(p=>p[k]))),max:[0,1,2].map(k=>Math.max(...vertices.map(p=>p[k]))),faces,planes};solids.push(s);
-  for(let i=0;i<faces.length;i++){emit(faces[i],planes[i].slice(0,3),material);if(planes[i][1]>.1)for(let j=1;j<faces[i].length-1;j++){const p=[faces[i][0],faces[i][j],faces[i][j+1]];surfaces.push({p,y:Math.min(...p.map(q=>q[1])),minX:Math.min(...p.map(q=>q[0])),maxX:Math.max(...p.map(q=>q[0])),minZ:Math.min(...p.map(q=>q[2])),maxZ:Math.max(...p.map(q=>q[2]))});}}
+  for(let i=0;i<faces.length;i++){expose(faces[i],planes[i].slice(0,3),material);if(planes[i][1]>.1)for(let j=1;j<faces[i].length-1;j++){const p=[faces[i][0],faces[i][j],faces[i][j+1]];surfaces.push({p,y:Math.min(...p.map(q=>q[1])),minX:Math.min(...p.map(q=>q[0])),maxX:Math.max(...p.map(q=>q[0])),minZ:Math.min(...p.map(q=>q[2])),maxZ:Math.max(...p.map(q=>q[2]))});}}
  }
  // Two fault walls run continuously down the transect. Dense sections around
  // the three stations expose broad ledges and inclined bedding in silhouette.
@@ -100,16 +115,34 @@ const OceanTrench=(()=>{
  // range. Each has an irregular sloping face, a 30–55m vertical section and
  // real solid volume. Their tips flank the animals rather than walling off
  // the current corridor or the saved observation/patrol positions.
- function spur(id,{x,z0,z1,top,bottom,side,thickness}){
-  const rows=Math.ceil((top-bottom)/5),cols=5;
-  const at=(j,k)=>{const y=mix(top,bottom,j/rows),z=mix(z0,z1,k/cols),edge=Math.sin(Math.PI*k/cols),profile=.52*Math.sin((y-top)*.53)+.26*Math.sin((y-top)*1.27),slant=(top-y)*.025;return [x+side*(slant+2*(1-edge)+profile),y,z];};
-  for(let j=0;j<rows;j++)for(let k=0;k<cols;k++){const p=[at(j,k),at(j,k+1),at(j+1,k+1),at(j+1,k)];prism(id+'-'+j+'-'+k+'a',[p[0],p[1],p[2]],0,side*thickness);prism(id+'-'+j+'-'+k+'b',[p[0],p[2],p[3]],0,side*thickness);}
+ function spur(id,{x,z0,z1,top,bottom,side,thickness,focus}){
+  const oldRows=Math.ceil((top-bottom)/5),cols=5,span=focus<-6000?30:22,nearTop=Math.min(top,focus+span*.5),nearBottom=Math.max(bottom,focus-span*.5),bands=focus<-6000?6:4,rows=[];
+  const phase=x*.13+z0*.09,weights=Array.from({length:bands},(_,i)=>1+.17*Math.sin(i*1.73+phase)),sum=weights.reduce((a,b)=>a+b,0);
+  for(let j=0;j<=oldRows;j++){const y=mix(top,bottom,j/oldRows);if(y>nearTop||y<nearBottom)rows.push({y,recess:0,layer:0});}
+  // Thin resistant lips and recessed softer beds have actual horizontal
+  // surfaces, not dark lines painted on a plane. The eroded front retreats
+  // into the existing rock, retaining the clear water of the original route.
+  let upper=nearTop;rows.push({y:upper,recess:0,layer:0});
+  for(let i=0;i<bands;i++){
+   const lower=i===bands-1?nearBottom:upper-(nearTop-nearBottom)*weights[i]/sum;
+   rows.push({y:upper-.28,recess:1,layer:i},{y:lower+.34,recess:1,layer:i},{y:lower,recess:0,layer:i});upper=lower;
+  }
+  rows.sort((a,b)=>b.y-a.y);
+  const oldProfile=y=>{const t=clamp((top-y)/(top-bottom)*oldRows,0,oldRows),j=Math.min(Math.floor(t),oldRows-1),sample=k=>{const h=mix(top,bottom,k/oldRows)-top;return .52*Math.sin(h*.53)+.26*Math.sin(h*1.27);};return mix(sample(j),sample(j+1),t-j);};
+  const at=(j,k)=>{
+   const row=rows[j],z=mix(z0,z1,k/cols),edge=Math.sin(Math.PI*k/cols),tilt=Math.sin(Math.PI*clamp((row.y-nearBottom)/(nearTop-nearBottom),0,1)),y=row.y+(z-(z0+z1)*.5)*.065*tilt;
+   // Keep the two original near silhouettes; erosion grows inward from the
+   // exposed ends instead of shifting the entire face out of torch range.
+   const bedWidth=(1.25+.27*Math.sin(row.layer*1.83+phase)+.18*Math.cos(z*.39+row.layer*.71))*(focus>-1000?.5:1),recess=row.recess*bedWidth*smooth(k/cols/.25)*smooth((1-k/cols)/.25),slant=(top-y)*.025;
+   return [x+side*(slant+2*(1-edge)+oldProfile(y)+recess),y,z];
+  };
+  for(let j=0;j<rows.length-1;j++)for(let k=0;k<cols;k++){const p=[at(j,k),at(j,k+1),at(j+1,k+1),at(j+1,k)];prism(id+'-'+j+'-'+k+'a',[p[0],p[1],p[2]],0,side*thickness);prism(id+'-'+j+'-'+k+'b',[p[0],p[2],p[3]],0,side*thickness);}
  }
- spur('midwater-spur',{x:774,z0:-96,z1:-104,top:-682,bottom:-730,side:1,thickness:20});
- spur('slope-spur',{x:770,z0:-115,z1:-127,top:-1384,bottom:-1428,side:1,thickness:25});
- spur('slope-left-spur',{x:756,z0:-112,z1:-127,top:-1384,bottom:-1428,side:-1,thickness:24});
- spur('hadal-left-spur',{x:770,z0:-132,z1:-151,top:-6984,bottom:-7040,side:-1,thickness:38});
- spur('hadal-back-spur',{x:788,z0:-140,z1:-157,top:-6980,bottom:-7040,side:1,thickness:14});
+ spur('midwater-spur',{x:774,z0:-96,z1:-104,top:-682,bottom:-730,side:1,thickness:20,focus:-700});
+ spur('slope-spur',{x:770,z0:-115,z1:-127,top:-1384,bottom:-1428,side:1,thickness:25,focus:-1402});
+ spur('slope-left-spur',{x:756,z0:-112,z1:-127,top:-1384,bottom:-1428,side:-1,thickness:24,focus:-1402});
+ spur('hadal-left-spur',{x:770,z0:-132,z1:-151,top:-6984,bottom:-7040,side:-1,thickness:38,focus:-7004});
+ spur('hadal-back-spur',{x:788,z0:-140,z1:-157,top:-6980,bottom:-7040,side:1,thickness:14,focus:-7004});
  // The 1400m muddy terrace is a real, finite ledge, open below it. Its central
  // patch stays exactly level for the small deposit feeders' feet.
  const shelf=(x,z)=>-1402-2.8*smooth(Math.max(Math.abs(x-766)/15,Math.abs(z+113)/13)-.48)+sedimentRelief(x,z,habitats.sea_pig.homes)*smooth(Math.min(x-751,781-x,z+126,-100-z)/3);
@@ -121,9 +154,23 @@ const OceanTrench=(()=>{
   const homes=encounters.filter(e=>e.species==='sea_pig'&&e.home[1]===-depth-2).map(e=>e.home),xs=axis(756,775,5,homes,0),zs=axis(-123,-104,5,homes,2),y=(x,z)=>-depth-2-3*smooth((Math.max(Math.abs(x-765.5),Math.abs(z+113.5))-7.5)/2)+sedimentRelief(x,z,homes)*.65;
   for(let j=0;j<zs.length-1;j++)for(let i=0;i<xs.length-1;i++){const x=xs[i],z=zs[j],x1=xs[i+1],z1=zs[j+1],p=[[x,y(x,z),z],[x1,y(x1,z),z],[x1,y(x1,z1),z1],[x,y(x,z1),z1]];prism('mud-'+depth+'-'+j+'-'+i+'a',[p[0],p[2],p[1]],1,-7,17,'roof');prism('mud-'+depth+'-'+j+'-'+i+'b',[p[0],p[3],p[2]],1,-7,17,'roof');}
  }
+ for(const owners of exposedFaces.values())for(const f of owners)emit(f.face,f.normal,f.material);
+ exposedFaces.clear();
  // Bottom sediment is divided into chunks horizontally as well as by depth.
  // Geometry remains local even at seven kilometres; no origin at the sea level.
  const q=floorGrid;for(let j=0;j<q.zs.length-1;j++)for(let i=0;i<q.xs.length-1;i++){const x=q.xs[i],z=q.zs[j],x1=q.xs[i+1],z1=q.zs[j+1],p=[[x,bedHeight(i,j),z],[x1,bedHeight(i+1,j),z],[x1,bedHeight(i+1,j+1),z1],[x,bedHeight(i,j+1),z1]];for(const ids of [[0,2,1],[0,3,2]]){const triangle=ids.map(k=>p[k]);emit(triangle,faceNormal(...triangle),17);}}
+ // The sediment is a continuous surface. Average only its upward faces by
+ // their real triangle area, in world space across depth groups. Vertical
+ // terrace edges, undersides and the fractured rock retain hard normals;
+ // positions, collision planes and the sampled ground remain untouched.
+ function smoothSedimentTops(){
+  // Retain the original world-space key from emit; reconstructing it from a
+  // local chunk origin can round the same boundary vertex differently.
+  for(const sum of sedimentNormals.values()){const length=V.len(sum);for(let k=0;k<3;k++)sum[k]/=length;}
+  for(const [g,corners]of sedimentCorners)for(let i=0;i<corners.length;i+=2)for(let k=0;k<3;k++)g.v[corners[i]+k]=corners[i+1][k];
+  sedimentNormals.clear();sedimentCorners.clear();
+ }
+ smoothSedimentTops();
 
  // A bounded visibility graph handles the finite terrace edge at the current
  // depth. Replanning must never first visit the last completed station.

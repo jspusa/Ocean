@@ -435,18 +435,28 @@ void main(){
  float sandDust=smoothstep(.73,.96,n.y)*smoothstep(.54,.76,noise(vWorld*.85));
  base=mix(base,vec3(.63,.59,.47),sandDust*.30);
  }
- if(uMat==16||uMat==17){
+ if(uMat==16){
   vec3 q=vWorld*.31,stone=triMap(uRock,q,n);
-  float bed=vUV.y,variation=noise(vWorld*.18),frequency=uMat==17?.42:1.7;
-  float layer=(bed+(variation-.5)*(uMat==17?.5:2.8))*frequency;
+  float bed=vUV.y,variation=noise(vWorld*.18);
+  float layer=(bed+(variation-.5)*2.8)*1.7;
   float band=sin(layer+stone.g*.7),resolve=exp(-pow(fwidth(layer),2.));
   float fracture=abs(sin(bed*.53+variation*3.3+stone.b*.4));
   float seam=1.-smoothstep(.025,.025+max(fwidth(fracture)*1.5,.045),fracture);
-  base*=mix(vec3(.88),stone*1.35,uMat==17?.32:.58);base*=1.+band*.08*resolve-seam*.13;
-  n=triNormal(uRockN,q,n,uMat==17?.095:.20);
-  if(uQuality>0)n=triNormal(uRockN,q*3.1,n,uMat==17?.025:.045);
-  rough=uMat==17?.96:clamp(.89+(stone.g-.5)*.12+variation*.025,.80,.97);occ=clamp(vUV.x,.18,1.);
-  if(uMat==16){float deposit=smoothstep(.58,.96,geomN.y);base=mix(base,vec3(.40,.37,.32),deposit*.30);}
+  base*=mix(vec3(.88),stone*1.35,.58);base*=1.+band*.08*resolve-seam*.13;
+  n=triNormal(uRockN,q,n,.20);
+  if(uQuality>0)n=triNormal(uRockN,q*3.1,n,.045);
+  rough=clamp(.89+(stone.g-.5)*.12+variation*.025,.80,.97);occ=clamp(vUV.x,.18,1.);
+  float deposit=smoothstep(.58,.96,geomN.y);base=mix(base,vec3(.40,.37,.32),deposit*.30);
+ }
+ if(uMat==17){
+  // Fine unconsolidated sediment has no rock fractures or hard bedding bands.
+  // Reuse the mipmapped grain maps on all three axes, including cut faces;
+  // their normal detail filters with distance instead of sparkling in motion.
+  vec3 q=vWorld*.28,grain=triMap(uSand,q,n);
+  float variation=noise(vWorld*.22),tone=dot(grain,vec3(.2126,.7152,.0722));
+  base*=mix(.87,1.03,variation)*(.60+.70*tone);
+  n=triNormal(uSandN,q,n,.22);
+  rough=.98;occ=clamp(vUV.x,.18,1.);
  }
  if(uMat==3||uMat==7){vec3 al=triMap(uCoral,vWorld*1.28,n);base*=mix(vec3(.94),al*1.40,.36);
  float age=fbm(vLocal*3.4+vec3(vGenes.x*21.));

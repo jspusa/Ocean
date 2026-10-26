@@ -10,15 +10,20 @@ function world(expansion=true,input=header){
  for(const name of modules)vm.runInContext(source(name),ctx,{filename:name+'.js'});
  if(expansion)for(const name of ['frilled_shark','frilled_shark_world'])if(fs.existsSync(path.join(root,'src',name+'.js')))vm.runInContext(source(name),ctx,{filename:name+'.js'});
  const renderer={batches:[],batch(g,instances,kind,dynamic){const batch={g,instances,kind,dynamic};this.batches.push(batch);return batch;}};ctx.renderer=renderer;
- return {ctx,renderer,get:s=>vm.runInContext(s,ctx)};
+ // Keep the historical 42 -> 43 registration assertion, then load all later
+ // production species before decoding today's archive. Procedural A/B worlds
+ // still exercise only the original append boundary.
+ const catalogue=JSON.parse(vm.runInContext('JSON.stringify(SPECIES.map(s=>s.id))',ctx)),loaded=new Set([...modules,...(expansion?['frilled_shark','frilled_shark_world']:[])]);
+ const loadArchiveSpecies=()=>{for(const name of ['frilled_shark','frilled_shark_world','barreleye','barreleye_world'])if(!loaded.has(name)){vm.runInContext(source(name),ctx,{filename:name+'.js'});loaded.add(name);}};
+ return {ctx,renderer,catalogue,loadArchiveSpecies,get:s=>vm.runInContext(s,ctx)};
 }
-function loadScene(w,keepNew=false){w.get('obstacles.push(...header.obstacles);reefPatches.push(...header.reefPatches);life.push(...header.life.filter(i=>'+(keepNew?'true':'!header.nodes[i].frilledShark')+').map(i=>header.nodes[i]));decorLife.push(...header.decorLife.map(i=>header.nodes[i]));shoal.push(...header.shoal.map(i=>header.nodes[i]));allLife=life.concat(decorLife);initializeIndividuals(renderer);');}
+function loadScene(w,keepNew=false){w.loadArchiveSpecies();w.get('obstacles.push(...header.obstacles);reefPatches.push(...header.reefPatches);life.push(...header.life.filter(i=>'+(keepNew?'true':'!header.nodes[i].frilledShark')+').map(i=>header.nodes[i]));decorLife.push(...header.decorLife.map(i=>header.nodes[i]));shoal.push(...header.shoal.map(i=>header.nodes[i]));allLife=life.concat(decorLife);initializeIndividuals(renderer);');}
 const previous=world(false),current=world();loadScene(previous);loadScene(current);
 assert.equal(current.get('typeof ensureFrilledShark'),'function','The ordinary compiled population seam can append the authored frilled shark');
 assert.equal(current.get('ensureFrilledShark(renderer)'),true);current.get('initializeIndividuals(renderer)');
 const fish=current.get('life.find(f=>f.frilledShark)'),sp=current.get('SPECIES.find(s=>s.id==="frilled_shark")');
-assert.equal(current.get('SPECIES.length'),43);assert.equal(current.get('SPECIES.indexOf(SPECIES.find(s=>s.id==="frilled_shark"))'),42);
-assert.equal(current.get('JSON.stringify(SPECIES.slice(0,42).map(s=>s.id))'),previous.get('JSON.stringify(SPECIES.map(s=>s.id))'));
+assert.equal(current.catalogue.length,43);assert.equal(current.get('SPECIES.indexOf(SPECIES.find(s=>s.id==="frilled_shark"))'),42);
+assert.equal(JSON.stringify(current.catalogue.slice(0,42)),JSON.stringify(previous.catalogue));
 assert.equal(fish.uid,'frilled_shark-001');assert.equal(fish.encounterId,'frilled-shark-pass');assert.deepEqual(Array.from(fish.home),[784,-900,-110]);assert.deepEqual(Array.from(fish.s),[1.7,1.7,1.7]);
 assert.equal(current.get('JSON.stringify(allLife.filter(f=>!f.frilledShark))'),previous.get('JSON.stringify(allLife)'),'Every prior UID, home, appearance and ordering stays unchanged');
 assert.equal(current.renderer.batches.length,2);const [near,far]=current.renderer.batches;assert.equal(near.instances,far.instances);assert.equal(near.instances.length,1);assert.equal(near.kind,11);assert.equal(near.dynamic,true);assert.equal(far.shadow,false);assert.equal(near.maxDistance,far.minDistance);assert(near.maxDistance>=12);assert(far.maxDistance>=70);

@@ -21,13 +21,56 @@ check('sediment has real low relief outside two-metre flat animal cores',()=>{
  assert(reference.every(y=>Math.abs(y+7002.5)<.30),'depositional relief remains modest');
 });
 check('authored habitats have correct feet or full-body water clearance',()=>{for(const [id,h]of Object.entries(T.habitats))for(const p of h.homes){const floor=T.floorAt(p[0],p[2],p[1]);assert(p.every(Number.isFinite));assert(Math.abs(p[1]+(id==='vampire_squid'?700:id==='sea_pig'?1402:7002))<6);assert.equal(R.pointBlocked([p[0],p[1]+(id==='sea_pig'?.1:0),p[2]],.04),false);if(id==='sea_pig')assert(Math.abs(p[1]-floor)<1e-8);else assert(p[1]-floor>.3);}});
-check('vertical indexing bounds local queries without missing exact solids',()=>{for(const s of T.stations){const q=[s.p[0]-23,s.p[1],s.p[2]],r=12,actual=R.nearbySolids(q,r),expected=R.solids.filter(o=>q.every((n,i)=>n>=o.min[i]-r&&n<=o.max[i]+r));assert.deepEqual(Array.from(actual,o=>o.id).sort(),Array.from(expected,o=>o.id).sort());assert(actual.length<180,'all depth slices must not be returned');}});
+check('vertical indexing bounds local queries without missing exact solids',()=>{for(const s of T.stations)for(const [q,limit]of [[[s.p[0]-23,s.p[1],s.p[2]],180],...s.route.map(p=>[p,800])]){const r=12,actual=R.nearbySolids(q,r),expected=R.solids.filter(o=>q.every((n,i)=>n>=o.min[i]-r&&n<=o.max[i]+r));assert.deepEqual(Array.from(actual,o=>o.id).sort(),Array.from(expected,o=>o.id).sort());assert(actual.length<limit,'local terrain queries stay bounded, including the finite mud terrace');}});
+check('rock collision faces remain closed convex volumes after adding strata',()=>{for(const s of T.solids){assert.equal(s.faces.length,s.planes.length);for(const f of s.faces)for(const p of f)for(const plane of s.planes)assert(plane[0]*p[0]+plane[1]*p[1]+plane[2]*p[2]<=plane[3]+1e-7,s.id+' has a vertex outside its own collision planes');}});
 const batches=[];T.build({batch(g,instances){const b={g,instances};batches.push(b);return b;}});
-check('geometry uses bounded local origins and finite physically deep vertices',()=>{assert(batches.length>20&&batches.length<=120);let tris=0;for(const b of batches){const v=b.g.v,origin=b.instances[0].p;assert(origin[1]<0);assert(v.every(Number.isFinite));tris+=v.length/36;for(let i=0;i<v.length;i+=12)assert(Math.abs(v[i+1])<170,'whole 7000m wall must not share one origin');assert(b.maxDistance>=180);}assert(tris<100000);console.log(JSON.stringify({batches:batches.length,triangles:tris,solids:T.solids.length}));});
+check('shared interior collider faces are absent and all exposed faces stay sealed',()=>{
+ const key=p=>p.map(n=>n.toFixed(5)).join(','),faces=new Map(),drawn=new Set(),normal=f=>{const a=f[1].map((n,i)=>n-f[0][i]),b=f[2].map((n,i)=>n-f[0][i]),v=[a[1]*b[2]-a[2]*b[1],a[2]*b[0]-a[0]*b[2],a[0]*b[1]-a[1]*b[0]];return v.map(n=>n/Math.hypot(...v));};
+ for(const s of T.solids)for(const f of s.faces){const id=f.map(key).sort().join('|');if(!faces.has(id))faces.set(id,[]);faces.get(id).push(f);}
+ for(const b of batches){const v=b.g.v,o=b.instances[0].p;for(let i=0;i<v.length;i+=36)drawn.add([0,12,24].map(k=>key(v.slice(i+k,i+k+3).map((n,j)=>n+o[j]))).sort().join('|'));}
+ let shared=0,submitted=0,exposed=0;
+ for(const owners of faces.values()){assert(owners.length<=2,'authored solids have no ambiguous triple-owned face');if(owners.length===2){
+  // A shared finite face separates two convex solid interiors. Both winding
+  // directions belong to collision, but neither is an exposed render surface.
+  const f=owners[0],n=normal(f),opposite=normal(owners[1]);assert(n.reduce((sum,value,i)=>sum+value*opposite[i],0)<-.999999,'only oppositely oriented shared faces separate solid interiors');shared++;
+  for(let a=0;a<f.length-2;a++)for(let b=a+1;b<f.length-1;b++)for(let d=b+1;d<f.length;d++)if(drawn.has([f[a],f[b],f[d]].map(key).sort().join('|')))submitted++;
+ }else{const f=owners[0];exposed++;for(let i=1;i<f.length-1;i++)assert(drawn.has([f[0],f[i],f[i+1]].map(key).sort().join('|')),'an exterior face or free edge was removed');}}
+ assert(shared>5000,'exercise the full connected walls and terraces');
+ assert(exposed>10000,'exercise the complete exposed surface, backs and terrace boundaries');
+ assert.equal(submitted,0,shared+' shared internal faces must not submit triangles');
+});
+check('near-station rock strata expose broad ledges at several actual heights',()=>{
+ for(const station of T.stations){
+  const levels=new Set();let area=0;
+  for(const b of batches){if(b.g.material!==16)continue;const v=b.g.v,o=b.instances[0].p;
+   for(let k=0;k<v.length;k+=36){if(v[k+4]<.65)continue;const p=[0,12,24].map(j=>v.slice(k+j,k+j+3).map((n,i)=>n+o[i])),center=[0,1,2].map(i=>(p[0][i]+p[1][i]+p[2][i])/3);
+    if(Math.abs(center[1]-station.p[1])>12||Math.hypot(center[0]-station.p[0],center[2]-station.p[2])>30)continue;
+    const a=p[1].map((n,i)=>n-p[0][i]),d=p[2].map((n,i)=>n-p[0][i]),projectedArea=Math.abs(a[2]*d[0]-a[0]*d[2])*.5;
+    if(projectedArea>.15){area+=projectedArea;levels.add(Math.round(center[1]/2));}
+   }
+  }
+  assert(area>8,station.id+' needs visible horizontal rock relief, not a normal-map stripe');
+  assert(levels.size>=3,station.id+' needs several separate stratum edges within the viewing area');
+ }
+});
+check('geometry uses bounded local origins and finite physically deep vertices',()=>{assert(batches.length>20&&batches.length<=120);let tris=0;for(const b of batches){const v=b.g.v,origin=b.instances[0].p;assert(origin[1]<0);assert(v.every(Number.isFinite));tris+=v.length/36;for(let i=0;i<v.length;i+=12)assert(Math.abs(v[i+1])<170,'whole 7000m wall must not share one origin');assert(b.maxDistance>=180);}assert(tris<=91056,'do not exceed the published v0.18.26 triangle budget');assert(T.solids.length<8000,'fine local strata must not multiply the complete collision world');console.log(JSON.stringify({batches:batches.length,triangles:tris,solids:T.solids.length}));});
 check('nonuniform bottom grid has no open interior edges and height queries match its actual triangles',()=>{
  const edges=new Map(),key=p=>p.map(n=>n.toFixed(6)).join(','),terraceVertices=new Set(T.solids.filter(s=>s.role==='roof').flatMap(s=>s.faces.flatMap(f=>f.map(key))));let triangles=0;
  for(const b of batches){if(b.g.material!==17)continue;const v=b.g.v,o=b.instances[0].p;for(let k=0;k<v.length;k+=36){const tri=[0,12,24].map(n=>v.slice(k+n,k+n+3).map((x,i)=>x+o[i]));if(tri.every(p=>terraceVertices.has(key(p))))continue;triangles++;const p=[0,1,2].map(i=>tri[0][i]*.2+tri[1][i]*.3+tri[2][i]*.5);assert(Math.abs(T.groundHeight(p[0],p[2])-p[1])<1e-7,'rendered triangle and ground interpolation agree');for(let i=0;i<3;i++){const a=tri[i],b=tri[(i+1)%3],id=[key(a),key(b)].sort().join('|');if(!edges.has(id))edges.set(id,{a,b,count:0});edges.get(id).count++;}}}
  assert(triangles>6700);for(const e of edges.values()){const boundary=e.a[0]===T.bounds.left&&e.b[0]===T.bounds.left||e.a[0]===T.bounds.right&&e.b[0]===T.bounds.right||e.a[2]===T.bounds.top&&e.b[2]===T.bounds.top||e.a[2]===T.bounds.bottom&&e.b[2]===T.bounds.bottom;assert.equal(e.count,boundary?1:2,'no T-junction or hidden interior slit');}
+});
+check('sediment tops share continuous unit normals while rock and terrace edges stay sharp',()=>{
+ const tops=new Map();let joined=0,crossBatch=0,sharp=0;
+ for(const [batch,b]of batches.entries()){const v=b.g.v,o=b.instances[0].p;for(let k=0;k<v.length;k+=36){
+  const a=v.slice(k,k+3),d=v.slice(k+12,k+15).map((n,i)=>n-a[i]),e=v.slice(k+24,k+27).map((n,i)=>n-a[i]),cross=[d[1]*e[2]-d[2]*e[1],d[2]*e[0]-d[0]*e[2],d[0]*e[1]-d[1]*e[0]],length=Math.hypot(...cross);if(length<1e-10)continue;const face=cross.map(n=>n/length);
+  for(const j of [k,k+12,k+24]){const n=v.slice(j+3,j+6);assert(Math.abs(Math.hypot(...n)-1)<1e-10,'finite unit shading normal');
+   if(b.g.material===17&&face[1]>0){const key=v.slice(j,j+3).map((x,i)=>(x+o[i]).toFixed(8)).join(','),previous=tops.get(key);
+    if(previous){joined++;crossBatch+=previous.batch!==batch?1:0;assert(n.every((x,i)=>Math.abs(x-previous.n[i])<1e-10),'shared sediment top has a hard triangle or depth-chunk shading seam at '+key);}
+    else tops.set(key,{n,batch});
+   }else{sharp++;assert(n.reduce((sum,x,i)=>sum+x*face[i],0)>1-1e-10,'rock strata, vertical edges and terrace undersides retain their actual flat face normal');}
+  }
+ }}
+ assert(joined>50000&&crossBatch>100,'exercise neighboring top triangles across depth groups');assert(sharp>10000,'exercise exposed rock, vertical terrace edges and undersides');
 });
 check('every collider face is represented by actual rendered vertices',()=>{const vertices=new Set();for(const b of batches)for(let i=0;i<b.g.v.length;i+=12)vertices.add(b.g.v.slice(i,i+3).map((n,k)=>(n+b.instances[0].p[k]).toFixed(5)).join(','));for(const s of T.solids)for(const f of s.faces)for(const p of f)assert(vertices.has(p.map(n=>n.toFixed(5)).join(',')),s.id+' invisible collision vertex');});
 check('connected trench leaves the existing reef terrain and random stream untouched',()=>{for(let x=-250;x<=250;x+=20)for(let z=-370;z<180;z+=20)assert.equal(R.groundHeight(x,z),oldGround(x,z));assert.equal(vm.runInContext('seed',c),oldSeed);});
