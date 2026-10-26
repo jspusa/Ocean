@@ -16,7 +16,11 @@ class OceanPerformance{
    // A 60 Hz presentation scheduled on (for example) 75 or 144 Hz RAF has
    // genuine alternating intervals. Only recovery tolerates that known tick
    // quantization; samples, exported intervals and the slow-mean gate stay raw.
-   const pacedPeak=rafInterval>0&&rafInterval<budget?Math.ceil((budget-.01)/rafInterval)*rafInterval+.1:0;
+   const pacedTicks=rafInterval>0&&rafInterval<budget?Math.ceil((budget-.01)/rafInterval):0;
+   // A 0.1 ms timestamp bin can perturb both ends of a measured interval.
+   // Predicting N ticks compounds that interval error; the observed span has
+   // its own bin too. The tiny remainder covers Float32 sample rounding only.
+   const pacedPeak=pacedTicks?pacedTicks*rafInterval+(pacedTicks+1)*.1+.001:0;
    // A 60 Hz display cannot report the old >78 FPS recovery threshold.
    // Probe upward only after several stable windows at the display budget.
    // No CPU duration is presented as GPU headroom; a failed probe backs off.

@@ -9,6 +9,13 @@ const source=fs.readFileSync(path.resolve(__dirname,'../../src/engine.js'),'utf8
 // to the old contract. Never regenerate or bless a new snapshot from the run.
 function replaceOnce(text,from,to){assert.equal(text.split(from).length,2,'Exactly one authored normalization: '+from);return text.replace(from,to);}
 const comparableSource=replaceOnce(replaceOnce(source,'outer:.62,inner:.98,strength:2.2,falloff:.024','outer:.76,inner:.987,strength:2.2,falloff:.055'),'uniform sampler2D uVolumeShadow;','uniform sampler2D uVolumeShadow;uniform sampler2D uCaustic;');
+// The immutable fixture stores hashes rather than raw uniform rows. Restore
+// ONLY the two newly omitted shadow IO blocks in a test reference, then prove
+// that reference against every old hash before projecting those blocks out.
+// Any changed non-shadow value/order still fails the immutable baseline check.
+const legacyShadowSource=replaceOnce(replaceOnce(comparableSource,
+ 'if(this.sunless)this._shadowMapDirty=true;\n  else if(refreshShadow){','if(refreshShadow){'),
+ 'if(!this.sunless){\n  g.bindFramebuffer(g.FRAMEBUFFER,this.dynamicShadowFBO);','{\n  g.bindFramebuffer(g.FRAMEBUFFER,this.dynamicShadowFBO);');
 const addedUniforms=Object.freeze({program:['uSunless'],volumeProgram:['uSunless'],pointProgram:['uSun','uLightDir','uLightColor','uDepth','uResolution','uExposure','uClarity','uPhotoAperture','uPhotoFocus']});
 const authoredAdditionCount=Object.values(addedUniforms).reduce((sum,names)=>sum+names.length,0);
 const isAdded=row=>addedUniforms[row.program]?.includes(row.name)===true;
@@ -47,6 +54,7 @@ function run(shaderSource=source){
 }
 const {f,frames}=run();
 const comparable=run(comparableSource).frames;
+const legacyShadows=run(legacyShadowSource).frames;
 const original=JSON.parse(fs.readFileSync(fixturePath,'utf8')),results=[];
 function check(name,fn){try{fn();results.push(true);console.log('PASS '+name);}catch(e){results.push(false);console.error('FAIL '+name+': '+e.message);}}
 const metadata=({state,values,...draw})=>draw;
@@ -63,9 +71,9 @@ function projectedFrame(frame){
  });
  return {activeCalls:active.length,activeHash:digest(active),draws};
 }
-check('the only presentation-order change is points after POST and before final AA',()=>{
+check('presentation changes are only the authored sprite move and omitted sunless shadow passes',()=>{
  for(let i=0;i<frames.length;i++){
-  const expected=original.frames[i].draws.map(metadata),index=expected.findIndex(row=>row.program==='pointProgram'),[point]=expected.splice(index,1);
+  const expected=original.frames[i].draws.filter(row=>i!==2||row.program!=='shadowProgram').map(metadata),index=expected.findIndex(row=>row.program==='pointProgram'),[point]=expected.splice(index,1);
   expected.splice(expected.findIndex(row=>row.program==='postProgram')+1,0,{...point,pass:'post'});
   // POST_VS uses gl_VertexID and has no attributes; the final draw retains
   // the current particle VAO instead of the earlier empty post VAO.
@@ -91,14 +99,17 @@ check('exact authored new uniform names, values and counts are submitted on ever
 });
 check('all other uniform values, submission order and draw states match the immutable v0.18 fixture',()=>{
  for(let i=0;i<comparable.length;i++){
-  const projected=projectedFrame(comparable[i]);assert.equal(projected.activeCalls,original.frames[i].activeCalls);
-  assert.equal(projected.activeHash,original.frames[i].activeHash,'Unchanged active submission sequence for frame '+i);
-  assert.deepEqual(projected.draws,original.frames[i].draws,'Unchanged draw values and state for frame '+i);
+  const legacy=projectedFrame(legacyShadows[i]);assert.equal(legacy.activeCalls,original.frames[i].activeCalls);
+  assert.equal(legacy.activeHash,original.frames[i].activeHash,'Restored reference must prove every immutable active submission for frame '+i);
+  assert.deepEqual(legacy.draws,original.frames[i].draws,'Restored reference must prove every immutable draw state for frame '+i);
+  const expected=projectedFrame({...legacyShadows[i],active:legacyShadows[i].active.filter(row=>i!==2||row.program!=='shadowProgram'),draws:legacyShadows[i].draws.filter(row=>i!==2||row.program!=='shadowProgram')});
+  assert.deepEqual(projectedFrame(comparable[i]),expected,'Only the proven sunless shadow rows are omitted in frame '+i);
  }
 });
 check('no shader pass submits inactive uniform locations',()=>{
- console.log('WORK '+JSON.stringify(frames.map((row,i)=>({frame:i,before:original.frames[i].allCalls,after:row.allCalls,removedNull:original.frames[i].nullCalls,removedAtlas:1,authoredActiveAdditions:authoredAdditionCount}))));
- for(let i=0;i<frames.length;i++){assert.equal(frames[i].nullCalls,0);assert.equal(original.frames[i].allCalls-frames[i].allCalls,original.frames[i].nullCalls+1-authoredAdditionCount,'Only authored active additions offset the removed null calls and volume atlas');assert.ok(original.frames[i].nullCalls>50,'Reference must expose no-op calls');}
+ const removedShadow=i=>i===2?legacyShadows[i].active.filter(row=>row.program==='shadowProgram').length:0;
+ console.log('WORK '+JSON.stringify(frames.map((row,i)=>({frame:i,before:original.frames[i].allCalls,after:row.allCalls,removedNull:original.frames[i].nullCalls,removedAtlas:1,authoredActiveAdditions:authoredAdditionCount,removedSunlessShadowUniforms:removedShadow(i)}))));
+ for(let i=0;i<frames.length;i++){assert.equal(frames[i].nullCalls,0);assert.equal(original.frames[i].allCalls-frames[i].allCalls,original.frames[i].nullCalls+1-authoredAdditionCount+removedShadow(i),'Only authored changes offset the removed null calls, volume atlas and proven sunless shadow uniforms');assert.ok(original.frames[i].nullCalls>50,'Reference must expose no-op calls');}
 });
 check('both sprite programs refresh their own camera, optics and lighting through shallow/deep/shallow frames',()=>{
  const f=fixture(),r=f.renderer,configs=[

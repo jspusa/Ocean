@@ -310,8 +310,15 @@ function animate(ms){
  }
  pendingFrameTime+=dt;
  const frameInterval=1000/(active||liveFeature?60:30);
- if(!renderer.pendingResize&&ms+.001<renderDeadline){pendingFrameCPU+=performance.now()-begin;requestAnimationFrame(animate);return;}
- renderDeadline=renderDeadline>ms?ms+frameInterval:renderDeadline+(Math.floor((ms+.001-renderDeadline)/frameInterval)+1)*frameInterval;
+ // RAF timestamps may be rounded to 0.1 ms. A just-early display tick must
+ // not become a missed frame (and a false adaptive-quality downgrade).
+ // Advance the original phase even for that early tick; only a forced resize
+ // well before the deadline starts a fresh interval. Diagnostics keep raw time.
+ // One clock bin plus 0.025 ms covers the bounded jitter without changing
+ // the frame budget; an early submission consumes its original deadline.
+ const deadlineTolerance=.125;
+ if(!renderer.pendingResize&&ms+deadlineTolerance<renderDeadline){pendingFrameCPU+=performance.now()-begin;requestAnimationFrame(animate);return;}
+ renderDeadline=renderDeadline>ms+deadlineTolerance?ms+frameInterval:renderDeadline+Math.max(1,Math.floor((ms-renderDeadline)/frameInterval)+1)*frameInterval;
  dt=pendingFrameTime;pendingFrameTime=0;
  if((!modal&&!photoOpen)||liveFeature){
   if(active&&previousPhysicsPosition&&!cameraCut)renderPosition=V.lerp(previousPhysicsPosition,player.p,simulationAccumulator*120);

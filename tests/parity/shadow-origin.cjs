@@ -28,9 +28,11 @@ const checks=[];
 function check(name,run){try{run();checks.push(true);console.log('PASS '+name);}catch(error){checks.push(false);console.error('FAIL '+name+': '+error.message);}}
 const boundaries=[
  [[0,-499.999,7],[0,-500.001,7]],
- [[31.999,-7000,-120],[32.001,-7000,-120]],
- [[766,-7007.999,-120],[766,-7008.001,-120]],
- [[766,-7000,-95.999],[766,-7000,-96.001]]
+ // 0.18.23 omits solar maps at 7000 m. Exercise the same three origin
+ // boundaries at 2000 m, where these shadow projections are still consumed.
+ [[31.999,-2000,-120],[32.001,-2000,-120]],
+ [[766,-2015.999,-120],[766,-2016.001,-120]],
+ [[766,-2000,-95.999],[766,-2000,-96.001]]
 ];
 check('entering and leaving relative-origin boundaries rebuilds the actual static shadow projection',()=>{
  for(const boundary of boundaries)for(const reverse of [false,true]){
@@ -52,8 +54,8 @@ check('surface and volume programs receive the rebuilt relative light matrix in 
  }
 });
 check('continuous motion within one origin and shadow cell retains the static map',()=>{
- const f=fixture(),r=f.renderer;f.render([766,-7000,-120]);const initial=Array.from(r.renderLightVP);
- for(let i=1;i<=60;i++){const eye=[766+i*.005,-7000+i*.005,-120+i*.005];f.render(eye,8+i/60);assert.equal(r.staticShadowUpdates,1);assert.deepEqual(Array.from(r.renderLightVP),initial);assert(projectionError(r,[776,-7002,-130])<.01);}
+ const f=fixture(),r=f.renderer;f.render([766,-2000,-120]);const initial=Array.from(r.renderLightVP);
+ for(let i=1;i<=60;i++){const eye=[766+i*.005,-2000+i*.005,-120+i*.005];f.render(eye,8+i/60);assert.equal(r.staticShadowUpdates,1);assert.deepEqual(Array.from(r.renderLightVP),initial);assert(projectionError(r,[776,-2002,-130])<.01);}
 });
 check('shadow-cell movement, lighting edits and explicit refresh still invalidate independently',()=>{
  const f=fixture(),r=f.renderer;f.render([7.999,-8,7]);f.render([8.001,-8,7]);assert.equal(r.staticShadowUpdates,2);

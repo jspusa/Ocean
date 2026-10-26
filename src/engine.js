@@ -1219,20 +1219,28 @@ class Renderer{
   // light matrix must use the same origin as this frame's instance positions.
   const key=center.join(',')+this.lighting+(underwater?'water':'air')+':'+origin.join(',');
   g.enable(g.DEPTH_TEST);g.depthMask(true);g.disable(g.BLEND);
-  if(this._shadowKey!==key||this.forceShadow){
-   this._shadowKey=key;this.forceShadow=false;this.renderLightVP=stableLightMatrix(mm(ortho(-40,40,-40,40,.1,230),lookAt(V.sub(V.add(center,V.mul(this.lightDir,100)),origin),V.sub(center,origin))),this.shadowSize);this.lightVP=origin.some(n=>n!==0)?worldProjection(this.renderLightVP,origin):this.renderLightVP;
+  const refreshShadow=this._shadowKey!==key||this.forceShadow||this._shadowMapDirty;
+  // Keep valid relative matrices even when the first saved view is sunless.
+  // The projection cache is not proof that its depth texture was rendered.
+  if(this._shadowKey!==key||(!this.sunless&&refreshShadow)){
+   this._shadowKey=key;this.renderLightVP=stableLightMatrix(mm(ortho(-40,40,-40,40,.1,230),lookAt(V.sub(V.add(center,V.mul(this.lightDir,100)),origin),V.sub(center,origin))),this.shadowSize);this.lightVP=origin.some(n=>n!==0)?worldProjection(this.renderLightVP,origin):this.renderLightVP;
+  }
+  if(this.sunless)this._shadowMapDirty=true;
+  else if(refreshShadow){
    g.bindFramebuffer(g.FRAMEBUFFER,this.shadowFBO);g.viewport(0,0,this.shadowSize,this.shadowSize);g.clear(g.DEPTH_BUFFER_BIT);g.colorMask(false,false,false,false);g.enable(g.POLYGON_OFFSET_FILL);g.polygonOffset(1.2,2.);
    this.common(this.shadowProgram,eye,this.lightVP,t);const planes=this.frustum(this.lightVP),state={};
    for(const b of this.batches){if(!b.visible||!b.shadow||b.dynamic||b.kind===3)continue;
     this.updateBatch(b,center,planes,true);if(!b.drawCount)continue;this.batchUniforms(this.shadowProgram,b,state,0);this.drawBatch(b);this.shadowDraws++;}
-   g.disable(g.POLYGON_OFFSET_FILL);g.colorMask(true,true,true,true);this.staticShadowUpdates=(this.staticShadowUpdates||0)+1;
+   g.disable(g.POLYGON_OFFSET_FILL);g.colorMask(true,true,true,true);this.staticShadowUpdates=(this.staticShadowUpdates||0)+1;this.forceShadow=false;this._shadowMapDirty=false;
   }
   // Small, independent actor map; moving silhouettes do not invalidate the reef cache.
   this.renderDynamicLightVP=stableLightMatrix(mm(ortho(-17,17,-17,17,.1,150),lookAt(V.add(relativeEye,V.mul(this.lightDir,65)),relativeEye)),this.dynamicShadowSize);this.dynamicLightVP=origin.some(n=>n!==0)?worldProjection(this.renderDynamicLightVP,origin):this.renderDynamicLightVP;
+  if(!this.sunless){
   g.bindFramebuffer(g.FRAMEBUFFER,this.dynamicShadowFBO);g.viewport(0,0,this.dynamicShadowSize,this.dynamicShadowSize);g.clear(g.DEPTH_BUFFER_BIT);g.colorMask(false,false,false,false);this.common(this.shadowProgram,eye,this.dynamicLightVP,t);
   const lightPlanes=this.frustum(this.dynamicLightVP),shadowState={};
   for(const b of this.batches){if(!b.visible||!b.dynamic||!b.shadow||![0,1,2,4,5,6,7,8,9,10,11,12].includes(b.kind)||(b.minDistance>0&&!b.shadowProxy))continue;this.updateBatch(b,eye,lightPlanes,true);if(!b.drawCount)continue;this.batchUniforms(this.shadowProgram,b,shadowState);this.drawBatch(b);this.shadowDraws++;}
   g.colorMask(true,true,true,true);
+  }
   g.bindFramebuffer(g.FRAMEBUFFER,this.msaaFBO||this.sceneFBO);if(this.msaaSamples)g.enable(g.SAMPLE_ALPHA_TO_COVERAGE);g.viewport(0,0,this.canvas.width,this.canvas.height);g.clearColor(.002,.025,.045,1);g.clear(g.COLOR_BUFFER_BIT|g.DEPTH_BUFFER_BIT);
   g.depthFunc(g.LEQUAL);this.common(this.skyProgram,eye,this.vp,t);this.setMatrix4fv(this.skyProgram,'uInvVP',false,inv);g.bindVertexArray(this.postVAO);g.drawArrays(g.TRIANGLES,0,3);g.depthFunc(g.LESS);this.drawCalls++;
   const surfaceStates=new Map();let activeSurface=null;

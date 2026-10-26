@@ -2,16 +2,17 @@
  * coordinate, clock or progression writes. Run alone on native Chrome GPU.
  * Touch profiles are desktop emulation, not physical phone acceptance. */
 'use strict';
-const fs=require('node:fs'),path=require('node:path'),assert=require('node:assert/strict');
+const fs=require('node:fs'),path=require('node:path'),assert=require('node:assert/strict'),crypto=require('node:crypto');
 const {chromium}=require(process.env.PLAYWRIGHT_PATH||'playwright');
 const option=(name,fallback)=>process.argv.find(v=>v.startsWith('--'+name+'='))?.slice(name.length+3)||fallback;
 const url=option('url',process.argv.find(v=>/^https?:/.test(v))||'http://127.0.0.1:8765/');
 const profile=option('profile','desktop'),touch=profile==='touch';
+const shadowAudit=process.argv.includes('--shadow-audit');
 assert(['desktop','touch'].includes(profile));
 assert(!new URL(url).searchParams.has('still'),'A frozen scene cannot prove field investigation');
 const output=path.resolve(__dirname,'../..',option('out','qa/parity/hadal-investigation-'+profile+'.json'));
 fs.mkdirSync(path.dirname(output),{recursive:true});
-const results=[],errors=[],traces=[],observations=[],inputs=[];let metadata=null,fatal=null;
+const results=[],errors=[],traces=[],observations=[],inputs=[];let metadata=null,fatal=null,shadowEpoch=0,shadowReturns=0,shadowPhoto=null;
 const distance=(a,b)=>Math.hypot(...a.map((v,k)=>v-b[k]));
 const check=(name,pass,detail)=>{results.push({name,pass:!!pass,detail});console.log((pass?'PASS ':'FAIL ')+name+(detail?' '+JSON.stringify(detail):''));};
 
@@ -42,6 +43,44 @@ const check=(name,pass,detail)=>{results.push({name,pass:!!pass,detail});console
    await page.waitForFunction(()=>window.__ocean?.ready||!document.getElementById('errorBox').classList.contains('hidden'),null,{timeout:120000});
    assert(await page.evaluate(()=>window.__ocean?.ready),await page.locator('#errorMessage').textContent());
    await page.locator('#loading').waitFor({state:'hidden'});await page.bringToFront();
+   if(shadowAudit)await page.evaluate(epoch=>{
+    const original=renderer.render,matrixNames=['lightVP','renderLightVP','dynamicLightVP','renderDynamicLightVP'];
+    const audit=window.__hadalShadowAudit={epoch,completedFrames:0,deepFrames:0,sunlitFrames:0,shallowDiveFrames:0,restorations:0,transitionCount:0,
+     deepShadowViolations:0,invalidMatrixFrames:0,restorationViolations:0,observerErrors:0,transitions:[],failures:[],lastComplete:null};
+    const retained=(r,view)=>({frame:r.frame,sunless:r.sunless===true,staticShadowUpdates:r.staticShadowUpdates||0,shadowDraws:r.shadowDraws,
+     forceShadow:r.forceShadow===true,origin:r.renderOrigin,view,matrices:matrixNames.map(name=>r[name])});
+    const details=s=>({...s,origin:s.origin?Array.from(s.origin):null,view:s.view?Array.from(s.view):null,
+     matrices:Object.fromEntries(matrixNames.map((name,i)=>[name,s.matrices[i]?Array.from(s.matrices[i]):null]))});
+    renderer.render=function(...args){
+     // Read-only observer: the original receiver, arguments, exceptions and
+     // return value are preserved. No player/render/clock setting is changed.
+     const before=retained(this,audit.lastComplete?.eye);const result=original.apply(this,args);
+     try{if(result!==false&&this.frame>before.frame){
+      audit.completedFrames++;const after=retained(this,args[0]);
+      const invalid=matrixNames.filter((name,i)=>{const m=after.matrices[i];if(!m||m.length!==16)return true;for(let k=0;k<16;k++)if(!Number.isFinite(m[k]))return true;return false;});
+      if(after.sunless){audit.deepFrames++;if(after.shadowDraws!==0)audit.deepShadowViolations++;}else audit.sunlitFrames++;
+      if(active&&!modal&&!after.sunless&&args[0][1]>-160)audit.shallowDiveFrames++;
+      if(invalid.length)audit.invalidMatrixFrames++;
+      const restoring=before.sunless&&!after.sunless,staticDelta=after.staticShadowUpdates-before.staticShadowUpdates;
+      if(restoring){audit.restorations++;if(staticDelta<1)audit.restorationViolations++;}
+      if(before.sunless!==after.sunless){audit.transitionCount++;if(audit.transitions.length<48)audit.transitions.push({completedFrame:audit.completedFrames,kind:restoring?'sunlight-restored':'entered-sunless',staticDelta,before:details(before),after:details(after)});}
+      if((invalid.length||after.sunless&&after.shadowDraws!==0||restoring&&staticDelta<1)&&audit.failures.length<12)audit.failures.push({completedFrame:audit.completedFrames,invalid,restoring,staticDelta,before:details(before),after:details(after)});
+      audit.lastComplete={frame:after.frame,eye:args[0].slice(),sunless:after.sunless,shadowDraws:after.shadowDraws,staticShadowUpdates:after.staticShadowUpdates,
+       forceShadow:after.forceShadow,matrixValid:invalid.length===0,origin:after.origin?.slice(),active,modal,adaptive:settings.adaptive,
+       quality:this.quality,scale:this.dynamicScale,resolution:[this.canvas.width,this.canvas.height]};
+     }}catch(error){audit.observerErrors++;if(audit.failures.length<12)audit.failures.push({observerError:String(error?.message||error)});}
+     return result;
+    };
+   },++shadowEpoch);
+  }
+  async function collectShadowAudit(label,{deep=false,restored=false}={}){
+   const audit=await page.evaluate(()=>JSON.parse(JSON.stringify(window.__hadalShadowAudit)));
+   observations.push({shadowAudit:{label,...audit}});
+   check('shadow audit '+label,audit.completedFrames>0&&(!deep||audit.deepFrames>0)&&(!restored||audit.restorations>0)&&
+    audit.deepShadowViolations===0&&audit.invalidMatrixFrames===0&&audit.restorationViolations===0&&audit.observerErrors===0,
+   {epoch:audit.epoch,completedFrames:audit.completedFrames,deepFrames:audit.deepFrames,restorations:audit.restorations,transitionCount:audit.transitionCount,
+    deepShadowViolations:audit.deepShadowViolations,invalidMatrixFrames:audit.invalidMatrixFrames,restorationViolations:audit.restorationViolations,observerErrors:audit.observerErrors});
+   assert(results.at(-1).pass,'Completed-frame shadow audit failed: '+label);return audit;
   }
   async function swim(on){
    if(moving===on)return;moving=on;
@@ -158,7 +197,19 @@ const check=(name,pass,detail)=>{results.push({name,pass:!!pass,detail});console
    const after=await state();check('continuous real-time field operation '+expected,after.hadal.records.length===expected&&after.t-before.t>=seconds-.25,{before,after});assert(results.at(-1).pass);
    const next=[null,'study:hadal-rim','study:hadal-turn','study:hadal-bottom','habitat:mariana_snailfish','study:hadal-reference',null][expected];check('explicit tracking advances after field operation '+expected,after.story.tracking==='hadal'&&after.waypoint===next,{tracking:after.story.tracking,waypoint:after.waypoint,next});
   }
-  async function returnHome(){await press('#pauseBtn');await press('#menuHome');await page.waitForFunction(()=>!active&&!modal);}
+  async function returnHome(){
+   const before=shadowAudit?await page.evaluate(()=>({completedFrames:__hadalShadowAudit.completedFrames,restorations:__hadalShadowAudit.restorations,lastComplete:__hadalShadowAudit.lastComplete})):null;
+   await press('#pauseBtn');await press('#menuHome');await page.waitForFunction(()=>!active&&!modal);
+   if(shadowAudit){
+    assert(before.lastComplete?.sunless,'The normal return must begin from a completed sunless frame');
+    await page.waitForFunction(before=>{const a=window.__hadalShadowAudit,s=a?.lastComplete;return !active&&!modal&&a.completedFrames>before.completedFrames&&a.restorations>before.restorations&&s&&!s.active&&!s.sunless&&s.eye[1]>-160;},before,{timeout:30000});
+    const after=await collectShadowAudit('normal-home-return-'+(++shadowReturns),{deep:true,restored:true});
+    const restored=after.transitions.find(row=>row.kind==='sunlight-restored'&&row.completedFrame>before.completedFrames);
+    check('first completed shallow home frame rebuilds static shadows and resumes sunlit draw work '+shadowReturns,
+     !!restored&&restored.staticDelta>=1&&restored.after.sunless===false&&restored.after.shadowDraws>0&&after.lastComplete.matrixValid&&after.lastComplete.adaptive,{before,restored,lastComplete:after.lastComplete});
+    assert(results.at(-1).pass);
+   }
+  }
   function oldState(s){const {hadal,investigation,...old}=s.story;return old;}
 
   await page.goto(url);await boot();
@@ -191,7 +242,9 @@ const check=(name,pass,detail)=>{results.push({name,pass:!!pass,detail});console
   await record(aimPoint('hadal-reference'),1);check('one physical instrument exists after deployment',(await state()).referenceSensorCount===1);
   for(const p of surveyed.route.filter(p=>p[2]>=-138))await travel(p,.45);
   await travel(stance('hadal-rim'),.35);await record(aimPoint('hadal-rim'),2);
-  const saved=await state();await returnHome();await page.reload();await boot();await openHadal();
+  const saved=await state();await returnHome();
+  if(shadowAudit)await collectShadowAudit('before-mid-investigation-reload',{deep:true,restored:true});
+  await page.reload();await boot();await openHadal();
   check('mid-investigation reload preserves deployed instrument and next step',(await state()).hadal.records.length===2&&(await state()).referenceSensorCount===1&&(await page.locator('#panelBody').innerText()).includes('記錄坡面轉折'),{before:saved,after:await state()});
   check('reload preserves tracked remaining slope site',(await state()).story.tracking==='hadal'&&(await state()).waypoint==='study:hadal-turn');await press('#closePanel');await press('#shipContinue');await page.waitForFunction(()=>active&&!modal);
   for(const p of surveyed.route.filter(p=>p[2]<-138&&p[2]>=-140))await travel(p,.45);
@@ -212,6 +265,29 @@ const check=(name,pass,detail)=>{results.push({name,pass:!!pass,detail});console
   assert.equal((await state()).selected.uid,fish.uid,'Native click/tap must select the original individual');
   await record(await page.evaluate(()=>animalFocusPoint(oceanSelection.target())),5,6);
   check('observation records the deliberately selected original individual',(await state()).hadal.records[4].uid===fish.uid);
+  if(shadowAudit){
+   await aimAt(await page.evaluate(()=>animalFocusPoint(oceanSelection.target())));
+   const before=await page.evaluate(()=>({film:JSON.parse(JSON.stringify(voyage.state.features.photography.film)),storage:oceanPhotography.snapshot(),selected:oceanSelection.snapshot().uid,
+    species:SPECIES[oceanSelection.target().species].name,frame:window.__hadalShadowAudit.lastComplete}));
+   assert.equal(before.selected,fish.uid,'The real shutter must retain the deliberately selected original individual');
+   assert(!before.storage.busy,'The photo store must be idle before the real shutter');
+   await press('#photoBtn');
+   await page.waitForFunction(count=>!voyage.photoBusy&&!oceanPhotography.snapshot().busy&&voyage.state.features.photography.film.length===count+1,before.film.length,{timeout:30000});
+   const after=await page.evaluate(()=>({film:JSON.parse(JSON.stringify(voyage.state.features.photography.film)),storage:oceanPhotography.snapshot(),frame:window.__hadalShadowAudit.lastComplete}));
+   const added=after.film.filter(p=>!before.film.some(old=>old.date===p.date)),photo=added[0];
+   observations.push({shadowPhotoCapture:{before,after}});
+   check('normal deep-water shutter saves the original selected individual',added.length===1&&photo.individual===fish.uid&&photo.species===before.species&&photo.bytes>10000&&after.storage.durable&&!after.storage.error&&!after.storage.recovery,{photo,storage:after.storage});
+   assert(results.at(-1).pass);
+   await press('#fieldToolsBtn');await press('#panelBody .menu-advanced > summary');await press('#panelBody [data-feature="photography"]');await press('[data-photo-view="'+photo.date+'"]');
+   await page.waitForFunction(()=>photoOpen&&$('photoImage').complete&&$('photoImage').naturalWidth>0);
+   const image=await page.evaluate(()=>{const e=$('photoImage');return {src:e.src,width:e.naturalWidth,height:e.naturalHeight};});
+   assert(image.src.startsWith('data:image/jpeg;base64,'),'The normal viewer must display the saved original JPEG');
+   const bytes=Buffer.from(image.src.split(',')[1],'base64'),file=output.replace(/\.json$/,'-hadal-photo.jpg');fs.writeFileSync(file,bytes);
+   shadowPhoto={date:photo.date,individual:photo.individual,metadata:photo,file,sha256:crypto.createHash('sha256').update(bytes).digest('hex'),width:image.width,height:image.height,bytes:bytes.length};
+   check('normal photo viewer decodes the saved JPEG with matching byte count',bytes.length===photo.bytes&&bytes[0]===0xff&&bytes[1]===0xd8&&bytes.at(-2)===0xff&&bytes.at(-1)===0xd9&&image.width>0&&image.height>0,shadowPhoto);
+   assert(results.at(-1).pass);await shot('hadal-photo-preview');await press('#closePhoto');await press('#closePanel');
+   await collectShadowAudit('after-normal-deep-photo',{deep:true});
+  }
   await travel([780,-7000,-134],.45);await travel(stance('hadal-reference'),.35);await record(aimPoint('hadal-reference'),6);check('recovery removes the same physical instrument',(await state()).referenceSensorCount===0);
   await openHadal();check('finished underwater survey cannot report',await page.locator('#hadalReport').isDisabled()&&!(await state()).hadal.reported);await press('#closePanel');await returnHome();await openHadal();
   if(touch)for(const view of [{width:844,height:390,insets:{left:44,right:44,bottom:21,top:0}},{width:320,height:568,insets:{top:24,bottom:20,left:0,right:0}}]){
@@ -220,7 +296,9 @@ const check=(name,pass,detail)=>{results.push({name,pass:!!pass,detail});console
   if(touch){await page.setViewportSize({width:390,height:844});await session.send('Emulation.setSafeAreaInsetsOverride',{insets:{top:0,right:0,bottom:0,left:0}});await page.waitForTimeout(450);}
   await press('#hadalReport');check('home report ends tracking and clears the completed route',(await state()).story.tracking===null&&(await state()).waypoint===null);
   check('home report preserves complete profile and individual',await page.locator('#hadalReportReply').isVisible()&&await page.locator('#hadalIndividual').isVisible()&&(await state()).hadal.reported);
-  await shot('report');await page.reload();await boot();await openHadal();
+  await shot('report');
+  if(shadowAudit)await collectShadowAudit('before-completed-report-reload',{deep:true,restored:true});
+  await page.reload();await boot();await openHadal();
   const final=await state();check('reload keeps report, old story and automatic quality',final.hadal.reported&&final.hadal.records.length===6&&JSON.stringify(oldState(final))===JSON.stringify(legacy)&&final.adaptive&&final.gl===0&&!final.lost,final);
   check('report stays readable without a second report control',await page.locator('#hadalReportReply').isVisible()&&await page.locator('#hadalReport').count()===0);
   if(touch)for(const view of [{width:844,height:390,insets:{left:44,right:44,bottom:21,top:0}},{width:320,height:568,insets:{top:24,bottom:20,left:0,right:0}}]){
@@ -229,9 +307,30 @@ const check=(name,pass,detail)=>{results.push({name,pass:!!pass,detail});console
    check('hadal journal fits safe area '+view.width+'x'+view.height,!fit.overflow&&fit.left>=0&&fit.right<=view.width&&fit.close.hit&&fit.close.width>=44&&fit.close.height>=44&&fit.close.left>=view.insets.left&&fit.close.right<=view.width-view.insets.right&&fit.close.top>=view.insets.top&&fit.close.bottom<=view.height-view.insets.bottom,fit);await shot('layout-'+view.width);
   }
   await press('#closePanel');
+  if(shadowAudit){
+   const stored=await page.evaluate(date=>({photo:voyage.state.features.photography.film.find(p=>p.date===date)||null,storage:oceanPhotography.snapshot()}),shadowPhoto.date);
+   check('reload retains the deep photograph and original individual',stored.photo?.individual===fish.uid&&stored.photo.bytes===shadowPhoto.bytes&&stored.storage.durable&&!stored.storage.error&&!stored.storage.recovery,stored);
+   assert(results.at(-1).pass);
+   if(touch){await page.setViewportSize({width:390,height:844});await session.send('Emulation.setSafeAreaInsetsOverride',{insets:{top:0,right:0,bottom:0,left:0}});await page.waitForTimeout(450);}
+   await press('#shipSettings');await press('#panelBody .settings-advanced > summary');await press('#legacyToolsBtn');
+   await press('#panelBody .menu-advanced > summary');await press('#panelBody [data-feature="photography"]');await press('[data-photo-view="'+shadowPhoto.date+'"]');
+   await page.waitForFunction(()=>photoOpen&&$('photoImage').complete&&$('photoImage').naturalWidth>0);
+   const reloadedImage=await page.evaluate(()=>{const e=$('photoImage');return {src:e.src,width:e.naturalWidth,height:e.naturalHeight};});
+   assert(reloadedImage.src.startsWith('data:image/jpeg;base64,'),'The normal reloaded viewer must display the saved original JPEG');
+   const reloadedBytes=Buffer.from(reloadedImage.src.split(',')[1],'base64'),file=output.replace(/\.json$/,'-hadal-photo-reloaded.jpg');fs.writeFileSync(file,reloadedBytes);
+   const reloadedPhoto={date:shadowPhoto.date,file,sha256:crypto.createHash('sha256').update(reloadedBytes).digest('hex'),bytes:reloadedBytes.length,width:reloadedImage.width,height:reloadedImage.height};
+   observations.push({shadowPhotoReload:reloadedPhoto});
+   check('normal photo viewer after reload decodes the identical original JPEG',reloadedPhoto.sha256===shadowPhoto.sha256&&reloadedPhoto.bytes===shadowPhoto.bytes&&reloadedPhoto.width===shadowPhoto.width&&reloadedPhoto.height===shadowPhoto.height,{original:shadowPhoto,reloaded:reloadedPhoto});
+   assert(results.at(-1).pass);await shot('hadal-photo-reloaded-preview');await press('#closePhoto');await press('#closePanel');
+   const before=await page.evaluate(()=>({completedFrames:window.__hadalShadowAudit.completedFrames,shallowDiveFrames:window.__hadalShadowAudit.shallowDiveFrames}));await press('#startBtn');
+   await page.waitForFunction(before=>{const a=window.__hadalShadowAudit,s=a?.lastComplete;return active&&!modal&&player.p[1]>-160&&a.shallowDiveFrames>=before.shallowDiveFrames+30&&s?.active&&!s.sunless&&s.eye[1]>-160;},before,{timeout:30000});
+   const shallow=await state(),audit=await collectShadowAudit('post-reload-normal-shallow-dive');
+   check('normal start after report reload completes 30 shallow dive frames with automatic quality',shallow.active&&!shallow.modal&&shallow.p[1]>-160&&shallow.adaptive&&shallow.gl===0&&!shallow.lost&&errors.length===0&&audit.lastComplete.matrixValid&&audit.shallowDiveFrames>=before.shallowDiveFrames+30,{before,afterCompletedFrames:audit.completedFrames,afterShallowDiveFrames:audit.shallowDiveFrames,lastComplete:audit.lastComplete,shallow});
+   assert(results.at(-1).pass);await shot('post-reload-shallow-dive');
+  }
   check('native input is released',await page.evaluate(()=>keys.size===0&&stick.every(v=>v===0)&&lookStick.every(v=>v===0)&&verticalInput===0));
   check('no native page errors',errors.length===0,errors);
- }catch(error){fatal=error.stack||String(error);console.error(fatal);try{observations.push({failure:await page.evaluate(()=>({p:player?.p,modal,active,story:typeof oceanStory==='undefined'?null:oceanStory.snapshot(),context:typeof oceanStory==='undefined'?null:oceanStory.hadal.context()}))});await page.screenshot({path:output.replace(/\.json$/,'-failure.png')});}catch(_){}process.exitCode=1;}
- finally{if(session){try{if(contacts.size)await session.send('Input.dispatchTouchEvent',{type:'touchCancel',touchPoints:[]});}catch(_){}await session.detach().catch(()=>{});}await browser.close();fs.writeFileSync(output,JSON.stringify({status:!fatal&&results.every(r=>r.pass)?'passed':'failed',url,profile,metadata,checks:results,errors,fatal,traces,observations,inputs},null,2));}
+ }catch(error){fatal=error.stack||String(error);console.error(fatal);if(shadowAudit)try{observations.push({shadowAudit:{label:'failure-before-close',...await page.evaluate(()=>JSON.parse(JSON.stringify(window.__hadalShadowAudit||null)))}});}catch(_){}try{observations.push({failure:await page.evaluate(()=>({p:player?.p,modal,active,story:typeof oceanStory==='undefined'?null:oceanStory.snapshot(),context:typeof oceanStory==='undefined'?null:oceanStory.hadal.context()}))});await page.screenshot({path:output.replace(/\.json$/,'-failure.png')});}catch(_){}process.exitCode=1;}
+ finally{if(session){try{if(contacts.size)await session.send('Input.dispatchTouchEvent',{type:'touchCancel',touchPoints:[]});}catch(_){}await session.detach().catch(()=>{});}await browser.close();fs.writeFileSync(output,JSON.stringify({status:!fatal&&results.every(r=>r.pass)?'passed':'failed',url,profile,metadata,checks:results,errors,fatal,traces,observations,inputs,...(shadowAudit?{shadowAudit:{enabled:true,epochs:shadowEpoch,homeReturns:shadowReturns,photo:shadowPhoto}}:{})},null,2));}
  if(results.some(r=>!r.pass))process.exitCode=1;
 })();
