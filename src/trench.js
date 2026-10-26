@@ -154,6 +154,15 @@ const OceanTrench=(()=>{
  }
 
  for(const s of surfaces)for(let x=Math.floor(s.minX/10);x<=Math.floor(s.maxX/10);x++)for(let z=Math.floor(s.minZ/10);z<=Math.floor(s.maxZ/10);z++){const key=x+','+z;if(!surfaceCells.has(key))surfaceCells.set(key,[]);surfaceCells.get(key).push(s);}
+ // Investigation anchors belong to this same rendered/collidable surface.
+ // Values are ground positions, not swimmer poses or imported save coordinates.
+ const studyPoints=Object.fromEntries([
+  ['hadal-reference','泥台基準點',781.4,-134],
+  ['hadal-rim','切溝上緣',780,-138],
+  ['hadal-turn','切溝轉折',780,-140],
+  ['hadal-bottom','切溝底部',780,-145]
+ ].map(([id,name,x,z])=>[id,{id,name,p:[x,floorAt(x,z,-6990),z],station:'hadal'}]));
+ function studyPoint(id){return typeof id==='string'&&Object.hasOwn(studyPoints,id)?studyPoints[id]:null;}
  function nearbySolids(p,r=0){return typeof OceanRegions!=='undefined'?OceanRegions.nearbySolids(p,r):solids.filter(s=>p.every((n,i)=>n>=s.min[i]-r&&n<=s.max[i]+r));}
  // Recenter each depth slice on its real terrain. The continental slope is
  // hundreds of metres west of the old station origins and must not disappear
@@ -166,6 +175,6 @@ const OceanTrench=(()=>{
  }
  function build(renderer){for(const {g,origin,distance}of groups.values()){const batch=renderer.batch(g,[{p:origin.slice()}]);batch.sceneRole='region:trench';batch.regionRole='strata';batch.maxDistance=distance;}}
  function freeze(o){if(o&&typeof o==='object'){for(const p of Object.values(o))freeze(p);Object.freeze(o);}return o;}
- freeze(bounds);freeze(worldBounds);freeze(stations);freeze(habitats);freeze(encounters);freeze(solids);
- return Object.freeze({bounds,worldBounds,stations,habitats,encounters,solids,containsXZ,containsPosition,groundHeight,floorAt,nearbySolids,route,build});
+ freeze(bounds);freeze(worldBounds);freeze(stations);freeze(habitats);freeze(encounters);freeze(solids);freeze(studyPoints);
+ return Object.freeze({bounds,worldBounds,stations,habitats,encounters,studyPoints,studyPoint,solids,containsXZ,containsPosition,groundHeight,floorAt,nearbySolids,route,build});
 })();
