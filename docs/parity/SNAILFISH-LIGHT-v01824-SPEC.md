@@ -1,6 +1,6 @@
 # 0.18.24 — hadal animal light and motion diagnosis
 
-Status: local implementation verified against 0.18.23 (`7b4961e`); public acceptance pending. No claim of complete commercial acceptance.
+Status: local implementation and public release verified against 0.18.23 (`7b4961e`). No claim of complete commercial acceptance.
 
 The user's realism and low-cost desktop/mobile requirements apply together. The
 normal 0.18.23 hadal photograph shows a small pale snailfish whose surface detail
