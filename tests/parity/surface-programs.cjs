@@ -6,9 +6,9 @@ const fs=require('node:fs'),path=require('node:path'),vm=require('node:vm'),asse
 const context=vm.createContext({console,performance});
 vm.runInContext(fs.readFileSync(path.join(__dirname,'../../src/engine.js'),'utf8')+`
  const BIO_NEUTRAL=[1,1,1,1],BIO_DEFAULT=[.5,.5,.5,.5];
- const SPECIES=[{materialProfile:{roughness:.4,subsurface:.2,patternScale:2,skin:'fish'},motionProfile:{type:'snailfish'}},{materialProfile:{roughness:.7,subsurface:.1,patternScale:7,skin:'shell'},motionProfile:{type:'vampire'}}];
+ const SPECIES=[{materialProfile:{roughness:.4,subsurface:.2,patternScale:2,skin:'fish'},motionProfile:{type:'snailfish'}},{materialProfile:{roughness:.7,subsurface:.1,patternScale:7,skin:'shell'},motionProfile:{type:'vampire'}},{materialProfile:{roughness:.64,subsurface:.55,patternScale:18,skin:'gelatinous'},motionProfile:{type:'sea_pig'}},{materialProfile:{roughness:.68,subsurface:.05,patternScale:95,skin:'fish'},motionProfile:{type:'frilled_shark'}}];
  var player={velocity:[.2,.1,0]};`,context,{filename:'engine.js'});
-const Renderer=vm.runInContext('Renderer',context),VS=vm.runInContext('VS',context),FS=vm.runInContext('FS',context),keys=['0:1','0:2','0:3','1:6','0:12','0:16','0:17'];
+const Renderer=vm.runInContext('Renderer',context),VS=vm.runInContext('VS',context),FS=vm.runInContext('FS',context),keys=['0:1','0:2','0:3','1:6','0:12','0:16','0:17','11:0'];
 function shaderProgram(vertex,fragment,key){
  const source=vertex+'\n'+fragment,uniforms=new Set([...source.matchAll(/uniform\s+(?:highp\s+)?\w+\s+(\w+)/g)].map(m=>m[1]));
  return {p:{key,uniforms,kind:Number(source.match(/const int uKind\s*=\s*(\d+)\s*;/)?.[1]??NaN),material:Number(source.match(/const int uMat\s*=\s*(\d+)\s*;/)?.[1]??NaN)},u:{},vertex,fragment};
@@ -33,8 +33,8 @@ function fixture(specialized=true){
  },{get:(object,key)=>key in object?object[key]:(()=>{})});
  const programs={program:shaderProgram(VS,FS,'fallback')};
  for(const [name,vertex,fragment]of [['shadowProgram','VS','SHADOW_FS'],['skyProgram','POST_VS','SKY_FS'],['waterProgram','WATER_VS','WATER_FS'],['pointProgram','POINT_VS','POINT_FS'],['volumeProgram','POST_VS','VOLUME_FS'],['volumeFilterProgram','POST_VS','VOLUME_FILTER_FS'],['postProgram','POST_VS','POST_FS'],['aaProgram','POST_VS','AA_FS']])programs[name]=shaderProgram(vm.runInContext(vertex,context),vm.runInContext(fragment,context),name);
- const batches=[[0,2],[0,3],[1,6],[0,1],[0,2],[3,3],[1,6],[0,3],[0,17],[0,16],[0,17],[0,18],[0,12],[0,3],[0,12]].map(([kind,material],id)=>({
-  id,vao:'vao'+id,ib:'ib'+id,visible:true,dynamic:kind!==0||id===14,shadow:true,kind,material,species:id%3-1,
+ const batches=[[0,2],[0,3],[1,6],[0,1],[0,2],[3,3],[1,6],[0,3],[0,17],[0,16],[0,17],[0,18],[0,12],[0,3],[0,12],[11,0],[11,0],[11,0],[11,0],[11,6],[10,0]].map(([kind,material],id)=>({
+  id,vao:'vao'+id,ib:'ib'+id,visible:true,dynamic:kind!==0||id===14,shadow:true,kind,material,species:id>=15&&id<=18?id-15:id%3-1,
   instances:[{p:[id,-8,-5],s:[1,.8,1.2],yaw:id*.1,bioGenes:[.1,.2,.3,.4],bank:.02},{p:[id+1,-8,-6],s:[.8,1,.9],ecologyPresent:id%3!==0}],
   data:new Float32Array(72).fill(NaN),radius:1,count:3,vertexCount:3,minDistance:id%2?1:0,maxDistance:40+id
  }));
@@ -61,11 +61,21 @@ check('research vessel uses a bounded fragment variant while retaining the origi
  assert.equal(program.fragment.replace('const int uKind=0;','uniform int uKind;').replace('const int uMat=12;','uniform int uMat;'),FS);
  f.renderer.setupSurfacePrograms();assert.equal(f.compiled.filter(p=>p.fragment.includes('const int uMat=12;')).length,1);
 });
-check('seven programs compile once; vessel and deep terrain preserves the original vertex source and specializes only fragment constants',()=>{
- const f=fixture();f.renderer.setupSurfacePrograms();assert.equal(f.compiled.length,7);
+check('all four trench-fauna rigs use one fragment-only program and retain generic fallback',()=>{
+ const f=fixture(),program=f.renderer.surfaceProgram({kind:11,material:0});
+ assert.notEqual(program,f.renderer.program,'trench fauna should not execute unrelated fragment material branches');
+ assert.equal(program.vertex,VS,'the complete original vertex shader must retain every rig and shadow deformation');
+ assert.equal(program.fragment.replace('const int uKind=11;','uniform int uKind;').replace('const int uMat=0;','uniform int uMat;'),FS,'only the two fragment selector declarations may change');
+ const draws=f.capture();assert.equal(draws.filter(d=>d.pass==='colour'&&d.uniforms.uKind[0]===11&&d.uniforms.uMat[0]===0).length,4);
+ const rigs=f.records.filter(d=>d.pass==='colour'&&d.uniforms.uKind[0]===11&&d.uniforms.uMat[0]===0);assert.deepEqual(rigs.map(d=>d.uniforms.uRigClass[0]),[3,1,2,5]);assert(rigs.every(d=>d.program===program.p));
+ const control=fixture();control.capture();const attempts=f.compiled.length;f.renderer.surfacePrograms.delete('11:0');assert.equal(f.renderer.surfaceProgram({kind:11,material:0}),f.renderer.program);assert.deepEqual(f.capture(),control.capture(),'fallback and specialization retain the same second-frame render state');assert.equal(f.compiled.length,attempts,'fallback routing may not compile during a frame');
+ f.renderer.surfacePrograms.set('11:0',program);assert.equal(f.renderer.surfaceProgram({kind:11,material:0}),program);
+});
+check('eight programs compile once; vessel, deep terrain and trench fauna preserve original vertex arithmetic',()=>{
+ const f=fixture();f.renderer.setupSurfacePrograms();assert.equal(f.compiled.length,8);
  for(const key of keys){const [kind,material]=key.split(':').map(Number),program=f.renderer.surfaceProgram({kind,material});assert.notEqual(program,f.renderer.program);assert(f.compiled.includes(program));
   for(const [stage,actual,original]of [['vertex',program.vertex,VS],['fragment',program.fragment,FS]]){
-   if(stage==='vertex'&&(material===12||material===16||material===17)){assert.equal(actual,VS,'vessel and deep terrain must retain the original vertex shader arithmetic');continue;}
+   if(stage==='vertex'&&(kind===11||material===12||material===16||material===17)){assert.equal(actual,VS,'vessel, deep terrain and trench fauna must retain the original vertex shader arithmetic');continue;}
    assert(actual.includes('const int uKind='+kind+';'));assert(actual.includes('const int uMat='+material+';'));
    assert.equal(actual.replace('const int uKind='+kind+';','uniform int uKind;').replace('const int uMat='+material+';','uniform int uMat;'),original,'all remaining shader source, including LOD discard, must be unchanged');
   }
@@ -73,7 +83,7 @@ check('seven programs compile once; vessel and deep terrain preserves the origin
  for(let kind=-1;kind<15;kind++)for(let material=0;material<20;material++){const b={kind,material},program=f.renderer.surfaceProgram(b);if(!keys.includes(kind+':'+material))assert.equal(program,f.renderer.program);}
  f.renderer.surfacePrograms.set('3:3',f.compiled[0]);assert.equal(f.renderer.surfaceProgram({kind:3,material:3}),f.renderer.program,'unknown pairs cannot opt into cached variants');
  for(const b of [{kind:0,material:2.5},{kind:'0',material:2},{kind:NaN,material:2},{}])assert.equal(f.renderer.surfaceProgram(b),f.renderer.program);
- assert.equal(f.compiled.length,7,'selection may not compile unbounded variants');
+ assert.equal(f.compiled.length,8,'selection may not compile unbounded variants');
  const source=vm.runInContext('surfaceShaderSource',context);assert.throws(()=>source(VS,3,3),/Unsupported surface/);assert.throws(()=>source(VS.replace('uniform int uMat;',''),0,2),/Missing surface shader uniform/);
 });
 check('interleaved variants preserve every pass, draw order, uniform, sampler and current instance prefix',()=>{
@@ -94,16 +104,16 @@ check('program state refreshes after next-frame metadata, pose, quality, lightin
  const draws=candidate.records.filter(d=>d.pass==='colour');assert(draws.length>=7,'deep-origin fixture must still render its interleaved batches');
  for(const d of draws){assert.deepEqual(d.uniforms.uTime,[29]);assert.deepEqual(d.uniforms.uQuality,[0]);assert.deepEqual(d.uniforms.uTorch,[1]);assert.deepEqual(d.uniforms.uFogDensity,[.055]);assert.deepEqual(d.uniforms.uRenderOrigin,[768,-6976,-128]);}
  const changed=draws.find(d=>d.id===2);assert.deepEqual(changed.uniforms.uRigClass,[2]);assert.deepEqual(changed.uniforms.uSurfaceProfile,[.91,.1,7,4]);
- assert.equal(candidate.compiled.length,7);assert.equal(candidate.invalid.length,0);
+ assert.equal(candidate.compiled.length,8);assert.equal(candidate.invalid.length,0);
 });
 check('one failed variant falls back without recompiling or removing successful programs',()=>{
- for(const failedMaterial of [1,3,12,16,17]){
+ for(const [failedKind,failedMaterial] of [[0,1],[0,3],[0,12],[0,16],[0,17],[11,0]]){
  const candidate=fixture(false),original=fixture(false),make=candidate.renderer.makeProgram;let attempts=0;
- candidate.renderer.makeProgram=function(vertex,fragment){attempts++;if(fragment.includes('const int uMat='+failedMaterial+';'))throw Error('simulated device compiler rejection');return make.call(this,vertex,fragment);};
- candidate.renderer.setupSurfacePrograms();candidate.renderer.setupSurfacePrograms();assert.equal(attempts,7);assert.equal(candidate.compiled.length,6);assert.equal(candidate.deleted.length,0);
- assert.equal(candidate.renderer.surfaceProgram({kind:0,material:failedMaterial}),candidate.renderer.program);assert.match(candidate.renderer.surfaceProgramFailures.get('0:'+failedMaterial),/simulated device compiler rejection/);assert.equal(candidate.renderer.surfaceProgramFailures.size,1);
- assert.deepEqual(candidate.capture(),original.capture());assert.equal(attempts,7,'rendering failed pairs must retain fallback without retrying');assert.equal(candidate.invalid.length,0);
- candidate.renderer.surfacePrograms=null;assert.deepEqual(candidate.capture(),original.capture());assert.equal(attempts,7,'diagnostic fallback must not compile during rendering');
+ candidate.renderer.makeProgram=function(vertex,fragment){attempts++;if(fragment.includes('const int uKind='+failedKind+';')&&fragment.includes('const int uMat='+failedMaterial+';'))throw Error('simulated device compiler rejection');return make.call(this,vertex,fragment);};
+ candidate.renderer.setupSurfacePrograms();candidate.renderer.setupSurfacePrograms();assert.equal(attempts,8);assert.equal(candidate.compiled.length,7);assert.equal(candidate.deleted.length,0);
+ assert.equal(candidate.renderer.surfaceProgram({kind:failedKind,material:failedMaterial}),candidate.renderer.program);assert.match(candidate.renderer.surfaceProgramFailures.get(failedKind+':'+failedMaterial),/simulated device compiler rejection/);assert.equal(candidate.renderer.surfaceProgramFailures.size,1);
+ assert.deepEqual(candidate.capture(),original.capture());assert.equal(attempts,8,'rendering failed pairs must retain fallback without retrying');assert.equal(candidate.invalid.length,0);
+ candidate.renderer.surfacePrograms=null;assert.deepEqual(candidate.capture(),original.capture());assert.equal(attempts,8,'diagnostic fallback must not compile during rendering');
  }
 });
 check('production compilation releases every temporary shader and failed program exactly once',()=>{

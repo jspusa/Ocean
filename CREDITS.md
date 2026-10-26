@@ -106,3 +106,7 @@
 ## 0.18.11 皇帶魚
 
 `src/oarfish.js` 的長冠皇帶魚（Regalecus glesne）由本庫程序曲面、鰭膜與細鰭條建立；銀色皮膚、暗斑、紅鰭及背鰭波動為原創美術與動畫。代表全長 4 m、約 480 m 的位置、個體數與懸停節律是遊戲配置，沒有下載研究網站的照片、影片、網格或材質。科學形態與觀察紀錄的來源及限制見 [OARFISH-REFERENCE](docs/parity/OARFISH-REFERENCE.md)。SVG 後備圖由本庫自行繪製；隨版圖鑑 JPEG 使用同一原創遊戲模型的 WebGL 棚景，不是實景照片。
+
+## 0.18.19 皺鰓鯊
+
+`src/frilled_shark.js`、`src/frilled_shark_world.js` 為原創程序模型、色彩與路線，`engine.js` 的專屬動作為即時遊戲近似。形態和深度參考 [來源說明](docs/parity/FRILLED-SHARK-REFERENCE.md)；沒有納入博物館照片、掃描、外部模型或貼圖。圖鑑 JPEG 由本作實際 WebGL 模型生成，SVG 為原創後備；棚景不是自然棲地照片。

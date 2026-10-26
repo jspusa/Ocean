@@ -1,7 +1,7 @@
 /* One connected ocean. The old deployment field is retained only so existing
  * save files load; depth and position determine the underwater environment. */
 // Compose runtime additions without mutating the immutable baked trench.
-const deepseaEncounters=Object.freeze([...(OceanTrench.encounters||[]),...(typeof OarfishWorld==='undefined'?[]:[OarfishWorld.encounter])]);
+const deepseaEncounters=Object.freeze([...(OceanTrench.encounters||[]),...(typeof OarfishWorld==='undefined'?[]:[OarfishWorld.encounter]),...(typeof FrilledSharkWorld==='undefined'?[]:[FrilledSharkWorld.encounter])]);
 const DeepseaRules=(()=>{
  const initial=()=>({schema:1,deployed:false,station:'midwater',visited:[]});
  const station=id=>OceanTrench.stations.find(s=>s.id===id);
@@ -67,15 +67,16 @@ const oceanDeepsea=(()=>{
  }
  function approachRoute(id,fish=observationTarget(id)){
   if(!fish)return null;
-  const point=animalFocusPoint(fish),traits=speciesTraits(fish.species),sp=SPECIES[fish.species],size=sp.size,ribbon=sp.id==='oarfish';
+  const point=animalFocusPoint(fish),traits=speciesTraits(fish.species),sp=SPECIES[fish.species],size=sp.size,ribbon=sp.id==='oarfish',frilled=sp.id==='frilled_shark',sideView=ribbon||frilled;
   const drift=Number.isFinite(fish.radius)?Math.max(0,fish.radius):Math.max(0,SPECIES[fish.species].motionProfile?.radius||0);
   // Leave room for both sides of the natural orbit in a narrow portrait view.
-  const distance=Math.min(traits.observeDistance*.72,Math.max(traits.viewDistance,size*2,ribbon?size*2.25:drift*7,traits.micro?1.05:1.5));
+  const distance=Math.min(traits.observeDistance*.72,Math.max(traits.viewDistance,size*2,ribbon?size*2.25:frilled?drift*2.6:drift*7,traits.micro?1.05:1.5));
   const away=V.sub(player.p,point),normal=[Math.sin(fish.yaw||0),0,Math.cos(fish.yaw||0)];
-  // A compressed ribbon is almost invisible end-on. Approach the nearer wide
-  // side at real swimming speed; the animal keeps its own position and pose.
-  const angle=ribbon?(fish.yaw||0)+(V.dot(away,normal)<0?Math.PI:0):Math.atan2(away[0],away[2]);
-  for(const turn of ribbon?[0,Math.PI,.22,-.22]:[0,.55,-.55,1.1,-1.1,Math.PI]){
+  // Approach elongated animals from their nearer broad side. The frilled
+  // shark's framing also reserves its slow circuit during the normal dwell;
+  // only the swimmer moves, and the animal keeps its own position and pose.
+  const angle=sideView?(fish.yaw||0)+(V.dot(away,normal)<0?Math.PI:0):Math.atan2(away[0],away[2]);
+  for(const turn of sideView?[0,Math.PI,.22,-.22]:[0,.55,-.55,1.1,-1.1,Math.PI]){
    const a=angle+turn,p=[point[0]+Math.sin(a)*distance,point[1]+Math.max(.15,Math.min(.45,distance*.18)),point[2]+Math.cos(a)*distance];
    const floor=OceanTrench.floorAt(p[0],p[2],p[1]+.1);if(Number.isFinite(floor))p[1]=Math.max(p[1],floor+.82);
    if(V.dist(p,point)>traits.observeDistance*.9||OceanRegions.pointBlocked(p,.4)||!OceanRegions.pathClear(player.p,p,.4)||blocked(p,point,.001))continue;

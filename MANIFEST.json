@@ -1,5 +1,5 @@
 {
-  "version": "0.18.18",
+  "version": "0.18.19",
   "scope": "served game and build sources",
   "files": [
     {
@@ -9,8 +9,8 @@
     },
     {
       "path": "CREDITS.md",
-      "bytes": 10952,
-      "sha256": "814c7bfbc2171e6e4af4127bd4d31148d178bf4b3b5faee7b0cee07889c4a109"
+      "bytes": 11369,
+      "sha256": "4878069aeb73b9b78c1146da8255a945c06c8f526cc9ac7b12b6514c4743259d"
     },
     {
       "path": "LICENSE",
@@ -19,13 +19,13 @@
     },
     {
       "path": "README.md",
-      "bytes": 31780,
-      "sha256": "c5e184900b336ad7fc8cf9f5482fb0ba09f1c88c0272ce04300ad2ce7483c81b"
+      "bytes": 32810,
+      "sha256": "25ed7e628aa51f10093379b7311a964ac9b0755c3875802a88ff6bd03292fc44"
     },
     {
       "path": "VERSION",
       "bytes": 8,
-      "sha256": "deddef284f8b7fd1f0f43a6641d7027f718408ee55cb91cd3d18dc6db45a0f95"
+      "sha256": "048b4b19cdaa6e5a87d31a254bb02016457173468ccd02a9fcf20cbb58d8eff7"
     },
     {
       "path": "assets/caustics.jpg",
@@ -101,6 +101,11 @@
       "path": "assets/guide_false_killer_whale.jpg",
       "bytes": 13149,
       "sha256": "284573162933e88db0a86624d334b5e2090bcd4f8488687351b1bfd8e5d838c4"
+    },
+    {
+      "path": "assets/guide_frilled_shark.jpg",
+      "bytes": 13291,
+      "sha256": "47b16a086667823036ad411322d31a7476fce7e6c1700a2f03b19c91bbbd2e3b"
     },
     {
       "path": "assets/guide_frogfish.jpg",
@@ -1164,18 +1169,18 @@
     },
     {
       "path": "bake_scene.cjs",
-      "bytes": 3164,
-      "sha256": "b105a1d5f1c33961b9e7c0eac7145ba82afbe650be9ab997a309e0e627b666a6"
+      "bytes": 3208,
+      "sha256": "ac7bda428688ac6c463c5c8c73c054063cef021d7e77df5e39a4143d00ee239f"
     },
     {
       "path": "build.py",
-      "bytes": 4208,
-      "sha256": "d5a31ef8670f0c0a47306a728d85411ad83a3f9bcd84d0c1f0284180da4df132"
+      "bytes": 4252,
+      "sha256": "1182dcc67b08946510c660afaa1faabac55e53addeaab742da1b125946fafbac"
     },
     {
       "path": "index.html",
-      "bytes": 15048,
-      "sha256": "b64398d6f1502ceeb99cb8c1143fc3b3c4be322d253805ac376b93993b667d74"
+      "bytes": 15164,
+      "sha256": "de4cad0f316cc8c1b96d922831fc639faf516ce618aa3e1d543d471104218c94"
     },
     {
       "path": "music/blue_silence.mp3",
@@ -1214,8 +1219,8 @@
     },
     {
       "path": "src/app.js",
-      "bytes": 82855,
-      "sha256": "6d1b59ba1ce782823fc1b98f3aee0e2143157174780e502c5ebf44571ac17465"
+      "bytes": 84249,
+      "sha256": "62452ad579607d77526c7cd2f6e037d2c2c9975d10ca95e8444ea012e25ca9bd"
     },
     {
       "path": "src/aquarium.js",
@@ -1244,13 +1249,13 @@
     },
     {
       "path": "src/config.js",
-      "bytes": 2761,
-      "sha256": "5ffee70e3c775ebb59d204f0cbe726bd40eea856364948b26a0663852cd9655d"
+      "bytes": 2826,
+      "sha256": "aad400a078e0f3f9bbe95362e80c2ca57d894ae4bcb7eba57ef82e6affb13007"
     },
     {
       "path": "src/deepsea.js",
-      "bytes": 15683,
-      "sha256": "6a49c012643c8c3145602ae5e1214ae3f9edffaf16d75ffc840193d71a030f48"
+      "bytes": 15911,
+      "sha256": "2cf25cc6adc27a60118adbcdfd67dcd06bc111e35f7a26a549a3d9b79e7bdc96"
     },
     {
       "path": "src/ecology.js",
@@ -1259,8 +1264,8 @@
     },
     {
       "path": "src/engine.js",
-      "bytes": 100643,
-      "sha256": "d721af7505d3a406316ab9ddadbf9242da4cc1658b7c12c965ba51cb0b2bd6f6"
+      "bytes": 101524,
+      "sha256": "8cd0b91b6668d8db732c4a136617c768f6868533c9eeef5dd0985e9a4b79d4c3"
     },
     {
       "path": "src/expedition.js",
@@ -1286,6 +1291,16 @@
       "path": "src/features.js",
       "bytes": 2741,
       "sha256": "e7640b068285d7b9e37848ad8f0ee1d4b8e972cee5bccd5fdc4e3217bd784e47"
+    },
+    {
+      "path": "src/frilled_shark.js",
+      "bytes": 7284,
+      "sha256": "7116fc2267c54f9b6f54de7de356bba43a70bc5f233bab68e2fc6bd73a9d919b"
+    },
+    {
+      "path": "src/frilled_shark_world.js",
+      "bytes": 2822,
+      "sha256": "10a0d5eea8f999fef8a86ef6eccba2e20b45bcfb4244a3e42a57546931d80b6e"
     },
     {
       "path": "src/gamepad_pointer.js",
@@ -1400,7 +1415,7 @@
     {
       "path": "src/shell.html",
       "bytes": 11370,
-      "sha256": "8d80c6af98925905f278c3e11e6102e16c918066bd5772d61c06daacafb4f80b"
+      "sha256": "212a3d69213e0ad7f2781656e6623940200b790be2fe5b84b47ae065290e5b57"
     },
     {
       "path": "src/ship.js",

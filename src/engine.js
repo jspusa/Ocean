@@ -210,6 +210,16 @@ void main(){vec3 p=aPosition,n=aNormal;vLocal=p;vUV=aUV;vTag=aTag;
    float height=max(0.,p.y-aUV.x),wave=beat+p.x*35.,bend=sin(wave)*.30;
    p.z+=bend*height;
    if(height>0.){n.x-=(cos(wave)*10.5*height-bend*aUV.y)*n.z;n.y-=bend*n.z;}
+  }else if(uRigClass==5){
+   // Frilled shark: a stable head and a slow lateral wave growing down the
+   // body. All attached fins, gills and teeth share this same displacement.
+   // The inverse-transpose shear includes both wave and envelope derivatives;
+   // colour and both shadow passes use this vertex shader unchanged.
+   float u=clamp((p.x+.5)/.78,0.,1.),envelope=1.-u*u*(3.-2.*u);
+   float dEnvelope=(p.x>-.5&&p.x<.28)?-6.*u*(1.-u)/.78:0.;
+   float wave=beat+p.x*7.2,amplitude=.07;
+   float derivative=amplitude*(7.2*cos(wave)*envelope*envelope+2.*sin(wave)*envelope*dEnvelope);
+   p.z+=sin(wave)*amplitude*envelope*envelope;n.x-=derivative*n.z;
   }
  }
  if(uKind==5){
@@ -838,7 +848,7 @@ float lb=L(b);frag=vec4(lb<lo||lb>hi?a:b,1.);
 // These common surfaces keep the original arithmetic while allowing the
 // compiler to remove every unrelated rig and material branch ahead of play.
 function surfaceShaderSource(source,kind,material){
- if(!((kind===0&&(material===1||material===2||material===3||material===12||material===16||material===17))||(kind===1&&material===6)))throw new RangeError('Unsupported surface shader');
+ if(!((kind===0&&(material===1||material===2||material===3||material===12||material===16||material===17))||(kind===1&&material===6)||(kind===11&&material===0)))throw new RangeError('Unsupported surface shader');
  for(const [name,value]of [['uKind',kind],['uMat',material]]){
   const declaration='uniform int '+name+';';if(!source.includes(declaration))throw new Error('Missing surface shader uniform: '+name);
   source=source.replace(declaration,'const int '+name+'='+value+';');
@@ -861,9 +871,10 @@ class Renderer{
  setupSurfacePrograms(){
   if(this.surfacePrograms)return this.surfacePrograms;
   const programs=this.surfacePrograms=new Map();this.surfaceProgramFailures=new Map();
-  for(const [kind,material]of [[0,1],[0,2],[0,3],[1,6],[0,12],[0,16],[0,17]]){const key=kind+':'+material;
-   // Preserve vessel/deep-terrain vertex arithmetic; specialize fragment work only.
-   try{programs.set(key,this.makeProgram(kind===0&&(material===12||material===16||material===17)?VS:surfaceShaderSource(VS,kind,material),surfaceShaderSource(FS,kind,material)));}
+  for(const [kind,material]of [[0,1],[0,2],[0,3],[1,6],[0,12],[0,16],[0,17],[11,0]]){const key=kind+':'+material;
+   // Preserve vessel, deep-terrain and trench-fauna vertex arithmetic;
+   // these variants specialize fragment work only, including every shared rig.
+   try{programs.set(key,this.makeProgram(kind===11&&material===0||kind===0&&(material===12||material===16||material===17)?VS:surfaceShaderSource(VS,kind,material),surfaceShaderSource(FS,kind,material)));}
    catch(error){this.surfaceProgramFailures.set(key,String(error?.message||error));}
   }return programs;
  }
@@ -876,6 +887,7 @@ class Renderer{
   if(b.kind===0&&b.material===12)return programs.get('0:12')||this.program;
   if(b.kind===0&&b.material===16)return programs.get('0:16')||this.program;
   if(b.kind===0&&b.material===17)return programs.get('0:17')||this.program;
+  if(b.kind===11&&b.material===0)return programs.get('11:0')||this.program;
   return this.program;
  }
  uniform(p,n){if(!(n in p.u))p.u[n]=this.gl.getUniformLocation(p.p,n);return p.u[n];}
@@ -1124,7 +1136,7 @@ class Renderer{
   g.bindRenderbuffer(g.RENDERBUFFER,null);g.bindFramebuffer(g.FRAMEBUFFER,null);
  }
  common(p,eye,vp,t){let g=this.gl;g.useProgram(p.p);if(this.textures[8]){this.bindTex(9,this.textures[8]);this.set1i(p,'uCaustic',9);}this.setMatrix4fv(p,'uVP',false,vp===this.vp?this.renderVP:vp===this.lightVP?this.renderLightVP:vp===this.dynamicLightVP?this.renderDynamicLightVP:vp);this.setMatrix4fv(p,'uLightVP',false,this.renderLightVP||this.lightVP);this.setMatrix4fv(p,'uDynamicLightVP',false,this.renderDynamicLightVP||this.renderLightVP||this.lightVP);this.set1i(p,'uSamples',this.msaaSamples||0);this.set1i(p,'uQuality',this.quality);this.set3fv(p,'uRenderOrigin',this.renderOrigin||[0,0,0]);this.set4f(p,'uTorchParams',TorchLightRules.outer,TorchLightRules.inner,TorchLightRules.strength,TorchLightRules.falloff);this.set3fv(p,'uCamera',eye);this.set1f(p,'uTorch',this.lamp?1:0);this.set3fv(p,'uViewForward',this.cameraForward||[0,0,-1]);this.set1f(p,'uTime',t);this.set1f(p,'uSwim',typeof player==='undefined'?.4:Math.min(1,Math.hypot(...player.velocity)/1.6));this.set1f(p,'uSun',this.sun);this.set3fv(p,'uFog',this.fog);this.set3fv(p,'uLightDir',this.lightDir);this.set3fv(p,'uAirLightDir',this.airLightDir||this.lightDir);this.set3fv(p,'uLightColor',this.lightColor);}
- speciesUniforms(p,b){const sp=typeof SPECIES!=='undefined'?SPECIES[b.species]:null,m=sp?.materialProfile,r=sp?.motionProfile?.type;this.set1i(p,'uRigClass',r==='vampire'?1:r==='sea_pig'?2:r==='snailfish'?3:r==='oarfish'?4:0);this.set4f(p,'uSurfaceProfile',m?clamp(m.roughness,.12,.98):-1,m?clamp(m.subsurface,0,1):0,m?Math.max(.1,m.patternScale||1):1,m?({fish:0,cetacean:1,cephalopod:2,crustacean:3,shell:4,gelatinous:5,silver:6}[m.skin]??0):-1);}
+ speciesUniforms(p,b){const sp=typeof SPECIES!=='undefined'?SPECIES[b.species]:null,m=sp?.materialProfile,r=sp?.motionProfile?.type;this.set1i(p,'uRigClass',r==='vampire'?1:r==='sea_pig'?2:r==='snailfish'?3:r==='oarfish'?4:r==='frilled_shark'?5:0);this.set4f(p,'uSurfaceProfile',m?clamp(m.roughness,.12,.98):-1,m?clamp(m.subsurface,0,1):0,m?Math.max(.1,m.patternScale||1):1,m?({fish:0,cetacean:1,cephalopod:2,crustacean:3,shell:4,gelatinous:5,silver:6}[m.skin]??0):-1);}
  batchUniforms(p,b,state,kind=b.kind){
   // State is local to one shader pass, so a new frame, a material edit or a
   // shadow/colour transition always reinitializes the relevant uniforms.
