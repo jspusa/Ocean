@@ -32,17 +32,17 @@
 
 原生近景、高低 LOD 與頭部診斷截圖已人工檢查；遠距以真正 36 m 距離選中低 LOD，再使用棚景鏡頭檢視，不以此冒充自然深海首見。新增個體只佔一組共享高低模型與兩個 instance batch，無逐幀幾何生成。
 
-保留 kind 11／material 0 的 fragment 特化：載入時預先編譯第 8 個表面程式，失敗可回退 generic，逐幀不編譯。只改兩個常數 selector，頂點、陰影、畫質、解析度和其餘內容保持。皺鰓鯊、吸血烏賊、海豬與獅子魚，在兩個時間、三種深海／棚景照明、桌機／觸控配置共 **48 案例、192 個 ABBA 比對畫面**，完整最終 RGBA／SHA-256 與 generic 一致，差異 channel、最大差異及 alpha 差異均為 0。皇帶魚使用 material 6，維持原通用路徑。`v01819-frilled-surface-camera2.json` status=passed、errors=[]、pixelFailures=[]。
+保留 kind 11／material 0 的 fragment 特化：載入時預先編譯第 8 個表面程式，失敗可回退 generic，逐幀不編譯。只改兩個常數 selector，頂點、陰影、畫質、解析度和其餘內容保持。皺鰓鯊、吸血烏賊、海豬與馬里亞納獅子魚，在兩個時間、三種深海／棚景照明、桌機／觸控配置共 **48 案例、192 個 ABBA 比對畫面**，完整最終 RGBA／SHA-256 與 generic 一致，差異 channel、最大差異及 alpha 差異均為 0。皇帶魚使用 material 6，維持原通用路徑。`v01819-frilled-surface-camera2.json` status=passed、errors=[]、pixelFailures=[]。
 
-| 同場景完整 render GPU 中位時間 | 通用程式 | 特化程式 | 證據評價 |
+| 同場景完整 render GPU P50 | 通用程式 | 特化程式 | 證據評價 |
 |---|---:|---:|---|
 | 首次桌機序列 | 5.954 ms | 6.617 ms | ★★☆ 此次較慢；後續因海豬 fixture 相機拒絕而未完成全套，原數字保留 |
 | 修正 fixture 後桌機完整序列 | 5.834 ms | 4.518 ms | ★★☆ 此次降低 22.56%；兩次方向不同，不宣稱穩定桌機加速比例 |
 | 修正 fixture 後觸控完整序列 | 3.710 ms | 1.765 ms | ★★☆ 此固定配置降低 52.44%；同一台電腦 GPU，非實體手機 |
 
-每配置為 100 個整幀 query，ABBA 四區塊各 25，區塊前 10 幀暖機。相同實際 900 m 個體、時間、相機、內容、燈光、畫質和 scale=1；桌機 2880×1800、quality 2、MSAA 4，觸控 585×1266、quality 1、MSAA 2。原始結果、負差與變動全部保留；上述 GPU 時間不能換算正常遊玩 FPS，也不足以保證其他硬體的收益。採用理由是完整像素等值、有效固定場景收益與原通用 fallback，沒有降低影像品質來達成數字。
+表中沿用 runner 的 P50：每模式合併 50 個樣本後，取排序第 26 值，不是中間兩值平均的通常中位數；原始 JSON 的 Median 命名依此解讀。每配置為 100 個整幀 query，ABBA 四區塊各 25，區塊前 10 幀暖機。相同實際 900 m 個體、時間、相機、內容、燈光、畫質和 scale=1；桌機 2880×1800、quality 2、MSAA 4，觸控 585×1266、quality 1、MSAA 2。原始結果、負差與變動全部保留；上述 GPU 時間不能換算正常遊玩 FPS，也不足以保證其他硬體的收益。採用理由是完整像素等值、有效固定場景收益與原通用 fallback，沒有降低影像品質來達成數字。
 
-另用相同場景只開／關新增個體的兩個 batch 估計內容成本，保留原有全部 batch：桌機無／有個體中位數 6.950／7.407 ms（差 +0.457 ms），觸控 2.138／2.313 ms（差 +0.174 ms）。`v01819-frilled-gpu-lit-candidate.json` 已在計時前固定開燈且通過動物中心可見性檢查，status=passed、errors=[]。這是新增內容成本，不能與上表不同 runner 的絕對值互作速度對照。
+另用相同場景只開／關新增個體的兩個 batch 估計內容成本，保留原有全部 batch：桌機無／有個體 P50 6.950／7.407 ms（差 +0.457 ms），觸控 2.138／2.313 ms（差 +0.174 ms）。`v01819-frilled-gpu-lit-candidate.json` 已在計時前固定開燈且通過動物中心可見性檢查，status=passed、errors=[]。這是新增內容成本，不能與上表不同 runner 的絕對值互作速度對照。
 
 ## 診斷紀錄與審查
 
@@ -64,4 +64,17 @@
 
 最後重打包靜態 **64/64** 通過，`v01819-pack-release.log`、`v01819-static-release.json`；完整 CPU 之後只改文件及上述瀏覽器 runner 橫向門檻，沒有改 runtime 或 CPU 測試。
 
-公開 Pages 指定提交、公開 manifest 逐檔 SHA-256 和公開自然遊玩尚待後續紀錄。此段完成前不宣稱 0.18.19 已發布。
+程式提交 `cd656e7791d632b54b0e936c697e5e3c00530d45` 已於 `2026-10-26T05:33:00Z` 完成 Pages 建置，error=null。公開 manifest 的 **291 個檔案** bytes／SHA-256 與本機一致；桌機／觸控預設入海均維持 adaptive=true、8 個表面程式、43 類圖鑑、GL0、無頁面錯誤。
+
+| 公開正式驗收 | 結果 | 範圍 |
+|---|---|---|
+| 桌機自然航程 | ★★★ 26/26 | 正常新航程、900 m 主動觀察、拍照、1400 m 抵達、圖鑑／沖印／重載；原 JPEG 40,923 bytes，SHA 一致 |
+| 觸控直向自然航程 | ★★★ 26/26 | 同樣正常流程；原 JPEG 15,567 bytes，SHA 一致；保留自動畫質 |
+| 正常操作節奏 | ★★★ 55/55 | 桌機／觸控正常入海、游動、環視、暫停／恢復、回首頁及重載；正常時間及自動畫質保留 |
+| 公開子目錄圖片故障 | ★★★ 32/32 | 觸控正常圖鑑／詳情／返回／認圖，在真正 HTTP 503 或 JPEG 解碼失敗時使用可解碼原創 SVG |
+
+公開桌機 9,464 次、觸控 9,135 次完成 render callback 的九區抽樣皆無全 RGB 0、GL 錯誤或未選取中央名稱。公開兩段航程均實際到約 1401.18 m；此輪原生自然新生物流程不宣稱重新走完 7000 m，全路線另由 CPU 與既有版本自然航程證據分列。橫向完整流程在本機驗證，公開完整自然流程為直向觸控，兩者不混稱。
+
+`v01819-public-validation.json` 五個依序程序皆 exit=0；正式報告 status=passed 或 passed=true，fatal=null、runtime errors 空。證據為 `v01819-pages-runtime.json`、`published-v0.18.19-delivery.json`、`v01819-public-frilled-{desktop,touch}.json`、`v01819-public-cadence.json` 及 `v01819-public-guide-fallback-touch.json`。最終統計覆核發現 runner 取第 26 排序值，文件已明確標為 runner P50，原始數據未改寫。
+
+本輪程式與公開交付完成；完整 Wii 功能、所有物種、多人服務、實體 iOS／Android／手把、長時間功耗與商業發售門檻仍持續追蹤，不因這個版本驗證通過而宣稱完成。
