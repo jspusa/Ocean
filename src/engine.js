@@ -1479,7 +1479,9 @@ class Renderer{
    const min=(b.minDistance||0)*ls,max=(b.maxDistance||220)*ls,fade=b.material!==1&&((b.minDistance||0)>0||(b.maxDistance&&b.maxDistance<180))?.60:0;
    if(state.min!==min||state.max!==max||state.fade!==fade){this.set3f(p,'uLODBounds',min,max,fade);state.min=min;state.max=max;state.fade=fade;}
    this.batchUniforms(p,b,state);this.drawBatch(b);}
-  g.disable(g.SAMPLE_ALPHA_TO_COVERAGE);this.common(this.waterProgram,eye,this.vp,t);g.bindVertexArray(this.waterVAO);g.drawArrays(g.TRIANGLES,0,this.waterCount);this.submittedTriangles+=this.waterCount/3;this.submittedVertices+=this.waterCount;this.drawCalls++;
+  g.disable(g.SAMPLE_ALPHA_TO_COVERAGE);
+  // A sunless frustum lies kilometres below the wave surface; no water vertex can contribute.
+  if(!this.sunless){this.common(this.waterProgram,eye,this.vp,t);g.bindVertexArray(this.waterVAO);g.drawArrays(g.TRIANGLES,0,this.waterCount);this.submittedTriangles+=this.waterCount/3;this.submittedVertices+=this.waterCount;this.drawCalls++;}
   g.disable(g.DEPTH_TEST);
   if(this.msaaFBO){
    g.bindFramebuffer(g.READ_FRAMEBUFFER,this.msaaFBO);g.bindFramebuffer(g.DRAW_FRAMEBUFFER,this.sceneFBO);

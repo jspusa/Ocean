@@ -8,18 +8,20 @@ vm.runInContext(fs.readFileSync(path.resolve(__dirname,'../../src/engine.js'),'u
 const Renderer=vm.runInContext('Renderer',context);
 const shallow=[0,-8,7],deep=[776,-7000,-125];
 function fixture(){
- let framebuffer=null,program=null,vao=null,colorMask=[true,true,true,true];
+ let framebuffer=null,program=null,vao=null,colorMask=[true,true,true,true],coverage=false;
  const events=[],uniforms=new Map();
- const constants={FRAMEBUFFER:0x8d40,ARRAY_BUFFER:0x8892,TEXTURE0:0x84c0,TEXTURE_2D:0x0de1,TRIANGLES:4,POINTS:0,
+ const constants={FRAMEBUFFER:0x8d40,READ_FRAMEBUFFER:0x8ca8,DRAW_FRAMEBUFFER:0x8ca9,ARRAY_BUFFER:0x8892,TEXTURE0:0x84c0,TEXTURE_2D:0x0de1,TRIANGLES:4,POINTS:0,
   DEPTH_TEST:0x0b71,BLEND:0x0be2,SAMPLE_ALPHA_TO_COVERAGE:0x809e,POLYGON_OFFSET_FILL:0x8037,
   DEPTH_BUFFER_BIT:0x0100,COLOR_BUFFER_BIT:0x4000,UNSIGNED_SHORT:0x1403};
  const set=(location,...values)=>{assert.equal(location.program,program);uniforms.get(program)[location.name]=values.flatMap(v=>v&&typeof v==='object'?Array.from(v):[v]);};
- const draw=(mode,count,instances=1)=>events.push({type:'draw',framebuffer,program:program.key,vao,mode,count,instances,colorMask:colorMask.slice(),uniforms:structuredClone(uniforms.get(program))});
+ const draw=(mode,count,instances=1)=>events.push({type:'draw',framebuffer,program:program.key,vao,mode,count,instances,colorMask:colorMask.slice(),coverage,uniforms:structuredClone(uniforms.get(program))});
  const gl=new Proxy({...constants,
   useProgram(value){program=value;if(!uniforms.has(value))uniforms.set(value,{});},getUniformLocation:(program,name)=>({program,name}),
   uniform1i:set,uniform1f:set,uniform2f:set,uniform3f:set,uniform3fv:set,uniform4f:set,
   uniformMatrix4fv(location,transpose,value){assert.equal(transpose,false);assert(ArrayBuffer.isView(value),'matrix must be a typed GPU upload');assert.equal(value.length,16);assert(Array.from(value).every(Number.isFinite),'all submitted matrices must be finite');set(location,value);},
-  bindFramebuffer(target,value){assert.equal(target,constants.FRAMEBUFFER);framebuffer=value;events.push({type:'bind',framebuffer});},
+  bindFramebuffer(target,value){assert([constants.FRAMEBUFFER,constants.READ_FRAMEBUFFER,constants.DRAW_FRAMEBUFFER].includes(target));if(target!==constants.READ_FRAMEBUFFER)framebuffer=value;events.push({type:'bind',target,framebuffer});},
+  enable(cap){if(cap===constants.SAMPLE_ALPHA_TO_COVERAGE)coverage=true;},disable(cap){if(cap===constants.SAMPLE_ALPHA_TO_COVERAGE)coverage=false;},
+  blitFramebuffer(){events.push({type:'resolve',coverage});},
   clear(mask){events.push({type:'clear',framebuffer,mask});},colorMask(...value){colorMask=value;},bindVertexArray(value){vao=value;},
   drawArrays(mode,start,count){assert.equal(start,0);draw(mode,count);},drawElementsInstanced(mode,count,type,offset,instances){assert.equal(type,constants.UNSIGNED_SHORT);assert.equal(offset,0);draw(mode,count,instances);}
  },{get:(object,key)=>key in object?object[key]:(()=>{})});
@@ -47,7 +49,7 @@ function check(name,run){try{run();results.push(true);console.log('PASS '+name);
 
 check('a first frame loaded at 7000 m submits the complete image without any solar shadow work',()=>{
  const f=fixture();f.capture();assert.deepEqual(shadowWork(f),[],'sunless receivers never read these shadow maps');
- assert.deepEqual(draws(f).map(d=>d.program),['skyProgram','program','program','waterProgram','volumeProgram','volumeFilterProgram','postProgram','pointProgram','aaProgram']);
+ assert.deepEqual(draws(f).map(d=>d.program),['skyProgram','program','program','volumeProgram','volumeFilterProgram','postProgram','pointProgram','aaProgram']);
  assert.equal(one(f,'volumeProgram').uniforms.uSunless[0],1);assert.equal(one(f,'postProgram').uniforms.uLamp[0],1);
  assert.equal(one(f,'aaProgram').framebuffer,null);assert(draws(f).every(d=>d.colorMask.every(Boolean)));
  assert.deepEqual([f.renderer.canvas.width,f.renderer.canvas.height,f.renderer.quality,f.renderer.dynamicScale],[800,600,2,1]);
@@ -71,9 +73,10 @@ check('sunless motion across shadow cells and relative origins retains pending r
  for(const [eye,lighting]of [[[31.999,-7000,-120],'day'],[[32.001,-7000,-120],'late'],[[766,-7007.999,-120],'blue'],[[766,-7008.001,-120],'day'],[[766,-7000,-95.999],'late'],[[766,-7000,-96.001],'blue']]){
   f.renderer.lighting=lighting;f.capture(eye);
   assert.equal(shadowWork(f).length,0);assert.equal(f.renderer.forceShadow,true,'deferred geometry refresh remains pending');
-  const volume=one(f,'volumeProgram'),water=one(f,'waterProgram');
-  assert.equal(volume.uniforms.uSunless[0],1);assert.deepEqual(volume.uniforms.uLightVP,water.uniforms.uLightVP);
-  assert.deepEqual(volume.uniforms.uRenderOrigin,water.uniforms.uRenderOrigin);assert.equal(one(f,'aaProgram').framebuffer,null);
+  const volume=one(f,'volumeProgram'),points=one(f,'pointProgram');
+  assert(!draws(f).some(d=>d.program==='waterProgram'),'No surface water work in the sunless view');
+  assert.equal(volume.uniforms.uSunless[0],1);assert.deepEqual(volume.uniforms.uLightVP,points.uniforms.uLightVP);
+  assert.deepEqual(volume.uniforms.uRenderOrigin,points.uniforms.uRenderOrigin);assert.equal(one(f,'aaProgram').framebuffer,null);
  }
 });
 
@@ -119,6 +122,21 @@ check('streaming waits preserve pending deep refresh and submit no partial frame
  f.renderer.sceneStream=null;f.capture(shallow);assert.equal(f.renderer.frame,frames+1);
  for(const target of ['static-shadow','dynamic-shadow'])assert(shadowWork(f).some(e=>e.type==='draw'&&e.framebuffer===target));
  assert.equal(one(f,'aaProgram').framebuffer,null);
+});
+
+check('deep water omission preserves MSAA resolve and the first returning surface frame',()=>{
+ for(const msaa of [false,true]){
+  const f=fixture(),r=f.renderer;if(msaa){r.msaaFBO='msaa-scene';r.msaaSamples=2;}
+  f.capture(deep);assert(!draws(f).some(d=>d.program==='waterProgram'));
+  assert.equal(r.submittedVertices,6,'Only the two deep objects submit vertices');assert.equal(r.submittedTriangles,2);
+  assert(draws(f).filter(d=>['volumeProgram','volumeFilterProgram','postProgram','pointProgram','aaProgram'].includes(d.program)).every(d=>!d.coverage));
+  assert.equal(f.events.filter(e=>e.type==='resolve').length,msaa?1:0);assert(f.events.filter(e=>e.type==='resolve').every(e=>!e.coverage));
+  f.capture(shallow);assert.equal(one(f,'waterProgram').coverage,false);assert.equal(one(f,'waterProgram').count,6);
+  assert.equal(r.submittedVertices,12);assert.equal(r.submittedTriangles,4);
+  for(const [depth,fov,expected]of [[4899.999,69,1],[4900,69,0],[4900.001,69,0],[7000,91,1],[7000,46,0]]){
+   r.photoFov=fov;f.capture([776,-depth,-125]);assert.equal(draws(f).filter(d=>d.program==='waterProgram').length,expected,`Water route at depth ${depth}, FOV ${fov}`);
+  }
+ }
 });
 
 console.log(`${results.filter(Boolean).length}/${results.length} sunless shadow routing checks passed`);
