@@ -1,6 +1,6 @@
 # Wii 第一代 Endless Ocean 功能對等追蹤
 
-目標：完整 feature parity，維持桌機／手機及自動畫質。**目標持續進行；0.18.11 已發布並驗證 287 個公開檔案與桌機／觸控入海，新增皇帶魚與觀察修正不表示對等完成。0.18.12 的調查入口、背景恢復與小螢幕版面修正已發布；CPU 83/83、靜態 61/61、公開 287 個檔案雜湊及桌機／觸控自然流程 25/25、31/31 已通過。** 歷史盤點：[0.14](docs/FEATURE_PARITY-v014.md)、[0.13](docs/FEATURE_PARITY-v013.md)、[0.12](docs/FEATURE_PARITY-v012.md)、[0.11](docs/FEATURE_PARITY-v011.md)、[0.10](docs/FEATURE_PARITY-v010.md)、[0.9](docs/FEATURE_PARITY-v09.md)、[0.8](docs/FEATURE_PARITY-v08.md)。
+目標：完整 feature parity，維持桌機／手機及自動畫質。**目標持續進行；0.18.21 遊戲前端已發布，公開 294 個檔案與雙端正常入海已核對。本機雙人桌機／觸控各 67/67；公網多人服務仍未配置，不表示完整多人或功能對等完成。** 歷史盤點：[0.14](docs/FEATURE_PARITY-v014.md)、[0.13](docs/FEATURE_PARITY-v013.md)、[0.12](docs/FEATURE_PARITY-v012.md)、[0.11](docs/FEATURE_PARITY-v011.md)、[0.10](docs/FEATURE_PARITY-v010.md)、[0.9](docs/FEATURE_PARITY-v09.md)、[0.8](docs/FEATURE_PARITY-v08.md)。
 
 依據：[官方功能研究](docs/WII-PARITY-REFERENCE.md)、[內容與圖鑑盤點](docs/WII-CONTENT-INVENTORY.md)、[完整玩家故事規格](docs/parity/SPEC.md)、[分項工作](docs/parity/issues)。
 

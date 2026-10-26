@@ -1,6 +1,6 @@
 # 0.18.21 雙人同游客戶端驗證
 
-基線 `2f4cc278c4cc17b413f5c139798dea5f0621263a`，本輪規格見 [Stage C 契約](parity/MULTIPLAYER-CLIENT-v01821-SPEC.md)。本機桌機與觸控模擬各 67/67 已通過，公開發布驗證仍在進行；以下不把本機連線視為公網服務。
+基線 `2f4cc278c4cc17b413f5c139798dea5f0621263a`，本輪規格見 [Stage C 契約](parity/MULTIPLAYER-CLIENT-v01821-SPEC.md)。本機桌機與觸控模擬各 67/67、指定提交的 Pages 建置、294 個公開檔案雜湊及公開正常操作已通過。公開的是遊戲前端；公網多人服務仍未配置。
 
 ## 實作範圍
 
@@ -45,3 +45,18 @@
 退出後實際 TCP=0，且沒有新 WebSocket 或姿態；訪客圖形故障後只剩房主 TCP=1。重載前舊 document 缺失 CDP 結束事件的識別碼保留在報告，沒有偽改為已關閉。暫停海圖收到真實遠端姿態時 renderer.dirty=false，直接更新 2D 地圖；這不是 FPS 或耗電量測。截圖已檢視遠端模型、桌機及觸控房間面板。
 
 獨立規格與程式審查的修正及結論見 [雙軸審查](parity/REVIEW-v01821.md)。完整多人與商用目標仍在進行。
+
+## 公開交付
+
+程式提交 `f1bd647147cfaadfa91e69db0821484394d554b8` 已推送 main；Pages 回報該提交於 `2026-10-26T08:18:58Z` built、error.message=null。原始回覆：`qa/parity/v01821-runtime-pages-build.json`。
+
+| 公開驗證 | 實際結果 |
+|---|---|
+| 發布內容 | ★★★ 294/294 檔案的長度與 SHA-256 全數符合本機 manifest；manifest 本身逐 byte 相符。`qa/parity/published-v0.18.21-delivery.json`。 |
+| 預設入海 | ★★★ 桌機與觸控配置由線上首頁正常入海；adaptive=true、quality 2／1、compiled=true、streamed=true、43 類圖鑑、8 個 surface programs、WebGL error=0、無自動中央焦點。errors=[]。 |
+| 未配置服務的介面 | ★★★ 公開桌機 6/6、觸控模擬 6/6；正式可見入口如實顯示未開放、不建立 socket／模型，關閉後正常單人入海。`qa/parity/v01821-public-desktop/report.json`、`v01821-public-touch/report.json`。 |
+| 公網雙人同遊 | ☆☆☆ 尚未提供自有後端；上列公開測試沒有本機 proxy、請求改寫或代用服務，不能算雙人外網驗收。 |
+
+公開測試直接使用 `https://jspusa.github.io/Ocean/`。目前 manifest SHA-256：`cee996bd2c8841024a639f4d5014703dcd0b212d618929ecb878e93669dc42e5`。後續驗證收據的文件提交不修改此 manifest 或 runtime；其 Pages 狀態及代表公開檔案另留於 `qa/parity/v01821-final-delivery-receipt.json`。
+
+本輪新增功能與既有單人入口已按上述範圍交付。完整商用目標、工作單 11、實體手機／其他硬體性能與耗電、全內容和公網連線仍未完成。
