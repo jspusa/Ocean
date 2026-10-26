@@ -35,7 +35,7 @@ v16 的 189.2／180.2 ms 是最後首頁 render 至第一個 active render 的�
 | resume 同步時間 | 0.1 ms | 0.1 ms | ★★★ 位於原始使用者手勢堆疊 |
 | click 至首個完整 renderer submit | 29.7 ms | 10.7 ms | ★★★ 非螢幕 paint 或普遍 FPS |
 
-完整來源 `v01817-audio-entry-strict-green.json`／`.log`。此正常流程於相同正式源碼、打包版號更新前執行；最終打包及公開版本另驗。背景／失焦與準備失敗的分項證據及原生返回焦點限制見下文；公開結果仍待執行。
+完整來源 `v01817-audio-entry-strict-green.json`／`.log`。此正常流程於相同正式源碼、打包版號更新前執行；最終打包及公開版本另驗。背景／失焦與準備失敗的分項證據及原生返回焦點限制見下文；公開最終結果見下文。
 
 ## 首次准入回覆恢復
 
@@ -66,3 +66,28 @@ v16 的 189.2／180.2 ms 是最後首頁 render 至第一個 active render 的�
 完整輪保留於 `v01817-audio-lifecycle-window-return-failed.json/.log`；其他儀器失敗為 `same-window-failed`、`focus-probe`、`native-focus-probe`、`pid-focus-probe`、`focus-order-probe`，各有原證據。最終 probe 的 PID 原生啟用回傳 true，頁面仍 hasFocus=false、hasBeenActive=false、無 trusted focus。此為未完成的儀器前置條件，沒有已確認的產品失敗，也不能用正常 strict 32/32 取代真視窗返回端到端驗證。觸控全部是同一桌機模擬，實體手機與人耳品質仍待驗收。
 
 [獨立雙軸審查](parity/REVIEW-v01817.md) 沒有已確認的 production 阻擋；Spec 保留上述 1 項端到端驗證缺口。本次有限音訊修正版不等於完整音訊／商用驗收。
+
+## 公開發布結果
+
+程式提交 `14ce976cc3296a6a9398e1cb554281965683346a` 已由 GitHub Pages 於 `2026-10-26T03:09:51Z` 建置（status=built、error.message=null）。[公開 0.18.17](https://jspusa.github.io/Ocean/?v=0.18.17) 的全部 **287 個檔案** SHA-256 與本機 manifest 相符；桌機／觸控尺寸均由正常首頁入海，adaptive=true、七個表面程式、compileFailures=[]、GL=0、無 context loss、42 類圖鑑，沒有自動中央魚名。觸控主要操作至少 44 px 且在畫面內。證據 `published-v0.18.17-delivery.json`、`v01817-public-delivery.log`。
+
+最終公開站嚴格手勢音訊 **32/32** 通過，errors=[]。所有觀察與等待使用 CDP userGesture=false，首次預備未啟用；正常 click／tap 才直接 resume，兩條原創配樂與非零 analyser 輸出成立。偏好關聲音、保存重載、無聲入海、從設定開聲音及同源第二分頁鎖定均通過。此正常流程不替代上述未完成的原生視窗返回測試。
+
+| 公開站首次正常入海，嚴格手勢 | 桌機 | 觸控尺寸 | 證據界線 |
+|---|---:|---:|---|
+| loading 內 prepare 同步時間 | 126.1 ms | 125.1 ms | ★★★ 必要成本移至載入，沒有消失 |
+| audio.start 同步時間 | 0.8 ms | 0.9 ms | ★★★ 重用同一圖 |
+| startDive 同步時間 | 6.0 ms | 7.1 ms | ★★★ 正常 UI 操作 |
+| click 至第一個完整 renderer submit | 35.3 ms | 12.7 ms | ★★★ 非螢幕 paint 或普遍 FPS |
+
+證據 `v01817-audio-entry-public.json/.log`。這是同一 Apple M3 Max／Chrome 156 的當次資料，不能換算實體手機或功耗成績。
+
+公開正常操作／渲染節奏 **55/55** 通過，兩種 profile 均完成入海、鍵盤／觸控游泳、轉向、暫停／恢復、回首頁及重開，adaptive=true、errors=[]、fatal=null、GL=0。沒有位置／時間／畫質／進度寫入；正常 pause 的完整場景提交為 0，恢復後繼續。這是約 1.5 秒正常游泳輸入區段，採樣端點可能多一幀，不能宣稱全裝置長時間 60 FPS。證據 `v01817-cadence-public.json/.log`。
+
+| 公開正常游泳採樣 | 桌機 | 觸控尺寸 | 證據界線 |
+|---|---:|---:|---|
+| 完整提交頻率 | 60.469 Hz | 59.852 Hz | ★★★ 短區段完成提交數 |
+| 提交間隔 P95／最大 | 18.1／18.7 ms | 18.8／19.1 ms | ★★★ 原始間隔保留 |
+| 解析度 | 2560×1600 | 585×1266 | ★★★ 兩端 scale=1 |
+
+本輪未改渲染器、世界幾何、材質或自動畫質；既有 0.18.16 黑閃畫面保留測試不冒充 0.18.17 新的跨裝置黑閃驗收。實體手機、其他硬體長時間負載、人耳音質、真視窗返回完整啟音、可玩多人與全部商用門檻保留。
