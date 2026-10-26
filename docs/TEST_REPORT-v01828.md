@@ -92,4 +92,6 @@ Renderer → WebGL 記錄測試執行正式 batch／packing／提交方法。先
 
 ## 公開交付
 
-待精確 Pages 提交、完整公開 manifest 及實際入海驗證後補記。本輪局部發布不將完整商用工作單改為完成。
+Runtime `6a845f12f4e05ce7f7cb9af76355174340672e5f` 已發布。GitHub Pages 於 `2026-10-26T17:34:11Z` 回報精確該提交 `built`，error.message=null。公開 MANIFEST 與本機完整一致，300／300 檔案 bytes／SHA-256 相符；桌機與觸控均透過正式開始按鈕入海，版號 0.18.28、自動畫質啟用、預設 quality 2／1、44 類目錄、8 個 surface programs、GL 0、無 page errors。觸控操作區尺寸與視窗邊界也通過。
+
+公開原始紀錄：`qa/parity/published-v0.18.28-delivery.json`；整合收據：`qa/parity/v01828-shell-dof/public-release-runtime.json`。這證明公開產物與基本可玩性，不代替實體手機、長時間耗電或全部劇情內容。後續文件提交不修改上述 runtime 或 manifest，本輪局部發布不將完整商用工作單改為完成。

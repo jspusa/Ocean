@@ -28,3 +28,7 @@ barreleye-render-browser   24023099fdc5f7a92ddbb6ac1d89316dc4f093ada9621edb9e8c7
 ```
 
 Standards 最後審核的 harness 為 `4b6ce119…`；其後僅將 `scratch` 診斷欄位從固定 conditions 移到場景頂層，不改 GL、場景或判準。Spec 核對最終 `24023099…`，最後兩端正式影像亦以此執行。
+
+## 發布核對
+
+Runtime `6a845f12f4e05ce7f7cb9af76355174340672e5f` 的 Pages 精確提交已 built；公開 300／300 檔案雜湊及兩端正式預設入海通過，errors=[]、GL 0。只將本輪交付記為完成；大型散焦成本與全商用缺口依 [報告](../TEST_REPORT-v01828.md) 保留。
