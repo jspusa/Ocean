@@ -10,7 +10,7 @@
 | --- | --- | --- |
 | `create` | `protocol:1, contentVersion, name` | 建立房間，收到私有 `joined`，角色 host |
 | `request` | `protocol:1, contentVersion, name, roomId` | 自己只收到 `pending`；主持者收到 `join-request` |
-| `resume` | `protocol:1, contentVersion, roomId, memberId, resumeToken` | 成功收到新的私有 `joined`；舊能力值立即失效 |
+| `resume` | `protocol:1, contentVersion, roomId, memberId, resumeToken, resumeNonce` | 成功收到新的私有 `joined`；舊能力值立即失效 |
 
 名稱 1–24 個 UTF-16 code units，不得全空白或含 Unicode control/format 字元。名稱是暫時顯示名稱，不是已驗證身分。房號及 memberId 是識別碼，不授予讀取房內狀態的權利。未知房號、版本錯誤、滿房、訪問關閉或主持者不在線皆不產生申請。
 
@@ -33,7 +33,21 @@
 }
 ```
 
-`resumeToken` 只留在該客戶端的連線 session；不要放入 URL、日誌、分享連結或遊戲存檔。伺服器只存 SHA-256 digest，對比使用固定時間比較。這是短期房間能力值，**不是 Stage B 持久身分**。能力值旋轉回覆若在網路中遺失，舊值不可再次使用；客人需重新申請，主持者需建立新房，不能用寬鬆重播破壞失效規則。
+`resumeToken` 只留在該客戶端的連線 session；不要放入 URL、日誌、分享連結或遊戲存檔。伺服器只存 SHA-256 digest，對比使用固定時間比較。這是短期房間能力值，**不是 Stage B 持久身分**。
+
+### 可恢復的重連旋轉
+
+每次開始新的重連程序，客戶端先使用安全亂數產生 32 bytes 的 `resumeNonce`，以無 padding base64url 編碼為 43 字元。Nonce 只用於這次程序，不能放入日誌、URL、遊戲存檔，也不能在下一次程序重用。它與現行能力值一同構成這次重連的私有恢復證明。
+
+伺服器接受現行能力值後，立即旋轉能力值、增加世代、取代舊 socket，再送出 `joined`。另外只保存一個「未確認交接」紀錄：完整原始 resume 身分／能力值／nonce 的 SHA-256 digest，以及從第一次接受起算的 30 秒截止時間。當 `joined` 因網路中斷未送達時，客戶端關閉前次 socket，使用**完全相同**的 resume 內容重試。只在此紀錄仍未確認且未過期時可恢復；每次恢復仍旋轉能力值、增加世代、關閉前一 socket，截止時間不延長。
+
+客戶端取得 `joined` 後，先保存新能力值與世代，立即送 `confirm` 操作（不等待遊戲 RAF）。伺服器清除未確認交接紀錄並回 `ack`。第一個通過當前 socket、世代與序號驗證的其他已准入操作也代表已取得 joined，會清除同一紀錄。若 confirm 或其 ack 遺失，客戶端已保存新能力值，可用新 nonce 開始下一次重連，無須回頭使用原始請求。
+
+客戶端一次只可有一個重連程序，保留至多一個未取得 joined 的原始 resume 請求，任意多次中斷都重試該內容。成功取得 joined 後刪除原始請求；不得多分頁競爭重連。無回覆不是拒絕；網路不通時保留該請求直到期限，不能自行猜測新能力值。明確 `resume_invalid` 表示資格已過期、被更新、已確認或房間消失，停止以該請求重試。
+
+每名成員只存現行能力值 digest 與最多一個有界恢復證明，沒有明文能力值、重試歷史或傳出重送佇列。舊能力值加上不同 nonce 一律無效；現行交接一經確認，連完全相同的舊請求都無效。下一次使用現行能力值的正常 resume 取代前次證明。任何舊 socket 的操作、延遲關閉及舊世代封包都不能影響新世代。既有握手、連線、限流、心跳與斷線席位期限仍適用；原生客戶端不能藉重試延長此證明的固定截止時間。
+
+本規則恢復的是已有資格者的重連回覆遺失。第一次建立／核准的 `joined` 若從未送達，客戶端尚未得到 room/member/capability，仍需重新建立／申請並等待原席位到期；Stage B 身分與邀請流程須另行處理這個邊界。服務重啟仍會失去記憶體中的房間。
 
 ## 已准入操作
 
@@ -41,6 +55,7 @@
 
 | type | 額外欄位 | 可操作角色及回覆 |
 | --- | --- | --- |
+| `confirm` | 無 | 兩端；確認 joined 已收到，撤銷先前恢復證明；`ack {seq}` |
 | `decide` | `requestId, approve:boolean` | host；`ack {seq}`，申請人收到 joined 或 rejected |
 | `visits` | `open:boolean` | host；`ack {seq}`；關閉時清除全部等待申請 |
 | `pose` | `pose` | 兩端；只向另一成員送姿態，自己不收到逐包 ack |

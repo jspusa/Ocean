@@ -38,10 +38,22 @@ check('dynamic actor transforms continue uploading each changed pose',()=>{
  const f=fixture(true);for(let i=0;i<4;i++){f.batch.instances[0].p[0]=i;f.update();}assert.equal(f.uploads.length,4);assert.equal(f.uploads.at(-1)[0],3);
 });
 function multisampling(mobile,quality,supported){
- const allocations=[];let id=0;
- const gl=new Proxy({SAMPLES:1,FRAMEBUFFER_COMPLETE:2,NO_ERROR:0,getInternalformatParameter:()=>supported,checkFramebufferStatus:()=>2,getError:()=>0,createFramebuffer:()=>++id,createRenderbuffer:()=>++id,renderbufferStorageMultisample:(_,samples,...dimensions)=>allocations.push({samples,dimensions})},{get:(o,k)=>k in o?o[k]:()=>{}});
- const renderer=Object.assign(Object.create(Renderer.prototype),{gl,mobile,quality,floatColor:true});renderer.setupMultisampling(390,844);return {samples:renderer.msaaSamples,allocations};
+ const allocations=[],queries=[];let id=0;
+ const gl=new Proxy({SAMPLES:1,FRAMEBUFFER_COMPLETE:2,RGBA16F:3,RGBA8:4,DEPTH_COMPONENT24:5,NO_ERROR:0,getInternalformatParameter:(_target,format)=>{queries.push(format);return Array.isArray(supported)?supported:supported[format];},checkFramebufferStatus:()=>2,getError:()=>0,createFramebuffer:()=>++id,createRenderbuffer:()=>++id,renderbufferStorageMultisample:(_,samples,...dimensions)=>allocations.push({samples,dimensions})},{get:(o,k)=>k in o?o[k]:()=>{}});
+ const renderer=Object.assign(Object.create(Renderer.prototype),{gl,mobile,quality,floatColor:true});renderer.setupMultisampling(390,844);return {renderer,queries,samples:renderer.msaaSamples,allocations};
 }
+check('size and quality changes reuse context format capabilities without changing supported samples',()=>{
+ const f=multisampling(false,2,[4,2]);assert.equal(f.queries.length,2);
+ for(const quality of [1,0,2]){f.renderer.quality=quality;f.renderer.setupMultisampling(800+quality,600);assert.equal(f.renderer.msaaSamples,[0,2,4][quality]);}
+ assert.equal(f.queries.length,2,'resize must not synchronously ask the GPU for unchanged format support');
+});
+check('format changes and separate renderers retain their own capability results including no support',()=>{
+ const f=multisampling(false,2,{3:[],4:[2],5:[4,2]});assert.equal(f.samples,0);
+ f.renderer.setupMultisampling(800,600);assert.deepEqual(f.queries,[3,5],'empty support is cached too');
+ f.renderer.floatColor=false;f.renderer.setupMultisampling(800,600);assert.equal(f.renderer.msaaSamples,2);assert.deepEqual(f.queries,[3,5,4]);
+ f.renderer.floatColor=true;f.renderer.setupMultisampling(400,300);assert.equal(f.renderer.msaaSamples,0);assert.deepEqual(f.queries,[3,5,4]);
+ const other=multisampling(true,2,[4]);assert.equal(other.samples,4);assert.deepEqual(other.queries,[3,5],'a new context must query its own hardware support');
+});
 check('balanced quality preserves supported 2x MSAA on desktop and mobile',()=>{
  for(const mobile of [false,true])assert.equal(multisampling(mobile,1,[4,2]).samples,2);
 });

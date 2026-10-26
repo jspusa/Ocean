@@ -1,6 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { once } from 'node:events';
+import net from 'node:net';
+import { randomBytes } from 'node:crypto';
+import { setTimeout as delay } from 'node:timers/promises';
 import WebSocket from 'ws';
 import { createOceanServer } from '../server.mjs';
 
@@ -13,8 +16,8 @@ async function fixture(t, options = {}) {
   await app.listen(0, '127.0.0.1');
   t.after(() => app.close());
   const url = `http://127.0.0.1:${app.address().port}`;
-  async function connect(path = '/v1', wsOptions = {}) {
-    const ws = new WebSocket(url.replace('http:', 'ws:') + path, 'ocean.v1', { origin, ...wsOptions });
+  async function connect(path = '/v1', wsOptions = {}, endpoint = url) {
+    const ws = new WebSocket(endpoint.replace('http:', 'ws:') + path, 'ocean.v1', { origin, ...wsOptions });
     const messages = [];
     const waiters = new Set();
     const closed = once(ws, 'close');
@@ -59,6 +62,39 @@ async function fixture(t, options = {}) {
     const peer = await connect(); peer.send({ type: 'create', ...handshake, name }); await peer.joined(); return peer;
   }
   return { app, url, connect, host };
+}
+
+// This proxy interrupts real transport bytes after hello; it never sees room internals.
+async function lossyProxy(t, upstreamUrl) {
+  const upstreamPort = Number(new URL(upstreamUrl).port);
+  const sockets = new Set();
+  let dropped, resolveDrop;
+  const proxy = net.createServer(downstream => {
+    const upstream = net.connect(upstreamPort, '127.0.0.1');
+    sockets.add(downstream); sockets.add(upstream);
+    for (const socket of [downstream, upstream]) {
+      socket.on('error', () => {});
+      socket.on('close', () => { sockets.delete(socket); downstream.destroy(); upstream.destroy(); });
+    }
+    downstream.pipe(upstream);
+    upstream.on('data', bytes => {
+      if (resolveDrop) {
+        const resolve = resolveDrop; resolveDrop = null;
+        downstream.destroy(); upstream.destroy();
+        resolve(bytes.length);
+      } else downstream.write(bytes);
+    });
+  });
+  await new Promise(resolve => proxy.listen(0, '127.0.0.1', resolve));
+  t.after(async () => {
+    for (const socket of sockets) socket.destroy();
+    await new Promise(resolve => proxy.close(resolve));
+  });
+  return {
+    url: `http://127.0.0.1:${proxy.address().port}`,
+    dropNextResponse() { dropped = new Promise(resolve => { resolveDrop = resolve; }); },
+    loss() { return dropped; }
+  };
 }
 
 test('HTTP health and real WebSocket creation expose a private host capability', async t => {
@@ -211,14 +247,14 @@ test('disconnect retains the guest slot and resume rotates capability and connec
   const third = await f.connect(); third.send({ type: 'request', ...handshake, roomId: host.session.roomId, name: 'Third' });
   assert.equal((await third.next('error')).code, 'room_full');
   const resumed = await f.connect();
-  resumed.send({ type: 'resume', ...handshake, roomId: previous.roomId, memberId: previous.memberId, resumeToken: previous.resumeToken });
+  resumed.send({ type: 'resume', ...handshake, roomId: previous.roomId, memberId: previous.memberId, resumeToken: previous.resumeToken, resumeNonce: randomBytes(32).toString('base64url') });
   const session = await resumed.joined();
   assert.equal(session.memberId, previous.memberId);
   assert.equal(session.generation, previous.generation + 1);
   assert.notEqual(session.resumeToken, previous.resumeToken);
   assert.deepEqual(session.snapshot.members.find(m => m.id === previous.memberId).pose, validPose);
   const stale = await f.connect();
-  stale.send({ type: 'resume', ...handshake, roomId: previous.roomId, memberId: previous.memberId, resumeToken: previous.resumeToken });
+  stale.send({ type: 'resume', ...handshake, roomId: previous.roomId, memberId: previous.memberId, resumeToken: previous.resumeToken, resumeNonce: randomBytes(32).toString('base64url') });
   assert.equal((await stale.next('error')).code, 'resume_invalid');
   resumed.op('pose', { pose: validPose, generation: previous.generation });
   assert.equal((await resumed.next('error')).code, 'stale_session');
@@ -226,10 +262,112 @@ test('disconnect retains the guest slot and resume rotates capability and connec
   assert.equal((await host.next('pose')).generation, session.generation);
 });
 
+test('a member recovers repeated resume replies lost in transit without losing its approved seat', async t => {
+  const f = await fixture(t); const { host, guest } = await pair(f);
+  const previous = guest.session;
+  const proxy = await lossyProxy(t, f.url);
+  const request = { type: 'resume', ...handshake, roomId: previous.roomId, memberId: previous.memberId, resumeToken: previous.resumeToken, resumeNonce: randomBytes(32).toString('base64url') };
+  for (let generation = 2; generation <= 4; generation++) {
+    const interrupted = await f.connect('/v1', {}, proxy.url);
+    proxy.dropNextResponse(); interrupted.send(request);
+    assert.ok(await proxy.loss() > 0);
+    await interrupted.closed;
+    assert.equal(interrupted.messages.some(message => message.type === 'joined'), false);
+    // The independent admitted member proves the handoff happened before the cut.
+    await host.next('presence', message => message.connected && message.generation === generation).catch(error => { throw new Error(`Handoff generation ${generation}: ${error.message}`); });
+    await host.next('presence', message => !message.connected && message.generation === generation);
+  }
+  const recovered = await f.connect(); recovered.send(request);
+  const joined = await recovered.joined();
+  assert.equal(joined.memberId, previous.memberId);
+  assert.equal(joined.generation, 5);
+  assert.equal(joined.snapshot.members.length, 2);
+  recovered.op('pose', { pose: validPose });
+  assert.equal((await host.next('pose')).generation, 5);
+});
+
+test('confirm retires the exact recovery proof and stale generations cannot confirm a handoff', async t => {
+  const f = await fixture(t); const { host, guest } = await pair(f);
+  const previous = guest.session;
+  const request = { type: 'resume', ...handshake, roomId: previous.roomId, memberId: previous.memberId, resumeToken: previous.resumeToken, resumeNonce: randomBytes(32).toString('base64url') };
+  const first = await f.connect(); first.send(request); await first.joined();
+  first.op('confirm', { generation: previous.generation });
+  assert.equal((await first.next('error')).code, 'stale_session');
+  const confirmed = await f.connect(); confirmed.send(request); await confirmed.joined();
+  assert.equal(confirmed.session.generation, 3);
+  confirmed.op('confirm'); await confirmed.next('ack');
+  const replay = await f.connect(); replay.send(request);
+  assert.equal((await replay.next('error')).code, 'resume_invalid');
+  confirmed.op('pose', { pose: validPose });
+  assert.equal((await host.next('pose')).generation, 3);
+  assert.equal(confirmed.ws.readyState, WebSocket.OPEN);
+});
+
+test('the original recovery deadline does not move when an unconfirmed handoff is retried', async t => {
+  const f = await fixture(t, { resumeGraceMs: 200 }); const { guest } = await pair(f);
+  const previous = guest.session;
+  const request = { type: 'resume', ...handshake, roomId: previous.roomId, memberId: previous.memberId, resumeToken: previous.resumeToken, resumeNonce: randomBytes(32).toString('base64url') };
+  const first = await f.connect(); first.send(request); await first.joined();
+  await delay(120);
+  const retry = await f.connect(); retry.send(request); await retry.joined();
+  assert.equal(retry.session.generation, 3);
+  await delay(120);
+  const expired = await f.connect(); expired.send(request);
+  assert.equal((await expired.next('error')).code, 'resume_invalid');
+  // The member is still connected; only the bounded recovery proof expired.
+  expired.send({ ...request, resumeToken: retry.session.resumeToken, resumeNonce: randomBytes(32).toString('base64url') });
+  assert.equal((await expired.joined()).generation, 4);
+});
+
+test('a recovered member sending its current pose retires the old exact request', async t => {
+  const f = await fixture(t); const { host, guest } = await pair(f);
+  const previous = guest.session;
+  const request = { type: 'resume', ...handshake, roomId: previous.roomId, memberId: previous.memberId, resumeToken: previous.resumeToken, resumeNonce: randomBytes(32).toString('base64url') };
+  const resumed = await f.connect(); resumed.send(request); await resumed.joined();
+  resumed.op('pose', { pose: validPose }); await host.next('pose');
+  const replay = await f.connect(); replay.send(request);
+  assert.equal((await replay.next('error')).code, 'resume_invalid');
+  resumed.op('preset', { category: 'navigation', preset: 'follow' });
+  assert.equal((await host.next('preset')).generation, 2);
+});
+
+test('losing the confirm acknowledgement still allows recovery with the already received capability', async t => {
+  const f = await fixture(t); const { host, guest } = await pair(f);
+  const previous = guest.session; const proxy = await lossyProxy(t, f.url);
+  const request = { type: 'resume', ...handshake, roomId: previous.roomId, memberId: previous.memberId, resumeToken: previous.resumeToken, resumeNonce: randomBytes(32).toString('base64url') };
+  const first = await f.connect('/v1', {}, proxy.url); first.send(request); await first.joined();
+  proxy.dropNextResponse(); first.op('confirm');
+  assert.ok(await proxy.loss() > 0); await first.closed;
+  assert.equal(first.messages.some(message => message.type === 'ack'), false);
+  await host.next('presence', message => !message.connected && message.generation === 2);
+  const recovered = await f.connect(); recovered.send(request);
+  assert.equal((await recovered.next('error')).code, 'resume_invalid');
+  recovered.send({ ...request, resumeToken: first.session.resumeToken, resumeNonce: randomBytes(32).toString('base64url') });
+  assert.equal((await recovered.joined()).generation, 3);
+  recovered.op('pose', { pose: validPose });
+  assert.equal((await host.next('pose')).generation, 3);
+});
+
+test('missing malformed or different recovery nonces never reuse a retired capability', async t => {
+  const f = await fixture(t); const { guest } = await pair(f);
+  const previous = guest.session;
+  const request = { type: 'resume', ...handshake, roomId: previous.roomId, memberId: previous.memberId, resumeToken: previous.resumeToken, resumeNonce: randomBytes(32).toString('base64url') };
+  const first = await f.connect(); first.send(request); await first.joined();
+  const invalid = await f.connect();
+  for (const resumeNonce of [undefined, '', 1, 'x'.repeat(44), '!'.repeat(43)]) {
+    invalid.send({ ...request, resumeNonce });
+    assert.equal((await invalid.next('error')).code, 'invalid_message');
+  }
+  invalid.send({ ...request, resumeNonce: randomBytes(32).toString('base64url') });
+  assert.equal((await invalid.next('error')).code, 'resume_invalid');
+  invalid.send(request);
+  assert.equal((await invalid.joined()).generation, 3);
+});
+
 test('a valid resume replaces an old socket, and old socket close cannot disconnect its replacement', async t => {
   const f = await fixture(t); const { host, guest } = await pair(f);
   const replacement = await f.connect();
-  replacement.send({ type: 'resume', ...handshake, roomId: guest.session.roomId, memberId: guest.session.memberId, resumeToken: guest.session.resumeToken });
+  replacement.send({ type: 'resume', ...handshake, roomId: guest.session.roomId, memberId: guest.session.memberId, resumeToken: guest.session.resumeToken, resumeNonce: randomBytes(32).toString('base64url') });
   await replacement.joined();
   assert.equal((await guest.closed)[0], 4001);
   assert.equal((await host.next('presence')).connected, true);
@@ -244,7 +382,7 @@ test('guest leaving revokes its capability and frees the slot; host leaving clos
   guest.op('leave'); assert.equal((await guest.next('left')).reason, 'left');
   assert.equal((await host.next('member-left')).memberId, old.memberId);
   const stale = await f.connect();
-  stale.send({ type: 'resume', ...handshake, roomId: old.roomId, memberId: old.memberId, resumeToken: old.resumeToken });
+  stale.send({ type: 'resume', ...handshake, roomId: old.roomId, memberId: old.memberId, resumeToken: old.resumeToken, resumeNonce: randomBytes(32).toString('base64url') });
   assert.equal((await stale.next('error')).code, 'resume_invalid');
   const next = await f.connect(); next.send({ type: 'request', ...handshake, roomId: old.roomId, name: 'Next' });
   const request = await host.next('join-request'); host.op('decide', { requestId: request.requestId, approve: true });
@@ -252,7 +390,7 @@ test('guest leaving revokes its capability and frees the slot; host leaving clos
   host.op('leave'); assert.equal((await next.next('room-closed')).reason, 'host_left');
   const after = await f.connect(); after.send({ type: 'request', ...handshake, roomId: old.roomId, name: 'After' });
   assert.equal((await after.next('error')).code, 'room_unavailable');
-  after.send({ type: 'resume', ...handshake, roomId: host.session.roomId, memberId: host.session.memberId, resumeToken: host.session.resumeToken });
+  after.send({ type: 'resume', ...handshake, roomId: host.session.roomId, memberId: host.session.memberId, resumeToken: host.session.resumeToken, resumeNonce: randomBytes(32).toString('base64url') });
   assert.equal((await after.next('error')).code, 'resume_invalid');
 });
 
@@ -262,7 +400,7 @@ test('expired disconnected membership cannot resume, and host expiry closes the 
   guest.ws.terminate(); await guest.closed; await host.next('presence');
   assert.equal((await host.next('member-left')).reason, 'resume_expired');
   const stale = await f.connect();
-  stale.send({ type: 'resume', ...handshake, roomId: previous.roomId, memberId: previous.memberId, resumeToken: previous.resumeToken });
+  stale.send({ type: 'resume', ...handshake, roomId: previous.roomId, memberId: previous.memberId, resumeToken: previous.resumeToken, resumeNonce: randomBytes(32).toString('base64url') });
   assert.equal((await stale.next('error')).code, 'resume_invalid');
   const next = await f.connect(); next.send({ type: 'request', ...handshake, roomId: previous.roomId, name: 'Next' });
   const req = await host.next('join-request'); host.op('decide', { requestId: req.requestId, approve: true }); await next.joined();
@@ -397,12 +535,15 @@ test('a reconnecting host recovers outstanding admission requests but a guest ne
   const request = await host.next('join-request');
   host.ws.terminate(); await host.closed;
   const resumed = await f.connect();
-  resumed.send({ type: 'resume', ...handshake, roomId: host.session.roomId, memberId: host.session.memberId, resumeToken: host.session.resumeToken });
+  const resumeRequest = { type: 'resume', ...handshake, roomId: host.session.roomId, memberId: host.session.memberId, resumeToken: host.session.resumeToken, resumeNonce: randomBytes(32).toString('base64url') };
+  resumed.send(resumeRequest);
   const session = await resumed.joined();
   assert.equal(session.snapshot.pending[0].requestId, request.requestId);
   assert.equal(session.snapshot.pending[0].name, 'Waiting');
   resumed.op('decide', { requestId: request.requestId, approve: true });
   assert.equal(Object.hasOwn((await waiting.joined()).snapshot, 'pending'), false);
+  const replay = await f.connect(); replay.send(resumeRequest);
+  assert.equal((await replay.next('error')).code, 'resume_invalid');
 });
 
 test('bounded preset bursts cannot turn approved membership into message spam', async t => {

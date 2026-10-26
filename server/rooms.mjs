@@ -15,7 +15,8 @@ function validPose(pose) {
 const fields = {
   create: ['protocol', 'contentVersion', 'name'],
   request: ['protocol', 'contentVersion', 'name', 'roomId'],
-  resume: ['protocol', 'contentVersion', 'roomId', 'memberId', 'resumeToken'],
+  resume: ['protocol', 'contentVersion', 'roomId', 'memberId', 'resumeToken', 'resumeNonce'],
+  confirm: ['roomEpoch', 'generation', 'seq'],
   decide: ['roomEpoch', 'generation', 'seq', 'requestId', 'approve'],
   visits: ['roomEpoch', 'generation', 'seq', 'open'],
   pose: ['roomEpoch', 'generation', 'seq', 'pose'],
@@ -28,6 +29,7 @@ function validMessage(message) {
   if (Object.keys(message).length !== required.length + 1 || required.some(key => !Object.hasOwn(message, key))) return false;
   if ('name' in message && (typeof message.name !== 'string' || !message.name.trim() || message.name.length > 24 || /[\p{Cc}\p{Cf}]/u.test(message.name))) return false;
   if (message.type === 'decide' && (typeof message.approve !== 'boolean' || typeof message.requestId !== 'string')) return false;
+  if (message.type === 'resume' && (typeof message.resumeNonce !== 'string' || !/^[A-Za-z0-9_-]{43}$/.test(message.resumeNonce))) return false;
   if (message.type === 'visits' && typeof message.open !== 'boolean') return false;
   for (const key of ['roomId', 'memberId', 'roomEpoch', 'contentVersion']) if (key in message && (typeof message[key] !== 'string' || message[key].length > 128)) return false;
   return true;
@@ -75,7 +77,13 @@ export function createRooms({ contentVersion, resumeGraceMs = 30000, pendingTtlM
       if (['create', 'request', 'resume'].includes(message.type) && (message.protocol !== 1 || message.contentVersion !== contentVersion)) return error(peer, 'version_mismatch');
       if (message.type === 'resume' && !peer.member && !peer.pending) {
         const room = rooms.get(message.roomId); const member = room?.members.get(message.memberId);
-        if (!member || (!member.peer && member.resumeUntil <= Date.now()) || typeof message.resumeToken !== 'string' || !/^[A-Za-z0-9_-]{43}$/.test(message.resumeToken) || !timingSafeEqual(member.resumeHash, digest(message.resumeToken))) return error(peer, 'resume_invalid');
+        const now = Date.now();
+        if (!member || (!member.peer && member.resumeUntil <= now) || typeof message.resumeToken !== 'string' || !/^[A-Za-z0-9_-]{43}$/.test(message.resumeToken)) return error(peer, 'resume_invalid');
+        const proof = digest(JSON.stringify(['ocean.resume.v1', message.protocol, message.contentVersion, room.id, member.id, message.resumeToken, message.resumeNonce]));
+        const current = timingSafeEqual(member.resumeHash, digest(message.resumeToken));
+        const retry = member.resumeRetry && member.resumeRetry.until > now && timingSafeEqual(member.resumeRetry.hash, proof);
+        if (!current && !retry) return error(peer, 'resume_invalid');
+        if (current) member.resumeRetry = { hash: proof, until: now + resumeGraceMs };
         const previousPeer = member.peer; const token = capability();
         member.generation++; member.resumeHash = digest(token); member.peer = peer;
         peer.member = member; peer.room = room; peer.seq = 0;
@@ -88,6 +96,8 @@ export function createRooms({ contentVersion, resumeGraceMs = 30000, pendingTtlM
         if (peer.member.peer !== peer || message.roomEpoch !== peer.room.epoch || message.generation !== peer.member.generation) return error(peer, 'stale_session');
         if (!Number.isSafeInteger(message.seq) || message.seq <= peer.seq || message.seq > peer.seq + 1000) return error(peer, 'stale_sequence');
         peer.seq = message.seq;
+        // A current-session operation proves joined reached this client.
+        peer.member.resumeRetry = null;
         if (['visits', 'decide'].includes(message.type) && peer.member.role !== 'host') return error(peer, 'host_only');
       }
       if (message.type === 'create' && !peer.member) {
@@ -107,6 +117,7 @@ export function createRooms({ contentVersion, resumeGraceMs = 30000, pendingTtlM
         peer.send({ type: 'pending', requestId: request.id });
         for (const member of room.members.values()) if (member.role === 'host') member.peer?.send({ type: 'join-request', requestId: request.id, name: request.name });
       } else if (!peer.member) error(peer, 'not_admitted');
+      else if (message.type === 'confirm') peer.send({ type: 'ack', seq: message.seq });
       else if (message.type === 'leave') {
         const room = peer.room; const member = peer.member;
         peer.send({ type: 'left', reason: 'left' });
@@ -183,6 +194,7 @@ export function createRooms({ contentVersion, resumeGraceMs = 30000, pendingTtlM
         }
       }
       for (const room of rooms.values()) for (const member of room.members.values()) {
+        if (member.resumeRetry?.until <= now) member.resumeRetry = null;
         if (member.peer || member.resumeUntil > now) continue;
         if (member.role === 'host') { closeRoom(room, 'host_disconnected'); break; }
         room.members.delete(member.id);
