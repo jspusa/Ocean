@@ -33,14 +33,31 @@ function summary(values){if(!values.length)return null;const a=values.slice().so
     s.previous=ms;s.distance+=V.dist(s.previousPosition,player.p);s.previousPosition=player.p.slice();
    };
   });
-  const began=Date.now();let station=0,travelStarted=0,lastSample=-1,lastMinute=-1;
+  const began=Date.now();let station=0,travelStarted=0,lastSample=-1,lastMinute=-1,observation=null;
   const stations=['midwater','slope','hadal','slope','midwater'];
   while(Date.now()-began<seconds*1000){
    const state=await page.evaluate(()=>({elapsed:(performance.now()-__endurance.first)/1000,active,modal,ready,focus:document.hasFocus(),hidden:document.hidden,deep:oceanDeepsea.snapshot(),p:player.p.slice(),scale:renderer.dynamicScale,quality:renderer.quality,resolution:[renderer.canvas.width,renderer.canvas.height],msaa:renderer.msaaSamples,lost:renderer.gl.isContextLost(),streamWaiting:!!renderer.sceneStream?.waitStarted,failedChunks:renderer.sceneStream?.failures.size||0,lastStreamErrorAt:renderer.sceneStream?.lastError||null,stats:window.__oceanStats||null,heap:performance.memory?.usedJSHeapSize??null,frames:__endurance.frames.length,distance:__endurance.distance}));
    assert(state.ready&&state.active&&!state.lost,'The actual dive must remain playable');assert(!state.hidden&&state.focus,'A background/unfocused run is not valid endurance evidence');
    if(Math.floor(state.elapsed/10)>lastSample){lastSample=Math.floor(state.elapsed/10);samples.push(state);}
    if(Math.floor(state.elapsed/60)>lastMinute){lastMinute=Math.floor(state.elapsed/60);console.log(JSON.stringify({minute:lastMinute,depth:Math.round(-state.p[1]),frames:state.frames,scale:state.scale,fps:state.stats?.fps,heap:state.heap,travel:state.deep.travelTarget}));}
+   if(state.deep.holding&&!state.modal&&!state.streamWaiting){
+    const trip=journeys.at(-1);assert(travelStarted&&trip,'An observation stop must belong to a requested journey');
+    assert.equal(state.deep.guideMode,'observing');assert.equal(state.deep.travelTarget,trip.station);
+    if(!observation){
+     assert(!trip.stops.some(s=>s.encounter===state.deep.encounter),'Continuation must not repeat a completed encounter in the same journey');
+     observation={encounter:state.deep.encounter,startedAtSeconds:state.elapsed,position:state.p};trip.stops.push(observation);
+    }
+    assert.equal(state.deep.encounter,observation.encounter,'The encounter must remain until the player continues');
+    if(state.elapsed-observation.startedAtSeconds>=15){
+     // Use a real click/tap after an actual wall-clock observation interval.
+     // The current guide has no automatic dwell timeout or injected resume.
+     await press('#deepseaContinue');
+     await page.waitForFunction(id=>oceanDeepsea.snapshot().travelTarget===id&&oceanDeepsea.snapshot().guideMode==='traveling'&&!modal,trip.station);
+     observation.continuedAtSeconds=await page.evaluate(()=>(performance.now()-__endurance.first)/1000);observation=null;
+    }
+   }
    if(!state.deep.travelTarget&&!state.modal&&!state.streamWaiting){
+    assert.equal(observation,null,'An observation cannot end without explicit continuation');
     if(travelStarted){
      const trip=journeys.at(-1),target=metadata.stations.find(s=>s.id===trip.station);
      assert(target,'Requested station must exist in the loaded world');
@@ -54,8 +71,8 @@ function summary(values){if(!values.length)return null;const a=values.slice().so
     }
     const id=stations[station++%stations.length];
     await press('#fieldToolsBtn');await press('#diveRecords [data-feature="deepsea"]');await press('[data-deepsea-station="'+id+'"]');
-    await page.waitForFunction(id=>oceanDeepsea.snapshot().travelTarget===id&&!modal,id);
-    journeys.push({station:id,startedAtSeconds:state.elapsed,from:state.p});travelStarted=state.elapsed;
+    await page.waitForFunction(id=>oceanDeepsea.snapshot().travelTarget===id&&oceanDeepsea.snapshot().guideMode==='traveling'&&!modal,id);
+    journeys.push({station:id,startedAtSeconds:state.elapsed,from:state.p,stops:[]});travelStarted=state.elapsed;
    }
    if(travelStarted)assert(state.elapsed-travelStarted<420,'Real-time guide route exceeded seven minutes');
    await page.waitForTimeout(1000);
@@ -68,6 +85,6 @@ function summary(values){if(!values.length)return null;const a=values.slice().so
   await page.screenshot({path:output.replace(/\.json$/,'.png')});
   console.log('STABLE '+seconds+' seconds of real native exploration (no FPS target asserted): '+result.frames.length+' rendered frames, '+result.completedRoutes+' completed guide routes');
  }finally{
-  await browser.close();fs.mkdirSync(path.dirname(output),{recursive:true});fs.writeFileSync(output,JSON.stringify({url,requestedSeconds:seconds,touchEmulation:touch,method:'Installed Chrome native GPU; isolated new save; visible start/guide controls and unmodified real RAF/simulation. No coordinate or clock advancement. Continuous frame intervals exclude explicit app pause and sampling reset boundaries, including adaptive-resolution resets; visible intervals include menu and streaming gaps. Focus, visibility and stream failures are sampled about once per second; GL errors are read at the final boundary only. Successful completion asserts continuity, not a smoothness/FPS target. No input-latency, temperature, battery or physical-phone claim.',metadata,journeys,samples,result,errors},null,2));
+  await browser.close();fs.mkdirSync(path.dirname(output),{recursive:true});fs.writeFileSync(output,JSON.stringify({url,requestedSeconds:seconds,touchEmulation:touch,method:'Installed Chrome native GPU; isolated new save; visible start/guide/continue controls and unmodified real RAF/simulation. Each encounter waits at least fifteen wall-clock seconds before a real continuation click/tap. No coordinate or clock advancement. Continuous frame intervals exclude explicit app pause and sampling reset boundaries, including adaptive-resolution resets; visible intervals include menu and streaming gaps. Focus, visibility and stream failures are sampled about once per second; GL errors are read at the final boundary only. Successful completion asserts continuity, not a smoothness/FPS target. No input-latency, temperature, battery or physical-phone claim.',metadata,journeys,samples,result,errors},null,2));
  }
 })().catch(error=>{console.error(error);process.exitCode=1;});

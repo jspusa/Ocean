@@ -83,7 +83,7 @@ function renderShip(){
  $('shipFinal').classList.toggle('hidden',!s.ended);oceanFeatures.call('shipRender');
 }
 function toggleCruise(){if(!active||modal)return;if(typeof oceanMicrocosm!=='undefined'&&oceanMicrocosm.isViewing())oceanMicrocosm.exit('cruise');voyage.state.cruise=!voyage.state.cruise;stopAuto();$('cruiseBtn').classList.toggle('active',voyage.state.cruise);toast(voyage.state.cruise?'巡航推進已開啟 · 移動速度提高，不自動駕駛':'已回到緩慢觀察速度');}
-function togglePhotoMode(){if(!active)return;if(typeof oceanGamepadPointer!=='undefined')oceanGamepadPointer.contextChanged();if(typeof oceanMicrocosm!=='undefined'&&oceanMicrocosm.isViewing())oceanMicrocosm.exit('camera');voyage.photoMode=!voyage.photoMode;renderer.photoFov=voyage.photoMode?48:null;$('cameraFrame').classList.toggle('hidden',!voyage.photoMode);$('photoModeBtn').classList.toggle('active',voyage.photoMode);renderer.dirty=true;}
+function togglePhotoMode(){if(!active)return;if(typeof oceanGamepadPointer!=='undefined')oceanGamepadPointer.contextChanged();if(typeof oceanMicrocosm!=='undefined'&&oceanMicrocosm.isViewing())oceanMicrocosm.exit('camera');voyage.photoMode=!voyage.photoMode;oceanFeatures.call('cameraModeChanged',voyage.photoMode);renderer.photoFov=voyage.photoMode?48:null;$('cameraFrame').classList.toggle('hidden',!voyage.photoMode);$('photoModeBtn').classList.toggle('active',voyage.photoMode);renderer.dirty=true;}
 function readLogger(){
  const p=[95,groundHeight(99,-166)+3,-147];if(V.dist(player.p,p)>8){toast('先靠近沉船旁的黃色記錄器。');return false;}
  voyage.state.reading=true;evaluateOrders();saveVoyage();
@@ -117,7 +117,7 @@ const legacyPhoto=takePhoto;
 takePhoto=async function(){
  if(!active||modal||photoOpen||voyage.photoBusy||voyage.importing||Date.now()-lastPhoto<900)return;
  if(!oceanPhotography.canCapture()){toast(oceanPhotography.blockedReason());return;}
- voyage.photoBusy=true;
+ oceanFeatures.call('beforePhoto');voyage.photoBusy=true;
  try{
   if(renderer.sceneStream){updateCamera();oceanFeatures.call('afterCamera',0);await renderer.sceneStream.ready(eye);if(!active||modal||photoOpen)return;}
   const photo=legacyPhoto();if(!photo)return;const grade=gradePhoto();

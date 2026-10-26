@@ -90,13 +90,22 @@ const summary=values=>{if(!values.length)return null;const a=values.slice().sort
   async function phase(id){stage=id;await read(id=>{__barreleyeProbe.phase=id;},id);}
   async function stopObserver(label){const frames=await read(()=>{const q=window.__barreleyeProbe;if(!q||q.done)return null;q.done=true;renderer.render=q.original;return q.frames;});if(frames)traces.push({label,frames});}
   async function guide(){await press('#fieldToolsBtn');await press('#diveRecords [data-feature="deepsea"]');await press('[data-deepsea-station="midwater"]');await wait(()=>oceanDeepsea.snapshot().travelTarget==='midwater'&&!modal);}
+  const guideStops=new Set();
   async function waitForRoute(encounter){
    const start=Date.now();let nextLog=0,last=null;
    while(Date.now()-start<routeSeconds*1000){
     last=await snapshot();assert(last.active&&!last.hidden&&last.focused&&!last.freeze&&!last.lost,'Natural route must remain active, focused and unfrozen');
     if(Date.now()-start>=nextLog){observations.push({stage,state:last});console.log(JSON.stringify({stage,seconds:(Date.now()-start)/1000,depth:-last.p[1],travel:last.deep.travelTarget,encounter:last.deep.encounter,holding:last.deep.holding,scale:last.scale}));nextLog+=10000;}
-    if(encounter&&last.deep.holding&&last.deep.encounter==='barreleye-pass')return last;
     if(!last.deep.travelTarget){assert(!encounter,'Guide finished without the required barreleye-pass stop');return last;}
+    if(last.deep.holding){
+     assert(last.deep.guideMode==='observing'&&last.deep.encounter,'Natural guide stop must await the player');
+     assert(!guideStops.has(last.deep.encounter),'The retained route must not repeat a reached encounter: '+last.deep.encounter);guideStops.add(last.deep.encounter);
+     if(encounter&&last.deep.encounter==='barreleye-pass')return last;
+     observations.push({stage:'explicit-guide-continuation',state:last});
+     // 0.18.32 waits indefinitely. Advance other stops through the same visible
+     // player control; never rewrite route, coordinates, time or knowledge.
+     await press('#deepseaContinue');
+    }
     const problem=await read(()=>window.__barreleyeProbe?.problem||null);assert(!problem,'Synchronous presentation readback requires diagnosis: '+JSON.stringify(problem));
     await page.waitForTimeout(120);
    }throw Error('Natural guide route exceeded '+routeSeconds+' seconds: '+JSON.stringify(last?.deep));
@@ -175,7 +184,7 @@ const summary=values=>{if(!values.length)return null;const a=values.slice().sort
   observations.push({stage:'natural-guide-first-view',geometry:firstView,image:firstViewImage,geometryAfterCapture:await geometryFrame(),fullyFramed:firstView.corners.every(p=>p.ndc[2]>0&&Math.abs(p.ndc[0])<.96&&Math.abs(p.ndc[1])<.96),broadside:firstView.broadsideCosine>.85,note:'First natural guide view before any player selection or camera adjustment. Framing and broadside are recorded without weakening the later full-body acceptance; inspect the native PNG for the body, transparent head shield, inner tubular eyes and broad pelvic fins.'});
   check('the first natural guide view reveals the entire broad side before player adjustment',Math.abs(firstView.bodyMetres-.14)<1e-8&&firstView.broadsideCosine>.85&&firstView.bodyPixels>=minimumGuideBodyCssPixels&&firstView.corners.every(p=>p.ndc[2]>0&&Math.abs(p.ndc[0])<.96&&Math.abs(p.ndc[1])<.96),{broadsideCosine:firstView.broadsideCosine,bodyPixels:firstView.bodyPixels,minimumBodyCssPixels:minimumGuideBodyCssPixels,pixelUnits:'CSS canvas coordinates, independent of DPR and adaptive backing-buffer scale',corners:firstView.corners});
   const hit=await hitSubject();check('natural stop exposes an unobstructed native selection target',!!hit,hit);await point(hit);
-  await wait(uid=>oceanSelection.snapshot().uid===uid&&!auto&&!oceanDeepsea.snapshot().travelTarget,hit.uid,{timeout:6000});
+  await wait(uid=>{const guide=oceanDeepsea.snapshot();return oceanSelection.snapshot().uid===uid&&!auto&&guide.travelTarget==='midwater'&&['observing','paused'].includes(guide.guideMode);},hit.uid,{timeout:6000});
   const observationTarget=hit;
   await wait(uid=>oceanSelection.snapshot().uid===uid&&persistent.seen.includes('barreleye')&&oceanEcology.knowledge(oceanEcology.state().field.barreleye)>=1,observationTarget.uid,{timeout:12000});
   const observed=await snapshot();check('real pointer observation records the same individual and ecology notes',observed.selection.uid===observationTarget.uid&&observed.seen&&observed.knowledge>=1&&!observed.focusCardHidden,{selection:observed.selection,knowledge:observed.knowledge,field:observed.field});
@@ -200,7 +209,9 @@ const summary=values=>{if(!values.length)return null;const a=values.slice().sort
   const preview=await snapshot();await page.waitForTimeout(800);const previewStill=await snapshot();
   check('actual photo preview freezes formal time and the barreleye pose',preview.photoOpen&&previewStill.photoOpen&&preview.t===previewStill.t&&distance(preview.actor.p,previewStill.actor.p)===0&&preview.actor.pitch===previewStill.actor.pitch&&preview.actor.yaw===previewStill.actor.yaw,{t:[preview.t,previewStill.t],photoOpen:previewStill.photoOpen});
   await screenshot('saved-photo-preview');await press('#closePhoto');await press('#closePanel');await page.keyboard.press('x');await wait(()=>!voyage.photoMode);inputs.push({type:'native-key',key:'x',purpose:'exit camera mode before continuing guide'});
-  await phase('continue-midwater');await guide();const arrival=await waitForRoute(false),station=metadata.stations.find(s=>s.id==='midwater');observations.push({stage,state:arrival});
+  await phase('continue-midwater');
+  assert.equal((await snapshot()).deep.travelTarget,'midwater','Observation and photography retain the original guide destination');
+  await press('#deepseaContinue');const arrival=await waitForRoute(false),station=metadata.stations.find(s=>s.id==='midwater');observations.push({stage,state:arrival});
   check('the existing 700 m midwater station remains reachable after observing the new encounter',arrival.deep.station==='midwater'&&distance(arrival.p,station.p)<45&&!arrival.deep.travelTarget,{p:arrival.p,distance:distance(arrival.p,station.p),station:arrival.deep.station});
   await phase('save-home');await press('#fieldToolsBtn');await press('#menuHome');await wait(()=>!active&&!modal&&!$('welcome').classList.contains('hidden'));
   await openNotebook();check('visible notebook exposes the earned barreleye entry',await read(()=>!document.querySelector('[data-species="43"]').classList.contains('unseen')));await press('[data-species="43"]');

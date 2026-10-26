@@ -17,9 +17,9 @@ async function travel(page,mode,id){
  check(mode,'main menu exposes deep sea without opening advanced tools ('+id+')',await page.locator('#diveRecords [data-feature="deepsea"]').isVisible());
  await press(page,mode,'#diveRecords [data-feature="deepsea"]');
  const button=page.locator('[data-deepsea-station="'+id+'"]');
- check(mode,'station card explains cancellable observation stops ('+id+')',(await button.locator('..').innerText()).includes('隨時接手探索'));
+ check(mode,'station card explains player-controlled observation stops ('+id+')',(await button.locator('..').innerText()).includes('隨時接手探索'));
  await press(page,mode,'[data-deepsea-station="'+id+'"]');
- await page.waitForFunction(id=>oceanDeepsea.snapshot().travelTarget===id&&!modal,id);
+ await page.waitForFunction(id=>oceanDeepsea.snapshot().travelTarget===id&&oceanDeepsea.snapshot().guideMode==='traveling'&&!modal,id);
 }
 async function run(browser,mode){
  const context=await browser.newContext({viewport:{width:mode.width,height:mode.height},deviceScaleFactor:1,isMobile:mode.touch,hasTouch:mode.touch}),page=await context.newPage();page.setDefaultTimeout(45000);
@@ -55,9 +55,9 @@ async function run(browser,mode){
   const actual=await page.evaluate(b=>({distance:V.dist(b.p,player.p),seconds:t-b.t,travel:oceanDeepsea.snapshot().travelTarget,compiled:renderer.sceneLoad.compiled,streamed:renderer.sceneLoad.streamed,gl:renderer.gl.getError(),focus:document.hasFocus()}),before);
   check(mode,'actual RAF drives a continuous guided swim with streamed native rendering',actual.distance>2&&actual.seconds>.5&&actual.travel==='midwater'&&actual.compiled&&actual.streamed&&actual.gl===0&&actual.focus,actual);
   if(mode.touch)await press(page,mode,'#upBtn');else{await page.keyboard.down('KeyW');await page.waitForTimeout(120);await page.keyboard.up('KeyW');}
-  await page.waitForFunction(()=>!auto&&!oceanDeepsea.snapshot().travelTarget);
+  await page.waitForFunction(()=>!auto&&oceanDeepsea.snapshot().travelTarget==='midwater'&&oceanDeepsea.snapshot().guideMode==='paused');
   await page.evaluate(()=>{window.__freeze=true;});
-  check(mode,'real manual movement immediately cancels the guided route',await page.evaluate(()=>!auto&&!oceanDeepsea.snapshot().travelTarget&&!follow));
+  check(mode,'real manual movement pauses guidance and retains its destination',await page.evaluate(()=>!auto&&oceanDeepsea.snapshot().travelTarget==='midwater'&&oceanDeepsea.snapshot().guideMode==='paused'&&!follow));
   const encountered=new Set();
   for(const id of ['midwater','slope','hadal']){
    await travel(page,mode,id);await page.evaluate(()=>{__deepLastHold=null;__deepMetrics={seconds:0,distance:0,maxStep:0,maxApproachSpeed:0,holds:[]};});
@@ -69,6 +69,14 @@ async function run(browser,mode){
      check(mode,'actual corridor stop is in-frame, selectable and streamed: '+s.encounter,!!fish&&fish.encounter===s.encounter&&fish.resident&&frame.gl===0&&!frame.lost,{frame,fish});
      check(mode,'guided stop leaves identification to the player: '+s.encounter,await page.evaluate(()=>!oceanSelection.target()&&!focusFish&&$('focusCard').classList.contains('hidden')));
      await page.screenshot({path:path.join(out,'deepsea-current-'+mode.id+'-'+s.encounter+'.png')});
+    }
+    if(s.holding){
+     // The current guide never leaves an observation stop on a timer. Resume
+     // through the same visible control a player uses, including revisits in
+     // a later trip; the global encountered set only deduplicates screenshots.
+     check(mode,'observation preserves the requested destination: '+s.encounter,s.guideMode==='observing'&&s.travelTarget===id,s);
+     await press(page,mode,'#deepseaContinue');
+     await page.waitForFunction(id=>oceanDeepsea.snapshot().travelTarget===id&&oceanDeepsea.snapshot().guideMode==='traveling'&&!modal,id);
     }
     if(!s.travelTarget)break;
    }
@@ -89,4 +97,4 @@ async function run(browser,mode){
  }catch(error){errors.push({mode:mode.id,message:error.stack});checks.push({mode:mode.id,name:'suite completed',pass:false,detail:error.message});console.error('FAIL '+mode.id+' '+error.message);await page.screenshot({path:path.join(out,'deepsea-current-'+mode.id+'-failure.png')}).catch(()=>{});await page.evaluate(()=>({p:player.p,t,active,modal,auto,freeze:window.__freeze,deep:oceanDeepsea.snapshot(),stream:{wait:renderer.sceneStream?.waitStarted,stats:renderer.sceneStream?.stats},console:!!renderer})).then(d=>fs.writeFileSync(path.join(out,'deepsea-current-'+mode.id+'-failure.json'),JSON.stringify(d,null,2))).catch(()=>{});
  }finally{await context.close();}
 }
-(async()=>{const browser=await pw.chromium.launch(require('./browser-launch.cjs')(true));try{for(const mode of modes)await run(browser,mode);}finally{await browser.close();fs.writeFileSync(path.join(out,'deepsea-current-browser.json'),JSON.stringify({url,gpuMode:'native Chrome',method:'Visible menu actions, actual RAF trip and real movement cancellation; long connected trips advance production 120Hz swimmer,30Hz life/camera,12Hz observation, without position fixtures; resident native WebGL screenshots and real pointer/taps. No physical phone or FPS claim.',checks,journeys,errors},null,2));}if(errors.length||checks.some(c=>!c.pass))process.exitCode=1;})().catch(error=>{console.error(error);process.exitCode=1;});
+(async()=>{const browser=await pw.chromium.launch(require('./browser-launch.cjs')(true));try{for(const mode of modes)await run(browser,mode);}finally{await browser.close();fs.writeFileSync(path.join(out,'deepsea-current-browser.json'),JSON.stringify({url,gpuMode:'native Chrome',method:'Visible menu and continuation actions, actual RAF trip and real movement takeover retaining the paused destination; long connected trips advance production 120Hz swimmer,30Hz life/camera,12Hz observation, without position fixtures; resident native WebGL screenshots and real pointer/taps. No physical phone or FPS claim.',checks,journeys,errors},null,2));}if(errors.length||checks.some(c=>!c.pass))process.exitCode=1;})().catch(error=>{console.error(error);process.exitCode=1;});

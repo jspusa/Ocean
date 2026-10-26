@@ -31,10 +31,15 @@ check('cancelled descent can continuously return to the previous station in both
 check('same-depth manual displacement can route back to the actual station',()=>{
  ctx.player.p=plain(station('slope').p).map((n,i)=>n+(i===0?8:i===2?8:0));state.station='slope';runTrip('slope');assert.deepEqual(plain(ctx.player.p),plain(station('slope').p));assert.equal(state.station,'slope');assert.equal(deep.travel('slope'),false);
 });
-check('ending guided swimming clears motion without forcing a shallow position or erasing visits',()=>{
- assert(deep.travel('hadal'));ctx.updatePlayer(1/60);const before=plain(ctx.player.p),visited=plain(state.visited);ctx.goHome();assert.equal(homes,1);assert.equal(jumps,0);assert(!state.deployed&&!ctx.renderer.submersible&&!ctx.active);assert.equal(deep.snapshot().travelTarget,null);assert.equal(ctx.auto,false);assert.deepEqual(plain(ctx.player.p),before);assert.deepEqual(plain(state.visited),visited);
+check('ending guided swimming stops motion but retains its destination, position and visits',()=>{
+ assert(deep.travel('hadal'));ctx.updatePlayer(1/60);const before=plain(ctx.player.p),visited=plain(state.visited);ctx.goHome();assert.equal(homes,1);assert.equal(jumps,0);assert(!state.deployed&&!ctx.renderer.submersible&&!ctx.active);assert.equal(deep.snapshot().travelTarget,'hadal');assert.equal(deep.snapshot().guideMode,'paused');assert.equal(ctx.auto,false);assert.deepEqual(plain(ctx.player.p),before);assert.deepEqual(plain(state.visited),visited);
 });
-check('prepare and resume keep deep coordinates without a deployed vehicle',()=>{ctx.renderer.submersible=true;state.deployed=true;const before=plain(ctx.player.p);feature.prepareDive();ctx.active=true;feature.startDive();assert.deepEqual(plain(ctx.player.p),before);assert.equal(state.deployed,false);assert.equal(ctx.renderer.submersible,false);assert(deep.isActive());ctx.player.p=[0,-8,0];assert.equal(deep.isActive(),false);});
+check('resume retains a paused destination and a new dive clears it without moving the swimmer',()=>{
+ ctx.renderer.submersible=true;state.deployed=true;const before=plain(ctx.player.p),visited=plain(state.visited);feature.prepareDive({resume:true});ctx.active=true;feature.startDive();
+ assert.equal(deep.snapshot().travelTarget,'hadal');assert.equal(deep.snapshot().guideMode,'paused');assert.equal(ctx.auto,false);for(let i=0;i<60;i++)ctx.updatePlayer(1/60);
+ assert.deepEqual(plain(ctx.player.p),before);assert.equal(state.deployed,false);assert.equal(ctx.renderer.submersible,false);assert(deep.isActive());assert.deepEqual(plain(state.visited),visited);
+ feature.prepareDive({resume:false});assert.equal(deep.snapshot().travelTarget,null);assert.equal(deep.snapshot().guideMode,null);assert.deepEqual(plain(ctx.player.p),before);assert.deepEqual(plain(state.visited),visited);ctx.player.p=[0,-8,0];assert.equal(deep.isActive(),false);
+});
 const source=read('voyage');
 vm.runInContext(source.slice(source.indexOf('function voyageDestination('),source.indexOf('function markPlace(')),ctx);
 vm.runInContext(source.slice(source.indexOf('function paintVoyageHUD('),source.indexOf('const legacyLifeUpdate=')),ctx);
@@ -54,9 +59,12 @@ check('connected-ocean HUD keeps both shallow and deep destinations available',(
  ctx.active=false;get('paintVoyageHUD()');assert(nodes.get('waypointHUD').classList.contains('hidden'));ctx.active=true;
 });
 ctx.markPlace=id=>{ctx.voyage.state.waypoint=id;};
-check('guide status appears only during travel and disappears when the dive ends',()=>{
+check('guide status remains available while paused and hides when the dive ends',()=>{
  ctx.active=true;feature.paintHUD();const status=nodes.get('deepseaStatus');assert(status.classList.contains('hidden'));assert(deep.travel('hadal'));feature.paintHUD();assert(!status.classList.contains('hidden'));
- feature.endDive();assert(status.classList.contains('hidden'));assert(!state.deployed);assert.equal(deep.snapshot().travelTarget,null);
+ ctx.stopAuto();ctx.updatePlayer(1/60);feature.paintHUD();assert(!status.classList.contains('hidden'));assert.equal(deep.snapshot().guideMode,'paused');assert.equal(deep.snapshot().travelTarget,'hadal');
+ feature.endDive();ctx.active=false;assert(status.classList.contains('hidden'));assert(!state.deployed);assert.equal(deep.snapshot().travelTarget,'hadal');assert.equal(deep.snapshot().guideMode,'paused');
+ // The following catalogue checks start a fresh dive, not a resumed guide.
+ feature.prepareDive({resume:false});feature.startDive();ctx.active=true;assert.equal(deep.snapshot().travelTarget,null);
 });
 vm.runInContext(source.slice(source.indexOf('const legacyFind=findSpecies;'),source.indexOf('// Chart marks a real game-space')),ctx);
 check('distant shallow observation only marks its habitat from deep water',()=>{

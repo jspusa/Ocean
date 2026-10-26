@@ -37,7 +37,7 @@ const fish=actors.find(f=>f.encounterId==='frilled-shark-pass'),phaseResults=[];
 const phases=[{name:'native-desktop-red',start:93.132},...Array.from({length:12},(_,i)=>({name:'circuit-phase-'+i,start:i*2*Math.PI*2.8/.1/12}))];
 for(const phase of phases){
  deep.cancelTravel();features.deepsea.prepareDive();c.player.p=[754,-899,-90];c.player.velocity=[0,0,0];c.t=phase.start;pose(fish,c.t,fish.p);assert(deep.travel('slope'));
- let gateTime=null,arrivalTime=null,position=null,maxSpeed=0,maxStep=0,held=0,changedAnimal=false;const samples=[];
+ let gateTime=null,arrivalTime=null,position=null,maxSpeed=0,maxStep=0,held=0,changedAnimal=false,heldSeconds=0,continued=false;const samples=[];
  for(let frame=0;frame<3600;frame++){
   c.t+=1/60;
   for(let step=0;step<2;step++){
@@ -49,17 +49,25 @@ for(const phase of phases){
   if(snap.approaching&&snap.encounter==='frilled-shark-pass'&&gateTime===null)gateTime=c.t;
   if(snap.holding&&snap.encounter==='frilled-shark-pass'){
    if(arrivalTime===null){arrivalTime=c.t;position=c.player.p.slice();}
+   assert.equal(snap.guideMode,'observing');assert.equal(snap.travelTarget,'slope');assert.equal(c.auto,false);
    assert(V.dist(position,c.player.p)<1e-9,'Observation must keep a fixed swimmer endpoint');
-   if(held%30===0||held===239)for(const vp of viewports)samples.push({seconds:held/60,...viewSample(fish,vp)});
+   // Retain the original first-four-second presentation gate. The new guide
+   // lets the animal keep swimming after that window while the player looks
+   // around; it does not promise an indefinitely frozen broadside pose.
+   if(held<240&&(held%30===0||held===239))for(const vp of viewports)samples.push({seconds:held/60,...viewSample(fish,vp)});
    held++;
+   heldSeconds=c.t-arrivalTime;
+   if(heldSeconds>=15){
+    assert(states.deepsea.guide.passed.includes('frilled-shark-pass'));const before=c.player.p.slice();continued=deep.resumeTravel();assert(continued,'Explicit public continuation failed');assert(V.dist(before,c.player.p)<1e-9,'Continuation teleported the swimmer');assert.equal(deep.snapshot().guideMode,'traveling');assert.equal(deep.snapshot().travelTarget,'slope');break;
+   }
   }else if(arrivalTime!==null)break;
  }
- phaseResults.push({...phase,gateTime,arrivalTime,position,maxSpeed,maxStep,held,changedAnimal,samples});
+ phaseResults.push({...phase,gateTime,arrivalTime,position,maxSpeed,maxStep,held,heldSeconds,continued,changedAnimal,samples});
 }
 let passed=0,failed=0;function check(name,fn){try{fn();passed++;console.log('PASS '+name)}catch(error){failed++;console.error('FAIL '+name+': '+error.message)}}
 check('native browser failure phase is reproduced through the public corridor',()=>{assert(Math.abs(phaseResults[0].gateTime-94.757)<.03,JSON.stringify(phaseResults[0]));});
-for(const r of phaseResults)check(r.name+' gives a stationary, safe full broadside throughout the four-second dwell in every aspect',()=>{
- assert(r.arrivalTime!==null&&r.held>=239,'Missing complete guided shark stop');assert(!r.changedAnimal,'Guidance must not mutate the actual fish');assert(r.maxSpeed<=2.2+1e-9&&r.maxStep<=2.2/120+1e-9);
+for(const r of phaseResults)check(r.name+' retains the first four seconds of readable broadside and waits fifteen seconds for explicit continuation',()=>{
+ assert(r.arrivalTime!==null&&r.held>=901&&r.heldSeconds>=15&&r.continued,'Missing complete player-controlled shark stop');assert.equal(r.samples.length,27,'All original four-second samples and viewports must remain');assert(!r.changedAnimal,'Guidance must not mutate the actual fish');assert(r.maxSpeed<=2.2+1e-9&&r.maxStep<=2.2/120+1e-9);
  assert(!get('OceanRegions').pointBlocked(r.position,.4),'Actual observation endpoint intersects rock');
  for(const s of r.samples){assert(s.fullBodyInFrame&&s.valid&&s.picked===s.uid,JSON.stringify(s));assert(s.projectedWidthPixels>=(s.viewport[1]>=800?100:40),JSON.stringify(s));assert(s.broadsideCosine>.85,JSON.stringify(s));}
 });

@@ -29,8 +29,26 @@ function viewSample(f,vp){
  return sample;
 }
 for(const station of T.stations){
- c.auto=false;features.navigation.prepareDive({resume:false});features.deepsea.prepareDive();features.deepsea.startDive();const departure=c.player.p.slice();assert(deep.travel(station.id));let frames=0,approachFrames=0,maxApproachSpeed=0,maxStep=0,approachSamples=[],holds=[];const expected=get('DeepseaRules').itinerary(T.route('midwater',station.id,departure),get('deepseaEncounters'),(a,b)=>get('OceanRegions').pathClear(a,b,.4)).filter(l=>l.encounter).map(l=>l.encounter.id);
- for(;frames<18000&&deep.snapshot().travelTarget;frames++){const before=c.player.p.slice(),approaching=deep.snapshot().approaching;c.updatePlayer(1/60);c.t+=1/60;if(frames%6===0)for(const f of moving)pose(f,c.t,f.p);const snapshot=deep.snapshot();if(snapshot.holding&&!holds.some(h=>h.id===snapshot.encounter)){const f=actors.find(f=>f.encounterId===snapshot.encounter);holds.push({id:snapshot.encounter,at:c.t,p:c.player.p.slice(),samples:(()=>{const original={p:f.p.slice(),yaw:f.yaw,pitch:f.pitch},samples=[];for(const seconds of f.frilledShark?[0,2,4]:[0,30,60]){pose(f,c.t+seconds,f.p);for(const vp of viewports)samples.push({seconds,...viewSample(f,vp)});}f.p.splice(0,3,...original.p);f.yaw=original.yaw;f.pitch=original.pitch;return samples;})()});}maxStep=Math.max(maxStep,V.dist(before,c.player.p));if(approaching){approachFrames++;maxApproachSpeed=Math.max(maxApproachSpeed,V.len(c.player.velocity));approachSamples.push({p:c.player.p.slice(),speed:V.len(c.player.velocity)});}}
+ c.auto=false;features.navigation.prepareDive({resume:false});features.deepsea.prepareDive({resume:false});features.deepsea.startDive();const departure=c.player.p.slice();assert(deep.travel(station.id));let frames=0,approachFrames=0,maxApproachSpeed=0,maxStep=0,approachSamples=[],holds=[],currentHold=null;const expected=get('DeepseaRules').itinerary(T.route('midwater',station.id,departure),get('deepseaEncounters'),(a,b)=>get('OceanRegions').pathClear(a,b,.4)).filter(l=>l.encounter).map(l=>l.encounter.id);
+ // Preserve the existing travel-time budget and add only the time deliberately
+ // spent at the now player-controlled stops. No timer may resume the guide.
+ const frameBudget=18000+expected.length*900;
+ for(;frames<frameBudget&&deep.snapshot().travelTarget;frames++){
+  const before=c.player.p.slice(),approaching=deep.snapshot().approaching;c.updatePlayer(1/60);c.t+=1/60;if(frames%6===0)for(const f of moving)pose(f,c.t,f.p);const snapshot=deep.snapshot();
+  if(snapshot.holding){
+   assert.equal(snapshot.guideMode,'observing');assert.equal(snapshot.travelTarget,station.id);assert.equal(c.auto,false);
+   if(!currentHold){
+    assert(!holds.some(h=>h.id===snapshot.encounter),'Explicit continuation repeated a completed encounter');
+    const f=actors.find(f=>f.encounterId===snapshot.encounter);
+    currentHold={id:snapshot.encounter,at:c.t,p:c.player.p.slice(),samples:(()=>{const original={p:f.p.slice(),yaw:f.yaw,pitch:f.pitch},samples=[];for(const seconds of f.frilledShark?[0,2,4]:[0,30,60]){pose(f,c.t+seconds,f.p);for(const vp of viewports)samples.push({seconds,...viewSample(f,vp)});}f.p.splice(0,3,...original.p);f.yaw=original.yaw;f.pitch=original.pitch;return samples;})()};holds.push(currentHold);
+   }
+   assert(V.dist(c.player.p,currentHold.p)<1e-9,'Paused observation moved the swimmer');
+   if(c.t-currentHold.at>=15){
+    currentHold.heldSeconds=c.t-currentHold.at;const position=c.player.p.slice();assert(deep.resumeTravel(),'Public explicit continuation failed');assert(V.dist(c.player.p,position)<1e-9,'Continuing teleported the swimmer');assert.equal(deep.snapshot().travelTarget,station.id);assert.equal(deep.snapshot().guideMode,'traveling');currentHold=null;
+   }
+  }
+  maxStep=Math.max(maxStep,V.dist(before,c.player.p));if(approaching){approachFrames++;maxApproachSpeed=Math.max(maxApproachSpeed,V.len(c.player.velocity));approachSamples.push({p:c.player.p.slice(),speed:V.len(c.player.velocity)});}
+ }
  assert.equal(deep.snapshot().travelTarget,null);assert.equal(c.auto,false);
  const arrival={expected,holds,approachFrames,maxApproachSpeed,finalApproachSpeed:Math.max(0,...approachSamples.filter(x=>V.dist(x.p,c.player.p)<=4).map(x=>x.speed)),maxStep,footClearance:c.player.p[1]-T.floorAt(c.player.p[0],c.player.p[2],c.player.p[1]+.1),id:station.id,departure,p:c.player.p.slice(),yaw:c.player.yaw,pitch:c.player.pitch,seconds:frames/60,notes:notes.splice(0),samples:[]};
  for(const seconds of [0,30,60])for(const vp of viewports){
@@ -56,7 +74,8 @@ for(const r of results){
  check(r.id+' real arrival leaves an in-frame selectable individual in all three viewports',()=>{for(const s of r.samples){const valid=s.actors.filter(a=>a.valid&&a.picked===a.uid);assert(valid.length>0,JSON.stringify({viewport:s.viewport,seconds:s.seconds,actors:s.actors.map(a=>({uid:a.uid,d:a.distance,max:a.observeDistance,blocked:a.blocked}))}));assert(valid.some(a=>a.bodyLengthPixels>=12),'animal remains too small at the actual approach endpoint');}});
 }
 check('actual compiled corridor actors are approached and held in every planned trip',()=>{assert.equal(T.encounters.length,9);for(const r of results){assert.deepEqual(r.holds.map(h=>h.id),Array.from(r.expected),r.id+' missed a real observation stop');for(const hold of r.holds)for(const s of hold.samples){assert(s.valid&&s.picked===s.uid,JSON.stringify({station:r.id,hold:hold.id,position:hold.p,sample:s}));assert(s.bodyLengthPixels>=12);}}});
-check('900 m frilled shark has a readable full-body side view during the actual dwell, then both deeper trips arrive',()=>{
+check('every observation stop remains stationary for fifteen seconds until explicit public continuation',()=>{for(const r of results)for(const hold of r.holds)assert(hold.heldSeconds>=15,JSON.stringify({station:r.id,hold:hold.id,heldSeconds:hold.heldSeconds}));});
+check('900 m frilled shark has a readable full-body side view in the first four seconds, then both deeper trips arrive',()=>{
  assert(!results.find(r=>r.id==='midwater').holds.some(h=>h.id==='frilled-shark-pass'));
  for(const id of ['slope','hadal']){const trip=results.find(r=>r.id===id),hold=trip.holds.find(h=>h.id==='frilled-shark-pass');assert(hold,id+' must visit the authored 900 m encounter');for(const s of hold.samples){assert(s.fullBodyInFrame,JSON.stringify({trip:id,sample:s}));assert(s.projectedWidthPixels>=(s.viewport[1]>=800?100:40),JSON.stringify({trip:id,sample:s}));assert(s.broadsideCosine>.85,JSON.stringify({trip:id,sample:s}));}assert(trip.notes.some(n=>n.includes('已到觀察區')||n.includes('已抵達')));}
 });

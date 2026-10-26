@@ -3,14 +3,20 @@
 // Compose runtime additions without mutating the immutable baked trench.
 const deepseaEncounters=Object.freeze([...(OceanTrench.encounters||[]),...(typeof OarfishWorld==='undefined'?[]:[OarfishWorld.encounter]),...(typeof FrilledSharkWorld==='undefined'?[]:[FrilledSharkWorld.encounter]),...(typeof BarreleyeWorld==='undefined'?[]:[BarreleyeWorld.encounter])]);
 const DeepseaRules=(()=>{
- const initial=()=>({schema:1,deployed:false,station:'midwater',visited:[]});
+ const initial=()=>({schema:2,deployed:false,station:'midwater',visited:[],guide:null});
  const station=id=>OceanTrench.stations.find(s=>s.id===id);
  function areaName(p){
   if(!Array.isArray(p)||p.length!==3||!p.every(Number.isFinite)||!OceanTrench.containsXZ(p[0],p[2]))return null;
   const near=OceanTrench.stations.find(s=>V.dist(p,s.p)<45);if(near)return near.name;
   const depth=-p[1];return depth<200?'外海大陸坡':depth<500?'大陸坡岩礁':depth<1000?'深海中層':depth<6000?'深海':'海溝深處';
  }
- function sanitize(raw){const s=initial();if(!raw||typeof raw!=='object')return s;const found=station(raw.station);if(found)s.station=found.id;if(Array.isArray(raw.visited))s.visited=[...new Set(raw.visited.filter(id=>station(id)))];return s;}
+ function sanitize(raw){
+  const s=initial();if(!raw||typeof raw!=='object')return s;
+  const found=station(raw.station);if(found)s.station=found.id;
+  if(Array.isArray(raw.visited))s.visited=[...new Set(raw.visited.filter(id=>station(id)))];
+  const guide=raw.guide;if(guide&&station(guide.target))s.guide={target:guide.target,passed:deepseaEncounters.filter(e=>e.guide!==false&&Array.isArray(guide.passed)&&guide.passed.includes(e.id)).map(e=>e.id)};
+  return s;
+ }
  function canResume(raw,p){const b=OceanTrench.worldBounds;return Array.isArray(p)&&p.length===3&&p.every(Number.isFinite)&&p[0]>=b.left&&p[0]<=b.right&&p[2]>=b.top&&p[2]<=b.bottom&&p[1]>=OceanTrench.bounds.min[1]&&p[1]<=-.65;}
  function advance(position,route,index,budget){
   let p=position.slice(),i=Math.max(0,Math.min(route.length,index));
@@ -48,10 +54,14 @@ const DeepseaRules=(()=>{
  return {initial,sanitize,station,areaName,canResume,advance,swimScale,itinerary};
 })();
 const oceanDeepsea=(()=>{
- const R=DeepseaRules,state=()=>oceanFeatures.state('deepsea');let transit=null,patrol=null,journey=null,lastHUD=0;
+ const R=DeepseaRules,state=()=>oceanFeatures.state('deepsea');let transit=null,patrol=null,journey=null,pausedEncounter=null,lastHUD=0;
  const isActive=()=>active&&OceanTrench.containsXZ(player.p[0],player.p[2])&&player.p[1]<-160;
  const current=()=>R.station(state().station)||OceanTrench.stations[0];
- function clearMotion(){transit=null;patrol=null;journey=null;stopAuto();resetInput();}
+ function clearMotion(keepGuide=false){transit=null;patrol=null;journey=null;pausedEncounter=null;if(!keepGuide)state().guide=null;stopAuto();resetInput();}
+ function pauseTravel(){
+  if(!transit)return;
+  transit=null;patrol=null;journey=null;player.velocity=[0,0,0];stopAuto();paintHUD();saveVoyage();
+ }
  function aimAt(p){const d=V.sub(p,player.p);player.yaw=Math.atan2(d[0],-d[2]);player.pitch=clamp(Math.atan2(d[1],Math.hypot(d[0],d[2])),-1.2,1.2);cameraCut=true;}
  function deploy(id){
   if(!R.station(id))return false;
@@ -75,8 +85,8 @@ const oceanDeepsea=(()=>{
   if(!fish)return null;
   const point=animalFocusPoint(fish),traits=speciesTraits(fish.species),sp=SPECIES[fish.species],size=sp.size,ribbon=sp.id==='oarfish',frilled=sp.id==='frilled_shark',barreleye=sp.id==='barreleye',sideView=ribbon||frilled||barreleye;
   const drift=Number.isFinite(fish.radius)?Math.max(0,fish.radius):Math.max(0,SPECIES[fish.species].motionProfile?.radius||0);
-  // Leave room for the natural orbit in portrait view. The shark's four-second
-  // dwell needs a closer side view so its slowly turning body stays readable.
+  // Leave room for the natural orbit in portrait view. The shark initially
+  // receives a closer side view; the swimmer can then look around freely.
   const distance=Math.min(traits.observeDistance*.72,Math.max(traits.viewDistance,size*2,ribbon?size*2.25:frilled?drift*2.2:drift*7,barreleye?.80:traits.micro?1.05:1.5));
   const away=V.sub(player.p,point),normal=[Math.sin(fish.yaw||0),0,Math.cos(fish.yaw||0)];
   // Approach elongated animals from their nearer broad side. The frilled
@@ -88,7 +98,7 @@ const oceanDeepsea=(()=>{
    let p=endpoint(point,angle+turn);
    if(frilled&&typeof frilledSharkMotionPose==='function'){
     // A fixed observation point must fit the shark when we arrive, not its
-    // heading at the gate. Predict the middle of the four-second dwell on a
+    // heading at the gate. Predict the first moments of observation on a
     // detached pose; the real animal and the resulting route never retarget.
     const predicted={...fish,p:fish.p.slice()},side=V.dot(away,normal)<0?Math.PI:0;let eta=approachSeconds(V.dist(player.p,p));
     for(let i=0;i<10;i++){frilledSharkMotionPose(predicted,t+eta+2);p=endpoint(animalFocusPoint(predicted),predicted.yaw+side+turn);eta=approachSeconds(V.dist(player.p,p));}
@@ -108,13 +118,16 @@ const oceanDeepsea=(()=>{
  }
  function encounterAnimal(encounter){return life.find(f=>f.encounterId===encounter.id&&f.ecologyPresent!==false&&(f.faunaVisibility??1)>=.8);}
  function completeLeg(trip){
-  if(trip.returning){nextLeg();return;}
   if(trip.approaching){
-   if(trip.encounter){transit.hold=4;player.velocity=[0,0,0];const f=life.find(f=>f.uid===trip.observationUID);if(f)aimAt(animalFocusPoint(f));paintHUD();return;}
+   if(trip.encounter){
+    const guide=state().guide;if(guide&&!guide.passed.includes(trip.encounter.id))guide.passed.push(trip.encounter.id);
+    pausedEncounter=trip.encounter.id;player.velocity=[0,0,0];const f=life.find(f=>f.uid===trip.observationUID);if(f)aimAt(animalFocusPoint(f));
+    pauseTravel();return;
+   }
    finishArrival(trip.target,trip.observationUID);return;
   }
   const fish=trip.encounter?encounterAnimal(trip.encounter):observationTarget(trip.target),approach=approachRoute(trip.target,fish);
-  if(approach){transit={...approach,encounter:trip.encounter,returnTo:player.p.slice()};paintHUD();return;}
+  if(approach){transit={...approach,encounter:trip.encounter};paintHUD();return;}
   if(trip.encounter)nextLeg();else finishArrival(trip.target);
  }
  function finishArrival(id,uid=null){
@@ -123,25 +136,36 @@ const oceanDeepsea=(()=>{
   aimAt(fish?animalFocusPoint(fish):R.station(id).look);saveVoyage();
   toast(fish?'已到觀察區 · 點一下附近生物，慢慢觀察。':'已抵達 '+R.station(id).name+' · 游近後點一下生物。');
  }
- function travel(id){
-  const target=R.station(id);if(!active||!target||V.dist(player.p,target.p)<2&&!transit)return false;
+ function beginTravel(id,passed=[]){
+  const target=R.station(id);if(!active||!target||photoOpen||voyage.photoBusy)return false;
+  if(V.dist(player.p,target.p)<2){finishArrival(id);return true;}
   const route=OceanTrench.route(state().station,id,player.p);
   if(!Array.isArray(route)||route.length<2){toast('先游到開闊水域，再跟著海流前往。');return false;}
   closePanel();clearMotion();if(typeof oceanSelection!=='undefined')oceanSelection.clear();
-  journey={target:id,legs:R.itinerary(route,deepseaEncounters,(a,b)=>OceanRegions.pathClear(a,b,.4))};nextLeg();auto=true;setAutoUI();renderer.dirty=true;paintHUD();return true;
+  if(voyage.photoMode&&typeof togglePhotoMode==='function')togglePhotoMode();
+  state().guide={target:id,passed:passed.slice()};
+  journey={target:id,legs:R.itinerary(route,deepseaEncounters.filter(e=>!passed.includes(e.id)),(a,b)=>OceanRegions.pathClear(a,b,.4))};nextLeg();auto=true;setAutoUI();renderer.dirty=true;paintHUD();saveVoyage();return true;
  }
- function cancelTravel(){if(!transit&&!patrol)return;clearMotion();paintHUD();toast('自由游動中。');}
+ function travel(id){const target=R.station(id);if(!target||V.dist(player.p,target.p)<2&&!state().guide)return false;return beginTravel(id);}
+ function resumeTravel(){const guide=state().guide;return !!guide&&beginTravel(guide.target,guide.passed);}
+ function cancelTravel(){if(!transit&&!patrol&&!state().guide)return;clearMotion();paintHUD();saveVoyage();toast('已結束導覽，可以自由游動。');}
  function constrain(p,from=null){
   const b=OceanTrench.worldBounds;p[0]=clamp(p[0],b.left+.8,b.right-.8);p[2]=clamp(p[2],b.top+.8,b.bottom-.8);
   p[1]=clamp(p[1],groundHeight(p[0],p[2])+.82,-.65);
   OceanRegions.resolve(p,.4,from);return p;
  }
- function prepareDive(){state().deployed=false;renderer.submersible=false;transit=null;patrol=null;journey=null;renderer.forceShadow=true;renderer.dirty=true;}
+ function prepareDive({resume=false}={}){clearMotion(resume);state().deployed=false;renderer.submersible=false;renderer.forceShadow=true;renderer.dirty=true;}
  function start(){voyage.previousPosition=player.p.slice();paintHUD();}
- function end(){clearMotion();$('deepseaStatus')?.classList.add('hidden');state().deployed=false;renderer.submersible=false;document.body.classList.remove('deepsea-active');if(typeof oceanDiveUI!=='undefined')oceanDiveUI.setVehicleLabel('');}
+ function end(){clearMotion(true);$('deepseaStatus')?.classList.add('hidden');state().deployed=false;renderer.submersible=false;document.body.classList.remove('deepsea-active');if(typeof oceanDiveUI!=='undefined')oceanDiveUI.setVehicleLabel('');}
  function paintHUD(){
   const enabled=isActive();document.body.classList.toggle('deepsea-active',enabled);if(typeof oceanDiveUI!=='undefined')oceanDiveUI.setVehicleLabel('');
-  const label=$('deepseaStatus');if(label){label.classList.toggle('hidden',!transit||!!modal||photoOpen);label.querySelector('span').textContent=transit?(transit.hold>0?'停一會，留意身旁的身影 · ':transit.approaching?'放慢速度，接近觀察區 · ':'順著海流 · ')+R.station(transit.target).name:current().name;label.querySelector('button').classList.toggle('hidden',!transit&&!patrol);}
+  const label=$('deepseaStatus'),guide=state().guide;
+  if(label){
+   label.classList.toggle('hidden',!active||!guide||!!modal||photoOpen);
+   const text=guide?(transit?(transit.approaching?'放慢速度，接近觀察區':'順著海流'):pausedEncounter?'已停靠，可以慢慢觀察':'導覽已暫停')+' · '+R.station(guide.target).name:current().name;
+   const caption=label.querySelector('span');if(caption.textContent!==text)caption.textContent=text;
+   const button=label.querySelector('#deepseaContinue'),action=transit?'停下觀察':'繼續前往';if(button.textContent!==action)button.textContent=action;
+  }
   const area=active&&R.areaName(player.p);if(area)$('areaName').textContent=area;
   if(enabled){const air=$('airStatus');if(air)air.textContent='自由探索';}
  }
@@ -154,29 +178,29 @@ const oceanDeepsea=(()=>{
  }
  function render(){
   panelTitle('THE DEEP','從微光，游向深藍');
-  $('panelBody').innerHTML=`<p class="panel-note">沿東方大陸坡，直接游入 7,000 公尺海溝。開闊處的海流會加快游動，靠近生物時自然放慢。</p><div class="deepsea-stations">${OceanTrench.stations.map(s=>`<article class="feature-section"><span class="feature-badge">${s.depth.toLocaleString()} m${state().visited.includes(s.id)?' · 已探索':''}</span><h3>${safe(s.name)}</h3><p>${s.id==='midwater'?'在微光水層尋找緩緩浮游的身影。':s.id==='slope'?'沿岩壁降到軟泥平台，低頭留意細小管足。':'下降至海溝底部，觀察泥床上方的柔軟魚影。'}</p><p class="feature-muted">沿途會在生物棲地放慢，短暫停留後繼續前進。點選生物、移動或拖曳，隨時接手探索。</p><button class="muted-btn" data-deepsea-station="${s.id}" ${active&&V.dist(player.p,s.p)<2&&!transit?'disabled':''}>${active&&V.dist(player.p,s.p)<2&&!transit?'目前位置':'跟著海流前往'} ↗</button></article>`).join('')}</div><p class="panel-note">移動或拖曳，就能隨時接手。</p>`;
+  $('panelBody').innerHTML=`<p class="panel-note">沿東方大陸坡，直接游入 7,000 公尺海溝。開闊處的海流會加快游動，靠近生物時自然放慢。</p><div class="deepsea-stations">${OceanTrench.stations.map(s=>`<article class="feature-section"><span class="feature-badge">${s.depth.toLocaleString()} m${state().visited.includes(s.id)?' · 已探索':''}</span><h3>${safe(s.name)}</h3><p>${s.id==='midwater'?'在微光水層尋找緩緩浮游的身影。':s.id==='slope'?'沿岩壁降到軟泥平台，低頭留意細小管足。':'下降至海溝底部，觀察泥床上方的柔軟魚影。'}</p><p class="feature-muted">沿途會在生物棲地停下，讓你慢慢觀察。點選生物、移動或拖曳，隨時接手探索；準備好再按「繼續前往」。</p><button class="muted-btn" data-deepsea-station="${s.id}" ${active&&V.dist(player.p,s.p)<2&&!transit?'disabled':''}>${active&&V.dist(player.p,s.p)<2&&!transit?'目前位置':'跟著海流前往'} ↗</button></article>`).join('')}</div><p class="panel-note">移動或拖曳就能接手，目的地會保留；重開續玩後也由你決定何時繼續。</p>`;
   $('panelBody').querySelectorAll('[data-deepsea-station]').forEach(b=>b.onclick=()=>deploy(b.dataset.deepseaStation));
  }
  function init(){
   oceanFeatures.addMenu({id:'deepsea',label:'深海與海溝',panel:'deepsea'});
-  const status=document.createElement('div');status.id='deepseaStatus';status.className='hidden';status.innerHTML='<span></span><button type="button">自由游動</button>';status.querySelector('button').onclick=cancelTravel;$('hud').append(status);
+  const status=document.createElement('div');status.id='deepseaStatus';status.className='hidden';status.innerHTML='<span role="status"></span><div class="deepsea-actions"><button id="deepseaContinue" type="button">停下觀察</button><button id="deepseaCancel" type="button">結束導覽</button></div>';status.querySelector('#deepseaContinue').onclick=()=>{if(transit)pauseTravel();else resumeTravel();$('ocean')?.focus?.({preventScroll:true});};status.querySelector('#deepseaCancel').onclick=()=>{cancelTravel();$('ocean')?.focus?.({preventScroll:true});};$('hud').append(status);
   const oldCollide=collide;collide=function(p,from=null){return OceanTrench.containsXZ(p[0],p[2])?constrain(p,from):oldCollide(p,from);};
   const oldPlayer=updatePlayer;updatePlayer=function(dt){
-   if(!auto&&(transit||patrol)){transit=null;patrol=null;journey=null;paintHUD();}
+   if(!auto&&transit)pauseTravel();
+   if(!auto&&patrol){patrol=null;paintHUD();}
    if(auto&&!follow&&!oceanFeatures.pointerCaptured()&&(transit||isActive())){
     if(!transit&&!patrol){const route=current().route||[current().p,current().look,current().p];patrol={route:[player.p.slice(),...route.map(p=>p.slice())],index:1};}
-    if(transit?.hold>0){const trip=transit;trip.hold=Math.max(0,trip.hold-dt);player.velocity=[0,0,0];const f=life.find(f=>f.uid===trip.observationUID);if(f)aimAt(animalFocusPoint(f));if(trip.hold===0){transit={target:trip.target,route:[player.p.slice(),trip.returnTo],index:1,returning:true};paintHUD();}return;}
     const trip=transit||patrol,before=player.p.slice(),remaining=V.dist(before,trip.route.at(-1));
-    const speed=transit?.approaching?approachSpeed(remaining):transit?.returning?3.2:transit?mix(8,260,smooth01((remaining-12)/180)):2.2,next=R.advance(before,trip.route,trip.index,dt*speed);
+    const speed=transit?.approaching?approachSpeed(remaining):transit?mix(8,260,smooth01((remaining-12)/180)):2.2,next=R.advance(before,trip.route,trip.index,dt*speed);
     player.p=collide(next.p,before);const d=V.sub(player.p,before);player.velocity=V.mul(d,1/Math.max(.0001,dt));
     if(V.len(d)>.001){player.yaw=lerpAngle(player.yaw,Math.atan2(d[0],-d[2]),1-Math.exp(-dt*3));player.pitch=mix(player.pitch,clamp(Math.atan2(d[1],Math.hypot(d[0],d[2])),-1.2,1.2),1-Math.exp(-dt*3));}
-    if(V.dist(player.p,next.p)>.25){clearMotion();toast('前方有岩壁，請自行游過。');return;}
+    if(V.dist(player.p,next.p)>.25){if(transit)pauseTravel();else clearMotion(true);toast('前方有岩壁，請自行游過，再按「繼續前往」。');return;}
     trip.index=next.index;if(next.done){if(transit)completeLeg(transit);else{patrol.index=1;patrol.route=[player.p.slice(),...(current().route||[current().p,current().look,current().p]).map(p=>p.slice())];}}return;
    }
    const speed=settings.speed;settings.speed=speed*R.swimScale(player.p);try{oldPlayer(dt);}finally{settings.speed=speed;}
   };
   renderer.submersible=false;
  }
- const feature={id:'deepsea',initial:R.initial,sanitize:R.sanitize,init,prepareDive,startDive:start,endDive:end,tick,paintHUD,photoMetadata(photo){const area=R.areaName(player.p);if(area)photo.area=area+' · '+Math.round(-player.p[1]).toLocaleString()+' m';},shipRender(){if(voyage.state.resume&&R.canResume(state(),voyage.state.resume.p)&&voyage.state.resume.p[1]<-160)$('shipContinue').textContent='繼續深海探索';},reset(){transit=null;patrol=null;journey=null;renderer.submersible=false;},renderPanel(type){if(type!=='deepsea')return false;render();return true;}};
- oceanFeatures.register(feature);return {isActive,deploy,travel,cancelTravel,current,feature,snapshot:()=>({deployed:false,freeSwimming:true,deep:isActive(),station:state().station,travelTarget:transit?.target||null,approaching:transit?.approaching===true,encounter:transit?.encounter?.id||null,holding:transit?.hold>0,vehicle:false,position:player.p.slice()})};
+ const feature={id:'deepsea',initial:R.initial,sanitize:R.sanitize,init,prepareDive,startDive:start,endDive:end,tick,paintHUD,panelChanged:pauseTravel,photoOpened:pauseTravel,beforePhoto:pauseTravel,cameraModeChanged(enabled){if(enabled)pauseTravel();},photoMetadata(photo){const area=R.areaName(player.p);if(area)photo.area=area+' · '+Math.round(-player.p[1]).toLocaleString()+' m';},shipRender(){if(voyage.state.resume&&R.canResume(state(),voyage.state.resume.p)&&voyage.state.resume.p[1]<-160)$('shipContinue').textContent='繼續深海探索';},reset(){clearMotion(true);renderer.submersible=false;},renderPanel(type){if(type!=='deepsea')return false;render();return true;}};
+ oceanFeatures.register(feature);return {isActive,deploy,travel,resumeTravel,cancelTravel,current,feature,snapshot:()=>({deployed:false,freeSwimming:true,deep:isActive(),station:state().station,travelTarget:state().guide?.target||null,guideMode:transit?'traveling':state().guide?(pausedEncounter?'observing':'paused'):null,approaching:transit?.approaching===true,encounter:transit?.encounter?.id||pausedEncounter,holding:!!pausedEncounter,vehicle:false,position:player.p.slice()})};
 })();

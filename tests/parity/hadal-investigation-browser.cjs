@@ -231,8 +231,19 @@ const check=(name,pass,detail)=>{results.push({name,pass:!!pass,detail});console
   if(touch){await page.setViewportSize({width:390,height:844});await session.send('Emulation.setSafeAreaInsetsOverride',{insets:{top:0,right:0,bottom:0,left:0}});await page.waitForTimeout(450);}
   await press('#hadalMark');check('visible journal explicitly enables tracking',(await state()).story.tracking==='hadal'&&(await state()).waypoint==='study:hadal-reference');await openHadal();
   await press('#hadalNavigation');await press('[data-deepsea-station="hadal"]');
-  let arrived=false;const transitStart=Date.now();
-  while(Date.now()-transitStart<240000){await page.waitForTimeout(1000);const s=await state();traces.push({at:Date.now(),p:s.p,target:s.deepsea.travelTarget,records:s.hadal.records.length,scale:s.scale,gl:s.gl});if(!s.deepsea.travelTarget&&s.p[1]<-6990){arrived=true;break;}if(traces.length%15===0)console.log(JSON.stringify({transit:s.deepsea,seconds:(Date.now()-transitStart)/1000}));}
+  let arrived=false;const transitStart=Date.now(),guideStops=new Set();
+  while(Date.now()-transitStart<240000){
+   await page.waitForTimeout(1000);const s=await state();traces.push({at:Date.now(),p:s.p,target:s.deepsea.travelTarget,guideMode:s.deepsea.guideMode,encounter:s.deepsea.encounter,records:s.hadal.records.length,scale:s.scale,gl:s.gl});
+   if(!s.deepsea.travelTarget&&s.p[1]<-6990){arrived=true;break;}
+   if(s.deepsea.holding){
+    assert(s.deepsea.guideMode==='observing'&&s.deepsea.encounter,'Natural guide stop must await the player');
+    assert(!guideStops.has(s.deepsea.encounter),'The guide must not repeat a reached encounter: '+s.deepsea.encounter);guideStops.add(s.deepsea.encounter);
+    observations.push({stage:'explicit-guide-continuation',state:s});inputs.push({type:'control',selector:'#deepseaContinue',encounter:s.deepsea.encounter,at:new Date().toISOString()});
+    // Continue through the actual player control. No route or clock injection.
+    await press('#deepseaContinue');
+   }
+   if(traces.length%15===0)console.log(JSON.stringify({transit:s.deepsea,seconds:(Date.now()-transitStart)/1000}));
+  }
   assert(arrived,'The visible existing current must reach the actual 7 km habitat');
   const arrival=await state();check('continuous normal current reaches 7 km without granting records',arrival.p[1]<-6990&&arrival.hadal.records.length===0&&arrival.adaptive,arrival);await shot('hadal-arrival');
   if(lightAudit){
