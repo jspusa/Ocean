@@ -1,22 +1,30 @@
 /* Normal-input CPU/submission diagnosis. Run alone on native Chrome.
- * No injected time/pose/quality, forced stream residency, GPU queries or pixels.
+ * No injected time/pose/quality, forced stream residency or pixels; GPU elapsed queries are opt-in.
  * --mode=light is a collection-overhead control, not a fixed-workload A/B.
  * --checkpoints=final avoids bulk collection during both swimming legs.
- * --trace=PATH optionally records the outbound leg; it is not an FPS test. */
+ * --trace=PATH optionally records the outbound leg; it is not an FPS test.
+ * --gpu=elapsed wraps each actual render, requires final checkpoints/no trace.
+ * Acceptance: every attempt has a submission identity; only completed renders
+ * with available, non-disjoint results enter GPU summaries. Pending/deferred/
+ * invalid/overflow retain identities. Cleanup deletes only owned query objects. */
 'use strict';
 const fs=require('node:fs'),path=require('node:path'),crypto=require('node:crypto'),assert=require('node:assert/strict'),{execFileSync}=require('node:child_process');
 const option=(key,fallback)=>process.argv.find(v=>v.startsWith('--'+key+'='))?.slice(key.length+3)||fallback;
-const root=path.resolve(__dirname,'../..'),url=option('url','http://127.0.0.1:8765/'),profile=option('profile','desktop'),mode=option('mode','full'),checkpointMode=option('checkpoints','final');
-const output=path.resolve(option('out','/tmp/ocean-natural-swim-'+profile+'-'+mode+'-'+checkpointMode+'.json'));
+const root=path.resolve(__dirname,'../..'),url=option('url','http://127.0.0.1:8765/'),profile=option('profile','desktop'),mode=option('mode','full'),checkpointMode=option('checkpoints','final'),gpuMode=option('gpu','off');
+const output=path.resolve(option('out','/tmp/ocean-natural-swim-'+profile+'-'+mode+'-'+checkpointMode+(gpuMode==='off'?'':'-gpu')+'.json'));
 const tracePath=option('trace','')?path.resolve(option('trace','')):null;
 assert(['desktop','touch'].includes(profile));assert(['full','light'].includes(mode));assert(['final','periodic'].includes(checkpointMode));assert(!new URL(url).searchParams.has('still'),'Frozen scenes cannot diagnose natural swimming');
+assert(['off','elapsed'].includes(gpuMode),'Use --gpu=off|elapsed');
+if(gpuMode!=='off'){assert.equal(checkpointMode,'final','GPU collection requires final checkpoints');assert(!tracePath,'GPU collection and Chrome trace must run separately');}
 if(tracePath){assert.equal(checkpointMode,'final','Trace requires final checkpoints to avoid bulk collection during swimming');assert.notEqual(tracePath,output);assert.notEqual(tracePath+'.meta.json',output);}
 const hash=data=>crypto.createHash('sha256').update(data).digest('hex'),touch=profile==='touch';
 const sourcePaths=['src/app.js','src/engine.js','src/performance.js','src/scene_stream.js','src/mobile-controls.js','src/voyage.js','tests/parity/browser-launch.cjs'];
-const report={status:'running',url,profile,mode,checkpointMode,command:process.argv,startedAt:new Date().toISOString(),harnessSHA256:hash(fs.readFileSync(__filename)),
+if(process.argv.includes('--check-gpu-fixtures')){gpuFixtures();process.exit();}
+const report={status:'running',url,profile,mode,checkpointMode,gpuMode,command:process.argv,startedAt:new Date().toISOString(),harnessSHA256:hash(fs.readFileSync(__filename)),
  local:{head:execFileSync('git',['rev-parse','HEAD'],{cwd:root,encoding:'utf8'}).trim(),sourceSHA256:Object.fromEntries(sourcePaths.map(p=>[p,hash(fs.readFileSync(path.join(root,p)))])),indexSHA256:hash(fs.readFileSync(path.join(root,'index.html')))},
- method:'Visible native Chrome, fresh context, normal start, 30 seconds forward and 30 seconds backward using real keyboard/CDP touch, then normal menu return. Actual clock, original simulation, natural streaming and default automatic quality remain active. No readPixels, screenshots, GPU queries, forced renders, pose/time/quality/save writes or synthetic frame samples. Passive RAF and actual renderer.frame increments measure callback opportunities and completed JS submissions, NOT GPU completion, compositor presentation or physical display refresh. Holds include waiting/menu boundaries; censoring is explicit. Full adds nested synchronous CPU and actual GL buffer submissions: ordinary render uploads aggregate per frame; frame-external/attach calls and ordinary calls over 1ms remain individual records. Slow raw calls flag inclusion in the aggregate, preventing double counting. Inclusive CPU durations must not be added together. Light omits detailed wrappers. RAF/render/event samples are retained. Final checkpoint mode collects at entry, after BOTH swimming legs have settled, and at the end: no bulk CDP drain/serialization during swimming. Periodic mode additionally collects every 10 seconds for failure diagnosis; its observed IPC/serialization stalls remain in the data and must not be mixed with final-mode results. Both modes attempt partial collection on failure; a browser crash can lose the uncollected tail. Full/light routes and adaptive resolutions can differ, so differences are diagnostic, not automatic performance wins. Touch uses this computer GPU, not a physical phone or battery measurement.',
+ method:'Visible native Chrome, fresh context, normal start, 30 seconds forward and 30 seconds backward using real keyboard/CDP touch, then normal menu return. Actual clock, original simulation, natural streaming and default automatic quality remain active. No readPixels, screenshots, forced renders, pose/time/quality/save writes or synthetic frame samples. Passive RAF and actual renderer.frame increments measure callback opportunities and completed JS submissions, NOT GPU completion, compositor presentation or physical display refresh. Holds include waiting/menu boundaries; censoring is explicit. Full adds nested synchronous CPU and actual GL buffer submissions: ordinary render uploads aggregate per frame; frame-external/attach calls and ordinary calls over 1ms remain individual records. Slow raw calls flag inclusion in the aggregate, preventing double counting. Inclusive CPU durations must not be added together. Light omits detailed wrappers. RAF/render/event samples are retained. Final checkpoint mode collects at entry, after BOTH swimming legs have settled, and at the end: no bulk CDP drain/serialization during swimming. Periodic mode additionally collects every 10 seconds for failure diagnosis; its observed IPC/serialization stalls remain in the data and must not be mixed with final-mode results. Both modes attempt partial collection on failure; a browser crash can lose the uncollected tail. Full/light routes and adaptive resolutions can differ, so differences are diagnostic, not automatic performance wins. Touch uses this computer GPU, not a physical phone or battery measurement.',
  chunks:[],checkpoints:[],checks:[],errors:[],consoleErrors:[]};
+if(gpuMode!=='off')report.gpu={collectorSHA256:hash(createGpuTimer.toString()),method:'One non-overlapping TIME_ELAPSED query surrounds the complete actual Renderer.render call, including stream/resize commands it executes. No explicit flush, finish, blocking wait or forced frame. Poll only after at least four passive RAF callbacks; at most eight availability checks per callback, 128 outstanding queries. Capture submission and result as immutable events joined by render ID; invalid, deferred, overflow and pending at stop never become a guessed zero. GPU elapsed is not presentation latency or exclusive shader/pass time. Queries/polls/snapshots add observer cost; this run is diagnostic, not an automatic performance A/B. JS original-call CPU and query begin/end/poll CPU are separate. shadowDraws is the renderer total (static plus dynamic); staticShadowUpdates delta and shadow key identify cache refreshes without assigning a cause.',specification:'https://registry.khronos.org/webgl/extensions/EXT_disjoint_timer_query_webgl2/'};
 let browser,context,page,cdp,contact=null,probeInstalled=false,traceCDP,traceDone,traceStarted=false,traceEndRequested=false,traceFinished=false;
 const save=()=>{fs.mkdirSync(path.dirname(output),{recursive:true});fs.writeFileSync(output,JSON.stringify(report,null,2));};
 const check=(name,pass,detail)=>{report.checks.push({name,pass:!!pass,detail});assert(pass,name);};
@@ -75,10 +83,125 @@ async function finishTrace(){
  finally{clearTimeout(timer);if(fd!==undefined)fs.closeSync(fd);if(handle)try{await traceCDP.send('IO.close',{handle});}catch(error){report.trace.closeError=String(error);report.trace.status='failed';throw error;}}
 }
 
-function installProbe(detail){
- const g=renderer.gl,stream=renderer.sceneStream,restores=[],listeners=[],names=['raf','renders','holds','events','life','stream','resizes','attachments','uploads','allocations','appCPU'];
+// External WebGL/clock seam shared by browser collection and CPU fixtures.
+// No flush/finish/wait loop: only AVAILABLE results after four observed RAFs.
+function createGpuTimer(g,now,emit){
+ const pending=new Map(),issues=[],limit=128,delay=4,readsPerRAF=8;
+ let ext=null,serial=0,stopped=false,faulted=false,created=0,deleted=0,stopReceipt=null;
+ const info={enabled:true,extension:'EXT_disjoint_timer_query_webgl2',supported:false,delayRAFs:delay,maxReadsPerRAF:readsPerRAF,maxPending:limit};
+ const log=(kind,extra={})=>emit({kind,at:now(),rafSerial:serial,...extra});
+ const fault=(where,error)=>{faulted=true;const row={where,error:String(error)};issues.push(row);log('error',row);};
+ try{
+  ext=g.getExtension(info.extension);if(!ext)info.reason='extension-unavailable';
+  else{info.counterBits=g.getQuery(ext.TIME_ELAPSED_EXT,ext.QUERY_COUNTER_BITS_EXT);info.initialExternalQuery=!!g.getQuery(ext.TIME_ELAPSED_EXT,g.CURRENT_QUERY);info.initialDisjoint=g.getParameter(ext.GPU_DISJOINT_EXT);info.supported=info.counterBits>0&&!info.initialExternalQuery&&!g.isContextLost();if(!info.supported)info.reason='counter-bits, initial ownership or context unavailable';}
+ }catch(error){info.reason=String(error);fault('initialize',error);}
+ const drop=ticket=>{
+  if(!ticket.query)return;
+  // Never end a foreign query, and never delete an object still active here.
+  if(g.getQuery(ext.TIME_ELAPSED_EXT,g.CURRENT_QUERY)===ticket.query)throw Error('Owned query is still active');
+  g.deleteQuery(ticket.query);pending.delete(ticket.query);deleted++;
+ };
+ const finish=(ticket,status,rawNs=null,extra={})=>{
+  if(ticket.terminal)return;drop(ticket);ticket.terminal=true;
+  log('result',{id:ticket.id,status,queryResultNs:rawNs,gpuMs:status==='valid'?rawNs/1e6:null,submissionOutcome:ticket.outcome??null,submittedRAF:ticket.serial,ageRAFs:serial-ticket.serial,...extra});
+ };
+ const poll=()=>{
+  if(!info.supported||!pending.size)return;
+  const at=now();let tested=0,ready=[],disjoint=false;
+  try{
+   if(g.isContextLost()){for(const ticket of [...pending.values()])finish(ticket,'context-lost');return;}
+   disjoint=g.getParameter(ext.GPU_DISJOINT_EXT);
+   if(!disjoint)for(const ticket of pending.values()){
+    if(tested>=readsPerRAF||serial-ticket.serial<delay)break;
+    tested++;if(!g.getQueryParameter(ticket.query,g.QUERY_RESULT_AVAILABLE))break;
+    ready.push({ticket,ns:g.getQueryParameter(ticket.query,g.QUERY_RESULT)});
+   }
+   // A disjoint detected anywhere in this collection invalidates every query
+   // still outstanding, including values just read but not yet accepted.
+   disjoint=g.getParameter(ext.GPU_DISJOINT_EXT)||disjoint;
+   if(disjoint){log('disjoint',{ids:[...pending.values()].map(t=>t.id)});for(const ticket of [...pending.values()])finish(ticket,'disjoint');}
+   else for(const {ticket,ns} of ready)finish(ticket,ticket.outcome!=='complete'?ticket.outcome:Number.isSafeInteger(ns)&&ns>=0?'valid':'invalid-result',ns,{available:true});
+  }catch(error){fault('poll',error);}
+  finally{log('poll',{tested,ready:ready.length,pending:pending.size,disjoint,cpuMs:now()-at});}
+ };
+ return {
+  info,
+  begin(id,before){
+   const at=now(),ticket={id,before,serial,query:null,status:'pending',terminal:false};
+   try{
+    if(stopped||faulted||!info.supported)ticket.status='collector-unavailable';
+    else if(g.isContextLost())ticket.status='context-lost';
+    else if(g.getQuery(ext.TIME_ELAPSED_EXT,g.CURRENT_QUERY)){ticket.status='external-query-active';log('ownership-conflict',{id});}
+    else if(pending.size>=limit)ticket.status='overflow';
+    else{ticket.query=g.createQuery();if(!ticket.query)throw Error('Query allocation failed');pending.set(ticket.query,ticket);created++;g.beginQuery(ext.TIME_ELAPSED_EXT,ticket.query);if(g.getQuery(ext.TIME_ELAPSED_EXT,g.CURRENT_QUERY)!==ticket.query)throw Error('Query begin did not establish ownership');}
+   }catch(error){ticket.status='query-error';fault('begin',error);}
+   ticket.beginCPUms=now()-at;return ticket;
+  },
+  end(ticket,submission,after){
+   if(!ticket)return;const at=now();ticket.outcome=submission.error?'render-error':submission.advance===1&&!submission.returnedFalse?'complete':submission.returnedFalse?'deferred':'no-frame';
+   try{
+    if(ticket.query){
+     const current=g.getQuery(ext.TIME_ELAPSED_EXT,g.CURRENT_QUERY);
+     if(current===ticket.query){g.endQuery(ext.TIME_ELAPSED_EXT);if(g.getQuery(ext.TIME_ELAPSED_EXT,g.CURRENT_QUERY)===ticket.query)throw Error('Query end retained ownership');}
+     else{ticket.status=g.isContextLost()?'context-lost':'ownership-lost';log('ownership-conflict',{id:ticket.id,point:'end',status:ticket.status});}
+    }
+   }catch(error){ticket.status='query-error';fault('end',error);}
+   const endCPUms=now()-at;if(after)submission={...submission,after:after()};
+   log('submitted',{id:ticket.id,status:ticket.status,before:ticket.before,submission,beginCPUms:ticket.beginCPUms,endCPUms});
+   if(ticket.status!=='pending')try{finish(ticket,ticket.status);}catch(error){fault('release-failed-query',error);}
+  },
+  tick(){if(!stopped){serial++;poll();}},
+  stop(){
+   if(!stopped){stopped=true;poll();stopReceipt={pending:[...pending.values()].map(t=>({id:t.id,submittedRAF:t.serial,ageRAFs:serial-t.serial,status:'pending-at-stop',submissionOutcome:t.outcome??null})),created,deleted,issues:issues.slice()};log('stopped',stopReceipt);}
+   return stopReceipt;
+  },
+  restore(){
+   this.stop();const failures=[],released=[],contextLost=g.isContextLost();let before=null,after=null,beforeOwned=false;
+   try{
+    if(ext){before=g.getQuery(ext.TIME_ELAPSED_EXT,g.CURRENT_QUERY);beforeOwned=!!before&&pending.has(before);if(beforeOwned)g.endQuery(ext.TIME_ELAPSED_EXT);
+     for(const ticket of [...pending.values()])try{drop(ticket);released.push(ticket.id);if(g.isQuery(ticket.query))throw Error('Deleted query remains live');}catch(error){failures.push({id:ticket.id,error:String(error)});}
+     after=g.getQuery(ext.TIME_ELAPSED_EXT,g.CURRENT_QUERY);
+    }
+   }catch(error){failures.push({error:String(error)});}
+   const currentPreserved=beforeOwned?after===null:after===before;
+   const glError=g.getError();return {ok:!contextLost&&!failures.length&&!pending.size&&currentPreserved&&glError===0,contextLost,glError,created,deleted,pending:[...pending.values()].map(t=>t.id),released,currentPreserved,failures,issues:issues.slice()};
+  }
+ };
+}
+
+// Lightweight fixtures exercise the real collector against the external WebGL
+// boundary only. They do not render, launch Chrome or assert GPU performance.
+function gpuFixtures(){
+ const fixture=()=>{
+  let current=null,ready=false,disjoint=false,lost=false,now=0,resultReads=0;const live=new Set(),deleted=[],rows=[];
+  const g={CURRENT_QUERY:1,QUERY_RESULT_AVAILABLE:2,QUERY_RESULT:3,getExtension:()=>({TIME_ELAPSED_EXT:4,QUERY_COUNTER_BITS_EXT:5,GPU_DISJOINT_EXT:6}),
+   getQuery:(target,key)=>key===5?64:current,getParameter:()=>{const v=disjoint;disjoint=false;return v;},isContextLost:()=>lost,
+   createQuery:()=>{const q={};live.add(q);return q;},beginQuery:(target,q)=>{assert.equal(current,null);current=q;},endQuery:()=>{assert(current);current=null;},
+   getQueryParameter:(q,key)=>{assert(live.has(q));if(key===2)return ready;assert(ready);resultReads++;return 1000000;},deleteQuery:q=>{assert.notEqual(current,q);assert(live.has(q));live.delete(q);deleted.push(q);},isQuery:q=>live.has(q),getError:()=>0};
+  const timer=createGpuTimer(g,()=>++now,row=>rows.push(row)),submit=(id,advance=1)=>{const ticket=timer.begin(id,{p:[1,2,3],resolution:[80,60]});timer.end(ticket,{advance,returnedFalse:advance===0,error:null,cpuSubmitMs:2,after:{resolution:[80,60]}});return ticket;};
+  return {g,timer,submit,rows,live,deleted,setReady:v=>ready=v,setDisjoint:()=>disjoint=true,setLost:()=>lost=true,setCurrent:q=>current=q,current:()=>current,resultReads:()=>resultReads};
+ };
+ const f=fixture();f.submit(1);f.setReady(true);for(let i=0;i<3;i++)f.timer.tick();assert.equal(f.resultReads(),0);f.timer.tick();assert.equal(f.rows.find(r=>r.kind==='result').gpuMs,1);assert.equal(f.rows.find(r=>r.kind==='result').status,'valid');assert.equal(f.live.size,0);
+ const d=fixture();d.submit(1);d.submit(2,0);for(let i=0;i<4;i++)d.timer.tick();assert.equal(d.resultReads(),0);d.setDisjoint();d.timer.tick();d.setReady(true);d.timer.tick();assert.deepEqual(d.rows.filter(r=>r.kind==='result').map(r=>r.status),['disjoint','disjoint']);assert.equal(d.resultReads(),0);
+ const e=fixture();e.submit(1,0);e.setReady(true);for(let i=0;i<4;i++)e.timer.tick();assert.equal(e.rows.find(r=>r.kind==='result').status,'deferred');assert.equal(e.rows.find(r=>r.kind==='result').gpuMs,null);
+ const o=fixture();for(let i=1;i<=129;i++)o.submit(i);assert.equal(o.live.size,128);assert.equal(o.rows.find(r=>r.id===129&&r.kind==='result').status,'overflow');const pending=o.timer.stop();assert.equal(pending.pending.length,128);assert.equal(o.resultReads(),0);assert.equal(o.timer.restore().ok,true);assert.equal(o.live.size,0);
+ const x=fixture(),foreign={};x.setCurrent(foreign);x.submit(1);assert.equal(x.rows.find(r=>r.kind==='result').status,'external-query-active');assert.equal(x.timer.restore().ok,true);assert.equal(x.current(),foreign);assert.equal(x.deleted.length,0);
+ const y=fixture(),ticket=y.timer.begin(1,{});y.setCurrent(foreign);y.timer.end(ticket,{advance:1,returnedFalse:false,error:null});assert.equal(y.rows.find(r=>r.kind==='result').status,'ownership-lost');assert.equal(y.current(),foreign);assert.equal(y.timer.restore().ok,true);assert.equal(y.current(),foreign);
+ const c=fixture();c.submit(1);c.setCurrent(foreign);assert.equal(c.timer.restore().ok,true);assert.equal(c.current(),foreign);assert.equal(c.deleted.length,1);
+ const l=fixture();l.submit(1);l.setLost();l.timer.tick();assert.equal(l.rows.find(r=>r.kind==='result').status,'context-lost');assert.equal(l.resultReads(),0);assert.equal(l.timer.restore().ok,false);
+ const b=fixture();for(let i=1;i<=12;i++)b.submit(i);b.setReady(true);for(let i=0;i<4;i++)b.timer.tick();assert.equal(b.resultReads(),8);b.timer.tick();assert.equal(b.resultReads(),12);
+ const u=fixture();u.submit(1);const saved=JSON.stringify(u.rows);u.setReady(true);for(let i=0;i<4;i++)u.timer.tick();assert.equal(JSON.stringify(u.rows.slice(0,JSON.parse(saved).length)),saved,'Settling must not mutate previously drained events');
+ console.log(JSON.stringify({status:'passed',fixtures:10,note:'External API fixtures only; no native GPU, timing or presentation evidence.'}));
+}
+
+function installProbe(options){
+ const detail=options.detail;
+ const g=renderer.gl,stream=renderer.sceneStream,restores=[],listeners=[],names=['raf','renders','holds','events','life','stream','resizes','attachments','uploads','allocations','appCPU',...(options.gpuFactory?['gpu']:[])];
  let data=Object.fromEntries(names.map(n=>[n,[]])),sequence=0,eventID=0,stage='installed',alive=true,rafID=null,currentFrame=null,currentUploads=null,currentAttach=null,currentResize=null,lastComplete=null,pendingRequests=[];
  const started=performance.now(),initialFrame=renderer.frame;
+ // The same standalone external-API collector runs in fixtures and Chrome; no
+ // production global or hook is installed. Default-off does not construct it.
+ const gpu=options.gpuFactory?Function('return ('+options.gpuFactory+')')()(g,()=>performance.now(),row=>data.gpu.push(row)):null;
  const state=()=>({at:performance.now(),frame:renderer.frame,p:player.p.slice(),eye:eye.slice(),yaw:player.yaw,pitch:player.pitch,t,diveSeconds,active,modal,photoOpen,adaptive:settings.adaptive,quality:renderer.quality,settingQuality:settings.quality,scale:renderer.dynamicScale,resolution:[renderer.canvas.width,renderer.canvas.height],msaa:renderer.msaaSamples,pendingResize:!!renderer.pendingResize,streamWaiting:!!stream?.waitStarted,jobs:stream?.jobs.size||0,queued:stream?.queue.length||0,loading:stream?.active||0,residentMeshes:renderer.sceneLoad?.residentMeshes??null,hidden:document.hidden,focused:document.hasFocus()});
  const event=(kind,extra={})=>{const row={id:++eventID,kind,at:performance.now(),stage,frame:currentFrame,...extra};data.events.push(row);return row;};
  const install=(owner,key,build)=>{
@@ -90,9 +213,14 @@ function installProbe(detail){
   if(!alive)return Reflect.apply(original,this,args);
   const at=performance.now(),before=this.frame,previous=currentFrame,previousUploads=currentUploads,id=++eventID;currentFrame=id;
   currentUploads=detail?{calls:0,bufferDataCalls:0,bufferSubDataCalls:0,uploadBytes:0,allocationBytes:0,cpuMs:0,maxCPUms:0}:null;let result,error=null;
+  const shadowBefore=gpu?(this.staticShadowUpdates||0):null,ticket=gpu?.begin(id,{...state(),stage,renderEye:args[0]?.slice(),renderTarget:args[1]?.slice(),renderTime:args[2],shadowKey:this._shadowKey??null,staticShadowUpdates:shadowBefore}),submitAt=gpu?performance.now():at;
   try{result=Reflect.apply(original,this,args);return result;}catch(e){error=String(e);throw e;}
   finally{
    const end=performance.now(),advance=this.frame-before,row={id,stage,at,end,cpuMs:end-at,frameBefore:before,frameAfter:this.frame,advance,returnedFalse:result===false,error};
+   if(gpu){
+    row.cpuSubmitMs=end-submitAt;
+    gpu.end(ticket,{stage,at:submitAt,end,cpuSubmitMs:row.cpuSubmitMs,frameBefore:before,frameAfter:this.frame,advance,returnedFalse:result===false,error},()=>({...state(),shadowKey:this._shadowKey??null,staticShadowUpdates:this.staticShadowUpdates||0,staticShadowUpdateDelta:(this.staticShadowUpdates||0)-shadowBefore,shadowDraws:advance===1?this.shadowDraws:null,draws:advance===1?this.drawCalls:null,triangles:advance===1?this.submittedTriangles:null,sunless:advance===1?!!this.sunless:null}));
+   }
    if(detail)Object.assign(row,{reportedInnerCPU:advance===1?this.cpuRenderMs:null,draws:advance===1?this.drawCalls:null,triangles:advance===1?this.submittedTriangles:null,staticShadowUpdates:this.staticShadowUpdates||0,bufferSubmissions:currentUploads});
    data.renders.push(row);
    if(advance>0){data.holds.push({from:lastComplete?.at??started,to:end,ms:end-(lastComplete?.at??started),fromFrame:lastComplete?.frame??initialFrame,toFrame:this.frame,fromStage:lastComplete?.stage??'installed',toStage:stage,censored:lastComplete?false:'left'});lastComplete={at:end,frame:this.frame,stage};}
@@ -156,7 +284,7 @@ function installProbe(detail){
  for(const type of ['blur','focus','pagehide','pageshow'])listen(window,type,()=>event(type,{hidden:document.hidden,focused:document.hasFocus()}));
  listen(document,'visibilitychange',()=>event('visibilitychange',{hidden:document.hidden,focused:document.hasFocus()}));
  const observe=timestamp=>{
-  if(!alive)return;const now=performance.now();
+  if(!alive)return;gpu?.tick();const now=performance.now();
   data.raf.push({timestamp,at:now,frame:renderer.frame,stage,p:player.p.slice(),t,active,modal,photoOpen,hidden:document.hidden,focused:document.hasFocus(),adaptive:settings.adaptive,quality:renderer.quality,scale:renderer.dynamicScale,width:renderer.canvas.width,height:renderer.canvas.height,streamWaiting:!!stream?.waitStarted,jobs:stream?.jobs.size||0,queued:stream?.queue.length||0,loading:stream?.active||0,completedFrameAgeMs:now-(lastComplete?.at??started),ageIsLowerBound:!lastComplete});
   rafID=requestAnimationFrame(observe);
  };
@@ -165,10 +293,10 @@ function installProbe(detail){
  window.__naturalSwimCost={
   mark(name){stage=name;return event('stage',{state:state()});},
   drain(){const at=performance.now(),rows=data;data=Object.fromEntries(names.map(n=>[n,[]]));return {sequence:++sequence,at,state:state(),rows};},
-  stop(){if(alive){alive=false;cancelAnimationFrame(rafID);const at=performance.now();data.holds.push({from:lastComplete?.at??started,to:at,ms:at-(lastComplete?.at??started),fromFrame:lastComplete?.frame??initialFrame,toFrame:null,fromStage:lastComplete?.stage??'installed',toStage:stage,censored:lastComplete?'right':'both'});event('stopped');}return {started,initial,initialFrame,lastComplete,state:state()};},
-  restore(){this.stop();const results=restores.reverse().map(f=>{try{return f();}catch(e){return {restored:false,error:String(e)};}});listeners.forEach(f=>f());return {results,ok:results.every(r=>r.restored)};}
+  stop(){if(alive){alive=false;cancelAnimationFrame(rafID);const at=performance.now();data.holds.push({from:lastComplete?.at??started,to:at,ms:at-(lastComplete?.at??started),fromFrame:lastComplete?.frame??initialFrame,toFrame:null,fromStage:lastComplete?.stage??'installed',toStage:stage,censored:lastComplete?'right':'both'});event('stopped');}return {started,initial,initialFrame,lastComplete,state:state(),...(gpu?{gpu:gpu.stop()}:{})};},
+  restore(){this.stop();const results=restores.reverse().map(f=>{try{return f();}catch(e){return {restored:false,error:String(e)};}});listeners.forEach(f=>f());const gpuRestore=gpu?.restore();return {results,...(gpu?{gpu:gpuRestore}:{}),ok:results.every(r=>r.restored)&&(!gpu||gpuRestore.ok)};}
  };
- return {started,initial,mode:detail?'full':'light'};
+ return {started,initial,mode:detail?'full':'light',...(gpu?{gpu:gpu.info}: {})};
 }
 
 async function checkpoint(label){
@@ -201,6 +329,12 @@ function summarize(){
   renderEntryCPU:stats(renders.map(r=>r.cpuMs)),lifeCPU:stats(rows('life').map(r=>r.end-r.at)),streamCPU:stats(rows('stream').map(r=>r.end-r.at)),resizeCPU:stats(rows('resizes').map(r=>r.end-r.at)),attachmentCPU:stats(rows('attachments').map(r=>r.end-r.at)),
   bufferSubmissions:{calls:aggregates.reduce((n,r)=>n+r.calls,0)+unaggregated.length,uploadBytes:[...aggregates,...unaggregated].reduce((n,r)=>n+r.uploadBytes,0),allocationBytes:[...aggregates,...unaggregated].reduce((n,r)=>n+r.allocationBytes,0),frameOutsideCalls:uploads.filter(r=>r.frame===null).length,rawSlowOrdinaryCalls:uploads.filter(r=>r.includedInFrameAggregate).length},
   stages:stages.map(name=>{const a=raf.filter(r=>r.stage===name),b=renders.filter(r=>r.stage===name),start=events.find(e=>e.kind==='stage'&&e.stage===name)?.state;return {name,samples:a.length,from:start||null,to:a.at(-1)||null,displacement:a.length&&start?distance(start.p,a.at(-1).p):null,rawRAFIntervalsMs:stats(intervals(a.map(r=>r.timestamp))),renderCPU:stats(b.map(r=>r.cpuMs)),completedFrameAgeMs:stats(a.map(r=>r.completedFrameAgeMs)),completeSubmissions:b.filter(r=>r.advance>0).length};})};
+ if(gpuMode==='elapsed'){
+  const events=rows('gpu'),submitted=events.filter(r=>r.kind==='submitted'),results=events.filter(r=>r.kind==='result'),terminal=new Map(results.map(r=>[r.id,r])),pending=report.end?.gpu?.pending||[];
+  const statusCounts={};for(const s of submitted){const status=terminal.get(s.id)?.status||(pending.some(p=>p.id===s.id)?'pending-at-stop':'unresolved');statusCounts[status]=(statusCounts[status]||0)+1;}
+  const valid=results.filter(r=>r.status==='valid');
+  report.gpu.summary={attempts:submitted.length,results:results.length,statusCounts,validElapsedMs:stats(valid.map(r=>r.gpuMs)),cpuSubmitMs:stats(submitted.map(r=>r.submission.cpuSubmitMs)),queryBeginCPUms:stats(submitted.map(r=>r.beginCPUms)),queryEndCPUms:stats(submitted.map(r=>r.endCPUms)),pollCPUms:stats(events.filter(r=>r.kind==='poll').map(r=>r.cpuMs)),pendingAtStop:pending,errors:events.filter(r=>r.kind==='error'),ownershipConflicts:events.filter(r=>r.kind==='ownership-conflict'),stages:stages.map(stage=>{const attempts=submitted.filter(r=>r.submission.stage===stage),ids=new Set(attempts.map(r=>r.id)),samples=valid.filter(r=>ids.has(r.id));return {stage,attempts:attempts.length,valid:samples.length,elapsedMs:stats(samples.map(r=>r.gpuMs))};}),identityComplete:submitted.length===renders.length&&new Set(submitted.map(r=>r.id)).size===submitted.length&&submitted.every(s=>renders.some(r=>r.id===s.id))&&new Set(results.map(r=>r.id)).size===results.length&&results.every(r=>submitted.some(s=>s.id===r.id))&&submitted.every(s=>terminal.has(s.id)||pending.some(p=>p.id===s.id))};
+ }
  return {raf,renders,events};
 }
 
@@ -220,7 +354,7 @@ function summarize(){
   report.loadedMethodSHA256=Object.fromEntries(Object.entries(methods).map(([k,v])=>[k,v?hash(v):null]));
   check('Native hardware and default adaptive quality',report.device.adaptive&&report.device.renderer&&!/swiftshader|software|llvmpipe|softpipe/i.test(report.device.renderer),report.device);
   check('Native WebGL starts without error',report.device.gl===0&&!report.device.contextLost);check('Production regional streaming is present',report.device.streamed===true);
-  probeInstalled=true;report.probe=await page.evaluate(installProbe,mode==='full');await mark('entry');
+  probeInstalled=true;report.probe=await page.evaluate(installProbe,{detail:mode==='full',gpuFactory:gpuMode==='elapsed'?createGpuTimer.toString():null});if(gpuMode==='elapsed')check('Native elapsed query is available and unowned',report.probe.gpu?.supported,report.probe.gpu);await mark('entry');
   await press('#startBtn');await page.waitForFunction(()=>active&&!modal);await page.locator('#welcome').waitFor({state:'hidden'});await checkpoint('entry');
   if(tracePath)await startTrace();
   await swim('outbound',true);
@@ -233,6 +367,7 @@ function summarize(){
   check('All recorded callbacks remain visible, focused and adaptive',rows.raf.length>0&&rows.raf.every(r=>!r.hidden&&r.focused&&r.adaptive));
   check('Render records distinguish completed and deferred attempts',rows.renders.length>0&&rows.renders.every(r=>!r.error&&(r.advance===0||r.advance===1)&&(!r.returnedFalse||r.advance===0)));
   for(const name of ['outbound','return']){const s=report.summary.stages.find(s=>s.name===name);check(name+' uses real movement and completes frames',s.samples>0&&s.displacement>.5&&s.completeSubmissions>0,s);}
+  if(gpuMode==='elapsed'){const s=report.gpu.summary;check('GPU attempts retain complete identities and terminal or pending states',s.identityComplete,s.statusCounts);check('GPU collector has no API or ownership failures',!s.errors.length&&!s.ownershipConflicts.length,{errors:s.errors,ownershipConflicts:s.ownershipConflicts});for(const stage of ['outbound','return'])check(stage+' has available non-disjoint complete-render GPU samples',s.stages.find(r=>r.stage===stage)?.valid>0,s.stages.find(r=>r.stage===stage));}
   const outward=report.summary.stages.find(s=>s.name==='outbound'),back=report.summary.stages.find(s=>s.name==='return');
   report.route={scheduledOutboundSeconds:30,scheduledReturnSeconds:30,actualInputDurationNote:'Native input timestamps and actual stage times are retained. Each leg uses a monotonic 30-second deadline; periodic checkpoints, when requested, share that deadline. Transport latency is not subtracted from observations.',outboundDisplacement:outward.displacement,returnDisplacement:back.displacement,distanceFromStartAfterReturn:back.to&&outward.from?distance(back.to.p,outward.from.p):null,note:'Reverse input follows the original heading. Collision, terrain, acceleration and current may prevent an exact return; position is never corrected.'};
   report.finalGL=await page.evaluate(()=>({error:renderer.gl.getError(),contextLost:renderer.gl.isContextLost()}));check('Final WebGL is healthy',report.finalGL.error===0&&!report.finalGL.contextLost);

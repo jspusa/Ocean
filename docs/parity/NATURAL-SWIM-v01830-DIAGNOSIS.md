@@ -63,4 +63,34 @@
 
 20 筆慢提交間隔與長等待時序重疊；同區在未追蹤的去程也有 20 筆 >33.4 ms 間隔。兩次自然 run 不能量化 trace 的性能影響。這是共享 GPU process 的 CPU 等待，未建立 flow ownership，不能直接叫作 GPU shader 執行時間，也不能指定某個 draw／光影 pass 為根因。完整獨立分析 SHA 為 `f0f17907256a485a42f1d9dd9eccceefcb0c35f251a0e2c6ae678facae2382f7`。
 
-下一步不開 Chrome trace，以不重疊的 `EXT_disjoint_timer_query_webgl2` 包住完整正式 renderer，延後非阻塞讀回，保留 disjoint／pending／deferred 以及每幀座標與 scale。保留原畫質、幾何、draw 與自動畫質；該區 GPU elapsed 若有峰值，再做獨立單 pass 診斷，否則追查 scheduling／presentation／backpressure。未取得證據前不刪除 framebuffer 檢查、不改變畫質門檻，不把單一等待事件當作已修復。完整商用及實體手機／耗電目標仍未完成。
+## 正常游泳的完整 GPU elapsed
+
+後續依上述判斷加入預設關閉的 `--gpu=elapsed`，只容許 final checkpoints 且 Chrome trace 關閉。每次正式 `Renderer.render` 使用一個不重疊 query；包含該呼叫實際執行的串流／resize 命令，保留完整原 draw、場景、時間、輸入及自動畫質。遵循 [Khronos extension 規格](https://registry.khronos.org/webgl/extensions/EXT_disjoint_timer_query_webgl2/) 的 AVAILABLE／disjoint 檢查；本工具另外採至少延後四個被動 RAF、每 callback 至多八筆、pending 上限 128 的政策，不呼叫 flush／finish、不等待、不強迫補畫。這些數量是工具自訂界線，並非規範要求。
+
+每次提交與結果各存不可變事件，以 render ID 串接，保留實際眼睛座標、前後解析度、品質、陰影 key／更新增量。disjoint、deferred、overflow、context loss 及停止時尚未完成的 query 不列入有效 GPU 值。只清除自己建立的 query，原生 renderer 的回傳和例外不被量測邏輯取代。GPU elapsed 是完整命令區間的計時，不能當作單一 shader 的獨占成本、螢幕呈現時間或 FPS；查詢本身也可能影響排程。
+
+凍結 harness SHA `96b90eb3d7057cfae8541d552de947609bcabba1a9d03087bebad35dc7023263` 通過語法、十個外部 WebGL 邊界 fixture 及獨立 Standards／Spec 審查。fixture 驗證延遲、失效、容量、外部 ownership 及清理，不是 GPU 效能證據。兩次原生工作串行執行，資料分別是 `desktop-light-gpu.json` 和 `touch-light-gpu.json`；各 16／16 正常流程檢查通過，無 page／console error、GL 0、wrapper 及 query 清理成功，正式 runtime SHA 未變。
+
+| 原生設定 | 有效 GPU query | 停止時 pending | 其他失效／overflow | 證據 |
+|---|---:|---:|---:|---|
+| 桌機，初始 2560×1600／quality 2／MSAA 4 | 3,826 | 1 | 0 | ★★★ 同機正常輸入 |
+| 觸控模擬，585×1266／quality 1／MSAA 2 | 3,913 | 1 | 0 | ★★★ 同機正常輸入 |
+
+這些總數含入海、停留及選單，不能當作兩個游泳航段的樣本數。停止時各一筆 pending 只有三個 RAF，保留身份並刪除資源，沒有當成 0 ms；清理後 created＝deleted、pending 為空且外部 current query 保留。量測 query begin／end／poll 的同步 CPU 最大值分別約 0.2／0.1／0.2 ms；這只涵蓋被計時的 API 呼叫，不是完整 observer 開銷或零干擾證明。
+
+在讀取 GPU 結果前，依先前無 query 的慢區座標選定三個世界 z 區帶：前側 `[11.5,17.5)`、慢區 `[3.5,11.5)`、後側 `[-2.5,3.5)`。兩腿都以相同視線方向通過；表內有效樣本全數來自真實持續輸入窗，數值是完整 renderer 的 GPU 平均／P95，單位 ms。返程的「前側／後側」仍是世界位置標籤，沒有交換成時間先後。
+
+| 設定／航段 | 前側：樣本／平均／P95 | 慢區：樣本／平均／P95 | 後側：樣本／平均／P95 | 證據 |
+|---|---|---|---|---|
+| 桌機去程 | 62／14.706／17.237 | 44／30.182／57.299 | 62／12.543／16.826 | ★★★ 原始 query |
+| 桌機返程 | 63／12.812／14.630 | 44／31.118／58.779 | 63／13.279／14.774 | ★★★ 原始 query |
+| 觸控模擬去程 | 62／5.536／9.334 | 83／7.276／10.021 | 62／6.598／9.563 | ★★★ 原始 query |
+| 觸控模擬返程 | 62／6.894／10.242 | 83／6.142／9.942 | 63／7.053／10.132 | ★★★ 原始 query |
+
+桌機去程前側與慢區固定 scale 1；離開慢區後在 z≈−0.432 自動降到 0.935，該後側區帶因此混合兩種解析度，該 render 呼叫 CPU 18.8 ms。返程在 z≈−12.522 恢復至 0.970，三個表列區帶都是 2483×1552，該較早 render CPU 16.5 ms。light 沒有 resize 細項包裝，這些是含尺寸變更的整個 render CPU，不能假稱純配置成本。觸控模擬表列區帶固定 scale 1；兩端在游完後 settle 收取資料期間另降 scale（桌機 0.905、觸控 0.935），該區段不納入游泳表。不同設定／自然 run 不是固定工作量 A/B，不能將差值換成手機或改版提升百分比。
+
+桌機慢區的原 renderer 同步 CPU 平均兩腿皆約 0.834 ms、最大 2.4／1.9 ms。排除靜態陰影快取更新的幀後，仍有去程 19／42、返程 20／41 筆 GPU elapsed 超過 33.4 ms，最大 65.468／64.374 ms。因此這次完整 GPU 區間已直接重現慢區負載，靜態陰影重建不是發生慢幀的必要條件；仍不能指定某一材質、draw 或 pass 為根因。
+
+原始資料與 root 分析保留於同一 QA 目錄的 `*-light-gpu-analysis.json`，獨立重算另存 `desktop-gpu-independent.json`／`touch-gpu-independent.json`。觸控兩腿 stage 各含一筆按下前 render；嚴格輸入窗樣本為 1,802／1,801，表列空間帶不含那兩筆，數值不受影響。原始桌機 report SHA 為 `9acd5f40191d1a7ba4875ca97be6b1dfb98d9bc1bc4bbd6e379931ce02db0fbf`，觸控為 `3eee25d17f57e3c34e7c3eea58c6eab7e6aa755c8dc9644e2d41a00606281d2e`。圖像定位另有正常游動後的 `reef-visual.png`／`reef-visual-state.json`；該截圖工作與計時分開，沒有拿截圖過程量效能。完整游泳 GPU 資料沒有畫面像素讀回，不能單憑這輪聲稱黑閃驗證。
+
+下一步聚焦同一礁區的單一渲染區段，保留所有正式 draw，分開量測、保留 query 邊界對 tile GPU 的影響，不將分段時間相加當作自然整幀占比。另有自動畫質短暫慢簇未觸發長平均門檻的現象，需以實際修改及正常輸入驗證回應速度，不能僅由離線數列宣稱改善。未改畫質門檻、未刪除 framebuffer 檢查，本輪診斷沒有發布新的 runtime 修正。完整商用及實體手機／耗電目標仍未完成。
