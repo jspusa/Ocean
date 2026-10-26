@@ -2,11 +2,11 @@
    Two 120-second original, synchronized stems are crossfaded by simulated depth.
    Soundscapes are synthesized; they are artistic, not scientific field recordings. */
 class OceanAudio {
- constructor(){this.ctx=null;this.ready=false;this.loading=null;this.enabled=false;this.custom=null;this.customName=null;this.localGeneration=0;this.sources=[];this.noise=null;this.lastBreath=-1;this.lastWhale=-100;this.lastKick=0;this.nextBubble=0;this.depth=18;this.effectsEmitted=0;this.startedAt=0;}
- async start(){
+ constructor(){this.ctx=null;this.timer=null;this.preparation=null;this.ready=false;this.loading=null;this.enabled=false;this.custom=null;this.customName=null;this.localGeneration=0;this.sources=[];this.noise=null;this.lastBreath=-1;this.lastWhale=-100;this.lastKick=0;this.nextBubble=0;this.depth=18;this.effectsEmitted=0;this.startedAt=0;}
+ prepare(){
   if(!this.ctx){const AC=window.AudioContext||window.webkitAudioContext;if(!AC)throw Error('瀏覽器不支援 Web Audio。');
    try{this.ctx=new AC({latencyHint:'playback',sampleRate:24000});}catch(_){this.ctx=new AC();}
-   const c=this.ctx;this.master=c.createGain();this.master.gain.value=0;
+   try{const c=this.ctx;this.master=c.createGain();this.master.gain.value=0;
    this.limiter=c.createDynamicsCompressor();this.limiter.threshold.value=-8;this.limiter.knee.value=12;this.limiter.ratio.value=4;this.limiter.attack.value=.008;this.limiter.release.value=.24;
    this.master.connect(this.limiter);this.limiter.connect(c.destination);
    this.music=c.createGain();this.music.gain.value=.60;this.music.connect(this.master);
@@ -15,8 +15,22 @@ class OceanAudio {
    this.stems=[c.createGain(),c.createGain()];this.stems.forEach(g=>{g.gain.value=0;g.connect(this.music);});
    this.analyser=c.createAnalyser();this.analyser.fftSize=256;this.master.connect(this.analyser);
    this.buildAmbience();this.startedAt=c.currentTime;
-   this.timer=setInterval(()=>this.tick(),90);
+   // Preparation stays silent and does not start music IO or periodic work.
+   this.preparation=c.suspend();
+   }catch(error){this.ctx.close?.().catch(()=>{});this.ctx=null;this.preparation=null;throw error;}
   }
+  return this.preparation;
+ }
+ async releasePrepared(){
+  if(!this.ctx||this.enabled||this.timer!==null)return false;
+  const context=this.ctx;this.ctx=null;this.preparation=null;
+  for(const key of ['master','limiter','music','environment','breath','stems','analyser','waterFilter','noise'])this[key]=null;
+  await context.close();return true;
+ }
+ async start(){
+  // Do not await: resume must remain in the original user gesture.
+  this.prepare()?.catch(()=>{});
+  if(this.timer===null)this.timer=setInterval(()=>this.tick(),90);
   this.enabled=true;
   // resume is intentionally inside the original tap/click call stack.
   this.ctx.resume().catch(()=>{});

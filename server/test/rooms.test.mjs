@@ -10,6 +10,7 @@ import { createOceanServer } from '../server.mjs';
 const origin = 'https://jspusa.github.io';
 const contentVersion = 'test-world-1';
 const handshake = { protocol: 1, contentVersion };
+const nonce = () => randomBytes(32).toString('base64url');
 
 async function fixture(t, options = {}) {
   const app = createOceanServer({ allowedOrigins: [origin], contentVersion, ...options });
@@ -59,7 +60,7 @@ async function fixture(t, options = {}) {
     return peer;
   }
   async function host(name = 'Host') {
-    const peer = await connect(); peer.send({ type: 'create', ...handshake, name }); await peer.joined(); return peer;
+    const peer = await connect(); peer.send({ type: 'create', ...handshake, admissionNonce: nonce(), name }); await peer.joined(); return peer;
   }
   return { app, url, connect, host };
 }
@@ -112,7 +113,7 @@ test('HTTP health and real WebSocket creation expose a private host capability',
 
 test('a requester receives no room snapshot until the host approves', async t => {
   const f = await fixture(t); const host = await f.host(); const guest = await f.connect();
-  guest.send({ type: 'request', ...handshake, roomId: host.session.roomId, name: 'Guest' });
+  guest.send({ type: 'request', ...handshake, admissionNonce: nonce(), roomId: host.session.roomId, name: 'Guest' });
   const pending = await guest.next('pending');
   assert.deepEqual(Object.keys(pending).sort(), ['requestId', 'type']);
   const request = await host.next('join-request');
@@ -131,7 +132,7 @@ test('a requester receives no room snapshot until the host approves', async t =>
 
 test('host rejection closes the pending client and does not admit them', async t => {
   const f = await fixture(t); const host = await f.host(); const guest = await f.connect();
-  guest.send({ type: 'request', ...handshake, roomId: host.session.roomId, name: 'Guest' });
+  guest.send({ type: 'request', ...handshake, admissionNonce: nonce(), roomId: host.session.roomId, name: 'Guest' });
   const request = await host.next('join-request'); await guest.next('pending');
   host.op('decide', { requestId: request.requestId, approve: false });
   assert.equal((await guest.next('rejected')).reason, 'host_rejected');
@@ -143,27 +144,27 @@ test('host rejection closes the pending client and does not admit them', async t
 
 test('closing visits cancels waiting requests and prevents new applications until reopened', async t => {
   const f = await fixture(t); const host = await f.host(); const waiting = await f.connect();
-  waiting.send({ type: 'request', ...handshake, roomId: host.session.roomId, name: 'Wait' });
+  waiting.send({ type: 'request', ...handshake, admissionNonce: nonce(), roomId: host.session.roomId, name: 'Wait' });
   await waiting.next('pending'); await host.next('join-request');
   host.op('visits', { open: false }); await host.next('ack');
   assert.equal((await waiting.next('rejected')).reason, 'visits_closed');
   const other = await f.connect();
-  other.send({ type: 'request', ...handshake, roomId: host.session.roomId, name: 'Other' });
+  other.send({ type: 'request', ...handshake, admissionNonce: nonce(), roomId: host.session.roomId, name: 'Other' });
   assert.equal((await other.next('error')).code, 'visits_closed');
   host.op('visits', { open: true }); await host.next('ack');
-  other.send({ type: 'request', ...handshake, roomId: host.session.roomId, name: 'Other' });
+  other.send({ type: 'request', ...handshake, admissionNonce: nonce(), roomId: host.session.roomId, name: 'Other' });
   assert.equal((await other.next('pending')).type, 'pending');
 });
 
 test('only two approved members occupy a room even when approvals race', async t => {
   const f = await fixture(t); const host = await f.host(); const guests = [await f.connect(), await f.connect()];
-  for (const [i, guest] of guests.entries()) guest.send({ type: 'request', ...handshake, roomId: host.session.roomId, name: 'Guest ' + i });
+  for (const [i, guest] of guests.entries()) guest.send({ type: 'request', ...handshake, admissionNonce: nonce(), roomId: host.session.roomId, name: 'Guest ' + i });
   const a = await host.next('join-request'); const b = await host.next('join-request');
   host.op('decide', { requestId: a.requestId, approve: true });
   host.op('decide', { requestId: b.requestId, approve: true });
   assert.equal((await guests[0].joined()).snapshot.members.length, 2);
   assert.equal((await guests[1].next('rejected')).reason, 'room_full');
-  const third = await f.connect(); third.send({ type: 'request', ...handshake, roomId: host.session.roomId, name: 'Third' });
+  const third = await f.connect(); third.send({ type: 'request', ...handshake, admissionNonce: nonce(), roomId: host.session.roomId, name: 'Third' });
   assert.equal((await third.next('error')).code, 'room_full');
 });
 
@@ -171,9 +172,9 @@ test('protocol and content mismatch cannot create or inspect a room', async t =>
   const f = await fixture(t); const host = await f.host();
   for (const fields of [{ protocol: 2 }, { contentVersion: 'different-world' }]) {
     const peer = await f.connect();
-    peer.send({ type: 'create', ...handshake, name: 'Wrong', ...fields });
+    peer.send({ type: 'create', ...handshake, admissionNonce: nonce(), name: 'Wrong', ...fields });
     assert.equal((await peer.next('error')).code, 'version_mismatch');
-    peer.send({ type: 'request', ...handshake, roomId: host.session.roomId, name: 'Wrong', ...fields });
+    peer.send({ type: 'request', ...handshake, admissionNonce: nonce(), roomId: host.session.roomId, name: 'Wrong', ...fields });
     assert.equal((await peer.next('error')).code, 'version_mismatch');
     assert.equal(peer.messages.some(m => m.snapshot), false);
   }
@@ -181,7 +182,7 @@ test('protocol and content mismatch cannot create or inspect a room', async t =>
 
 async function pair(f) {
   const host = await f.host(); const guest = await f.connect();
-  guest.send({ type: 'request', ...handshake, roomId: host.session.roomId, name: 'Guest' });
+  guest.send({ type: 'request', ...handshake, admissionNonce: nonce(), roomId: host.session.roomId, name: 'Guest' });
   const request = await host.next('join-request');
   host.op('decide', { requestId: request.requestId, approve: true });
   await host.next('ack'); await guest.joined(); await host.next('member-joined');
@@ -244,7 +245,7 @@ test('disconnect retains the guest slot and resume rotates capability and connec
   const previous = guest.session;
   guest.ws.terminate(); await guest.closed;
   assert.equal((await host.next('presence')).connected, false);
-  const third = await f.connect(); third.send({ type: 'request', ...handshake, roomId: host.session.roomId, name: 'Third' });
+  const third = await f.connect(); third.send({ type: 'request', ...handshake, admissionNonce: nonce(), roomId: host.session.roomId, name: 'Third' });
   assert.equal((await third.next('error')).code, 'room_full');
   const resumed = await f.connect();
   resumed.send({ type: 'resume', ...handshake, roomId: previous.roomId, memberId: previous.memberId, resumeToken: previous.resumeToken, resumeNonce: randomBytes(32).toString('base64url') });
@@ -384,11 +385,11 @@ test('guest leaving revokes its capability and frees the slot; host leaving clos
   const stale = await f.connect();
   stale.send({ type: 'resume', ...handshake, roomId: old.roomId, memberId: old.memberId, resumeToken: old.resumeToken, resumeNonce: randomBytes(32).toString('base64url') });
   assert.equal((await stale.next('error')).code, 'resume_invalid');
-  const next = await f.connect(); next.send({ type: 'request', ...handshake, roomId: old.roomId, name: 'Next' });
+  const next = await f.connect(); next.send({ type: 'request', ...handshake, admissionNonce: nonce(), roomId: old.roomId, name: 'Next' });
   const request = await host.next('join-request'); host.op('decide', { requestId: request.requestId, approve: true });
   await next.joined();
   host.op('leave'); assert.equal((await next.next('room-closed')).reason, 'host_left');
-  const after = await f.connect(); after.send({ type: 'request', ...handshake, roomId: old.roomId, name: 'After' });
+  const after = await f.connect(); after.send({ type: 'request', ...handshake, admissionNonce: nonce(), roomId: old.roomId, name: 'After' });
   assert.equal((await after.next('error')).code, 'room_unavailable');
   after.send({ type: 'resume', ...handshake, roomId: host.session.roomId, memberId: host.session.memberId, resumeToken: host.session.resumeToken, resumeNonce: randomBytes(32).toString('base64url') });
   assert.equal((await after.next('error')).code, 'resume_invalid');
@@ -402,7 +403,7 @@ test('expired disconnected membership cannot resume, and host expiry closes the 
   const stale = await f.connect();
   stale.send({ type: 'resume', ...handshake, roomId: previous.roomId, memberId: previous.memberId, resumeToken: previous.resumeToken, resumeNonce: randomBytes(32).toString('base64url') });
   assert.equal((await stale.next('error')).code, 'resume_invalid');
-  const next = await f.connect(); next.send({ type: 'request', ...handshake, roomId: previous.roomId, name: 'Next' });
+  const next = await f.connect(); next.send({ type: 'request', ...handshake, admissionNonce: nonce(), roomId: previous.roomId, name: 'Next' });
   const req = await host.next('join-request'); host.op('decide', { requestId: req.requestId, approve: true }); await next.joined();
   host.ws.terminate(); await host.closed;
   assert.equal((await next.next('room-closed')).reason, 'host_disconnected');
@@ -410,27 +411,32 @@ test('expired disconnected membership cannot resume, and host expiry closes the 
 
 test('pending applications have a bounded lifetime and disconnected hosts cannot admit new requests', async t => {
   const f = await fixture(t, { pendingTtlMs: 60, sweepMs: 10 }); const host = await f.host(); const pending = await f.connect();
-  pending.send({ type: 'request', ...handshake, roomId: host.session.roomId, name: 'Pending' });
+  pending.send({ type: 'request', ...handshake, admissionNonce: nonce(), roomId: host.session.roomId, name: 'Pending' });
   const request = await host.next('join-request'); await pending.next('pending');
   assert.equal((await pending.next('rejected')).reason, 'request_expired');
   host.op('decide', { requestId: request.requestId, approve: true });
   assert.equal((await host.next('error')).code, 'request_unavailable');
   host.ws.terminate(); await host.closed;
-  const other = await f.connect(); other.send({ type: 'request', ...handshake, roomId: host.session.roomId, name: 'Other' });
+  const other = await f.connect(); other.send({ type: 'request', ...handshake, admissionNonce: nonce(), roomId: host.session.roomId, name: 'Other' });
   assert.equal((await other.next('error')).code, 'host_unavailable');
 });
 
 test('room and waiting-request capacity are enforced before allocating more state', async t => {
   const f = await fixture(t, { maxRooms: 1, maxPendingPerRoom: 1 }); const host = await f.host();
-  const anotherHost = await f.connect(); anotherHost.send({ type: 'create', ...handshake, name: 'Other' });
+  const anotherHost = await f.connect(); anotherHost.send({ type: 'create', ...handshake, admissionNonce: nonce(), name: 'Other' });
   assert.equal((await anotherHost.next('error')).code, 'server_full');
-  const waiting = await f.connect(); waiting.send({ type: 'request', ...handshake, roomId: host.session.roomId, name: 'Wait' }); await waiting.next('pending');
-  const excess = await f.connect(); excess.send({ type: 'request', ...handshake, roomId: host.session.roomId, name: 'Excess' });
+  const original = { type: 'request', ...handshake, admissionNonce: nonce(), roomId: host.session.roomId, name: 'Wait' };
+  const waiting = await f.connect(); waiting.send(original); await waiting.next('pending');
+  const excess = await f.connect(); excess.send({ type: 'request', ...handshake, admissionNonce: nonce(), roomId: host.session.roomId, name: 'Excess' });
   assert.equal((await excess.next('error')).code, 'pending_full');
   waiting.ws.terminate(); await waiting.closed;
-  // Public closure notification makes slot reclamation observable without inspecting internal maps.
+  excess.send({ type: 'request', ...handshake, admissionNonce: nonce(), roomId: host.session.roomId, name: 'Excess' });
+  assert.equal((await excess.next('error')).code, 'pending_full');
+  const recovered = await f.connect(); recovered.send({ type: 'recover', admission: original }); await recovered.next('pending');
+  recovered.send({ type: 'cancel' }); await recovered.next('cancelled');
+  // Public cancellation makes slot reclamation observable without inspecting internal maps.
   await host.next('request-cancelled');
-  excess.send({ type: 'request', ...handshake, roomId: host.session.roomId, name: 'Excess' });
+  excess.send({ type: 'request', ...handshake, admissionNonce: nonce(), roomId: host.session.roomId, name: 'Excess' });
   assert.equal((await excess.next('pending')).type, 'pending');
 });
 
@@ -440,12 +446,12 @@ test('malformed JSON, unknown fields and unsafe names cannot become room data', 
     peer.ws.send(raw); assert.equal((await peer.next('error')).code, 'invalid_message');
   }
   for (const name of ['', 'x'.repeat(25), 'bad\u0000name', 'bad\u202ename', { text: 'name' }]) {
-    peer.send({ type: 'create', ...handshake, name });
+    peer.send({ type: 'create', ...handshake, admissionNonce: nonce(), name });
     assert.equal((await peer.next('error')).code, 'invalid_message');
   }
-  peer.send({ type: 'create', ...handshake, name: 'Valid', save: { completed: true } });
+  peer.send({ type: 'create', ...handshake, admissionNonce: nonce(), name: 'Valid', save: { completed: true } });
   assert.equal((await peer.next('error')).code, 'invalid_message');
-  peer.send({ type: 'create', ...handshake, name: 'Valid' }); await peer.joined();
+  peer.send({ type: 'create', ...handshake, admissionNonce: nonce(), name: 'Valid' }); await peer.joined();
   peer.op('pose', { pose: validPose, save: { completed: true } });
   assert.equal((await peer.next('error')).code, 'invalid_message');
   peer.op('decide', { requestId: 'unknown', approve: 'yes' });
@@ -454,11 +460,11 @@ test('malformed JSON, unknown fields and unsafe names cannot become room data', 
 
 test('a pending client cannot create another room or overwrite its application', async t => {
   const f = await fixture(t); const host = await f.host(); const peer = await f.connect();
-  peer.send({ type: 'request', ...handshake, roomId: host.session.roomId, name: 'Pending' }); await peer.next('pending');
+  peer.send({ type: 'request', ...handshake, admissionNonce: nonce(), roomId: host.session.roomId, name: 'Pending' }); await peer.next('pending');
   const req = await host.next('join-request');
-  peer.send({ type: 'create', ...handshake, name: 'Sneak' });
+  peer.send({ type: 'create', ...handshake, admissionNonce: nonce(), name: 'Sneak' });
   assert.equal((await peer.next('error')).code, 'already_pending');
-  peer.send({ type: 'request', ...handshake, roomId: host.session.roomId, name: 'Again' });
+  peer.send({ type: 'request', ...handshake, admissionNonce: nonce(), roomId: host.session.roomId, name: 'Again' });
   assert.equal((await peer.next('error')).code, 'already_pending');
   host.op('decide', { requestId: req.requestId, approve: true });
   assert.equal((await peer.joined()).role, 'guest');
@@ -488,7 +494,7 @@ test('oversized or binary packets close only the offending socket, leaving the r
   const f = await fixture(t); const host = await f.host();
   const oversized = await f.connect(); oversized.ws.send('x'.repeat(4097));
   assert.equal((await oversized.closed)[0], 1009);
-  const binary = await f.connect(); binary.ws.send(Buffer.from(JSON.stringify({ type: 'create', ...handshake, name: 'Binary' })));
+  const binary = await f.connect(); binary.ws.send(Buffer.from(JSON.stringify({ type: 'create', ...handshake, admissionNonce: nonce(), name: 'Binary' })));
   assert.equal((await binary.closed)[0], 1003);
   host.op('visits', { open: false });
   assert.equal((await host.next('ack')).seq, host.seq);
@@ -514,7 +520,7 @@ test('unauthenticated sockets time out, with bounded per-address and total conne
 test('server heartbeat detects a silent connection independently of gameplay messages', async t => {
   const f = await fixture(t, { heartbeatMs: 30 }); const host = await f.host();
   const silent = await f.connect('/v1', { autoPong: false });
-  silent.send({ type: 'request', ...handshake, roomId: host.session.roomId, name: 'Silent' });
+  silent.send({ type: 'request', ...handshake, admissionNonce: nonce(), roomId: host.session.roomId, name: 'Silent' });
   const request = await host.next('join-request'); host.op('decide', { requestId: request.requestId, approve: true }); await silent.joined();
   assert.equal((await silent.closed)[0], 1006);
   assert.equal((await host.next('presence')).connected, false);
@@ -531,7 +537,7 @@ test('the actual hadal trench position is accepted while impossible depths remai
 
 test('a reconnecting host recovers outstanding admission requests but a guest never receives them', async t => {
   const f = await fixture(t); const host = await f.host(); const waiting = await f.connect();
-  waiting.send({ type: 'request', ...handshake, roomId: host.session.roomId, name: 'Waiting' });
+  waiting.send({ type: 'request', ...handshake, admissionNonce: nonce(), roomId: host.session.roomId, name: 'Waiting' });
   const request = await host.next('join-request');
   host.ws.terminate(); await host.closed;
   const resumed = await f.connect();
@@ -571,4 +577,249 @@ test('HTTP exposes only a no-store health check and gives no success body for un
   assert.deepEqual(await response.json(), { error: 'not_found' });
   const health = await fetch(f.url + '/health');
   assert.equal(health.headers.get('cache-control'), 'no-store');
+});
+
+
+test('initial host joined lost on real TCP recovers the same single room and retires on confirm', async t => {
+  const f = await fixture(t, { maxRooms: 1 }); const proxy = await lossyProxy(t, f.url);
+  const original = { type: 'create', ...handshake, admissionNonce: nonce(), name: 'Lost host' };
+  const first = await f.connect('/v1', {}, proxy.url);
+  proxy.dropNextResponse(); first.send(original);
+  assert.ok(await proxy.loss() > 0); await first.closed;
+  assert.equal(first.messages.some(message => message.type === 'joined'), false);
+  const recovered = await f.connect(); recovered.send({ type: 'recover', admission: original });
+  const session = await recovered.joined();
+  assert.equal(session.role, 'host'); assert.equal(session.generation, 2);
+  assert.equal(session.snapshot.members.length, 1);
+  assert.equal(session.snapshot.members[0].name, 'Lost host');
+  const replay = await f.connect(); replay.send(original);
+  assert.equal((await replay.next('error')).code, 'admission_used');
+  recovered.op('confirm'); await recovered.next('ack');
+  replay.send({ type: 'recover', admission: original });
+  assert.equal((await replay.next('error')).code, 'admission_invalid');
+  replay.send({ type: 'create', ...handshake, admissionNonce: nonce(), name: 'Extra' });
+  assert.equal((await replay.next('error')).code, 'server_full');
+});
+
+test('initial approved guest joined lost on TCP recovers its original approved seat repeatedly', async t => {
+  const f = await fixture(t); const host = await f.host(); const proxy = await lossyProxy(t, f.url);
+  const original = { type: 'request', ...handshake, admissionNonce: nonce(), name: 'Lost guest', roomId: host.session.roomId };
+  const first = await f.connect('/v1', {}, proxy.url); first.send(original);
+  const pending = await first.next('pending'); const request = await host.next('join-request');
+  assert.equal(pending.requestId, request.requestId);
+  proxy.dropNextResponse(); host.op('decide', { requestId: request.requestId, approve: true });
+  assert.ok(await proxy.loss() > 0); await first.closed; await host.next('ack');
+  const member = (await host.next('member-joined')).member;
+  assert.equal(first.messages.some(message => message.type === 'joined'), false);
+  await host.next('presence', message => !message.connected && message.memberId === member.id);
+  for (let generation = 2; generation <= 3; generation++) {
+    const interrupted = await f.connect('/v1', {}, proxy.url);
+    proxy.dropNextResponse(); interrupted.send({ type: 'recover', admission: original });
+    assert.ok(await proxy.loss() > 0); await interrupted.closed;
+    await host.next('presence', message => message.connected && message.generation === generation);
+    await host.next('presence', message => !message.connected && message.generation === generation);
+  }
+  const third = await f.connect();
+  third.send({ type: 'request', ...handshake, admissionNonce: nonce(), name: 'Third', roomId: host.session.roomId });
+  assert.equal((await third.next('error')).code, 'room_full');
+  const recovered = await f.connect(); recovered.send({ type: 'recover', admission: original });
+  const session = await recovered.joined();
+  assert.equal(session.memberId, member.id); assert.equal(session.roomId, host.session.roomId);
+  assert.equal(session.generation, 4); assert.equal(session.snapshot.members.length, 2);
+  recovered.op('pose', { pose: validPose }); assert.equal((await host.next('pose')).generation, 4);
+  third.send({ type: 'recover', admission: original });
+  assert.equal((await third.next('error')).code, 'admission_invalid');
+});
+
+test('a pending response lost on TCP recovers the same private application without duplicate approval', async t => {
+  const f = await fixture(t); const host = await f.host(); const proxy = await lossyProxy(t, f.url);
+  const original = { type: 'request', ...handshake, admissionNonce: nonce(), name: 'Pending loss', roomId: host.session.roomId };
+  const first = await f.connect('/v1', {}, proxy.url);
+  proxy.dropNextResponse(); first.send(original);
+  assert.ok(await proxy.loss() > 0); await first.closed;
+  const request = await host.next('join-request');
+  const retry = await f.connect(); retry.send({ type: 'recover', admission: original });
+  assert.deepEqual(await retry.next('pending'), { type: 'pending', requestId: request.requestId });
+  assert.equal(retry.messages.some(message => message.type === 'joined' || message.snapshot), false);
+  assert.equal(host.messages.some(message => message.type === 'join-request' || message.type === 'request-cancelled'), false);
+  const replacement = await f.connect(); replacement.send({ type: 'recover', admission: original });
+  assert.equal((await replacement.next('pending')).requestId, request.requestId);
+  assert.equal((await retry.closed)[0], 4001);
+  host.op('decide', { requestId: request.requestId, approve: true }); await host.next('ack');
+  const session = await replacement.joined();
+  assert.equal(session.snapshot.members.length, 2);
+  assert.equal((await host.next('member-joined')).member.id, session.memberId);
+});
+
+test('late approval of a disconnected application starts one fixed initial joined recovery window', async t => {
+  const f = await fixture(t, { pendingTtlMs: 500, resumeGraceMs: 200, sweepMs: 10 }); const host = await f.host();
+  const original = { type: 'request', ...handshake, admissionNonce: nonce(), name: 'Late guest', roomId: host.session.roomId };
+  const pending = await f.connect(); pending.send(original); await pending.next('pending');
+  const request = await host.next('join-request'); pending.ws.terminate(); await pending.closed;
+  await delay(250);
+  host.op('decide', { requestId: request.requestId, approve: true }); await host.next('ack');
+  const member = (await host.next('member-joined')).member;
+  assert.equal(member.connected, false);
+  await delay(90);
+  const recovered = await f.connect(); recovered.send({ type: 'recover', admission: original });
+  const session = await recovered.joined(); assert.equal(session.memberId, member.id);
+  assert.equal(session.generation, 2);
+  await delay(130);
+  const expired = await f.connect(); expired.send({ type: 'recover', admission: original });
+  assert.equal((await expired.next('error')).code, 'admission_invalid');
+  recovered.op('pose', { pose: validPose }); assert.equal((await host.next('pose')).generation, 2);
+});
+
+test('explicit cancellation after pending recovery revokes the proof and frees the waiting slot', async t => {
+  const f = await fixture(t, { maxPendingPerRoom: 1 }); const host = await f.host();
+  const original = { type: 'request', ...handshake, admissionNonce: nonce(), name: 'Cancel me', roomId: host.session.roomId };
+  const first = await f.connect(); first.send(original); await first.next('pending');
+  const request = await host.next('join-request'); first.ws.terminate(); await first.closed;
+  const retry = await f.connect(); retry.send({ type: 'recover', admission: original }); await retry.next('pending');
+  retry.send({ type: 'cancel' });
+  assert.deepEqual(await retry.next('cancelled'), { type: 'cancelled', requestId: request.requestId });
+  assert.equal((await retry.closed)[0], 1000);
+  assert.equal((await host.next('request-cancelled')).requestId, request.requestId);
+  const stale = await f.connect(); stale.send({ type: 'recover', admission: original });
+  assert.equal((await stale.next('error')).code, 'admission_invalid');
+  host.op('decide', { requestId: request.requestId, approve: true });
+  assert.equal((await host.next('error')).code, 'request_unavailable');
+  stale.send({ type: 'request', ...handshake, admissionNonce: nonce(), name: 'Next', roomId: host.session.roomId });
+  await stale.next('pending');
+});
+
+test('host rejection visits closure and room closure revoke disconnected applications', async t => {
+  for (const action of ['reject', 'visits', 'leave']) {
+    await t.test(action, async t => {
+      const f = await fixture(t); const host = await f.host();
+      const original = { type: 'request', ...handshake, admissionNonce: nonce(), name: 'Offline', roomId: host.session.roomId };
+      const waiting = await f.connect(); waiting.send(original); await waiting.next('pending');
+      const request = await host.next('join-request'); waiting.ws.terminate(); await waiting.closed;
+      await delay(25); // Allow the remote TCP close event to reach the server.
+      if (action === 'reject') host.op('decide', { requestId: request.requestId, approve: false });
+      else if (action === 'visits') host.op('visits', { open: false });
+      else host.op('leave');
+      await host.next(action === 'leave' ? 'left' : 'ack');
+      const denied = await f.connect(); denied.send({ type: 'recover', admission: original });
+      assert.equal((await denied.next('error')).code, 'admission_invalid');
+      assert.equal(denied.messages.some(message => message.type === 'joined' || message.type === 'pending'), false);
+    });
+  }
+});
+
+test('pending recovery cannot extend its fixed expiry and expiry frees the disconnected waiting slot', async t => {
+  const f = await fixture(t, { pendingTtlMs: 180, sweepMs: 5, maxPendingPerRoom: 1 }); const host = await f.host();
+  const original = { type: 'request', ...handshake, admissionNonce: nonce(), name: 'Expires', roomId: host.session.roomId };
+  const first = await f.connect(); first.send(original); await first.next('pending');
+  const request = await host.next('join-request');
+  await delay(100);
+  const retry = await f.connect(); retry.send({ type: 'recover', admission: original }); await retry.next('pending');
+  retry.ws.terminate(); await retry.closed;
+  assert.equal((await host.next('request-cancelled')).requestId, request.requestId);
+  const expired = await f.connect(); expired.send({ type: 'recover', admission: original });
+  assert.equal((await expired.next('error')).code, 'admission_invalid');
+  expired.send({ type: 'request', ...handshake, admissionNonce: nonce(), name: 'Replacement', roomId: host.session.roomId });
+  await expired.next('pending');
+});
+
+test('admission proofs bind the whole original request and cannot bypass versions or closed visits', async t => {
+  const f = await fixture(t); const host = await f.host();
+  const original = { type: 'request', ...handshake, admissionNonce: nonce(), name: 'Bound guest', roomId: host.session.roomId };
+  const waiting = await f.connect(); waiting.send(original); await waiting.next('pending');
+  const request = await host.next('join-request'); const attacker = await f.connect();
+  for (const changes of [{ name: 'Another' }, { admissionNonce: nonce() }, { roomId: 'another-room' }]) {
+    attacker.send({ type: 'recover', admission: { ...original, ...changes } });
+    assert.equal((await attacker.next('error')).code, 'admission_invalid');
+  }
+  attacker.send({ type: 'recover', admission: { type: 'create', ...handshake, admissionNonce: original.admissionNonce, name: original.name } });
+  assert.equal((await attacker.next('error')).code, 'admission_invalid');
+  for (const changes of [{ protocol: 2 }, { contentVersion: 'other-version' }]) {
+    attacker.send({ type: 'recover', admission: { ...original, ...changes } });
+    assert.equal((await attacker.next('error')).code, 'version_mismatch');
+  }
+  for (const admissionNonce of [undefined, '', 12, '!'.repeat(43), 'x'.repeat(44)]) {
+    attacker.send({ type: 'recover', admission: { ...original, admissionNonce } });
+    assert.equal((await attacker.next('error')).code, 'invalid_message');
+  }
+  attacker.send({ type: 'recover', admission: { ...original, extra: true } });
+  assert.equal((await attacker.next('error')).code, 'invalid_message');
+  assert.equal(attacker.messages.some(message => message.snapshot || message.type === 'pending'), false);
+  host.op('decide', { requestId: request.requestId, approve: true }); await host.next('ack'); await waiting.joined();
+  host.op('visits', { open: false }); await host.next('ack');
+  const recovered = await f.connect(); recovered.send({ type: 'recover', admission: original }); await recovered.joined();
+  assert.equal(recovered.session.memberId, waiting.session.memberId);
+  assert.equal(recovered.session.snapshot.visitsOpen, false);
+  assert.equal((await waiting.closed)[0], 4001);
+  recovered.op('confirm', { generation: 1 }); assert.equal((await recovered.next('error')).code, 'stale_session');
+  attacker.send({ type: 'recover', admission: original }); await attacker.joined();
+  assert.equal(attacker.session.generation, 3);
+  attacker.op('confirm'); await attacker.next('ack');
+  const revoked = await f.connect(); revoked.send({ type: 'recover', admission: original });
+  assert.equal((await revoked.next('error')).code, 'admission_invalid');
+});
+
+test('current capability resume retires initial admission even if its confirm acknowledgement was lost', async t => {
+  const f = await fixture(t); const proxy = await lossyProxy(t, f.url);
+  const original = { type: 'create', ...handshake, admissionNonce: nonce(), name: 'Host' };
+  const host = await f.connect('/v1', {}, proxy.url); host.send(original); await host.joined();
+  proxy.dropNextResponse(); host.op('confirm'); assert.ok(await proxy.loss() > 0); await host.closed;
+  const retry = await f.connect(); retry.send({ type: 'recover', admission: original });
+  assert.equal((await retry.next('error')).code, 'admission_invalid');
+  retry.send({ type: 'resume', ...handshake, roomId: host.session.roomId, memberId: host.session.memberId, resumeToken: host.session.resumeToken, resumeNonce: nonce() });
+  assert.equal((await retry.joined()).generation, 2);
+  const old = await f.connect(); old.send({ type: 'recover', admission: original });
+  assert.equal((await old.next('error')).code, 'admission_invalid');
+});
+
+test('unknown and expired initial recovery never create a replacement room', async t => {
+  const f = await fixture(t, { maxRooms: 1, resumeGraceMs: 150, sweepMs: 5 });
+  const original = { type: 'create', ...handshake, admissionNonce: nonce(), name: 'Bound host' };
+  const host = await f.connect(); host.send(original); await host.joined();
+  const unknown = await f.connect(); unknown.send({ type: 'recover', admission: { ...original, admissionNonce: nonce() } });
+  assert.equal((await unknown.next('error')).code, 'admission_invalid');
+  await delay(80);
+  const recovered = await f.connect(); recovered.send({ type: 'recover', admission: original }); await recovered.joined();
+  assert.equal(recovered.session.roomId, host.session.roomId);
+  await delay(90);
+  unknown.send({ type: 'recover', admission: original }); assert.equal((await unknown.next('error')).code, 'admission_invalid');
+  unknown.send({ type: 'create', ...handshake, admissionNonce: nonce(), name: 'Extra' });
+  assert.equal((await unknown.next('error')).code, 'server_full');
+  recovered.op('leave'); await recovered.next('left');
+  unknown.send({ type: 'recover', admission: original }); assert.equal((await unknown.next('error')).code, 'admission_invalid');
+  unknown.send({ type: 'create', ...handshake, admissionNonce: nonce(), name: 'Fresh intent' });
+  assert.notEqual((await unknown.joined()).roomId, host.session.roomId);
+});
+
+test('short-lived terminal admission records are bounded and release capacity at their fixed expiry', async t => {
+  const f = await fixture(t, { maxRooms: 1, maxPendingPerRoom: 1, pendingTtlMs: 150, sweepMs: 5 }); const host = await f.host();
+  for (let i = 0; i < 2; i++) {
+    const guest = await f.connect();
+    const original = { type: 'request', ...handshake, admissionNonce: nonce(), name: 'Rejected ' + i, roomId: host.session.roomId };
+    guest.send(original); await guest.next('pending'); const request = await host.next('join-request');
+    host.op('decide', { requestId: request.requestId, approve: false }); await host.next('ack'); await guest.closed;
+    const retry = await f.connect(); retry.send(original);
+    assert.equal((await retry.next('error')).code, 'admission_used');
+    retry.ws.terminate(); await retry.closed;
+  }
+  const bounded = await f.connect();
+  const original = { type: 'request', ...handshake, admissionNonce: nonce(), name: 'Next', roomId: host.session.roomId };
+  bounded.send(original); assert.equal((await bounded.next('error')).code, 'recovery_full');
+  host.op('visits', { open: false }); await host.next('ack');
+  host.op('visits', { open: true }); await host.next('ack');
+  await delay(180);
+  bounded.send(original); await bounded.next('pending');
+});
+
+test('normal resume alone retires an unconfirmed initial admission proof', async t => {
+  const f = await fixture(t);
+  const original = { type: 'create', ...handshake, admissionNonce: nonce(), name: 'Unconfirmed host' };
+  const host = await f.connect(); host.send(original); await host.joined();
+  // No confirm or admitted operation has been sent on the initial connection.
+  const resumed = await f.connect();
+  resumed.send({ type: 'resume', ...handshake, roomId: host.session.roomId, memberId: host.session.memberId, resumeToken: host.session.resumeToken, resumeNonce: nonce() });
+  assert.equal((await resumed.joined()).generation, 2);
+  const stale = await f.connect(); stale.send({ type: 'recover', admission: original });
+  assert.equal((await stale.next('error')).code, 'admission_invalid');
+  resumed.op('confirm'); await resumed.next('ack');
+  assert.equal(resumed.ws.readyState, WebSocket.OPEN);
 });

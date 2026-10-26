@@ -36,6 +36,7 @@ class AudioContext {
  async decodeAudioData(){return {decodedFixture:true};}
  async resume(){this.state='running';}
  async suspend(){this.state='suspended';}
+ async close(){this.state='closed';}
 }
 // Follow the graph built by production start()/loadLocal(), rather than assuming
 // which master/music node a source is connected to. Filters pass control gain;
@@ -47,7 +48,7 @@ function outputGain(source,destination,seen=new Set()){
  const downstream=[...source.connections].reduce((sum,node)=>sum+outputGain(node,destination,visited),0);
  return (source.kind==='gain'?source.gain.value:1)*downstream;
 }
-async function fixture(){
+async function fixture(start=true){
  const notices=[],settings={sound:true,master:.7,music:.5,ambience:.6,breath:.8};
  const context=vm.createContext({console,window:{AudioContext},document:{hidden:false},settings,
   active:false,modal:'shipRest',photoOpen:false,shipMode:'rest',training:null,renderer:{submersible:false},surface:false,
@@ -55,14 +56,31 @@ async function fixture(){
   atob,clamp:(n,a,b)=>Math.max(a,Math.min(b,n)),mix:(a,b,t)=>a+(b-a)*t,V:{len:v=>Math.hypot(...v)},
   $:()=>null,toast:value=>notices.push(value),setInterval:()=>1,setTimeout:()=>1});
  vm.runInContext('const oceanShip={snapshot:()=>({mode:shipMode})};const oceanEcology={snapshot:()=>({training})};const oceanSwimActions={isSurface:()=>surface};'+source,context);
- const audio=vm.runInContext('oceanAudio',context);await audio.start();audio.tick();
+ const audio=vm.runInContext('oceanAudio',context);if(start){await audio.start();audio.tick();}
  return {context,audio,settings,notices,musicGain:()=>[...audio.sources,...(audio.custom?[audio.custom]:[])].reduce((sum,node)=>sum+outputGain(node,audio.ctx.destination),0)};
 }
 async function local(f){await f.audio.loadLocal({name:'private-song.mp3',size:1,arrayBuffer:async()=>new Uint8Array([0]).buffer});f.audio.tick();return f.audio.custom;}
 const results=[];
-async function check(name,run){try{await run(await fixture());results.push({name,pass:true});console.log('PASS '+name);}catch(error){results.push({name,pass:false,error:error.message});console.error('FAIL '+name+'\n  '+error.message);}}
+async function check(name,run,start=true){try{await run(await fixture(start));results.push({name,pass:true});console.log('PASS '+name);}catch(error){results.push({name,pass:false,error:error.message});console.error('FAIL '+name+'\n  '+error.message);}}
 
 (async()=>{
+ await check('Loading can prepare a suspended silent graph before the first sound gesture',async f=>{
+  await f.audio.prepare();
+  assert.equal(f.audio.status.context,'suspended');assert.equal(f.audio.enabled,false);
+  assert.equal(f.audio.loading,null);assert.equal(f.audio.ready,false);assert.equal(f.audio.sources.length,0);
+  assert.equal(f.audio.timer,null);assert.equal(f.audio.master.gain.value,0);
+  const ctx=f.audio.ctx;await f.audio.prepare();assert.equal(f.audio.ctx,ctx);
+  await f.audio.start();assert.equal(f.audio.ctx,ctx);assert.equal(f.audio.status.context,'running');
+  assert.equal(f.audio.sources.length,2);assert(f.musicGain()>0);
+ },false);
+ await check('An unused loading graph can be released without closing a playing graph',async f=>{
+  await f.audio.prepare();const prepared=f.audio.ctx;
+  assert.equal(await f.audio.releasePrepared(),true);assert.equal(prepared.state,'closed');
+  assert.equal(f.audio.ctx,null);assert.equal(f.audio.noise,null);assert.equal(f.audio.timer,null);
+  await f.audio.start();const running=f.audio.ctx;assert.notEqual(running,prepared);
+  assert.equal(await f.audio.releasePrepared(),false);assert.equal(f.audio.ctx,running);
+  assert.equal(running.state,'running');assert(f.musicGain()>0);
+ },false);
  await check('Original music at the deckchair has an open route to the destination',f=>{
   assert.equal(f.audio.sources.length,2);assert(f.audio.sources.every(s=>s.started));
   assert(f.musicGain()>0,'decoded and started stems must not end at a zero-gain master');

@@ -8,13 +8,15 @@
 
 | type | 其餘必要欄位 | 結果 |
 | --- | --- | --- |
-| `create` | `protocol:1, contentVersion, name` | 建立房間，收到私有 `joined`，角色 host |
-| `request` | `protocol:1, contentVersion, name, roomId` | 自己只收到 `pending`；主持者收到 `join-request` |
+| `create` | `protocol:1, contentVersion, name, admissionNonce` | 建立房間，收到私有 `joined`，角色 host |
+| `request` | `protocol:1, contentVersion, name, roomId, admissionNonce` | 自己只收到 `pending`；主持者收到 `join-request` |
+| `recover` | `admission:<完整原始 create/request 物件>` | 只恢復原等待申請或原已准入席位，不建立房間或新申請 |
+| `cancel` | 無 | 僅目前等待申請的 socket 可取消，收到 `cancelled {requestId}` 後關閉 |
 | `resume` | `protocol:1, contentVersion, roomId, memberId, resumeToken, resumeNonce` | 成功收到新的私有 `joined`；舊能力值立即失效 |
 
 名稱 1–24 個 UTF-16 code units，不得全空白或含 Unicode control/format 字元。名稱是暫時顯示名稱，不是已驗證身分。房號及 memberId 是識別碼，不授予讀取房內狀態的權利。未知房號、版本錯誤、滿房、訪問關閉或主持者不在線皆不產生申請。
 
-`pending` 只有 `{type, requestId}`，不包含房間世代、其他成員或姿態。等待者不能建立另一房間或重複申請；退出等待直接關閉 socket。
+`pending` 只有 `{type, requestId}`，不包含房間世代、其他成員或姿態。等待者不能建立另一房間或重複申請。網路斷線保留原申請至固定到期；退出等待必須送 `cancel`，不能用關閉 socket 代表取消。若取消前已斷線，先 recover 原申請，再取消。核准先於取消發生時，已加入者應使用 `leave`。
 
 `join-request` 為 `{type, requestId, name}`。主持者使用已准入操作 `decide` 處理。等待者被拒絕會收到 `{type:'rejected', reason}`，接著 socket 關閉。最多 4 件等待申請，30 秒逾時；已滿兩人時不再收申請。
 
@@ -35,6 +37,26 @@
 
 `resumeToken` 只留在該客戶端的連線 session；不要放入 URL、日誌、分享連結或遊戲存檔。伺服器只存 SHA-256 digest，對比使用固定時間比較。這是短期房間能力值，**不是 Stage B 持久身分**。
 
+### 首次建立與核准回覆遺失
+
+在每個新的建立／申請意圖前，客戶端以安全亂數產生 32 bytes 的 `admissionNonce`，無 padding base64url 為 43 字元。保留完整原始 create/request 於這次連線 session，直到收到 joined。此 nonce 是私有恢復能力的一部分，不可放入 URL、日誌、分享連結、遊戲存檔，亦不可在另一個新意圖重用。
+
+若 pending 或 joined 回覆遺失，關閉舊 socket，於新連線只送：
+
+```js
+{ type: 'recover', admission: originalCreateOrRequest }
+```
+
+`admission` 必須精確包含原始操作類型、protocol、contentVersion、name、admissionNonce，以及 request 的 roomId；不得多欄位或變更值。recover 不會建立房間、重送主持者申請或直接核准。找不到、已過期、已拒絕／取消、房間已關閉或已確認皆回 `admission_invalid`，不洩漏快照。版本不一致回 `version_mismatch`。初始 create/request 在 nonce 紀錄仍保留時重送會回 `admission_used`；**不確定結果只能 recover，不能重送 create/request**。明確 `admission_invalid` 後停止恢復；新的使用者意圖才能另取 nonce 建立／申請。
+
+等待期間，recover 只將同一個 requestId 換到新 socket，回覆原本的 pending。舊 socket 被取代，不產生額外申請、核准或房間快照；等待的固定期限不延長。主持者可核准暫時離線的申請，只保留同一個客人席位，`member-joined` 的 connected 為 false。
+
+房主第一次建立、或客人第一次被核准時，開始一個固定 30 秒的首次 joined 恢復窗口。**核准窗口與等待期限分開**：晚核准者仍有完整恢復時間；之後任意次重試均不延長。recover 已准入者會旋轉能力值、增加世代、關閉舊 socket，回傳同一房間與成員的 joined。兩人上限包含離線保留席位。關閉訪問會撤銷等待申請，但既有已准入者仍能恢復原席位。
+
+客戶端收到 joined 後先保存新 resumeToken／generation，立即 confirm。當前 socket／epoch／generation／seq 通過驗證的第一個操作，或使用現行能力值開始 resume，均撤銷首次准入證明。確認後舊原始請求不能恢復；confirm 的 ack 遺失時改用已收到的 resumeToken 走重連流程。舊世代不能確認或撤銷新世代的證明。
+
+伺服器只存 nonce digest 與完整請求 digest。全服務最多 `maxRooms * (maxPendingPerRoom + 2)` 筆首次准入紀錄，預設 192 筆；含短期的已撤銷 nonce 紀錄，不保留歷史或重傳佇列。等待紀錄到期後釋放；第一次准入只更新一次為准入窗口截止時間，重試不更新。超過上限在任何新房／申請配置前回 `recovery_full`，客戶端應等候後重試明確未受理的新意圖，不可迴圈洪泛。取消／拒絕／關房會立即撤銷證明，僅保留至原截止時間的 nonce digest 防止窗口內重用。所有紀錄都在程序記憶體，重啟後無法恢復。
+
 ### 可恢復的重連旋轉
 
 每次開始新的重連程序，客戶端先使用安全亂數產生 32 bytes 的 `resumeNonce`，以無 padding base64url 編碼為 43 字元。Nonce 只用於這次程序，不能放入日誌、URL、遊戲存檔，也不能在下一次程序重用。它與現行能力值一同構成這次重連的私有恢復證明。
@@ -47,7 +69,7 @@
 
 每名成員只存現行能力值 digest 與最多一個有界恢復證明，沒有明文能力值、重試歷史或傳出重送佇列。舊能力值加上不同 nonce 一律無效；現行交接一經確認，連完全相同的舊請求都無效。下一次使用現行能力值的正常 resume 取代前次證明。任何舊 socket 的操作、延遲關閉及舊世代封包都不能影響新世代。既有握手、連線、限流、心跳與斷線席位期限仍適用；原生客戶端不能藉重試延長此證明的固定截止時間。
 
-本規則恢復的是已有資格者的重連回覆遺失。第一次建立／核准的 `joined` 若從未送達，客戶端尚未得到 room/member/capability，仍需重新建立／申請並等待原席位到期；Stage B 身分與邀請流程須另行處理這個邊界。服務重啟仍會失去記憶體中的房間。
+已有 room/member/capability 的重連回覆遺失使用本節 resume 流程；尚未收到第一次 joined 使用前節 admission 恢復流程。兩種流程均只在單一程序的固定期限內有效；Stage B 持久身分／邀請尚未實作，服務重啟仍會失去房間。
 
 ## 已准入操作
 
@@ -91,12 +113,13 @@
 | `member-joined` | `member`：加入已核准同伴 |
 | `presence` | `memberId,generation,connected`：斷線立即凍結；新世代清掉舊插值資料 |
 | `member-left` | `memberId,reason`：移除遠端角色與提示 |
-| `request-cancelled` | `requestId`：申請人斷線，主持者移除等待項目 |
+| `request-cancelled` | `requestId`：申請人明確取消或申請逾期，主持者移除等待項目 |
+| `cancelled` | `requestId`：取消已受理，等待者清除原始請求並停止重試 |
 | `left` | `reason:'left'`：停止連線與上傳，不碰個人探索進度 |
 | `room-closed` | `reason`：清除遠端房間狀態；不可偽造返程或故事完成 |
 | `error` | `code`：回應拒絕，無任意輸入回顯；通常連線仍可用 |
 
-錯誤包括 `invalid_message`, `invalid_pose`, `invalid_preset`, `version_mismatch`, `not_admitted`, `already_pending`, `host_only`, `stale_session`, `stale_sequence`, `resume_invalid`, `room_unavailable`, `host_unavailable`, `room_full`, `visits_closed`, `server_full`, `pending_full`, `request_unavailable`, `preset_rate_limited`, `rate_limited`。
+錯誤包括 `invalid_message`, `invalid_pose`, `invalid_preset`, `version_mismatch`, `not_admitted`, `already_pending`, `host_only`, `stale_session`, `stale_sequence`, `resume_invalid`, `admission_invalid`, `admission_used`, `recovery_full`, `room_unavailable`, `host_unavailable`, `room_full`, `visits_closed`, `server_full`, `pending_full`, `request_unavailable`, `preset_rate_limited`, `rate_limited`。
 
 正常關閉為 1000；被新版連線取代為 4001；握手／訊息速率為 1008；binary 為 1003；過大封包為 1009；慢速接收端為 1013。遠端不回應關閉或心跳時可能只觀察到 1006。所有 close reason 為伺服器固定字串，不含使用者輸入或憑證。
 
