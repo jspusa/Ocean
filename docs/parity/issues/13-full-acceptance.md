@@ -147,6 +147,8 @@ Pages 建置時間為 `2026-10-26T00:04:56Z`，見 `qa/parity/v01814-pages-runti
 
 依 [本輪規格](../DEEP-WATER-v01830-SPEC.md) 只在原 sunless 視錐省略不可見海面，保留原幾何與畫面；未採用共用頂點候選的資料及負結果另存 [實驗紀錄](../WATER-GRID-EXPERIMENT.md)。144 張完整影像相等，GPU 配對資料小而混合，沒有建立整體 GPU／FPS／耗電改善或完全不退步的證據。CPU 首輪 103／104，修正舊水面 fixture 後合計 104／104；靜態 68／68。自然流程、公開交付與限制依 [報告](../../TEST_REPORT-v01830.md) 的最新狀態，不提高整體商用或實體裝置星級。
 
+最終正常海溝流程桌機 54／54、觸控模擬 68／68 通過；公開 runtime `5545a3f938ba30cf85a6588bbe59d57f73839d45` 已 Pages built、300／300 檔案一致、雙端預設入海通過。完整航程證據在本機取得，公開與實體裝置界線分開記錄。
+
 下一項優先診斷為正常礁區游泳的慢幀。重用 `startup-performance-browser.cjs` 的透明 CPU／GPU 觀測及 `render-cadence-browser.cjs` 的原生游泳輸入，保持自然串流、自動畫質與真時間，先連續 30 秒及輕記錄控制。需補上 frame 外 `attachBatchMesh` 上傳事件、resize request→commit、被動 RAF 與最後完成畫面停留時間；目前 `cpuRenderMs` 起點在 stream.update／resize 之後，串流等待又會重置效能時間戳，現有欄位不足以定位卡頓。這是量測盲點，尚未證明某個上傳或 pass 就是瓶頸。
 
 若整幀 GPU 訊號值得追查，再做獨立受控單 pass 計時；不可省略正常 draw、同時跑其他 GPU 工作或把可能含 tile flush 的分段時間相加宣稱自然整幀占比。最後仍須正常完整 frame 比對。完整 33 項、內容、實體手機／耗電、外網多人及商用目標保持 in-progress。

@@ -86,4 +86,8 @@ alpha-to-coverage 關閉仍無條件執行；MSAA resolve、後製、光照、�
 
 ## 公開交付
 
-本機驗收完成，公開部署待核對。完整商用目標保持進行中。
+正式提交 `5545a3f938ba30cf85a6588bbe59d57f73839d45` 已於 2026-10-26 20:02:09 UTC 完成 GitHub Pages 建置。公開 manifest SHA-256 為 `a8367d77e3d7b45d84dc4a796ffbf704600ee0801236a17e17633d433b1fce0f`；300／300 個公開檔案與本機逐位元組核對通過。
+
+正式網址的桌機與觸控模擬均經正常開始按鈕進入自由探索，預設自動畫質啟用、quality 2／1、44 類生物、8 個表面程式編譯、GL 0、無 context loss／page error，觸控操作區均在畫面內且不小於 44 px。公開啟動收據為 `qa/parity/published-v0.18.30-delivery.json`，Pages 與來源聯結收據為 `qa/parity/v01830-deep-water/public-release-runtime.json`。
+
+本輪長程海溝調查為本機驗收，公開另核對檔案與正常入海；不混稱公開全航程或實體手機驗收。完整商用目標保持進行中，下一項為正常礁區游泳慢幀診斷。
