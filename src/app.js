@@ -528,8 +528,12 @@ async function boot(){try{loadJournal();applyRecoveryGraphics();window.__freeze=
  if(settings.startWithSound&&!document.hidden&&document.hasFocus()){
   $('loadDetail').textContent='準備海底聲景';await pause();
   if(oceanSaveGuard.live&&!document.hidden&&document.hasFocus()){
-   try{await oceanAudio.prepare();if(!oceanSaveGuard.live||document.hidden||!document.hasFocus())await oceanAudio.releasePrepared();}
+   // Audio is optional: native suspend/close can remain pending indefinitely.
+   // Detach an unused graph before retrying on the next real sound gesture.
+   let preparationTimer;
+   try{await Promise.race([oceanAudio.prepare(),new Promise((_,reject)=>{preparationTimer=setTimeout(()=>reject(new Error('Audio preparation timed out')),1500);})]);if(!oceanSaveGuard.live||document.hidden||!document.hasFocus())oceanAudio.releasePrepared().catch(()=>{});}
    catch(error){oceanAudio.releasePrepared().catch(()=>{});console.warn('Audio preparation unavailable; retry on sound gesture',error);}
+   finally{clearTimeout(preparationTimer);}
   }
  }
  if(!oceanSaveGuard.live)return;ready=true;oceanSaveHealth.init();renderer.render(eye,target,0);$('startBtn').disabled=false;$('tourStart').disabled=false;$('loading').classList.add('gone');setTimeout(()=>$('loading').classList.add('hidden'),700);lastTime=performance.now();requestAnimationFrame(animate);
