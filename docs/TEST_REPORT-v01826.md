@@ -25,7 +25,11 @@
 
 ## 公開交付
 
-待本輪提交與 Pages 指定 commit 建置後，另核對公開 manifest 所列檔案、兩端預設入海，以及公開保存恢復流程；本機通過不等同發布完成。
+runtime 提交 `2abe0affc74929cdcb1238c39c0dc779a8782690` 已由 Pages 完成建置，API 回報 `built`、`error.message:null`，時間 `2026-10-26T13:45:22Z`。
+
+公開網址的 297／297 個 manifest 檔案 bytes／SHA-256 與本機相同；桌機與觸控預設自動畫質入海、44 類目錄、8 個表面 shader、GL error 0、畫面及控制布局皆通過。另直接在公開網址以隔離 profile 跑完整保存恢復，桌機與觸控各 5 組，共 10 組通過：不可讀保護、原始／部分下載、故障回滾、有效匯入、實際快門、持續提示、完整匯出、重試及 exact JPEG reload。公開證據為 `qa/parity/published-v0.18.26-delivery.json` 與 `qa/parity/v01826-evidence/public-save-health/report.json`。
+
+這是已驗證的公開版本，不只成功 push；下面的實體裝置與整體商用限制仍然成立。
 
 ## 仍未完成
 

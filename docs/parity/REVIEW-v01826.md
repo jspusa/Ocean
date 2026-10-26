@@ -26,3 +26,5 @@ Standards：0 明文違反、0 需修改氣味、1 已採納測試建議。Spec�
 - `src/shell.html`：`f3999e7e79186c5bed4bac7263f89fb123f7399a3720c5bde3cf3d9ca2776a39`
 
 最終 Standards 另只讀核對兩個既有 fixture 的正常啟動前置修正：hadal-study-points 保留所有標記／重讀／不移動／非法 ID 斷言；surface-controls 仍先核對實際 ownership 與 recoveryReads，再呼叫正式 loadVoyage。沒有削弱斷言或新增發現。
+
+公開交付門檻已另行通過：指定 runtime Pages 建置、297 個公開檔案、兩端預設入海與兩端共 10 組保存恢復流程；見測試報告。完整商用星級不因這個切片提升。
