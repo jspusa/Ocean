@@ -714,23 +714,28 @@ uniform sampler2D uImage;uniform highp sampler2D uSurfaceDepth;uniform highp sam
 uniform vec2 uScratchSize;uniform vec2 uResolution;uniform vec2 uTileOrigin;uniform vec2 uShellDepthRange;
 uniform vec3 uDepthParams;uniform vec4 uOffsets;uniform vec4 uWeights;uniform float uCenterWeight;
 out vec4 frag;
+// Preserve each source's coverage and destination-depth rejection. Fixed
+// uniform components avoid dynamically indexing local arrays in every tap.
+void addShellSample(inout vec4 sum,vec2 at,float opaque,vec2 offset,float weight){
+ if(weight<.000001)return;
+ vec2 q=(at+offset)/uScratchSize;
+ vec4 sampleColor=texture(uImage,q);if(sampleColor.a<=0.)return;
+ vec4 z=texture(uSurfaceDepth,q);if(z.a<=0.)return;
+ float source=uShellDepthRange.x+uShellDepthRange.y*z.r/z.a;
+ if(source>opaque+uDepthParams.z)return;
+ sum+=sampleColor*(weight*.5);
+}
 void main(){
- float offsets[9]=float[9](-uOffsets.w,-uOffsets.z,-uOffsets.y,-uOffsets.x,0.,uOffsets.x,uOffsets.y,uOffsets.z,uOffsets.w);
- float weights[9]=float[9](uWeights.w,uWeights.z,uWeights.y,uWeights.x,uCenterWeight,uWeights.x,uWeights.y,uWeights.z,uWeights.w);
  vec2 at=gl_FragCoord.xy-uTileOrigin;float d=texture(uDepth,gl_FragCoord.xy/uResolution).r;
  float opaque=uDepthParams.x*uDepthParams.y/(uDepthParams.y-d*(uDepthParams.y-uDepthParams.x));
  vec4 sum=vec4(0.);
- for(int y=0;y<9;y++)for(int x=0;x<9;x++){
-  float weight=weights[x]*weights[y];if(weight<.000001)continue;
-  vec2 q=(at+vec2(offsets[x],offsets[y]))/uScratchSize;
-  vec4 sampleColor=texture(uImage,q);if(sampleColor.a<=0.)continue;
-  vec4 z=texture(uSurfaceDepth,q);if(z.a<=0.)continue;
-  // Source visibility alone cannot keep a blurred rim off an in-focus
-  // foreground edge. Reject each sample using its own surface depth.
-  float source=uShellDepthRange.x+uShellDepthRange.y*z.r/z.a;
-  if(source>opaque+uDepthParams.z)continue;
-  sum+=sampleColor*(weight*.5);
- }
+ // Expand once at program creation, preserving the original y-then-x
+ // accumulation order, weight cutoff and bilinear coordinates exactly.
+ ${(()=>{
+  const offsets=['-uOffsets.w','-uOffsets.z','-uOffsets.y','-uOffsets.x','0.','uOffsets.x','uOffsets.y','uOffsets.z','uOffsets.w'];
+  const weights=['uWeights.w','uWeights.z','uWeights.y','uWeights.x','uCenterWeight','uWeights.x','uWeights.y','uWeights.z','uWeights.w'];
+  return offsets.flatMap((y,j)=>offsets.map((x,i)=>`addShellSample(sum,at,opaque,vec2(${x},${y}),${weights[i]}*${weights[j]});`)).join('\n ');
+ })()}
  frag=sum;
 }`;
 const SHADOW_FS=`#version 300 es
