@@ -25,15 +25,15 @@ SOFTWARE.
 Scientific accuracy and real-world dive planning are outside this concept
 prototype's scope. External reference pages remain subject to their own terms.
 -->
-<html lang="zh-Hant" data-version="0.18.30">
+<html lang="zh-Hant" data-version="0.18.31">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#031329"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="description" content="重返蔚藍：從珊瑚礁一路游向深海海溝，與巨鯨和深海生物相遇。自由探索的 3D 海洋世界。">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 64 64%27%3E%3Crect width=%2764%27 height=%2764%27 rx=%2715%27 fill=%27%23082f3b%27/%3E%3Cpath d=%27M13 25c12-13 25 13 38 0M13 39c12-13 25 13 38 0%27 fill=%27none%27 stroke=%27%23d1e6cc%27 stroke-width=%274%27 stroke-linecap=%27round%27/%3E%3C/svg%3E">
 <title>重返蔚藍 · 自由入海</title>
-<link rel="stylesheet" href="src/style.css?v=0.18.30">
-<link rel="stylesheet" href="src/mobile-controls.css?v=0.18.30">
-<link rel="manifest" href="ocean.webmanifest?v=0.18.30">
+<link rel="stylesheet" href="src/style.css?v=0.18.31">
+<link rel="stylesheet" href="src/mobile-controls.css?v=0.18.31">
+<link rel="manifest" href="ocean.webmanifest?v=0.18.31">
 </head>
 <body>
 <canvas id="ocean" tabindex="0" aria-label="可互動的三維海底場景" aria-describedby="playInstructions"></canvas>
@@ -78,55 +78,55 @@ prototype's scope. External reference pages remain subject to their own terms.
 <button id="saveHealthNotice" hidden aria-label="檢查尚未保存的成果"><span id="saveHealthLabel" aria-live="polite"></span> · 處理</button>
 <dialog id="saveLoadGate" aria-labelledby="saveLoadTitle" aria-describedby="saveLoadMessage"><h2 id="saveLoadTitle">先保留你的舊航程</h2><p id="saveLoadMessage">航程或圖鑑的主檔與備份未能讀取，已停止自動保存與入海，避免用空進度覆蓋舊資料。請重新讀取，或匯入你先前匯出的完整存檔。</p><div class="recovery-actions"><button id="saveLoadRetry" class="primary">重新讀取</button><button id="saveLoadChoose">匯入完整存檔</button><button id="saveLoadRaw">下載原始航程資料</button><input id="saveLoadImport" type="file" accept="application/json,.json" hidden></div><p>原始資料下載保留無法解析的文字，<strong>不含照片原圖</strong>，供後續救援；不能直接匯入。請勿清除網站資料。</p><p id="saveLoadStatus" role="status" aria-live="polite"></p></dialog>
 <dialog id="saveImportProgress" aria-labelledby="saveImportTitle" aria-describedby="saveImportMessage"><h2 id="saveImportTitle">正在匯入航程</h2><p id="saveImportMessage" role="status" tabindex="-1">正在核對原圖與保存進度，請稍候。完成後會自動返回。</p></dialog>
-<script src="src/config.js?v=0.18.30"></script>
-<script src="src/engine.js?v=0.18.30"></script>
-<script src="src/world.js?v=0.18.30"></script>
-<script src="src/reef_detail.js?v=0.18.30"></script>
-<script src="src/next_reef.js?v=0.18.30"></script>
-<script src="src/individuals.js?v=0.18.30"></script>
-<script src="src/open_world.js?v=0.18.30"></script>
-<script src="src/trench.js?v=0.18.30"></script>
-<script src="src/fauna.js?v=0.18.30"></script>
-<script src="src/cetaceans.js?v=0.18.30"></script>
-<script src="src/abyss_fauna.js?v=0.18.30"></script>
-<script src="src/trench_fauna.js?v=0.18.30"></script>
-<script src="src/fauna_world.js?v=0.18.30"></script>
-<script src="src/cetacean_world.js?v=0.18.30"></script>
-<script src="src/regions.js?v=0.18.30"></script>
-<script src="src/abyss_world.js?v=0.18.30"></script>
-<script src="src/trench_world.js?v=0.18.30"></script>
-<script src="src/pelagic_life.js?v=0.18.30"></script>
-<script src="src/reef_fauna.js?v=0.18.30"></script>
-<script src="src/oarfish.js?v=0.18.30"></script>
-<script src="src/frilled_shark.js?v=0.18.30"></script>
-<script src="src/frilled_shark_world.js?v=0.18.30"></script>
-<script src="src/barreleye.js?v=0.18.30"></script>
-<script src="src/barreleye_world.js?v=0.18.30"></script>
-<script src="src/scene_stream.js?v=0.18.30"></script>
-<script src="src/scene_cache.js?v=0.18.30"></script>
-<script src="src/seasons.js?v=0.18.30"></script>
-<script src="src/audio.js?v=0.18.30"></script>
-<script src="src/performance.js?v=0.18.30"></script>
-<script src="src/selection.js?v=0.18.30"></script>
-<script src="src/save_session.js?v=0.18.30"></script>
-<script src="src/app.js?v=0.18.30"></script>
-<script src="src/gamepad_ui.js?v=0.18.30"></script>
-<script src="src/gamepad_pointer.js?v=0.18.30"></script>
-<script src="src/voyage.js?v=0.18.30"></script>
-<script src="src/features.js?v=0.18.30"></script>
-<script src="src/ecology.js?v=0.18.30"></script>
-<script src="src/exploration.js?v=0.18.30"></script>
-<script src="src/expedition.js?v=0.18.30"></script>
-<script src="src/aquarium.js?v=0.18.30"></script>
-<script src="src/photography.js?v=0.18.30"></script>
-<script src="src/navigation.js?v=0.18.30"></script>
-<script src="src/ship.js?v=0.18.30"></script>
-<script src="src/microcosm.js?v=0.18.30"></script>
-<script src="src/story.js?v=0.18.30"></script>
-<script src="src/deepsea.js?v=0.18.30"></script>
-<script src="src/room_client.js?v=0.18.30"></script>
-<script src="src/multiplayer.js?v=0.18.30"></script>
-<script src="src/mobile-controls.js?v=0.18.30"></script>
-<script src="src/save_session_ui.js?v=0.18.30"></script>
-<script src="src/bootstrap.js?v=0.18.30"></script>
+<script src="src/config.js?v=0.18.31"></script>
+<script src="src/engine.js?v=0.18.31"></script>
+<script src="src/world.js?v=0.18.31"></script>
+<script src="src/reef_detail.js?v=0.18.31"></script>
+<script src="src/next_reef.js?v=0.18.31"></script>
+<script src="src/individuals.js?v=0.18.31"></script>
+<script src="src/open_world.js?v=0.18.31"></script>
+<script src="src/trench.js?v=0.18.31"></script>
+<script src="src/fauna.js?v=0.18.31"></script>
+<script src="src/cetaceans.js?v=0.18.31"></script>
+<script src="src/abyss_fauna.js?v=0.18.31"></script>
+<script src="src/trench_fauna.js?v=0.18.31"></script>
+<script src="src/fauna_world.js?v=0.18.31"></script>
+<script src="src/cetacean_world.js?v=0.18.31"></script>
+<script src="src/regions.js?v=0.18.31"></script>
+<script src="src/abyss_world.js?v=0.18.31"></script>
+<script src="src/trench_world.js?v=0.18.31"></script>
+<script src="src/pelagic_life.js?v=0.18.31"></script>
+<script src="src/reef_fauna.js?v=0.18.31"></script>
+<script src="src/oarfish.js?v=0.18.31"></script>
+<script src="src/frilled_shark.js?v=0.18.31"></script>
+<script src="src/frilled_shark_world.js?v=0.18.31"></script>
+<script src="src/barreleye.js?v=0.18.31"></script>
+<script src="src/barreleye_world.js?v=0.18.31"></script>
+<script src="src/scene_stream.js?v=0.18.31"></script>
+<script src="src/scene_cache.js?v=0.18.31"></script>
+<script src="src/seasons.js?v=0.18.31"></script>
+<script src="src/audio.js?v=0.18.31"></script>
+<script src="src/performance.js?v=0.18.31"></script>
+<script src="src/selection.js?v=0.18.31"></script>
+<script src="src/save_session.js?v=0.18.31"></script>
+<script src="src/app.js?v=0.18.31"></script>
+<script src="src/gamepad_ui.js?v=0.18.31"></script>
+<script src="src/gamepad_pointer.js?v=0.18.31"></script>
+<script src="src/voyage.js?v=0.18.31"></script>
+<script src="src/features.js?v=0.18.31"></script>
+<script src="src/ecology.js?v=0.18.31"></script>
+<script src="src/exploration.js?v=0.18.31"></script>
+<script src="src/expedition.js?v=0.18.31"></script>
+<script src="src/aquarium.js?v=0.18.31"></script>
+<script src="src/photography.js?v=0.18.31"></script>
+<script src="src/navigation.js?v=0.18.31"></script>
+<script src="src/ship.js?v=0.18.31"></script>
+<script src="src/microcosm.js?v=0.18.31"></script>
+<script src="src/story.js?v=0.18.31"></script>
+<script src="src/deepsea.js?v=0.18.31"></script>
+<script src="src/room_client.js?v=0.18.31"></script>
+<script src="src/multiplayer.js?v=0.18.31"></script>
+<script src="src/mobile-controls.js?v=0.18.31"></script>
+<script src="src/save_session_ui.js?v=0.18.31"></script>
+<script src="src/bootstrap.js?v=0.18.31"></script>
 </body></html>

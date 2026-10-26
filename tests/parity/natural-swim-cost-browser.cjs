@@ -4,27 +4,37 @@
  * --checkpoints=final avoids bulk collection during both swimming legs.
  * --trace=PATH optionally records the outbound leg; it is not an FPS test.
  * --gpu=elapsed wraps each actual render, requires final checkpoints/no trace.
+ * --gpu-scope=opaque selects only the observed sky-to-water opaque interval.
+ * Scope timings may shift tile work; never add them or call them exclusive costs.
  * Acceptance: every attempt has a submission identity; only completed renders
  * with available, non-disjoint results enter GPU summaries. Pending/deferred/
  * invalid/overflow retain identities. Cleanup deletes only owned query objects. */
 'use strict';
 const fs=require('node:fs'),path=require('node:path'),crypto=require('node:crypto'),assert=require('node:assert/strict'),{execFileSync}=require('node:child_process');
 const option=(key,fallback)=>process.argv.find(v=>v.startsWith('--'+key+'='))?.slice(key.length+3)||fallback;
-const root=path.resolve(__dirname,'../..'),url=option('url','http://127.0.0.1:8765/'),profile=option('profile','desktop'),mode=option('mode','full'),checkpointMode=option('checkpoints','final'),gpuMode=option('gpu','off');
-const output=path.resolve(option('out','/tmp/ocean-natural-swim-'+profile+'-'+mode+'-'+checkpointMode+(gpuMode==='off'?'':'-gpu')+'.json'));
+const root=path.resolve(__dirname,'../..'),url=option('url','http://127.0.0.1:8765/'),profile=option('profile','desktop'),mode=option('mode','full'),checkpointMode=option('checkpoints','final'),gpuMode=option('gpu','off'),gpuScope=option('gpu-scope','full');
+const output=path.resolve(option('out','/tmp/ocean-natural-swim-'+profile+'-'+mode+'-'+checkpointMode+(gpuMode==='off'?'':'-gpu')+(gpuScope==='full'?'':'-opaque')+'.json'));
 const tracePath=option('trace','')?path.resolve(option('trace','')):null;
 assert(['desktop','touch'].includes(profile));assert(['full','light'].includes(mode));assert(['final','periodic'].includes(checkpointMode));assert(!new URL(url).searchParams.has('still'),'Frozen scenes cannot diagnose natural swimming');
 assert(['off','elapsed'].includes(gpuMode),'Use --gpu=off|elapsed');
+assert(['full','opaque'].includes(gpuScope),'Use --gpu-scope=full|opaque');
+if(process.argv.some(v=>v.startsWith('--gpu-scope=')))assert.equal(gpuMode,'elapsed','Explicit GPU scope requires --gpu=elapsed');
 if(gpuMode!=='off'){assert.equal(checkpointMode,'final','GPU collection requires final checkpoints');assert(!tracePath,'GPU collection and Chrome trace must run separately');}
 if(tracePath){assert.equal(checkpointMode,'final','Trace requires final checkpoints to avoid bulk collection during swimming');assert.notEqual(tracePath,output);assert.notEqual(tracePath+'.meta.json',output);}
 const hash=data=>crypto.createHash('sha256').update(data).digest('hex'),touch=profile==='touch';
 const sourcePaths=['src/app.js','src/engine.js','src/performance.js','src/scene_stream.js','src/mobile-controls.js','src/voyage.js','tests/parity/browser-launch.cjs'];
 if(process.argv.includes('--check-gpu-fixtures')){gpuFixtures();process.exit();}
-const report={status:'running',url,profile,mode,checkpointMode,gpuMode,command:process.argv,startedAt:new Date().toISOString(),harnessSHA256:hash(fs.readFileSync(__filename)),
+const report={status:'running',url,profile,mode,checkpointMode,gpuMode,gpuScope,command:process.argv,startedAt:new Date().toISOString(),harnessSHA256:hash(fs.readFileSync(__filename)),
  local:{head:execFileSync('git',['rev-parse','HEAD'],{cwd:root,encoding:'utf8'}).trim(),sourceSHA256:Object.fromEntries(sourcePaths.map(p=>[p,hash(fs.readFileSync(path.join(root,p)))])),indexSHA256:hash(fs.readFileSync(path.join(root,'index.html')))},
  method:'Visible native Chrome, fresh context, normal start, 30 seconds forward and 30 seconds backward using real keyboard/CDP touch, then normal menu return. Actual clock, original simulation, natural streaming and default automatic quality remain active. No readPixels, screenshots, forced renders, pose/time/quality/save writes or synthetic frame samples. Passive RAF and actual renderer.frame increments measure callback opportunities and completed JS submissions, NOT GPU completion, compositor presentation or physical display refresh. Holds include waiting/menu boundaries; censoring is explicit. Full adds nested synchronous CPU and actual GL buffer submissions: ordinary render uploads aggregate per frame; frame-external/attach calls and ordinary calls over 1ms remain individual records. Slow raw calls flag inclusion in the aggregate, preventing double counting. Inclusive CPU durations must not be added together. Light omits detailed wrappers. RAF/render/event samples are retained. Final checkpoint mode collects at entry, after BOTH swimming legs have settled, and at the end: no bulk CDP drain/serialization during swimming. Periodic mode additionally collects every 10 seconds for failure diagnosis; its observed IPC/serialization stalls remain in the data and must not be mixed with final-mode results. Both modes attempt partial collection on failure; a browser crash can lose the uncollected tail. Full/light routes and adaptive resolutions can differ, so differences are diagnostic, not automatic performance wins. Touch uses this computer GPU, not a physical phone or battery measurement.',
  chunks:[],checkpoints:[],checks:[],errors:[],consoleErrors:[]};
-if(gpuMode!=='off')report.gpu={collectorSHA256:hash(createGpuTimer.toString()),method:'One non-overlapping TIME_ELAPSED query surrounds the complete actual Renderer.render call, including stream/resize commands it executes. No explicit flush, finish, blocking wait or forced frame. Poll only after at least four passive RAF callbacks; at most eight availability checks per callback, 128 outstanding queries. Capture submission and result as immutable events joined by render ID; invalid, deferred, overflow and pending at stop never become a guessed zero. GPU elapsed is not presentation latency or exclusive shader/pass time. Queries/polls/snapshots add observer cost; this run is diagnostic, not an automatic performance A/B. JS original-call CPU and query begin/end/poll CPU are separate. shadowDraws is the renderer total (static plus dynamic); staticShadowUpdates delta and shadow key identify cache refreshes without assigning a cause.',specification:'https://registry.khronos.org/webgl/extensions/EXT_disjoint_timer_query_webgl2/'};
+if(gpuMode!=='off')report.gpu={scope:gpuScope,collectorSHA256:hash(createGpuTimer.toString()),method:'One non-overlapping TIME_ELAPSED query surrounds the complete actual Renderer.render call, including stream/resize commands it executes. No explicit flush, finish, blocking wait or forced frame. Poll only after at least four passive RAF callbacks; at most eight availability checks per callback, 128 outstanding queries. Capture submission and result as immutable events joined by render ID; invalid, deferred, overflow and pending at stop never become a guessed zero. GPU elapsed is not presentation latency or exclusive shader/pass time. Queries/polls/snapshots add observer cost; this run is diagnostic, not an automatic performance A/B. JS original-call CPU and query begin/end/poll CPU are separate. shadowDraws is the renderer total (static plus dynamic); staticShadowUpdates delta and shadow key identify cache refreshes without assigning a cause.',specification:'https://registry.khronos.org/webgl/extensions/EXT_disjoint_timer_query_webgl2/'};
+if(gpuMode==='elapsed'&&gpuScope==='opaque'){
+ report.gpu.boundarySHA256=hash(createOpaqueScope.toString());
+ report.gpu.method='One query per actual renderer attempt, only inside the observed main opaque interval after sky and before SAMPLE_ALPHA_TO_COVERAGE disable. Full-render query is disabled. All original draws, state changes and input/simulation remain intact; no renderer source rewriting. Boundaries require the pinned loaded renderer and exact observed order. Query close happens at the interval exit; the complete renderer return/throw later controls sample validity. Missing, invalid, deferred and skipped queries retain IDs and are never zero GPU time. Existing 4 RAF / 8 checks / 128 pending policy remains. Interval includes original texture setup and instance uploads as well as draws; tile GPU scheduling/store/load/resolve may shift with query boundaries. This is not exclusive material/fragment time, an additive share, or full-frame cost. cpuSubmitMs measures the instrumented renderer call, INCLUDING in-call scope observers; query API CPU is separately recorded but subtraction is not an exact uninstrumented cost. No flush, finish, extra framebuffer or forced draw. Source/position/quality/resolution and completed-frame association are retained.';
+}
+// Re-review the observed boundaries before accepting a different renderer body.
+function acceptsOpaqueSource(source){return source.indexMatches===true&&source.engine==='8485d541e6f0587d155af47dfff53667cc8f415b56cc122a5cd52f900be16200'&&source.render==='7f43075ca39db8c68af9b938f82f6a4ebff290bb86fed304f156376208a117c6';}
 let browser,context,page,cdp,contact=null,probeInstalled=false,traceCDP,traceDone,traceStarted=false,traceEndRequested=false,traceFinished=false;
 const save=()=>{fs.mkdirSync(path.dirname(output),{recursive:true});fs.writeFileSync(output,JSON.stringify(report,null,2));};
 const check=(name,pass,detail)=>{report.checks.push({name,pass:!!pass,detail});assert(pass,name);};
@@ -105,6 +115,16 @@ function createGpuTimer(g,now,emit){
   if(ticket.terminal)return;drop(ticket);ticket.terminal=true;
   log('result',{id:ticket.id,status,queryResultNs:rawNs,gpuMs:status==='valid'?rawNs/1e6:null,submissionOutcome:ticket.outcome??null,submittedRAF:ticket.serial,ageRAFs:serial-ticket.serial,...extra});
  };
+ const close=ticket=>{
+  if(!ticket||ticket.intervalClosed)return;const at=now();ticket.intervalClosed=true;
+  try{
+   if(ticket.query){const current=g.getQuery(ext.TIME_ELAPSED_EXT,g.CURRENT_QUERY);
+    if(current===ticket.query){g.endQuery(ext.TIME_ELAPSED_EXT);if(g.getQuery(ext.TIME_ELAPSED_EXT,g.CURRENT_QUERY)===ticket.query)throw Error('Query end retained ownership');}
+    else{ticket.status=g.isContextLost()?'context-lost':'ownership-lost';log('ownership-conflict',{id:ticket.id,point:'end',status:ticket.status});}
+   }
+  }catch(error){ticket.status='query-error';fault('end',error);}
+  ticket.endCPUms=now()-at;
+ };
  const poll=()=>{
   if(!info.supported||!pending.size)return;
   const at=now();let tested=0,ready=[],disjoint=false;
@@ -137,17 +157,14 @@ function createGpuTimer(g,now,emit){
    }catch(error){ticket.status='query-error';fault('begin',error);}
    ticket.beginCPUms=now()-at;return ticket;
   },
+  close,
+  skip(id,before,status){return {id,before,serial,query:null,status,terminal:false,beginCPUms:0};},
   end(ticket,submission,after){
-   if(!ticket)return;const at=now();ticket.outcome=submission.error?'render-error':submission.advance===1&&!submission.returnedFalse?'complete':submission.returnedFalse?'deferred':'no-frame';
-   try{
-    if(ticket.query){
-     const current=g.getQuery(ext.TIME_ELAPSED_EXT,g.CURRENT_QUERY);
-     if(current===ticket.query){g.endQuery(ext.TIME_ELAPSED_EXT);if(g.getQuery(ext.TIME_ELAPSED_EXT,g.CURRENT_QUERY)===ticket.query)throw Error('Query end retained ownership');}
-     else{ticket.status=g.isContextLost()?'context-lost':'ownership-lost';log('ownership-conflict',{id:ticket.id,point:'end',status:ticket.status});}
-    }
-   }catch(error){ticket.status='query-error';fault('end',error);}
-   const endCPUms=now()-at;if(after)submission={...submission,after:after()};
-   log('submitted',{id:ticket.id,status:ticket.status,before:ticket.before,submission,beginCPUms:ticket.beginCPUms,endCPUms});
+   if(!ticket)return;ticket.outcome=submission.error?'render-error':submission.advance===1&&!submission.returnedFalse?'complete':submission.returnedFalse?'deferred':'no-frame';
+   close(ticket);
+   if(ticket.status==='pending'&&submission.scope?.status!=='captured'&&submission.scope&&!submission.error)ticket.status=submission.scope.status;
+   if(after)submission={...submission,after:after()};
+   log('submitted',{id:ticket.id,status:ticket.status,before:ticket.before,submission,beginCPUms:ticket.beginCPUms,endCPUms:ticket.endCPUms});
    if(ticket.status!=='pending')try{finish(ticket,ticket.status);}catch(error){fault('release-failed-query',error);}
   },
   tick(){if(!stopped){serial++;poll();}},
@@ -165,6 +182,57 @@ function createGpuTimer(g,now,emit){
    }catch(error){failures.push({error:String(error)});}
    const currentPreserved=beforeOwned?after===null:after===before;
    const glError=g.getError();return {ok:!contextLost&&!failures.length&&!pending.size&&currentPreserved&&glError===0,contextLost,glError,created,deleted,pending:[...pending.values()].map(t=>t.id),released,currentPreserved,failures,issues:issues.slice()};
+  }
+ };
+}
+
+// Observe the pinned renderer's existing call sequence. No GL state is added.
+// Exit only closes the interval; the outer render's eventual return/throw owns
+// whether its sample is usable. All original arguments/return values survive.
+function createOpaqueScope(g,r,gpu,now,install){
+ let frame=null;
+ const reject=reason=>{if(!frame)return;frame.errors.push(reason);gpu.close(frame.ticket);frame.phase='invalid';};
+ const observe=(owner,key,before,after)=>install(owner,key,original=>function(...args){
+  if(frame&&before)before(args);const result=Reflect.apply(original,this,args);if(frame&&after)after(args);return result;
+ });
+ observe(g,'bindFramebuffer',args=>{if((args[0]===g.FRAMEBUFFER||args[0]===g.DRAW_FRAMEBUFFER)&&['scene','sky-program','sky-drawn','opaque'].includes(frame.phase))reject('Framebuffer changed inside sky-to-opaque boundaries');},args=>{
+  if(args[0]!==g.FRAMEBUFFER&&args[0]!==g.DRAW_FRAMEBUFFER)return;
+  if(args[1]!== (r.msaaFBO||r.sceneFBO))return;
+  if(frame.phase!=='await-scene')return reject('Duplicate or misplaced scene framebuffer');
+  frame.phase='scene';frame.boundaries.scene=true;
+ });
+ observe(r,'common',null,args=>{
+  if(args[0]===r.skyProgram){if(frame.phase!=='scene')return reject('Misplaced sky program');frame.phase='sky-program';frame.boundaries.skyProgram=true;}
+  else if(['scene','sky-program','sky-drawn'].includes(frame.phase))reject('Program changed before sky boundary');
+ });
+ observe(g,'drawArrays',null,args=>{
+  if(frame.phase==='sky-program'){
+   if(args.length!==3||args[0]!==g.TRIANGLES||args[1]!==0||args[2]!==3)return reject('Unexpected sky draw');
+   frame.phase='sky-drawn';frame.boundaries.skyDraw=true;
+  }else if(frame.phase==='scene'||frame.phase==='sky-drawn')reject('Misplaced draw before opaque');
+ });
+ observe(g,'depthFunc',null,args=>{
+  if(frame.phase==='sky-drawn'){
+   if(args[0]!==g.LESS)return reject('Missing LESS after sky');
+   frame.boundaries.less=true;frame.intervalState={quality:r.quality,scale:r.dynamicScale,resolution:[r.canvas.width,r.canvas.height],msaa:r.msaaSamples};frame.startAt=now();frame.ticket=gpu.begin(frame.id,frame.before);frame.phase='opaque';
+  }else if(args[0]===g.LESS&&['scene','sky-program','opaque','closed'].includes(frame.phase))reject('Misplaced LESS boundary');
+ });
+ observe(g,'disable',args=>{
+  if(args[0]!==g.SAMPLE_ALPHA_TO_COVERAGE)return;
+  if(frame.phase!=='opaque')return reject('Missing or duplicate opaque exit');
+  frame.endAt=now();gpu.close(frame.ticket);frame.phase='closed';frame.boundaries.alphaDisable=true;
+  // These are reset inside the opaque interval. drawCalls cannot be subtracted:
+  // the preceding sky increments that counter AFTER depthFunc(LESS) returns.
+  frame.triangles=r.submittedTriangles;frame.vertices=r.submittedVertices;
+ },null);
+ return {
+  start(id,before){if(frame)throw Error('Nested renderer cannot use opaque scope');frame={id,before,phase:'await-scene',ticket:null,boundaries:{},errors:[],startAt:null,endAt:null,triangles:null,vertices:null};},
+  finish(submission,after){
+   if(!frame)return;const f=frame;frame=null;
+   const captured=f.phase==='closed'&&!f.errors.length;
+   const status=captured?'captured':submission.error?'render-error':submission.returnedFalse&&!f.ticket&&!f.errors.length?'deferred':f.phase==='await-scene'?'scope-missing':'scope-invalid';
+   const scope={name:'opaque',status,startAt:f.startAt,endAt:f.endAt,boundaries:f.boundaries,triangles:f.triangles,vertices:f.vertices,intervalState:f.intervalState??null,errors:f.errors};
+   gpu.end(f.ticket||gpu.skip(f.id,f.before,status),{...submission,scope},after);
   }
  };
 }
@@ -191,7 +259,28 @@ function gpuFixtures(){
  const l=fixture();l.submit(1);l.setLost();l.timer.tick();assert.equal(l.rows.find(r=>r.kind==='result').status,'context-lost');assert.equal(l.resultReads(),0);assert.equal(l.timer.restore().ok,false);
  const b=fixture();for(let i=1;i<=12;i++)b.submit(i);b.setReady(true);for(let i=0;i<4;i++)b.timer.tick();assert.equal(b.resultReads(),8);b.timer.tick();assert.equal(b.resultReads(),12);
  const u=fixture();u.submit(1);const saved=JSON.stringify(u.rows);u.setReady(true);for(let i=0;i<4;i++)u.timer.tick();assert.equal(JSON.stringify(u.rows.slice(0,JSON.parse(saved).length)),saved,'Settling must not mutate previously drained events');
- console.log(JSON.stringify({status:'passed',fixtures:10,note:'External API fixtures only; no native GPU, timing or presentation evidence.'}));
+ const scopeFixture=()=>{
+  const f=fixture(),calls=[],restores=[],g=f.g,r={sceneFBO:{},msaaFBO:null,skyProgram:{},canvas:{width:80,height:60},quality:2,dynamicScale:1,msaaSamples:0,submittedTriangles:0,submittedVertices:0};
+  Object.assign(g,{FRAMEBUFFER:10,DRAW_FRAMEBUFFER:11,TRIANGLES:12,LESS:13,LEQUAL:14,SAMPLE_ALPHA_TO_COVERAGE:15});
+  for(const key of ['bindFramebuffer','depthFunc','drawArrays','disable'])g[key]=function(...args){calls.push([key,...args]);return key;};
+  r.common=function(...args){assert.equal(this,r);calls.push(['common',...args]);return 'common';};
+  for(const key of ['beginQuery','endQuery']){const original=g[key];g[key]=function(...args){calls.push([key]);return Reflect.apply(original,this,args);};}
+  const install=(owner,key,build)=>{const original=owner[key],descriptor=Object.getOwnPropertyDescriptor(owner,key),wrapped=build(original);owner[key]=wrapped;restores.push(()=>{assert.equal(owner[key],wrapped);Object.defineProperty(owner,key,descriptor);assert.equal(owner[key],original);});};
+  const scope=createOpaqueScope(g,r,f.timer,()=>calls.length,install),sky=()=>{g.bindFramebuffer(g.FRAMEBUFFER,r.msaaFBO||r.sceneFBO);assert.equal(r.common(r.skyProgram,1,2,3),'common');g.drawArrays(g.TRIANGLES,0,3);g.depthFunc(g.LESS);},finish=(result={advance:1,returnedFalse:false,error:null})=>{scope.finish(result,()=>({resolution:[80,60]}));f.setReady(true);for(let i=0;i<4;i++)f.timer.tick();return f.rows.find(e=>e.kind==='result');};
+  return {...f,r,calls,scope,sky,finish,restore:()=>restores.reverse().forEach(f=>f())};
+ };
+ const a=scopeFixture();a.scope.start(1,{resolution:[80,60]});a.r.sceneFBO={};a.sky();a.r.submittedTriangles=7;a.r.submittedVertices=9;a.calls.push(['opaque-draw']);a.g.disable(a.g.SAMPLE_ALPHA_TO_COVERAGE);a.calls.push(['water-draw']);assert.equal(a.finish().status,'valid');assert.deepEqual(a.calls.map(c=>c[0]),['bindFramebuffer','common','drawArrays','depthFunc','beginQuery','opaque-draw','endQuery','disable','water-draw']);assert.equal(a.rows.find(e=>e.kind==='submitted').submission.scope.triangles,7);a.restore();
+ const empty=scopeFixture();empty.scope.start(1,{});empty.sky();empty.g.disable(empty.g.SAMPLE_ALPHA_TO_COVERAGE);assert.equal(empty.finish().status,'valid');assert.equal(empty.rows.find(e=>e.kind==='submitted').submission.scope.triangles,0);empty.restore();
+ const deferred=scopeFixture();deferred.scope.start(1,{});assert.equal(deferred.finish({advance:0,returnedFalse:true,error:null}).status,'deferred');assert.equal(deferred.calls.length,0);deferred.restore();
+ const missing=scopeFixture();missing.scope.start(1,{});assert.equal(missing.finish().status,'scope-missing');missing.restore();
+ const noEnd=scopeFixture();noEnd.scope.start(1,{});noEnd.sky();assert.equal(noEnd.finish().status,'scope-invalid');assert.equal(noEnd.current(),null);noEnd.restore();
+ const duplicate=scopeFixture();duplicate.scope.start(1,{});duplicate.sky();duplicate.g.disable(duplicate.g.SAMPLE_ALPHA_TO_COVERAGE);duplicate.g.disable(duplicate.g.SAMPLE_ALPHA_TO_COVERAGE);assert.equal(duplicate.finish().status,'scope-invalid');assert.equal(duplicate.calls.filter(c=>c[0]==='endQuery').length,1);duplicate.restore();
+ const switched=scopeFixture();switched.scope.start(1,{});switched.sky();switched.g.bindFramebuffer(switched.g.FRAMEBUFFER,{});switched.g.disable(switched.g.SAMPLE_ALPHA_TO_COVERAGE);assert.equal(switched.finish().status,'scope-invalid');switched.restore();
+ for(const switchAt of ['scene','sky-program','sky-drawn']){const f=scopeFixture();f.scope.start(1,{});f.g.bindFramebuffer(f.g.FRAMEBUFFER,f.r.sceneFBO);if(switchAt==='scene')f.g.bindFramebuffer(f.g.DRAW_FRAMEBUFFER,{});f.r.common(f.r.skyProgram);if(switchAt==='sky-program')f.g.bindFramebuffer(f.g.DRAW_FRAMEBUFFER,{});f.g.drawArrays(f.g.TRIANGLES,0,3);if(switchAt==='sky-drawn')f.g.bindFramebuffer(f.g.DRAW_FRAMEBUFFER,{});f.g.depthFunc(f.g.LESS);f.g.disable(f.g.SAMPLE_ALPHA_TO_COVERAGE);assert.equal(f.finish().status,'scope-invalid','Pre-opaque FBO change at '+switchAt);assert.equal(f.calls.some(c=>c[0]==='beginQuery'),false);f.restore();}
+ const late=scopeFixture();late.scope.start(1,{});late.sky();late.g.disable(late.g.SAMPLE_ALPHA_TO_COVERAGE);late.setCurrent(foreign);assert.equal(late.finish({advance:0,returnedFalse:false,error:'original render error'}).status,'render-error');assert.equal(late.current(),foreign);late.restore();assert.equal(late.timer.restore().ok,true);
+ const badSky=scopeFixture();badSky.scope.start(1,{});badSky.g.bindFramebuffer(badSky.g.FRAMEBUFFER,badSky.r.sceneFBO);badSky.r.common(badSky.r.skyProgram);badSky.g.drawArrays(badSky.g.TRIANGLES,0,6);badSky.g.depthFunc(badSky.g.LESS);badSky.g.disable(badSky.g.SAMPLE_ALPHA_TO_COVERAGE);assert.equal(badSky.finish().status,'scope-invalid');assert.equal(badSky.calls.some(c=>c[0]==='beginQuery'),false);badSky.restore();
+ const identity={indexMatches:true,engine:'8485d541e6f0587d155af47dfff53667cc8f415b56cc122a5cd52f900be16200',render:'7f43075ca39db8c68af9b938f82f6a4ebff290bb86fed304f156376208a117c6'};assert.equal(acceptsOpaqueSource(identity),true);for(const changed of [{indexMatches:false},{engine:'other source'},{render:'other loaded renderer'}])assert.equal(acceptsOpaqueSource({...identity,...changed}),false);
+ console.log(JSON.stringify({status:'passed',fixtures:20,note:'External API fixtures only; no native GPU, timing or presentation evidence.'}));
 }
 
 function installProbe(options){
@@ -208,18 +297,21 @@ function installProbe(options){
   const original=owner[key],descriptor=Object.getOwnPropertyDescriptor(owner,key),wrapped=build(original);owner[key]=wrapped;
   restores.push(()=>{if(owner[key]!==wrapped)return {key,restored:false,reason:'wrapper ownership changed'};if(descriptor)Object.defineProperty(owner,key,descriptor);else delete owner[key];return {key,restored:owner[key]===original};});
  };
+ const opaque=options.opaqueFactory?Function('return ('+options.opaqueFactory+')')()(g,renderer,gpu,()=>performance.now(),install):null;
  // Keep this wrapper small and identical in both collection modes.
  install(renderer,'render',original=>function(...args){
   if(!alive)return Reflect.apply(original,this,args);
   const at=performance.now(),before=this.frame,previous=currentFrame,previousUploads=currentUploads,id=++eventID;currentFrame=id;
   currentUploads=detail?{calls:0,bufferDataCalls:0,bufferSubDataCalls:0,uploadBytes:0,allocationBytes:0,cpuMs:0,maxCPUms:0}:null;let result,error=null;
-  const shadowBefore=gpu?(this.staticShadowUpdates||0):null,ticket=gpu?.begin(id,{...state(),stage,renderEye:args[0]?.slice(),renderTarget:args[1]?.slice(),renderTime:args[2],shadowKey:this._shadowKey??null,staticShadowUpdates:shadowBefore}),submitAt=gpu?performance.now():at;
+  const shadowBefore=gpu?(this.staticShadowUpdates||0):null,gpuBefore=gpu?{...state(),stage,renderEye:args[0]?.slice(),renderTarget:args[1]?.slice(),renderTime:args[2],shadowKey:this._shadowKey??null,staticShadowUpdates:shadowBefore}:null;
+  let ticket=null;if(opaque)opaque.start(id,gpuBefore);else if(gpu)ticket=gpu.begin(id,gpuBefore);const submitAt=gpu?performance.now():at;
   try{result=Reflect.apply(original,this,args);return result;}catch(e){error=String(e);throw e;}
   finally{
    const end=performance.now(),advance=this.frame-before,row={id,stage,at,end,cpuMs:end-at,frameBefore:before,frameAfter:this.frame,advance,returnedFalse:result===false,error};
    if(gpu){
     row.cpuSubmitMs=end-submitAt;
-    gpu.end(ticket,{stage,at:submitAt,end,cpuSubmitMs:row.cpuSubmitMs,frameBefore:before,frameAfter:this.frame,advance,returnedFalse:result===false,error},()=>({...state(),shadowKey:this._shadowKey??null,staticShadowUpdates:this.staticShadowUpdates||0,staticShadowUpdateDelta:(this.staticShadowUpdates||0)-shadowBefore,shadowDraws:advance===1?this.shadowDraws:null,draws:advance===1?this.drawCalls:null,triangles:advance===1?this.submittedTriangles:null,sunless:advance===1?!!this.sunless:null}));
+    const submission={stage,at:submitAt,end,cpuSubmitMs:row.cpuSubmitMs,cpuIncludesScopeObserver:!!opaque,frameBefore:before,frameAfter:this.frame,advance,returnedFalse:result===false,error},after=()=>({...state(),shadowKey:this._shadowKey??null,staticShadowUpdates:this.staticShadowUpdates||0,staticShadowUpdateDelta:(this.staticShadowUpdates||0)-shadowBefore,shadowDraws:advance===1?this.shadowDraws:null,draws:advance===1?this.drawCalls:null,triangles:advance===1?this.submittedTriangles:null,sunless:advance===1?!!this.sunless:null});
+    if(opaque)opaque.finish(submission,after);else gpu.end(ticket,submission,after);
    }
    if(detail)Object.assign(row,{reportedInnerCPU:advance===1?this.cpuRenderMs:null,draws:advance===1?this.drawCalls:null,triangles:advance===1?this.submittedTriangles:null,staticShadowUpdates:this.staticShadowUpdates||0,bufferSubmissions:currentUploads});
    data.renders.push(row);
@@ -333,7 +425,7 @@ function summarize(){
   const events=rows('gpu'),submitted=events.filter(r=>r.kind==='submitted'),results=events.filter(r=>r.kind==='result'),terminal=new Map(results.map(r=>[r.id,r])),pending=report.end?.gpu?.pending||[];
   const statusCounts={};for(const s of submitted){const status=terminal.get(s.id)?.status||(pending.some(p=>p.id===s.id)?'pending-at-stop':'unresolved');statusCounts[status]=(statusCounts[status]||0)+1;}
   const valid=results.filter(r=>r.status==='valid');
-  report.gpu.summary={attempts:submitted.length,results:results.length,statusCounts,validElapsedMs:stats(valid.map(r=>r.gpuMs)),cpuSubmitMs:stats(submitted.map(r=>r.submission.cpuSubmitMs)),queryBeginCPUms:stats(submitted.map(r=>r.beginCPUms)),queryEndCPUms:stats(submitted.map(r=>r.endCPUms)),pollCPUms:stats(events.filter(r=>r.kind==='poll').map(r=>r.cpuMs)),pendingAtStop:pending,errors:events.filter(r=>r.kind==='error'),ownershipConflicts:events.filter(r=>r.kind==='ownership-conflict'),stages:stages.map(stage=>{const attempts=submitted.filter(r=>r.submission.stage===stage),ids=new Set(attempts.map(r=>r.id)),samples=valid.filter(r=>ids.has(r.id));return {stage,attempts:attempts.length,valid:samples.length,elapsedMs:stats(samples.map(r=>r.gpuMs))};}),identityComplete:submitted.length===renders.length&&new Set(submitted.map(r=>r.id)).size===submitted.length&&submitted.every(s=>renders.some(r=>r.id===s.id))&&new Set(results.map(r=>r.id)).size===results.length&&results.every(r=>submitted.some(s=>s.id===r.id))&&submitted.every(s=>terminal.has(s.id)||pending.some(p=>p.id===s.id))};
+  report.gpu.summary={attempts:submitted.length,results:results.length,statusCounts,validElapsedMs:stats(valid.map(r=>r.gpuMs)),cpuSubmitMs:stats(submitted.map(r=>r.submission.cpuSubmitMs)),queryBeginCPUms:stats(submitted.map(r=>r.beginCPUms)),queryEndCPUms:stats(submitted.map(r=>r.endCPUms)),pollCPUms:stats(events.filter(r=>r.kind==='poll').map(r=>r.cpuMs)),pendingAtStop:pending,errors:events.filter(r=>r.kind==='error'),ownershipConflicts:events.filter(r=>r.kind==='ownership-conflict'),scopeBoundaryFailures:submitted.filter(r=>['scope-missing','scope-invalid'].includes(r.submission.scope?.status)).map(r=>({id:r.id,scope:r.submission.scope})),stages:stages.map(stage=>{const attempts=submitted.filter(r=>r.submission.stage===stage),ids=new Set(attempts.map(r=>r.id)),samples=valid.filter(r=>ids.has(r.id));return {stage,attempts:attempts.length,valid:samples.length,elapsedMs:stats(samples.map(r=>r.gpuMs))};}),identityComplete:submitted.length===renders.length&&new Set(submitted.map(r=>r.id)).size===submitted.length&&submitted.every(s=>renders.some(r=>r.id===s.id))&&new Set(results.map(r=>r.id)).size===results.length&&results.every(r=>submitted.some(s=>s.id===r.id))&&submitted.every(s=>terminal.has(s.id)||pending.some(p=>p.id===s.id))};
  }
  return {raf,renders,events};
 }
@@ -352,9 +444,10 @@ function summarize(){
   report.device=await page.evaluate(()=>{const g=renderer.gl,e=g.getExtension('WEBGL_debug_renderer_info');return {version:document.documentElement.dataset.version,userAgent:navigator.userAgent,renderer:e?g.getParameter(e.UNMASKED_RENDERER_WEBGL):null,viewport:[innerWidth,innerHeight],dpr:devicePixelRatio,coarse:matchMedia('(pointer:coarse)').matches,adaptive:settings.adaptive,quality:renderer.quality,msaa:renderer.msaaSamples,scale:renderer.dynamicScale,resolution:[renderer.canvas.width,renderer.canvas.height],compiled:renderer.sceneLoad?.compiled,streamed:renderer.sceneLoad?.streamed,gl:g.getError(),contextLost:g.isContextLost()};});
   const methods=await page.evaluate(()=>({render:renderer.render.toString(),resize:renderer.resize.toString(),attachBatchMesh:renderer.attachBatchMesh.toString(),updateLife:updateLife.toString(),performanceRecord:oceanPerf.record.toString(),streamUpdate:renderer.sceneStream?.update.toString(),streamLoad:renderer.sceneStream?.load.toString()}));
   report.loadedMethodSHA256=Object.fromEntries(Object.entries(methods).map(([k,v])=>[k,v?hash(v):null]));
+  if(gpuScope==='opaque'){report.gpu.sourceGate={baseline:'b337564279219cbbff573a548c274c0e11393256',indexMatches:report.document.matchesLocalIndex,engine:report.local.sourceSHA256['src/engine.js'],render:report.loadedMethodSHA256.render};check('Opaque boundaries use the pinned actual renderer and source',acceptsOpaqueSource(report.gpu.sourceGate),report.gpu.sourceGate);}
   check('Native hardware and default adaptive quality',report.device.adaptive&&report.device.renderer&&!/swiftshader|software|llvmpipe|softpipe/i.test(report.device.renderer),report.device);
   check('Native WebGL starts without error',report.device.gl===0&&!report.device.contextLost);check('Production regional streaming is present',report.device.streamed===true);
-  probeInstalled=true;report.probe=await page.evaluate(installProbe,{detail:mode==='full',gpuFactory:gpuMode==='elapsed'?createGpuTimer.toString():null});if(gpuMode==='elapsed')check('Native elapsed query is available and unowned',report.probe.gpu?.supported,report.probe.gpu);await mark('entry');
+  probeInstalled=true;report.probe=await page.evaluate(installProbe,{detail:mode==='full',gpuFactory:gpuMode==='elapsed'?createGpuTimer.toString():null,opaqueFactory:gpuScope==='opaque'?createOpaqueScope.toString():null});if(gpuMode==='elapsed')check('Native elapsed query is available and unowned',report.probe.gpu?.supported,report.probe.gpu);await mark('entry');
   await press('#startBtn');await page.waitForFunction(()=>active&&!modal);await page.locator('#welcome').waitFor({state:'hidden'});await checkpoint('entry');
   if(tracePath)await startTrace();
   await swim('outbound',true);
@@ -367,7 +460,7 @@ function summarize(){
   check('All recorded callbacks remain visible, focused and adaptive',rows.raf.length>0&&rows.raf.every(r=>!r.hidden&&r.focused&&r.adaptive));
   check('Render records distinguish completed and deferred attempts',rows.renders.length>0&&rows.renders.every(r=>!r.error&&(r.advance===0||r.advance===1)&&(!r.returnedFalse||r.advance===0)));
   for(const name of ['outbound','return']){const s=report.summary.stages.find(s=>s.name===name);check(name+' uses real movement and completes frames',s.samples>0&&s.displacement>.5&&s.completeSubmissions>0,s);}
-  if(gpuMode==='elapsed'){const s=report.gpu.summary;check('GPU attempts retain complete identities and terminal or pending states',s.identityComplete,s.statusCounts);check('GPU collector has no API or ownership failures',!s.errors.length&&!s.ownershipConflicts.length,{errors:s.errors,ownershipConflicts:s.ownershipConflicts});for(const stage of ['outbound','return'])check(stage+' has available non-disjoint complete-render GPU samples',s.stages.find(r=>r.stage===stage)?.valid>0,s.stages.find(r=>r.stage===stage));}
+  if(gpuMode==='elapsed'){const s=report.gpu.summary;check('GPU attempts retain complete identities and terminal or pending states',s.identityComplete,s.statusCounts);check('GPU collector has no API or ownership failures',!s.errors.length&&!s.ownershipConflicts.length,{errors:s.errors,ownershipConflicts:s.ownershipConflicts});if(gpuScope==='opaque')check('Every completed opaque interval has exact observed boundaries',!s.scopeBoundaryFailures.length,s.scopeBoundaryFailures);for(const stage of ['outbound','return'])check(stage+(gpuScope==='full'?' has available non-disjoint complete-render GPU samples':' has available opaque intervals associated with complete renders'),s.stages.find(r=>r.stage===stage)?.valid>0,s.stages.find(r=>r.stage===stage));}
   const outward=report.summary.stages.find(s=>s.name==='outbound'),back=report.summary.stages.find(s=>s.name==='return');
   report.route={scheduledOutboundSeconds:30,scheduledReturnSeconds:30,actualInputDurationNote:'Native input timestamps and actual stage times are retained. Each leg uses a monotonic 30-second deadline; periodic checkpoints, when requested, share that deadline. Transport latency is not subtracted from observations.',outboundDisplacement:outward.displacement,returnDisplacement:back.displacement,distanceFromStartAfterReturn:back.to&&outward.from?distance(back.to.p,outward.from.p):null,note:'Reverse input follows the original heading. Collision, terrain, acceleration and current may prevent an exact return; position is never corrected.'};
   report.finalGL=await page.evaluate(()=>({error:renderer.gl.getError(),contextLost:renderer.gl.isContextLost()}));check('Final WebGL is healthy',report.finalGL.error===0&&!report.finalGL.contextLost);
