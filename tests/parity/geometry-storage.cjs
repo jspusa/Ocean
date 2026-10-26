@@ -15,12 +15,14 @@ for(const b of header.batches){
  const vertices=new Float32Array(raw.buffer,raw.byteOffset+base+b.vertexOffset,b.vertexFloats),indices=new Uint32Array(raw.buffer,raw.byteOffset+base+b.indexOffset,b.indexCount),batch=f.renderer.batch({indexed:{vertices,indices,radius:b.radius},material:b.material,species:b.species,shadow:b.shadow},b.instanceIDs.map(i=>header.nodes[i]),b.kind,b.dynamic),uploaded=f.uploads.at(-1);
  assert.equal(uploaded.length,indices.length);for(let i=0;i<indices.length;i++)assert.equal(uploaded[i],indices[i],'Every triangle index must remain exact');
  assert.equal(uploaded.BYTES_PER_ELEMENT,2,'The authored world fits exact 16-bit storage');assert.equal(batch.indexType,3);
- f.renderer.drawBatch(batch);assert.equal(f.draws.at(-1)[2],3);assert.equal(f.draws.at(-1)[1],indices.length);
+ const drawsBefore=f.draws.length;f.renderer.drawBatch(batch);
+ if(batch.drawCount){assert.equal(f.draws.length,drawsBefore+1);assert.equal(f.draws.at(-1)[2],3);assert.equal(f.draws.at(-1)[1],indices.length);}
+ else assert.equal(f.draws.length,drawsBefore,'An empty instance batch has no GPU submission; its stored indices are still checked above');
  before+=indices.byteLength;after+=uploaded.byteLength;
 }
 assert.equal(after,before/2);console.log('PASS '+header.batches.length+' authored meshes preserve every index; GPU index bytes '+before+' -> '+after);
 for(const max of [65534,65535,65536]){
- const f=fixture(),indices=new Uint32Array([0,1,max]),vertices=new Float32Array((max+1)*12),batch=f.renderer.batch({indexed:{vertices,indices,radius:1},material:6},[],1,true),uploaded=f.uploads[0];
+ const f=fixture(),indices=new Uint32Array([0,1,max]),vertices=new Float32Array((max+1)*12),batch=f.renderer.batch({indexed:{vertices,indices,radius:1},material:6},[{p:[0,0,0]}],1,true),uploaded=f.uploads[0];
  assert.deepEqual(Array.from(uploaded),Array.from(indices));assert.equal(uploaded.BYTES_PER_ELEMENT,max<65535?2:4,'0xffff is a WebGL2 primitive-restart marker for UNSIGNED_SHORT');
  assert.equal(batch.indexType,max<65535?3:4);f.renderer.drawBatch(batch);assert.equal(f.draws[0][2],batch.indexType);
 }

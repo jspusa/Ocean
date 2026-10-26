@@ -1,5 +1,5 @@
 {
-  "version": "0.18.24",
+  "version": "0.18.25",
   "scope": "served game and build sources",
   "files": [
     {
@@ -9,8 +9,8 @@
     },
     {
       "path": "CREDITS.md",
-      "bytes": 11369,
-      "sha256": "4878069aeb73b9b78c1146da8255a945c06c8f526cc9ac7b12b6514c4743259d"
+      "bytes": 12099,
+      "sha256": "431789790ceda8a7b308610ef76a4ad1dbeb9e9399747073bbd00561593ca389"
     },
     {
       "path": "LICENSE",
@@ -19,13 +19,13 @@
     },
     {
       "path": "README.md",
-      "bytes": 36007,
-      "sha256": "bd27ec5e2692947218121ff00e1c88cf39c9191afbdf12a59842ee2b34b603fd"
+      "bytes": 36649,
+      "sha256": "d09b9d3098261b6373dd054515d3b1464d0b792e2b85692c524ed2df6fa1077a"
     },
     {
       "path": "VERSION",
       "bytes": 8,
-      "sha256": "7dfa11db657a70d977c940cb490759ba55e8511102e1dc5bbb02e3715f09dfb6"
+      "sha256": "19f692818530fb6e8eb1d340a938808d76a9308569b57b5e0f93190c6f2f7dfd"
     },
     {
       "path": "assets/caustics.jpg",
@@ -46,6 +46,11 @@
       "path": "assets/coral_nor_gl.jpg",
       "bytes": 230833,
       "sha256": "da8ef709fa49db13083b1c312155b3aa8a3eae81fee230678bff30767c48703f"
+    },
+    {
+      "path": "assets/guide_barreleye.jpg",
+      "bytes": 16388,
+      "sha256": "8ba90d8c7749f7c792d7df659b3eaef199d1fe54f7363a0b5b2f46a7941f54a8"
     },
     {
       "path": "assets/guide_beluga.jpg",
@@ -1169,18 +1174,18 @@
     },
     {
       "path": "bake_scene.cjs",
-      "bytes": 3208,
-      "sha256": "ac7bda428688ac6c463c5c8c73c054063cef021d7e77df5e39a4143d00ee239f"
+      "bytes": 3340,
+      "sha256": "50410ce2ff70cac3c352f30f570b862c6dff6d1a3984101293b8bd2718372586"
     },
     {
       "path": "build.py",
-      "bytes": 4978,
-      "sha256": "8b43f288ce8f20d70d0837237c09967bee6c2e37226e3afa1acc2073b9345b1e"
+      "bytes": 5014,
+      "sha256": "4f3f107eb8c27ab058a0833a0d2aeb45749823e0929613b166f0303f3b73d9cf"
     },
     {
       "path": "index.html",
-      "bytes": 15270,
-      "sha256": "f5a0c5a7dd6f628546110939fddab214f23806d7ae1eae6278c995c6a2c33857"
+      "bytes": 15378,
+      "sha256": "96fe9b1c7282871e144d94030d54186b2073d0c9d1e9040c553b87c4810514cc"
     },
     {
       "path": "music/blue_silence.mp3",
@@ -1224,8 +1229,8 @@
     },
     {
       "path": "src/app.js",
-      "bytes": 84952,
-      "sha256": "a51b8c93bf2001a225c52c123e6a6131367d6a4ea41e62c4eb2716e0c3f9dcd9"
+      "bytes": 85032,
+      "sha256": "756931887e6b52f8f692005056d3e5743723489f26f532c896d7303c24486894"
     },
     {
       "path": "src/aquarium.js",
@@ -1236,6 +1241,16 @@
       "path": "src/audio.js",
       "bytes": 12277,
       "sha256": "ec30470c4adc4e5a943bae3891c7bd0696c135d9d8e37b5fe30bdbd1fb849b14"
+    },
+    {
+      "path": "src/barreleye.js",
+      "bytes": 11202,
+      "sha256": "e783f493813b0d7b1a58f0ff45e9b7a21899cf65e275aed45de60ad484c174cb"
+    },
+    {
+      "path": "src/barreleye_world.js",
+      "bytes": 2464,
+      "sha256": "cbaa0aae472e25883fff4d0a8bc96128f8954c61dee0fde3cf7945dedbabe481"
     },
     {
       "path": "src/bootstrap.js",
@@ -1254,13 +1269,13 @@
     },
     {
       "path": "src/config.js",
-      "bytes": 2858,
-      "sha256": "f08e79283bd97cf70245961ff441a75e0940f1aef895f37ed288ceca54341a50"
+      "bytes": 2915,
+      "sha256": "f69fb380d9ad89f12d4f9917d360653aaa974bcd79b9c6e5ed5f4de36a18214f"
     },
     {
       "path": "src/deepsea.js",
-      "bytes": 15911,
-      "sha256": "2cf25cc6adc27a60118adbcdfd67dcd06bc111e35f7a26a549a3d9b79e7bdc96"
+      "bytes": 16037,
+      "sha256": "9e5f49266a1e149140975eb652eaeb70973fffe1d73b0291bd35b08f65431936"
     },
     {
       "path": "src/ecology.js",
@@ -1269,8 +1284,8 @@
     },
     {
       "path": "src/engine.js",
-      "bytes": 106036,
-      "sha256": "e94d92332a2ea6cd7302758d18bd69a50f42a04e0221fcf801a20fa50161431f"
+      "bytes": 112994,
+      "sha256": "7a5feae87f89c77d2f01fb2c87651b07513dd775669efce350763625b292c850"
     },
     {
       "path": "src/expedition.js",
@@ -1409,8 +1424,8 @@
     },
     {
       "path": "src/scene_cache.js",
-      "bytes": 4223,
-      "sha256": "1b5a6020e651e155877cf40478f5e6702445f98dd060738682325dc2f957d78f"
+      "bytes": 4318,
+      "sha256": "4a06b97563f1b60ad203ffa6d8c8d10edcfb78563e70e3f8f2b064e3d6be8717"
     },
     {
       "path": "src/scene_stream.js",
@@ -1430,7 +1445,7 @@
     {
       "path": "src/shell.html",
       "bytes": 11370,
-      "sha256": "d86bfce910b2a8257f9706f60f2d29db5fd95afd36fc188e0e00529acc077799"
+      "sha256": "f9df944f6c6d0c48c845de69d4fb7fdf5685dac6af6e8b03af077374f0e91dc4"
     },
     {
       "path": "src/ship.js",

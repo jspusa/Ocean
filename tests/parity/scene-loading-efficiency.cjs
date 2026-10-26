@@ -2,7 +2,7 @@
  * recording renderer. Geometry identity is the renderer's sharing seam. */
 'use strict';
 const fs=require('node:fs'),path=require('node:path'),vm=require('node:vm'),zlib=require('node:zlib'),assert=require('node:assert/strict');
-const root=path.resolve(__dirname,'../..'),source=['scene_stream.js','scene_cache.js'].map(file=>fs.readFileSync(path.join(root,'src',file),'utf8')).join('\n');
+const root=path.resolve(__dirname,'../..'),source=['engine.js','scene_stream.js','scene_cache.js'].map(file=>fs.readFileSync(path.join(root,'src',file),'utf8')).join('\n');
 const packed=fs.readFileSync(path.join(root,'assets/reef.mesh.gz')),decoded=zlib.gunzipSync(packed),base=8+decoded.readUInt32LE(4),originalHeader=JSON.parse(decoded.subarray(8,base));
 function archive(header,payload=Buffer.alloc(0)){
  let data=Buffer.from(JSON.stringify(header));data=Buffer.concat([data,Buffer.alloc((4-data.length%4)%4,32)]);
@@ -10,9 +10,9 @@ function archive(header,payload=Buffer.alloc(0)){
 }
 function chunked(data,size=65536){let offset=0;return new ReadableStream({pull(controller){if(offset>=data.length){controller.close();return;}controller.enqueue(data.subarray(offset,offset+size));offset+=size;}});}
 async function load({body=chunked(packed),streamOnly=false,compression=DecompressionStream,status=200,ResponseImpl=Response}={}){
- const calls=[],warnings=[],stats={arrayBufferCalls:0},renderer={batches:[],batch(geo,instances,kind,dynamic){const b={geo,instances,kind,dynamic};calls.push(b);this.batches.push(b);return b;}};
+ const calls=[],warnings=[],stats={arrayBufferCalls:0},loadDetail={textContent:''},renderer={batches:[],batch(geo,instances,kind,dynamic){const b={geo,instances,kind,dynamic};calls.push(b);this.batches.push(b);return b;}};
  const response={ok:status===200,status,body,arrayBuffer:async()=>{stats.arrayBufferCalls++;if(streamOnly)throw Error('Do not materialize the compressed archive');return packed.buffer.slice(packed.byteOffset,packed.byteOffset+packed.byteLength);}};
- const context=vm.createContext({console:{warn:(...args)=>warnings.push(args)},performance,AbortController,setTimeout,clearTimeout,Response:ResponseImpl,Blob,ReadableStream,TransformStream,DecompressionStream:compression,DataView,TextDecoder,Uint8Array,Uint32Array,Float32Array,WORLD:'scene.gz',OPEN_WORLD:{version:originalHeader.sourceVersion},fetch:async()=>response,requestAnimationFrame:callback=>callback(0),$:()=>({textContent:''}),obstacles:[],reefPatches:[],life:[],decorLife:[],shoal:[],allLife:[],diverBatch:null});
+ const context=vm.createContext({console:{warn:(...args)=>warnings.push(args)},performance,AbortController,setTimeout,clearTimeout,Response:ResponseImpl,Blob,ReadableStream,TransformStream,DecompressionStream:compression,DataView,TextDecoder,Uint8Array,Uint32Array,Float32Array,WORLD:'scene.gz',OPEN_WORLD:{version:originalHeader.sourceVersion},fetch:async()=>response,requestAnimationFrame:callback=>callback(0),document:{getElementById:id=>id==='loadDetail'?loadDetail:null},obstacles:[],reefPatches:[],life:[],decorLife:[],shoal:[],allLife:[],diverBatch:null});
  vm.runInContext(source,context);const ok=await context.loadCompiledScene(renderer);return {ok,calls,warnings,stats,context,renderer};
 }
 const tests=[];function check(name,fn){tests.push({name,fn});}

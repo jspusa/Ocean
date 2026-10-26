@@ -62,6 +62,12 @@ function meshIndexData(indices){
  for(let k=0;k<indices.length;k++)if(indices[k]>=65535)return indices;
  return new Uint16Array(indices);
 }
+function transparentShellRange(range,count){
+ if(range==null)return null;
+ const {first,count:length}=range;
+ if(!Number.isSafeInteger(first)||!Number.isSafeInteger(length)||first<0||length<=0||first%3||length%3||first+length!==count)throw new RangeError('Invalid transparent shell index range');
+ return {first,count:length};
+}
 function meshCullBounds(vertices){
  const min=[Infinity,Infinity,Infinity],max=[-Infinity,-Infinity,-Infinity];
  for(let k=0;k<vertices.length;k+=12)for(let axis=0;axis<3;axis++){
@@ -235,6 +241,23 @@ void main(){vec3 p=aPosition,n=aNormal;vLocal=p;vUV=aUV;vTag=aTag;
    float wave=beat+p.x*7.2,amplitude=.07;
    float derivative=amplitude*(7.2*cos(wave)*envelope*envelope+2.*sin(wave)*envelope*dEnvelope);
    p.z+=sin(wave)*amplitude*envelope*envelope;n.x-=derivative*n.z;
+  }else if(uRigClass==6){
+   // Slow fin propulsion leaves the fluid shield rigid. Eyes turn inside it;
+   // both geometry and normals share the same rotation, including shadows.
+   if(aTag>3.5&&aTag<4.5){
+    float angle=-.52359878*(1.+sin(uTime*.16+aExtra.x)),c=cos(angle),s=sin(angle);
+    vec2 q=p.xy-vec2(.24,.045);p.xy=vec2(c*q.x-s*q.y,s*q.x+c*q.y)+vec2(.24,.045);
+    n.xy=vec2(c*n.x-s*n.y,s*n.x+c*n.y);
+   }else if(p.x<-.15){
+    float u=clamp((-.15-p.x)/.35,0.,1.),w=u*u*(3.-2.*u),dw=u<1.?-6.*u*(1.-u)/.35:0.;
+    float wave=beat+p.x*5.;p.z+=sin(wave)*.015*w;
+    n.x-=(cos(wave)*.075*w+sin(wave)*.015*dw)*n.z;
+   }else if(fin&&p.x>-.03&&p.y>-.075){
+    // The pectorals sit above the broad pelvic stabilizers. Pin their roots
+    // and leave the low pelvic membranes out of this propulsion stroke.
+    float z=abs(p.z),u=clamp((z-.118)/.149,0.,1.),w=u*u*(3.-2.*u),dw=z>.118&&z<.267?6.*u*(1.-u)*sign(p.z)/.149:0.;
+    float flap=sin(beat+sign(p.z))*.010;p.y+=flap*w;n.z-=flap*dw*n.y;
+   }
   }
  }
  if(uKind==5){
@@ -625,6 +648,37 @@ void main(){
  frag=vec4(max(col,vec3(0.)),clamp(coverage,.0,1.));
 
 }`;
+// A bounded forward layer for convex, thin fluid shields. It shares the
+// production deformation and transforms; only the photographic sample offset
+// differs. This is an authored non-refractive optical approximation.
+const SHELL_VS=VS.replace('void main(){','uniform vec2 uShellOffset;uniform vec2 uResolution;uniform float uShellBlur;\nvoid main(){').replace('gl_Position=uVP*vec4(vRelative,1.);','gl_Position=uVP*vec4(vRelative,1.);gl_Position.xy+=uShellOffset*uShellBlur*2./uResolution*gl_Position.w;');
+const SHELL_FS=`#version 300 es
+precision highp float;precision highp int;
+in vec3 vRelative;in vec3 vWorld;in vec3 vNormal;in float vLodDistance;
+uniform sampler2D uDepth;uniform vec2 uResolution;uniform vec3 uCamera;uniform vec3 uRenderOrigin;uniform vec3 uViewForward;
+uniform vec3 uLightDir;uniform vec3 uLightColor;uniform vec4 uTorchParams;
+uniform float uTorch;uniform float uSun;uniform float uClarity;uniform float uExposure;uniform float uShellWeight;uniform vec3 uLODBounds;
+out vec4 frag;
+${WATER_OPTICS_GLSL}
+void main(){
+ vec2 uv=gl_FragCoord.xy/uResolution;
+ if(gl_FragCoord.z>texture(uDepth,uv).r)discard;
+ if(uLODBounds.z>0.){float dither=fract(52.9829189*fract(dot(gl_FragCoord.xy,vec2(.06711056,.00583715))));
+  if(uLODBounds.x>0.&&dither>=smoothstep(uLODBounds.x-uLODBounds.z,uLODBounds.x+uLODBounds.z,vLodDistance))discard;
+  if(dither<smoothstep(uLODBounds.y-uLODBounds.z,uLODBounds.y+uLODBounds.z,vLodDistance))discard;}
+ vec3 delta=vRelative-(uCamera-uRenderOrigin),E=normalize(-delta),n=normalize(vNormal);
+ float d=length(delta),NoV=max(.0,dot(n,E)),depth=max(0.,-vWorld.y);
+ float rim=pow(1.-NoV,4.),alpha=.025+.42*rim;
+ vec3 col=uLightColor*sunThroughWater(depth,uLightDir.y)*uSun*(.035+.13*rim)*max(0.,dot(n,uLightDir));
+ if(uTorch>.5){float cone=smoothstep(uTorchParams.x,uTorchParams.y,dot(-E,normalize(uViewForward)));
+  float highlight=pow(NoV,90.)*.20;
+  col+=vec3(.80,.93,1.)*vec3(1.,.91,.80)*exp(-vec3(.044,.018,.009)*d)*cone*uTorchParams.z/(1.+d*d*uTorchParams.w)*(.032+.20*rim+highlight);}
+ vec3 trans=exp(-waterExtinction(uClarity)*d);
+ col=col*trans+waterRadiance(normalize(delta),max(0.,-uCamera.y),uSun)*(1.-trans);
+ vec3 x=max(vec3(0.),col*uExposure);col=pow(clamp((x*(2.51*x+.03))/(x*(2.43*x+.59)+.14),0.,1.),vec3(1./2.2));
+ col*=1.-.035*pow(length((uv-.5)*vec2(1.,.85))*1.4,2.);
+ frag=vec4(col,alpha*uShellWeight);
+}`;
 const SHADOW_FS=`#version 300 es
 precision highp float;precision highp int;in float vTag;uniform int uMat;void main(){if(uMat==7&&vTag>20.)discard;}`;
 const SKY_FS=`#version 300 es
@@ -919,7 +973,7 @@ function surfaceShaderSource(source,kind,material){
 
 class Renderer{
  constructor(canvas,initialQuality=null){this.canvas=canvas;const g=canvas.getContext('webgl2',{alpha:false,antialias:false,depth:true,preserveDrawingBuffer:false,powerPreference:'high-performance'});if(!g)throw new Error('請以支援 WebGL 2 的一般瀏覽器開啟。');this.gl=g;this.maxTextureSize=g.getParameter(g.MAX_TEXTURE_SIZE);this.mobile=matchMedia('(pointer:coarse)').matches;this.batches=[];this.fog=[.0008,.005,.028];this.lightDir=V.norm([-.36,1.,.30]);this.lightColor=[1.05,1.02,.93];this.clarity=1.;this.lamp=false;this.dynamicScale=1;this.lighting="day";this.fogDensity=.034;this.sun=1.02;this.quality=initialQuality??(this.mobile?1:2);this.exposure=1.11;this.drawCalls=0;this.frame=0;
-  this.program=this.makeProgram(VS,FS);this.setupSurfacePrograms();this.shadowProgram=this.makeProgram(VS,SHADOW_FS);this.waterProgram=this.makeProgram(WATER_VS,WATER_FS);this.pointProgram=this.makeProgram(POINT_VS,POINT_FS);this.rayProgram=this.makeProgram(RAY_VS,RAY_FS);this.postProgram=this.makeProgram(POST_VS,POST_FS);this.volumeProgram=this.makeProgram(POST_VS,VOLUME_FS);this.volumeFilterProgram=this.makeProgram(POST_VS,VOLUME_FILTER_FS);this.bubbleProgram=this.makeProgram(BUBBLE_VS,BUBBLE_FS);this.aaProgram=this.makeProgram(POST_VS,AA_FS);this.skyProgram=this.makeProgram(POST_VS,SKY_FS);this.msaaSamples=0;
+  this.program=this.makeProgram(VS,FS);this.setupSurfacePrograms();this.shellProgram=this.makeProgram(SHELL_VS,SHELL_FS);this.shadowProgram=this.makeProgram(VS,SHADOW_FS);this.waterProgram=this.makeProgram(WATER_VS,WATER_FS);this.pointProgram=this.makeProgram(POINT_VS,POINT_FS);this.rayProgram=this.makeProgram(RAY_VS,RAY_FS);this.postProgram=this.makeProgram(POST_VS,POST_FS);this.volumeProgram=this.makeProgram(POST_VS,VOLUME_FS);this.volumeFilterProgram=this.makeProgram(POST_VS,VOLUME_FILTER_FS);this.bubbleProgram=this.makeProgram(BUBBLE_VS,BUBBLE_FS);this.aaProgram=this.makeProgram(POST_VS,AA_FS);this.skyProgram=this.makeProgram(POST_VS,SKY_FS);this.msaaSamples=0;
   this.floatColor=!!g.getExtension('EXT_color_buffer_float');this.aniso=g.getExtension('EXT_texture_filter_anisotropic');this.textures=[];this.loaded=this.loadTextures();g.enable(g.DEPTH_TEST);g.disable(g.CULL_FACE);this.lightVP=mm(ortho(-51,51,-51,51,.1,180),lookAt([-42,84,14],[0,-12,-12]));
   this.setupWater();this.setupBubbles();this.setupParticles();this.setupRays();this.setupShadow();this.postVAO=g.createVertexArray();this.resize();
  }
@@ -999,7 +1053,7 @@ class Renderer{
  upgradeTextures(){if(this.textureFull)return Promise.resolve();if(!this._textureUpgrade)this._textureUpgrade=this.loadTextures(true).finally(()=>this._textureUpgrade=null);return this._textureUpgrade;}
 
  batch(geo,instances,kind=0,dynamic=false){
-  const g=this.gl,mesh=geo.indexed||indexGeometry(geo.v),vao=g.createVertexArray();g.bindVertexArray(vao);
+  const g=this.gl,mesh=geo.indexed||indexGeometry(geo.v),transparentShell=transparentShellRange(geo.transparentShell,mesh.indices.length),vao=g.createVertexArray();g.bindVertexArray(vao);
   // Compiled meshes are immutable. Loader-canonicalized copies may share only
   // geometry buffers; each draw batch still owns its VAO and instance state.
   // Weak keys let the large decoded scene storage go after loading finishes.
@@ -1015,7 +1069,7 @@ class Renderer{
   g.bindBuffer(g.ELEMENT_ARRAY_BUFFER,eb);
   const ib=g.createBuffer(),data=new Float32Array(instances.length*24);g.bindBuffer(g.ARRAY_BUFFER,ib);g.bufferData(g.ARRAY_BUFFER,data.byteLength,g.DYNAMIC_DRAW);
   this.attr(3,3,96,0,1);this.attr(4,4,96,12,1);this.attr(5,3,96,28,1);this.attr(6,2,96,40,1);this.attr(9,4,96,48,1);this.attr(10,4,96,64,1);this.attr(11,4,96,80,1);
-  const b={vao,vb,eb,ib,count:mesh.indices.length,vertexCount:mesh.vertices.length/12,indexType,instances,data,kind,dynamic,material:geo.material||0,species:geo.species??-1,visible:true,shadow:geo.shadow!==false,radius:mesh.radius,drawCount:instances.length,_lastVisible:null};
+  const b={vao,vb,eb,ib,count:mesh.indices.length,vertexCount:mesh.vertices.length/12,indexType,instances,data,kind,dynamic,material:geo.material||0,species:geo.species??-1,visible:true,shadow:geo.shadow!==false,radius:mesh.radius,drawCount:instances.length,_lastVisible:null,transparentShell};
   // Rigid geometry may lie far from its instance pivot (seabed tiles), or be
   // very thin (trench walls). Keep the existing sphere as a cheap first test,
   // then reject the tighter box only when it is wholly outside a clip plane.
@@ -1029,11 +1083,12 @@ class Renderer{
   this.updateBatch(b);this.batches.push(b);g.bindVertexArray(null);return b;
  }
  deferredBatch(meta,instances){
-  const b={instances,data:new Float32Array(instances.length*24),count:meta.indexCount,vertexCount:meta.vertexFloats/12,kind:meta.kind,dynamic:meta.dynamic,material:meta.material||0,species:meta.species??-1,shadow:meta.shadow!==false,visible:meta.visible!==false,radius:meta.radius,drawCount:0,vao:null,vb:null,eb:null,ib:null};
+  const transparentShell=transparentShellRange(meta.transparentShell,meta.indexCount);
+  const b={instances,data:new Float32Array(instances.length*24),count:meta.indexCount,vertexCount:meta.vertexFloats/12,kind:meta.kind,dynamic:meta.dynamic,material:meta.material||0,species:meta.species??-1,shadow:meta.shadow!==false,visible:meta.visible!==false,radius:meta.radius,drawCount:0,vao:null,vb:null,eb:null,ib:null,transparentShell};
   for(const k of ['minDistance','maxDistance','shadowProxy','sceneRole'])if(meta[k]!==undefined)b[k]=meta[k];this.batches.push(b);return b;
  }
  attachBatchMesh(b,mesh){
-  const visible=b.visible,replacement=this.batch({indexed:mesh,material:b.material,species:b.species,shadow:b.shadow},b.instances,b.kind,b.dynamic);this.batches.pop();Object.assign(b,replacement);b.visible=visible;
+  const visible=b.visible,replacement=this.batch({indexed:mesh,material:b.material,species:b.species,shadow:b.shadow,transparentShell:b.transparentShell},b.instances,b.kind,b.dynamic);this.batches.pop();Object.assign(b,replacement);b.visible=visible;
  }
  updateBatch(b,eye=null,planes=null,shadowPass=false){
   if(b.streamMesh!==undefined&&!b.vao){b.drawCount=0;return;}
@@ -1085,7 +1140,46 @@ class Renderer{
   }else b._uploadedData=null;
   this.gl.bindBuffer(this.gl.ARRAY_BUFFER,b.ib);this.gl.bufferSubData(this.gl.ARRAY_BUFFER,0,a,0,j);
  }
- drawBatch(b){this.gl.bindVertexArray(b.vao);this.gl.drawElementsInstanced(this.gl.TRIANGLES,b.count,b.indexType,0,b.drawCount);this.drawCalls++;}
+ drawBatch(b,part='opaque',instance=null){
+  if(part!=='opaque'&&part!=='shell')throw new RangeError('Unknown batch draw part');
+  if(instance!==null&&(!Number.isInteger(instance)||instance<0||instance>=b.drawCount))throw new RangeError('Invalid packed instance index');
+  const shell=part==='shell'?b.transparentShell:null,count=part==='shell'?(shell?.count||0):(b.transparentShell?.first??b.count);
+  if(!count||!b.drawCount)return;
+  const g=this.gl,first=shell?.first||0,instances=instance===null?b.drawCount:1;
+  g.bindVertexArray(b.vao);
+  if(instance!==null)this.batchInstanceOffset(b,instance*96);
+  try{g.drawElementsInstanced(g.TRIANGLES,count,b.indexType,first*(b.indexType===g.UNSIGNED_SHORT?2:4),instances);this.drawCalls++;}
+  finally{if(instance!==null)this.batchInstanceOffset(b,0);}
+ }
+ batchInstanceOffset(b,offset){
+  this.gl.bindBuffer(this.gl.ARRAY_BUFFER,b.ib);
+  for(const [loc,size,start]of [[3,3,0],[4,4,12],[5,3,28],[6,2,40],[9,4,48],[10,4,64],[11,4,80]])this.attr(loc,size,96,start+offset,1);
+ }
+ renderTransparentShells(eye,t){
+  const draws=[],origin=this.renderOrigin||[0,0,0];
+  // Sort packed visible instances only. Aquarium specimens retain their saved
+  // order and identity; no actor or opaque instance buffer is rewritten here.
+  for(const b of this.batches)if(b.visible&&b.transparentShell&&b.drawCount)for(let i=0;i<b.drawCount;i++){
+   const k=i*24,d=Math.hypot(b.data[k]+origin[0]-eye[0],b.data[k+1]+origin[1]-eye[1],b.data[k+2]+origin[2]-eye[2]);draws.push({b,i,d});
+  }
+  this.shellDraws=0;if(!draws.length)return;
+  draws.sort((a,b)=>b.d-a.d);const g=this.gl,p=this.shellProgram,state={},ls=this.mobile?(this.quality===0?.64:.82):(this.quality===0?.75:1);
+  this.common(p,eye,this.vp,t);this.bindTex(1,this.sceneDepth);this.set1i(p,'uDepth',1);this.set2f(p,'uResolution',this.canvas.width,this.canvas.height);this.set1f(p,'uExposure',this.exposure);this.set1f(p,'uClarity',this.clarity);
+  g.enable(g.CULL_FACE);g.cullFace(g.BACK);
+  try{for(const {b,i,d}of draws){
+   this.batchUniforms(p,b,state);this.set3f(p,'uLODBounds',(b.minDistance||0)*ls,(b.maxDistance||220)*ls,b.material!==1&&((b.minDistance||0)>0||(b.maxDistance&&b.maxDistance<180))?.60:0);
+   // Bounded image-space convolution of the tiny shell only. Focused heads
+   // cost one draw; defocused photos use nine disk taps, with the same CoC
+   // cap as the scene camera. This does not add a render target or screen pass.
+   const coc=this.photoAperture>0?clamp(Math.abs(d-(this.photoFocus||8))/Math.max(d,.5)*18/this.photoAperture,0,8):0,taps=coc>.35?9:1;
+   this.set1f(p,'uShellBlur',taps>1?coc:0);this.set1f(p,'uShellWeight',1/taps);
+   for(let sample=0;sample<taps;sample++){
+    const a=sample*2.39996323,r=sample?Math.sqrt((sample-.5)/(taps-1)):0;
+    this.set2f(p,'uShellOffset',Math.cos(a)*r,Math.sin(a)*r);this.drawBatch(b,'shell',i);this.shellDraws++;
+    this.submittedTriangles+=b.transparentShell.count/3;this.submittedVertices+=b.transparentShell.count;
+   }
+  }}finally{g.disable(g.CULL_FACE);}
+ }
  frustum(vp){let p=[];for(let a=0;a<3;a++)for(let sign of [-1,1]){let q=[vp[3]+sign*vp[a],vp[7]+sign*vp[4+a],vp[11]+sign*vp[8+a],vp[15]+sign*vp[12+a]],n=Math.hypot(q[0],q[1],q[2]);p.push(q.map(x=>x/n));}return p;}
  setupWater(){
   const g=this.gl,segments=this.mobile?64:112,positions=[];
@@ -1200,7 +1294,7 @@ class Renderer{
  common(p,eye,vp,t){let g=this.gl;g.useProgram(p.p);if(this.textures[8]){this.bindTex(9,this.textures[8]);this.set1i(p,'uCaustic',9);}this.setMatrix4fv(p,'uVP',false,vp===this.vp?this.renderVP:vp===this.lightVP?this.renderLightVP:vp===this.dynamicLightVP?this.renderDynamicLightVP:vp);this.setMatrix4fv(p,'uLightVP',false,this.renderLightVP||this.lightVP);this.setMatrix4fv(p,'uDynamicLightVP',false,this.renderDynamicLightVP||this.renderLightVP||this.lightVP);this.set1i(p,'uSamples',this.msaaSamples||0);this.set1i(p,'uQuality',this.quality);this.set1i(p,'uSunless',this.sunless?1:0);this.set3fv(p,'uRenderOrigin',this.renderOrigin||[0,0,0]);this.set4f(p,'uTorchParams',TorchLightRules.outer,TorchLightRules.inner,TorchLightRules.strength,TorchLightRules.falloff);this.set3fv(p,'uCamera',eye);this.set1f(p,'uTorch',this.lamp?1:0);this.set3fv(p,'uViewForward',this.cameraForward||[0,0,-1]);this.set1f(p,'uTime',t);this.set1f(p,'uSwim',typeof player==='undefined'?.4:Math.min(1,Math.hypot(...player.velocity)/1.6));this.set1f(p,'uSun',this.sun);this.set3fv(p,'uFog',this.fog);this.set3fv(p,'uLightDir',this.lightDir);this.set3fv(p,'uAirLightDir',this.airLightDir||this.lightDir);this.set3fv(p,'uLightColor',this.lightColor);
   if(p===this.pointProgram||p===this.bubbleProgram){this.set1i(p,'uDepth',1);this.set2f(p,'uResolution',this.canvas.width,this.canvas.height);this.set1f(p,'uExposure',this.exposure);this.set1f(p,'uClarity',this.clarity??1);this.set1f(p,'uPhotoAperture',this.photoAperture||0);this.set1f(p,'uPhotoFocus',this.photoFocus||8);}
  }
- speciesUniforms(p,b){const sp=typeof SPECIES!=='undefined'?SPECIES[b.species]:null,m=sp?.materialProfile,r=sp?.motionProfile?.type;this.set1i(p,'uRigClass',r==='vampire'?1:r==='sea_pig'?2:r==='snailfish'?3:r==='oarfish'?4:r==='frilled_shark'?5:0);this.set4f(p,'uSurfaceProfile',m?clamp(m.roughness,.12,.98):-1,m?clamp(m.subsurface,0,1):0,m?Math.max(.1,m.patternScale||1):1,m?({fish:0,cetacean:1,cephalopod:2,crustacean:3,shell:4,gelatinous:5,silver:6}[m.skin]??0):-1);}
+ speciesUniforms(p,b){const sp=typeof SPECIES!=='undefined'?SPECIES[b.species]:null,m=sp?.materialProfile,r=sp?.motionProfile?.type;this.set1i(p,'uRigClass',r==='vampire'?1:r==='sea_pig'?2:r==='snailfish'?3:r==='oarfish'?4:r==='frilled_shark'?5:r==='barreleye'?6:0);this.set4f(p,'uSurfaceProfile',m?clamp(m.roughness,.12,.98):-1,m?clamp(m.subsurface,0,1):0,m?Math.max(.1,m.patternScale||1):1,m?({fish:0,cetacean:1,cephalopod:2,crustacean:3,shell:4,gelatinous:5,silver:6}[m.skin]??0):-1);}
  batchUniforms(p,b,state,kind=b.kind){
   // State is local to one shader pass, so a new frame, a material edit or a
   // shadow/colour transition always reinitializes the relevant uniforms.
@@ -1256,7 +1350,7 @@ class Renderer{
   const names=['uSand','uSandN','uRock','uRockN','uShell','uShellN','uCoral','uCoralN'];for(let i=0;i<8;i++)this.bindTex(i,this.textures[i]);this.bindTex(8,this.shadowTexture);g.bindSampler(8,this.shadowSampler);this.bindTex(10,this.dynamicShadowTexture);g.bindSampler(10,this.shadowSampler);
   this.submittedTriangles=0;this.submittedVertices=0;const planes=this.frustum(this.vp),ls=this.mobile?(this.quality===0?.64:.82):(this.quality===0?.75:1);
   for(const b of this.batches){if(!b.visible)continue;this.updateBatch(b,eye,planes);if(!b.drawCount)continue;
-   this.submittedTriangles+=b.count/3*b.drawCount;this.submittedVertices+=b.vertexCount*b.drawCount;
+   this.submittedTriangles+=(b.transparentShell?.first??b.count)/3*b.drawCount;this.submittedVertices+=b.vertexCount*b.drawCount;
    const p=this.surfaceProgram(b);let state=surfaceStates.get(p);
    if(!state){this.common(p,eye,this.vp,t);this.set1f(p,'uFogDensity',this.fogDensity);this.set1f(p,'uShadowTexel',1/this.shadowSize);this.set1f(p,'uShadows',1);
     for(let i=0;i<8;i++)this.set1i(p,names[i],i);this.set1i(p,'uShadow',8);this.set1i(p,'uDynamicShadow',10);state={};surfaceStates.set(p,state);activeSurface=p;
@@ -1282,6 +1376,7 @@ class Renderer{
   // sprites in that same space, using their own light path and resolved
   // scene depth. No additional target, point count or fullscreen pass.
   g.enable(g.BLEND);g.blendFunc(g.SRC_ALPHA,g.ONE_MINUS_SRC_ALPHA);g.depthMask(false);
+  this.renderTransparentShells(eye,t);
   this.common(this.pointProgram,eye,this.vp,t);this.set1f(this.pointProgram,'uScale',this.canvas.height*.044);g.bindVertexArray(this.particleVAO);
   if(eye[1]<-.18){g.drawArrays(g.POINTS,0,this.quality===0?240:520);this.renderBubbles(eye,t);}
   g.depthMask(true);g.disable(g.BLEND);

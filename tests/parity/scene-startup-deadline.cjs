@@ -3,7 +3,7 @@
 'use strict';
 const fs=require('node:fs'),path=require('node:path'),vm=require('node:vm'),assert=require('node:assert/strict'),zlib=require('node:zlib');
 const {getEventListeners}=require('node:events');
-const root=path.resolve(__dirname,'../..'),source=['scene_stream.js','scene_cache.js'].map(file=>fs.readFileSync(path.join(root,'src',file),'utf8')).join('\n');
+const root=path.resolve(__dirname,'../..'),source=['engine.js','scene_stream.js','scene_cache.js'].map(file=>fs.readFileSync(path.join(root,'src',file),'utf8')).join('\n');
 const flush=async()=>{for(let i=0;i<12;i++)await Promise.resolve();await new Promise(setImmediate);};
 function archive(change=()=>{}){
  const header={format:'return-blue/indexed-scene/1',sourceVersion:'deadline-fixture',nodes:[{p:[0,-8,0]}],batches:[{vertexOffset:0,vertexFloats:36,indexOffset:144,indexCount:3,radius:1,instanceIDs:[0],kind:0}],obstacles:[{p:[0,-10,0],s:[1,1,1]}],reefPatches:[],life:[0],decorLife:[],shoal:[],diverBatch:0};
@@ -14,11 +14,11 @@ function archive(change=()=>{}){
 }
 const packed=archive();
 function fixture(network,{compression=DecompressionStream,response=Response,regional=false}={}){
- let now=1000,nextTimer=0;const timers=new Map(),requests=[],warnings=[],uploads=[];
+ let now=1000,nextTimer=0;const timers=new Map(),requests=[],warnings=[],uploads=[],loadDetail={textContent:''};
  const renderer={batches:[],batch(geometry,instances,kind,dynamic){const batch={geometry,instances,kind,dynamic};uploads.push(batch);this.batches.push(batch);return batch;}};
  const context=vm.createContext({console:{warn:(...args)=>warnings.push(args)},performance:{now:()=>now},AbortController,Response:response,ReadableStream,TransformStream,DecompressionStream:compression,DataView,TextDecoder,Uint8Array,Uint32Array,Float32Array,
   setTimeout(fn,delay){const id=++nextTimer;timers.set(id,{at:now+delay,fn});return id;},clearTimeout:id=>timers.delete(id),requestAnimationFrame:fn=>queueMicrotask(()=>fn(now)),
-  WORLD:'scene.gz',...(regional?{WORLD_STREAM:'index.json'}:{}),OPEN_WORLD:{version:'deadline-fixture'},$:()=>({textContent:''}),obstacles:[],reefPatches:[],life:[],decorLife:[],shoal:[],allLife:[],diverBatch:null,
+  WORLD:'scene.gz',...(regional?{WORLD_STREAM:'index.json'}:{}),OPEN_WORLD:{version:'deadline-fixture'},document:{getElementById:id=>id==='loadDetail'?loadDetail:null},obstacles:[],reefPatches:[],life:[],decorLife:[],shoal:[],allLife:[],diverBatch:null,
   fetch(url,options={}){const request={url:String(url),signal:options.signal,at:now};requests.push(request);return network(request);}});
  vm.runInContext(source,context,{filename:'scene-startup.js'});
  function observe(promise){const result={state:'pending'};result.promise=promise.then(value=>{result.state='resolved';result.value=value;},error=>{result.state='rejected';result.error=error;});return result;}

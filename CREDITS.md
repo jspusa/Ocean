@@ -110,3 +110,9 @@
 ## 0.18.19 皺鰓鯊
 
 `src/frilled_shark.js`、`src/frilled_shark_world.js` 為原創程序模型、色彩與路線，`engine.js` 的專屬動作為即時遊戲近似。形態和深度參考 [來源說明](docs/parity/FRILLED-SHARK-REFERENCE.md)；沒有納入博物館照片、掃描、外部模型或貼圖。圖鑑 JPEG 由本作實際 WebGL 模型生成，SVG 為原創後備；棚景不是自然棲地照片。
+
+## 0.18.25 桶眼魚
+
+`src/barreleye.js` 的高低模型、膜鰭、透明頭罩、成對銀色管眼、綠色晶狀體及 SVG 備援為原創程序幾何與插圖；`assets/guide_barreleye.jpg` 由本作模型在隔離 WebGL 棚景繪製。未將參考照片、外部模型或 Nintendo 素材納入發布包。生物形態依據與假說界線見 [BARRELEYE-REFERENCE](docs/parity/BARRELEYE-REFERENCE.md)。
+
+代表全長 0.14 m、690 m 遭遇位置、數量、動作與眼動節律是本作編排。透明罩使用既有畫面上的局部薄組織近似，沒有折射、體積液體或完整透明組織光學；綠色晶狀體不自發光。此內容不代表完整圖鑑、科學生態模擬或全面超越 Wii 的驗收。
