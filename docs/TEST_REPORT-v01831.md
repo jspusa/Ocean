@@ -55,7 +55,11 @@
 
 ## 公開交付
 
-本機最終打包為 0.18.31，正式 engine 與受控／自然測量使用的來源相同。公開發布的 Pages commit、300 個檔案 hashes 與正常入海收據在部署完成後記錄。
+公開網站已發布 0.18.31。GitHub Pages 對正式 runtime commit `094bbadbfd3a37c1ba9a1f0db71eefc55912435d` 回報 `built`，建置時間為 2026-10-26 21:55:38 UTC。正式 engine 與受控／自然測量使用的來源相同；manifest SHA-256 為 `622b5471cd4ebbf61f5475858cc7c746e79333f738d8eff87eef104f83d503c6`。
+
+直接從 [公開網址](https://jspusa.github.io/Ocean/) 驗證全部 300 個 manifest 檔案 SHA-256，全部符合。桌機與觸控瀏覽器正常開始遊戲均通過：預設自動畫質、場景編譯與串流完成、九個表面程式無編譯失敗、44 種生物資料、自由探索模式、未自動開啟觀察焦點、GL 0、context 未遺失及操作介面位於可視範圍。觸控方向按鈕為 44×44 CSS px，搖桿為 88×88；觸控為桌機上的瀏覽器模擬，不是實體手機驗證，也不代表已逐一遇見全部生物。
+
+公開入海收據為 `qa/parity/published-v0.18.31-delivery.json`，SHA-256 `7b571614d66d3d24b2e21ce59aa56b47c2973c028619e5b4c6e4b0bcd9c4cbfd`；三項檢查通過，errors 為空。桌機及觸控公開截圖已檢視，畫面與操作介面可見。完整發布證據另存本機 `qa/parity/v01831-anemone/public-release-receipt.json`。此後補寫交付紀錄的文件提交不改動上述 runtime 或 manifest。
 
 ## CPU 與審查
 
