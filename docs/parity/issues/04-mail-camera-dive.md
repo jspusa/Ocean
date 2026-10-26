@@ -39,3 +39,7 @@
 證據：`qa/parity/v01810-guest-local-desktop.json`、`v01810-guest-touch-final.json`、`v01810-guest-public-touch.json`、`v01810-guest-touch-layout.json`、`v01810-escort-{red,green}-resume-migration.log` 及 `published-v0.18.10-delivery.json`。桌機 JSON 的歷史 `OPEN_WORLD.version` 值不作交付版本證據，公開版本另由頁面版號及全部雜湊確認。Standards／Spec 各自複查通過，最終全專案 CPU 79/79、靜態 60/60；首頁觀察重定位漏洞也已先 RED 後修復。
 
 程式提交 `e4a5985088c2eeabaaf1a805e73d3412c4a7a22e` 已公開發布，新版公開 20 分鐘探索已完成，全程 59.503 FPS、22 段／54.63 km，P95／P99 為 16.7／16.8 ms。詳見 [0.18.10 報告](../../TEST_REPORT-v01810.md)。完整原作委託、故事內容、全部自然流程及實體裝置驗收仍未完成，本工作單保持進行中。
+
+## 0.18.28 透明生物照片
+
+本輪修復桶眼魚頭罩的大光圈多重輪廓，保留原身份、模型及清晰對焦畫面；同個體 LOD 先合成，clone 各自保存 packed actor 對應。兩端正常 f/2 快門、沖印與重載各 31／31；完整影像／遮擋、相容路徑、GPU 正負差額及公開交付依 [本輪報告](../../TEST_REPORT-v01828.md)。大型透明罩散焦成本增加，沒有宣稱整體 GPU 零增加。完整原作委託、內容、實體裝置與商用驗收仍未完成，本工作單保持進行中。

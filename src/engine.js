@@ -68,6 +68,13 @@ function transparentShellRange(range,count){
  if(!Number.isSafeInteger(first)||!Number.isSafeInteger(length)||first<0||length<=0||first%3||length%3||first+length!==count)throw new RangeError('Invalid transparent shell index range');
  return {first,count:length};
 }
+function transparentShellBounds(mesh,range){
+ const min=[Infinity,Infinity,Infinity],max=[-Infinity,-Infinity,-Infinity];
+ for(let i=range.first;i<range.first+range.count;i++)for(let axis=0;axis<3;axis++){
+  const value=mesh.vertices[mesh.indices[i]*12+axis];min[axis]=Math.min(min[axis],value);max[axis]=Math.max(max[axis],value);
+ }
+ return {min,max};
+}
 function meshCullBounds(vertices){
  const min=[Infinity,Infinity,Infinity],max=[-Infinity,-Infinity,-Infinity];
  for(let k=0;k<vertices.length;k+=12)for(let axis=0;axis<3;axis++){
@@ -689,6 +696,43 @@ void main(){
  col*=1.-.035*pow(length((uv-.5)*vec2(1.,.85))*1.4,2.);
  frag=vec4(col,alpha*uShellWeight);
 }`;
+// A defocused surface first writes one premultiplied image and its own depth.
+// Keep the focused shader byte-for-byte identical to the existing direct layer.
+const SHELL_IMAGE_FS=SHELL_FS
+ .replace('out vec4 frag;', 'uniform vec2 uShellOrigin;uniform vec2 uShellDepthRange;\nlayout(location=0) out vec4 frag;layout(location=1) out vec4 surfaceDepth;')
+ .replace('vec2 uv=gl_FragCoord.xy/uResolution;', 'vec2 screen=gl_FragCoord.xy+uShellOrigin,uv=screen/uResolution;')
+ .replace('dot(gl_FragCoord.xy,vec2(.06711056,.00583715))', 'dot(screen,vec2(.06711056,.00583715))')
+ .replace('frag=vec4(col,alpha*uShellWeight);', `
+ // Alpha is bounded by .445. Reversible 2x encoding retains more signal
+ // on the existing RGBA8 fallback; the local filter decodes by .5.
+ frag=vec4(col*alpha,alpha)*2.;
+ float z=dot(delta,normalize(uViewForward));
+ surfaceDepth=vec4(clamp((z-uShellDepthRange.x)/uShellDepthRange.y,0.,1.),0.,0.,1.);`);
+const SHELL_FILTER_FS=`#version 300 es
+precision highp float;
+uniform sampler2D uImage;uniform highp sampler2D uSurfaceDepth;uniform highp sampler2D uDepth;
+uniform vec2 uScratchSize;uniform vec2 uResolution;uniform vec2 uTileOrigin;uniform vec2 uShellDepthRange;
+uniform vec3 uDepthParams;uniform vec4 uOffsets;uniform vec4 uWeights;uniform float uCenterWeight;
+out vec4 frag;
+void main(){
+ float offsets[9]=float[9](-uOffsets.w,-uOffsets.z,-uOffsets.y,-uOffsets.x,0.,uOffsets.x,uOffsets.y,uOffsets.z,uOffsets.w);
+ float weights[9]=float[9](uWeights.w,uWeights.z,uWeights.y,uWeights.x,uCenterWeight,uWeights.x,uWeights.y,uWeights.z,uWeights.w);
+ vec2 at=gl_FragCoord.xy-uTileOrigin;float d=texture(uDepth,gl_FragCoord.xy/uResolution).r;
+ float opaque=uDepthParams.x*uDepthParams.y/(uDepthParams.y-d*(uDepthParams.y-uDepthParams.x));
+ vec4 sum=vec4(0.);
+ for(int y=0;y<9;y++)for(int x=0;x<9;x++){
+  float weight=weights[x]*weights[y];if(weight<.000001)continue;
+  vec2 q=(at+vec2(offsets[x],offsets[y]))/uScratchSize;
+  vec4 sampleColor=texture(uImage,q);if(sampleColor.a<=0.)continue;
+  vec4 z=texture(uSurfaceDepth,q);if(z.a<=0.)continue;
+  // Source visibility alone cannot keep a blurred rim off an in-focus
+  // foreground edge. Reject each sample using its own surface depth.
+  float source=uShellDepthRange.x+uShellDepthRange.y*z.r/z.a;
+  if(source>opaque+uDepthParams.z)continue;
+  sum+=sampleColor*(weight*.5);
+ }
+ frag=sum;
+}`;
 const SHADOW_FS=`#version 300 es
 precision highp float;precision highp int;in float vTag;uniform int uMat;void main(){if(uMat==7&&vTag>20.)discard;}`;
 const SKY_FS=`#version 300 es
@@ -983,7 +1027,7 @@ function surfaceShaderSource(source,kind,material){
 
 class Renderer{
  constructor(canvas,initialQuality=null){this.canvas=canvas;const g=canvas.getContext('webgl2',{alpha:false,antialias:false,depth:true,preserveDrawingBuffer:false,powerPreference:'high-performance'});if(!g)throw new Error('請以支援 WebGL 2 的一般瀏覽器開啟。');this.gl=g;this.maxTextureSize=g.getParameter(g.MAX_TEXTURE_SIZE);this.mobile=matchMedia('(pointer:coarse)').matches;this.batches=[];this.fog=[.0008,.005,.028];this.lightDir=V.norm([-.36,1.,.30]);this.lightColor=[1.05,1.02,.93];this.clarity=1.;this.lamp=false;this.dynamicScale=1;this.lighting="day";this.fogDensity=.034;this.sun=1.02;this.quality=initialQuality??(this.mobile?1:2);this.exposure=1.11;this.drawCalls=0;this.frame=0;
-  this.program=this.makeProgram(VS,FS);this.setupSurfacePrograms();this.shellProgram=this.makeProgram(SHELL_VS,SHELL_FS);this.shadowProgram=this.makeProgram(VS,SHADOW_FS);this.waterProgram=this.makeProgram(WATER_VS,WATER_FS);this.pointProgram=this.makeProgram(POINT_VS,POINT_FS);this.rayProgram=this.makeProgram(RAY_VS,RAY_FS);this.postProgram=this.makeProgram(POST_VS,POST_FS);this.volumeProgram=this.makeProgram(POST_VS,VOLUME_FS);this.volumeFilterProgram=this.makeProgram(POST_VS,VOLUME_FILTER_FS);this.bubbleProgram=this.makeProgram(BUBBLE_VS,BUBBLE_FS);this.aaProgram=this.makeProgram(POST_VS,AA_FS);this.skyProgram=this.makeProgram(POST_VS,SKY_FS);this.msaaSamples=0;
+  this.program=this.makeProgram(VS,FS);this.setupSurfacePrograms();this.shellProgram=this.makeProgram(SHELL_VS,SHELL_FS);this.shellImageProgram=this.makeProgram(VS,SHELL_IMAGE_FS);this.shellFilterProgram=this.makeProgram(POST_VS,SHELL_FILTER_FS);this.shadowProgram=this.makeProgram(VS,SHADOW_FS);this.waterProgram=this.makeProgram(WATER_VS,WATER_FS);this.pointProgram=this.makeProgram(POINT_VS,POINT_FS);this.rayProgram=this.makeProgram(RAY_VS,RAY_FS);this.postProgram=this.makeProgram(POST_VS,POST_FS);this.volumeProgram=this.makeProgram(POST_VS,VOLUME_FS);this.volumeFilterProgram=this.makeProgram(POST_VS,VOLUME_FILTER_FS);this.bubbleProgram=this.makeProgram(BUBBLE_VS,BUBBLE_FS);this.aaProgram=this.makeProgram(POST_VS,AA_FS);this.skyProgram=this.makeProgram(POST_VS,SKY_FS);this.msaaSamples=0;
   this.floatColor=!!g.getExtension('EXT_color_buffer_float');this.aniso=g.getExtension('EXT_texture_filter_anisotropic');this.textures=[];this.loaded=this.loadTextures();g.enable(g.DEPTH_TEST);g.disable(g.CULL_FACE);this.lightVP=mm(ortho(-51,51,-51,51,.1,180),lookAt([-42,84,14],[0,-12,-12]));
   this.setupWater();this.setupBubbles();this.setupParticles();this.setupRays();this.setupShadow();this.postVAO=g.createVertexArray();this.resize();
  }
@@ -1079,7 +1123,7 @@ class Renderer{
   g.bindBuffer(g.ELEMENT_ARRAY_BUFFER,eb);
   const ib=g.createBuffer(),data=new Float32Array(instances.length*24);g.bindBuffer(g.ARRAY_BUFFER,ib);g.bufferData(g.ARRAY_BUFFER,data.byteLength,g.DYNAMIC_DRAW);
   this.attr(3,3,96,0,1);this.attr(4,4,96,12,1);this.attr(5,3,96,28,1);this.attr(6,2,96,40,1);this.attr(9,4,96,48,1);this.attr(10,4,96,64,1);this.attr(11,4,96,80,1);
-  const b={vao,vb,eb,ib,count:mesh.indices.length,vertexCount:mesh.vertices.length/12,indexType,instances,data,kind,dynamic,material:geo.material||0,species:geo.species??-1,visible:true,shadow:geo.shadow!==false,radius:mesh.radius,drawCount:instances.length,_lastVisible:null,transparentShell};
+  const b={vao,vb,eb,ib,count:mesh.indices.length,vertexCount:mesh.vertices.length/12,indexType,instances,data,kind,dynamic,material:geo.material||0,species:geo.species??-1,visible:true,shadow:geo.shadow!==false,radius:mesh.radius,drawCount:instances.length,_lastVisible:null,transparentShell,shellBounds:transparentShell?transparentShellBounds(mesh,transparentShell):null};
   // Rigid geometry may lie far from its instance pivot (seabed tiles), or be
   // very thin (trench walls). Keep the existing sphere as a cheap first test,
   // then reject the tighter box only when it is wholly outside a clip plane.
@@ -1102,7 +1146,11 @@ class Renderer{
  }
  updateBatch(b,eye=null,planes=null,shadowPass=false){
   if(b.streamMesh!==undefined&&!b.vao){b.drawCount=0;return;}
-  let j=0;const a=b.data;const lodScale=this.mobile?(this.quality===0?.64:.82):(this.quality===0?.75:1);
+  let j=0;const a=b.data;
+  // Aquarium/source clones own a different packed buffer. Their actor mapping
+  // must never alias a cache inherited by object spread from another batch.
+  if(b.transparentShell&&b.shellPackedData!==a){b.shellPackedData=a;b.shellInstances=[];}
+  const shellActors=b.transparentShell?b.shellInstances:null;const lodScale=this.mobile?(this.quality===0?.64:.82):(this.quality===0?.75:1);
   // Terrain LODs have matching edges but different interior heights. Submit
   // exactly one opaque surface; overlapping dithered surfaces fight in depth.
   const atomicGround=!shadowPass&&b.material===1,margin=atomicGround?0:.6;
@@ -1130,6 +1178,7 @@ class Renderer{
     }
    }
    // No spread, short-lived arrays or typed-array views inside the hot instance loop.
+   if(shellActors)shellActors[j/24]=i;
    const origin=this.renderOrigin||[0,0,0];a[j++]=p[0]-origin[0];a[j++]=p[1]-origin[1];a[j++]=p[2]-origin[2];a[j++]=i.yaw||0;
    a[j++]=sc[0];a[j++]=sc[1];a[j++]=sc[2];a[j++]=tint[0];a[j++]=tint[1];a[j++]=tint[2];a[j++]=i.phase||0;a[j++]=i.pitch||0;
    const m=i.bioMorph||BIO_NEUTRAL,genes=i.bioGenes||BIO_DEFAULT;
@@ -1137,7 +1186,7 @@ class Renderer{
    a[j++]=genes[0];a[j++]=genes[1];a[j++]=genes[2];a[j++]=genes[3];
    a[j++]=i.bank||0;a[j++]=i.effort??.7;a[j++]=(b.kind===9||b.kind===7)?clamp(i.partnerFinPulse||0,0,1):(i.finWear||0);a[j++]=b.kind===8?1-clamp(i.faunaVisibility??(1-(i.retreat||0)),0,1):b.kind===9?(i.cetaceanBeat||2.3):b.kind===10?(i.abyssBeat||1.7):b.kind===11?(i.trenchBeat||1.6):0;
   }
-  b.drawCount=j/24;if(!j)return;
+  b.drawCount=j/24;if(shellActors)shellActors.length=b.drawCount;if(!j)return;
   if(!b.dynamic){
    // Compare the actual Float32 payload against the last GPU upload, not a
    // camera key: shadows pack a different visible set, and scene features can
@@ -1166,30 +1215,87 @@ class Renderer{
   for(const [loc,size,start]of [[3,3,0],[4,4,12],[5,3,28],[6,2,40],[9,4,48],[10,4,64],[11,4,80]])this.attr(loc,size,96,start+offset,1);
  }
  renderTransparentShells(eye,t){
-  const draws=[],origin=this.renderOrigin||[0,0,0];
-  // Sort packed visible instances only. Aquarium specimens retain their saved
-  // order and identity; no actor or opaque instance buffer is rewritten here.
+  const draws=[],groups=new Map(),origin=this.renderOrigin||[0,0,0];
+  // Sort packed visible instances only; never reorder the saved actors.
   for(const b of this.batches)if(b.visible&&b.transparentShell&&b.drawCount)for(let i=0;i<b.drawCount;i++){
-   const k=i*24,d=Math.hypot(b.data[k]+origin[0]-eye[0],b.data[k+1]+origin[1]-eye[1],b.data[k+2]+origin[2]-eye[2]);draws.push({b,i,d});
+   const k=i*24,d=Math.hypot(b.data[k]+origin[0]-eye[0],b.data[k+1]+origin[1]-eye[1],b.data[k+2]+origin[2]-eye[2]);const entry={b,i,d},actor=b.shellInstances?.[i];
+   // Complementary LOD masks belong to one physical surface. Gather them
+   // before blur so the overlap is not alpha-composited a second time.
+   if(actor&&groups.has(actor))groups.get(actor).entries.push(entry);
+   else{const group={b,i,d,entries:[entry]};draws.push(group);if(actor)groups.set(actor,group);}
   }
   this.shellDraws=0;if(!draws.length)return;
-  draws.sort((a,b)=>b.d-a.d);const g=this.gl,p=this.shellProgram,state={},ls=this.mobile?(this.quality===0?.64:.82):(this.quality===0?.75:1);
-  this.common(p,eye,this.vp,t);this.bindTex(1,this.sceneDepth);this.set1i(p,'uDepth',1);this.set2f(p,'uResolution',this.canvas.width,this.canvas.height);this.set1f(p,'uExposure',this.exposure);this.set1f(p,'uClarity',this.clarity);
-  g.enable(g.CULL_FACE);g.cullFace(g.BACK);
-  try{for(const {b,i,d}of draws){
-   this.batchUniforms(p,b,state);this.set3f(p,'uLODBounds',(b.minDistance||0)*ls,(b.maxDistance||220)*ls,b.material!==1&&((b.minDistance||0)>0||(b.maxDistance&&b.maxDistance<180))?.60:0);
-   // Bounded image-space convolution of the tiny shell only. Focused heads
-   // cost one draw; defocused photos use nine disk taps, with the same CoC
-   // cap as the scene camera. This does not add a render target or screen pass.
-   const coc=this.photoAperture>0?clamp(Math.abs(d-(this.photoFocus||8))/Math.max(d,.5)*18/this.photoAperture,0,8):0,taps=coc>.35?9:1;
-   this.set1f(p,'uShellBlur',taps>1?coc:0);this.set1f(p,'uShellWeight',1/taps);
-   for(let sample=0;sample<taps;sample++){
-    const a=sample*2.39996323,r=sample?Math.sqrt((sample-.5)/(taps-1)):0;
-    this.set2f(p,'uShellOffset',Math.cos(a)*r,Math.sin(a)*r);this.drawBatch(b,'shell',i);this.shellDraws++;
-    this.submittedTriangles+=b.transparentShell.count/3;this.submittedVertices+=b.transparentShell.count;
-   }
+  draws.sort((a,b)=>b.d-a.d);const g=this.gl,p=this.shellProgram,ls=this.mobile?(this.quality===0?.64:.82):(this.quality===0?.75:1);
+  const setup=(b,p=this.shellProgram)=>{
+   this.common(p,eye,this.vp,t);this.bindTex(1,this.sceneDepth);this.set1i(p,'uDepth',1);this.set2f(p,'uResolution',this.canvas.width,this.canvas.height);this.set1f(p,'uExposure',this.exposure);this.set1f(p,'uClarity',this.clarity);
+   this.batchUniforms(p,b,{});this.set3f(p,'uLODBounds',(b.minDistance||0)*ls,(b.maxDistance||220)*ls,b.material!==1&&((b.minDistance||0)>0||(b.maxDistance&&b.maxDistance<180))?.60:0);
+   g.enable(g.CULL_FACE);g.cullFace(g.BACK);
+  };
+  try{for(const {d,entries}of draws){
+   const coc=this.photoAperture>0?clamp(Math.abs(d-(this.photoFocus||8))/Math.max(d,.5)*18/this.photoAperture,0,8):0;
+   if(coc>.35){this.renderDefocusedShell(entries,coc,eye,setup);continue;}
+   for(const {b,i}of entries){setup(b);this.set2f(p,'uShellOffset',0,0);this.set1f(p,'uShellBlur',0);this.set1f(p,'uShellWeight',1);
+   this.drawBatch(b,'shell',i);this.shellDraws++;
+   this.submittedTriangles+=b.transparentShell.count/3;this.submittedVertices+=b.transparentShell.count;}
   }}finally{g.disable(g.CULL_FACE);}
  }
+ renderDefocusedShell(entries,coc,eye,setup){
+  const g=this.gl,p=this.shellImageProgram,filter=this.shellFilterProgram,w=this.canvas.width,h=this.canvas.height,origin=this.renderOrigin||[0,0,0];
+  let minX=w,minY=h,maxX=0,maxY=0,nearest=Infinity,farthest=-Infinity,clipped=false;
+  for(const {b,i:instance}of entries){const k=instance*24,a=b.data;
+  const position=[a[k]+origin[0],a[k+1]+origin[1],a[k+2]+origin[2]],radius=b.radius*Math.max(a[k+4],a[k+5],a[k+6])*1.15;
+  // The barreleye shield is rigid; transform its actual indexed bounds in
+  // the same pitch -> scale -> yaw order as VS. Other shells use the cull sphere.
+  const rigid=typeof SPECIES!=='undefined'&&SPECIES[b.species]?.motionProfile?.type==='barreleye'&&b.shellBounds;
+  const yaw=a[k+3],pitch=a[k+11],cy=Math.cos(yaw),sy=Math.sin(yaw),cp=Math.cos(pitch),sp=Math.sin(pitch);
+  for(let corner=0;corner<8;corner++){
+   let q;
+   if(rigid){const v=[0,1,2].map(axis=>b.shellBounds[(corner>>axis)&1?'max':'min'][axis]),x=(v[0]*cp-v[1]*sp)*a[k+4],y=(v[0]*sp+v[1]*cp)*a[k+5],z=v[2]*a[k+6];q=[position[0]+cy*x+sy*z,position[1]+y,position[2]-sy*x+cy*z];}
+   else q=position.map((v,axis)=>v+((corner>>axis)&1?radius:-radius));
+   const projected=project(q,this.vp),z=V.dot(V.sub(q,eye),this.cameraForward);nearest=Math.min(nearest,z);farthest=Math.max(farthest,z);
+   if(projected[2]<=.001){clipped=true;continue;}const x=(projected[0]*.5+.5)*w,y=(projected[1]*.5+.5)*h;minX=Math.min(minX,x);minY=Math.min(minY,y);maxX=Math.max(maxX,x);maxY=Math.max(maxY,y);
+  }
+  }
+  const near=Number.isFinite(this.photoNear)?clamp(this.photoNear,.002,.16):.16;
+  if(farthest<=near)return;
+  // Very small drawing buffers cannot hold a full 17-pixel kernel. Bound
+  // its support to the actual scratch size, with normalized surviving weights.
+  const scratchMin=Math.min(this.volumeW,this.volumeH),support=Math.min(8,Math.max(0,Math.floor((scratchMin-3)/2))),halo=Math.min(support+2,Math.floor((scratchMin-1)/2));
+  if(clipped){minX=0;minY=0;maxX=w;maxY=h;}
+  const x0=Math.max(0,Math.floor(minX)-halo),y0=Math.max(0,Math.floor(minY)-halo),x1=Math.min(w,Math.ceil(maxX)+halo),y1=Math.min(h,Math.ceil(maxY)+halo);
+  if(x1<=x0||y1<=y0)return;
+  nearest=Math.max(0,nearest-.001);const span=Math.max(.002,farthest-nearest+.001);
+  // A normalized, continuous image kernel, represented by bilinear pairs
+  // of adjacent texels. 17x17 finite support needs at most 9x9 fetch pairs.
+  const sigma=Math.max(.2,coc*.5),weights=Array.from({length:9},(_,i)=>i<=support?Math.exp(-.5*(i/sigma)**2):0),total=weights[0]+2*weights.slice(1).reduce((s,v)=>s+v,0),offsets=[],pairs=[];
+  for(let i=1;i<9;i+=2){const sum=weights[i]+weights[i+1];offsets.push(sum?i+weights[i+1]/sum:i);pairs.push(sum/total);}
+  // The volumetric image has already been consumed by POST_FS. Reuse both
+  // existing targets as color/depth MRT scratch, at one screen pixel per texel.
+  // Tiles overlap by the filter halo; only their disjoint interiors are composed.
+  const tileW=Math.max(1,this.volumeW-2*halo),tileH=Math.max(1,this.volumeH-2*halo);
+  const scissorEnabled=g.isEnabled(g.SCISSOR_TEST),scissorBox=g.getParameter(g.SCISSOR_BOX);
+  try{for(let y=y0;y<y1;y+=tileH)for(let x=x0;x<x1;x+=tileW){
+   const tw=Math.min(tileW,x1-x),th=Math.min(tileH,y1-y),ox=x-halo,oy=y-halo;
+   this.bindTex(0,null);this.bindTex(2,null);this.bindTex(3,null);
+   g.bindFramebuffer(g.FRAMEBUFFER,this.volumeFBO);g.framebufferTexture2D(g.FRAMEBUFFER,g.COLOR_ATTACHMENT1,g.TEXTURE_2D,this.volumeFilteredColor,0);g.drawBuffers([g.COLOR_ATTACHMENT0,g.COLOR_ATTACHMENT1]);
+   g.enable(g.SCISSOR_TEST);g.scissor(0,0,tw+2*halo,th+2*halo);
+   g.disable(g.BLEND);g.clearBufferfv(g.COLOR,0,[0,0,0,0]);g.clearBufferfv(g.COLOR,1,[0,0,0,0]);g.viewport(-ox,-oy,w,h);
+   for(const {b,i:instance}of entries){setup(b,p);this.set2f(p,'uShellOrigin',ox,oy);this.set2f(p,'uShellDepthRange',nearest,span);
+   this.drawBatch(b,'shell',instance);this.shellDraws++;this.submittedTriangles+=b.transparentShell.count/3;this.submittedVertices+=b.transparentShell.count;}
+   g.drawBuffers([g.COLOR_ATTACHMENT0]);g.framebufferTexture2D(g.FRAMEBUFFER,g.COLOR_ATTACHMENT1,g.TEXTURE_2D,null,0);
+   if(scissorEnabled){const sx=Math.max(x,scissorBox[0]),sy=Math.max(y,scissorBox[1]);g.scissor(sx,sy,Math.max(0,Math.min(x+tw,scissorBox[0]+scissorBox[2])-sx),Math.max(0,Math.min(y+th,scissorBox[1]+scissorBox[3])-sy));}else g.scissor(x,y,tw,th);
+   g.bindFramebuffer(g.FRAMEBUFFER,this.aaFBO);g.viewport(x,y,tw,th);g.disable(g.CULL_FACE);g.enable(g.BLEND);g.blendFunc(g.ONE,g.ONE_MINUS_SRC_ALPHA);g.useProgram(filter.p);
+   this.bindTex(0,this.volumeColor);this.bindTex(2,this.volumeFilteredColor);this.set1i(filter,'uImage',0);this.set1i(filter,'uSurfaceDepth',2);this.set1i(filter,'uDepth',1);
+   this.set2f(filter,'uScratchSize',this.volumeW,this.volumeH);this.set2f(filter,'uResolution',w,h);this.set2f(filter,'uTileOrigin',ox,oy);this.set2f(filter,'uShellDepthRange',nearest,span);
+   this.set3f(filter,'uDepthParams',near,950,span/(this.floatColor?1024:128));this.set4f(filter,'uOffsets',...offsets);this.set4f(filter,'uWeights',...pairs);this.set1f(filter,'uCenterWeight',weights[0]/total);
+   g.bindVertexArray(this.postVAO);g.drawArrays(g.TRIANGLES,0,3);this.drawCalls++;
+  }}finally{
+   g.scissor(...scissorBox);if(!scissorEnabled)g.disable(g.SCISSOR_TEST);
+   g.bindFramebuffer(g.FRAMEBUFFER,this.volumeFBO);g.drawBuffers([g.COLOR_ATTACHMENT0]);g.framebufferTexture2D(g.FRAMEBUFFER,g.COLOR_ATTACHMENT1,g.TEXTURE_2D,null,0);
+   g.bindFramebuffer(g.FRAMEBUFFER,this.aaFBO);g.viewport(0,0,w,h);g.enable(g.BLEND);g.blendFunc(g.SRC_ALPHA,g.ONE_MINUS_SRC_ALPHA);g.enable(g.CULL_FACE);g.cullFace(g.BACK);
+  }
+ }
+
  frustum(vp){let p=[];for(let a=0;a<3;a++)for(let sign of [-1,1]){let q=[vp[3]+sign*vp[a],vp[7]+sign*vp[4+a],vp[11]+sign*vp[8+a],vp[15]+sign*vp[12+a]],n=Math.hypot(q[0],q[1],q[2]);p.push(q.map(x=>x/n));}return p;}
  setupWater(){
   const g=this.gl,segments=this.mobile?64:112,positions=[];
