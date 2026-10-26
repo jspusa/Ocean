@@ -1,6 +1,6 @@
 # 0.18.22 房間重啟恢復驗證
 
-基線 `7c8d672b9e5b6184bc2e7f07c0ca221654670c9f`；規格見 [本輪契約](parity/ROOM-DURABILITY-v01822-SPEC.md)。最終本機驗證已完成，公開發布尚未完成。
+基線 `7c8d672b9e5b6184bc2e7f07c0ca221654670c9f`；規格見 [本輪契約](parity/ROOM-DURABILITY-v01822-SPEC.md)。最終本機驗證及公開靜態交付已完成；公網多人服務仍未配置。
 
 ## 本輪行為
 
@@ -49,3 +49,18 @@ server/room-store.mjs df7a41fea6b2ca8a09b024a9d7d92d1f4873f7d5ee3e65af76b4bb7437
 server/server.mjs 12f72ab4b91f7fd5c74cb45498185ea93f23fd08888c6a18c6543a437de6519b
 tests/parity/multiplayer-browser.cjs d4e6696e6dc24ce3376dcdb71ce092d79f245198c504f569e5dc2d635b19bd5b
 ```
+
+## 公開交付
+
+程式提交 `c10120d95bd9e9810311a1c66f2e92ad28382aa3` 已推送 main；Pages 於 `2026-10-26T09:12:02Z` 回報該提交 built、error.message=null。原始回覆為 `qa/parity/v01822-runtime-pages-build.json`。
+
+| 公開驗證 | 結果與界線 |
+|---|---|
+| 發布內容 | ★★★ 294/294 檔案的長度及 SHA-256 全數相符，manifest 自身逐 byte 相符；`qa/parity/published-v0.18.22-delivery.json`。 |
+| 預設入海 | ★★★ 桌機及觸控正常首頁入海，adaptive=true、quality 2／1、compiled=true、streamed=true、43 類圖鑑、8 個 surface programs、WebGL error=0、context 未遺失、沒有自動中央焦點，errors=[]。 |
+| 未配置服務的介面 | ★★★ 桌機與觸控各 6/6，公開入口如實顯示未開放，不建立 socket 或同伴模型；關閉後正常單人遊玩。`qa/parity/v01822-public-desktop/report.json`、`v01822-public-touch/report.json`。 |
+| 公網雙人與資料庫 | ☆☆☆ 未配置；公開的是靜態遊戲及後端來源，GitHub Pages 沒有執行 Node／SQLite。兩人與重啟恢復仍是本機服務驗證。 |
+
+公開測試直接使用 `https://jspusa.github.io/Ocean/`，沒有 proxy、請求替換或代用後端。公開觸控仍使用同一台電腦模擬。
+
+Manifest SHA-256：`5f2ad0d3ea0ec2752a777c1949c2e70edc8bcd45047f8248834d5d0ee6351faa`。後續文件提交不改 runtime 或 manifest；文件提交的 Pages 建置及代表公開檔案逐 byte 核對，另記於 `qa/parity/v01822-final-delivery-receipt.json`。完整商用目標、工作單 11、實體裝置與全內容仍在進行。
