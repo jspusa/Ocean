@@ -182,7 +182,7 @@ const oceanExploration=(()=>{
  function startStroke(event){
   if(penMode&&!penAllowed())setPen(null);
   if(!penMode||event.button>0)return;
-  event.preventDefault();event.stopImmediatePropagation();if(penPointer!==null)return;resetInput();player.velocity=[0,0,0];penPointer=event.pointerId;renderer.canvas.setPointerCapture?.(event.pointerId);
+  event.preventDefault();event.stopImmediatePropagation();if(penPointer!==null)return;resetInput();player.velocity=[0,0,0];penPointer=event.pointerId;oceanGamepadPointer.capture(renderer.canvas,event);
   if(penMode==='erase'){eraseAt(event);return;}
   if(state().strokes.length>=R.limits.strokes){toast('已達 48 筆上限，請先擦除或撤銷筆記。');return;}
   const normal=V.norm(V.sub(target,eye));penPlane={normal,point:V.add(eye,V.mul(normal,4))};const p=penPoint(event);draft=p?{id:state().sequence+1,color:state().penColor,points:[p]}:null;
@@ -198,7 +198,7 @@ const oceanExploration=(()=>{
  function finishStroke(event,cancel=false){
   if(event&&event.pointerId!==penPointer)return;if(event){event.preventDefault();event.stopImmediatePropagation();}
   const releasedPointer=penPointer;penPointer=null;
-  if(releasedPointer!==null&&renderer.canvas.hasPointerCapture?.(releasedPointer))renderer.canvas.releasePointerCapture(releasedPointer);
+  if(releasedPointer!==null&&oceanGamepadPointer.hasCapture(renderer.canvas,releasedPointer))oceanGamepadPointer.release(renderer.canvas,releasedPointer);
   penPlane=null;if(draft&&!cancel&&draft.points.length>1){R.appendStroke(state(),draft.points,draft.color);dirty=true;}
   draft=null;inkDirty=true;renderer.dirty=true;if(dirty)persistNow();updatePenUI();
  }
@@ -207,6 +207,7 @@ const oceanExploration=(()=>{
   if(mode&&(!active||modal&&modal!=='exploration')){toast('先開始潛水，再使用水中筆。');return false;}
   if(mode&&!['draw','erase'].includes(mode))return false;
   if(mode&&(photoOpen||voyage.photoMode||document.body.classList.contains('cinematic'))){toast('先離開攝影取景或觀賞模式，再使用水中筆。');return false;}
+  if(typeof oceanGamepadPointer!=='undefined')oceanGamepadPointer.contextChanged();
   if(mode){if(modal)closePanel();if(typeof oceanEcology!=='undefined'){oceanEcology.setTool(null);if(oceanEcology.snapshot().grabbedUID)oceanEcology.toggleRide();}releaseMouseLook();stopAuto();resetInput();player.velocity=[0,0,0];}
   finishStroke(null,false);penMode=mode||null;document.body.classList.toggle('exploration-pen',!!penMode);$('explorationPenBar')?.classList.toggle('hidden',!penMode);renderer.canvas.style.cursor=penMode==='erase'?'cell':penMode?'crosshair':'';updatePenUI();paintHUD();return true;
  }
@@ -271,9 +272,9 @@ const oceanExploration=(()=>{
   };
   $('explorationZoomIn').onclick=()=>zoom(1.4);$('explorationZoomOut').onclick=()=>zoom(1/1.4);$('explorationZoomReset').onclick=()=>{chartView.scale=1;chartView.x=chartView.y=0;drawPreview(canvas);};
   canvas.addEventListener('wheel',event=>{event.preventDefault();zoom(Math.exp(-event.deltaY*.0016),point(event));},{passive:false});
-  canvas.addEventListener('pointerdown',event=>{if(event.button>0)return;event.preventDefault();canvas.setPointerCapture(event.pointerId);const p=point(event);pointers.set(event.pointerId,p);if(pointers.size===1){drag={p,x:chartView.x,y:chartView.y};moved=false;}else if(pointers.size===2){const [a,b]=[...pointers.values()];pinch={distance:Math.hypot(a[0]-b[0],a[1]-b[1]),scale:chartView.scale,x:chartView.x,y:chartView.y,center:[(a[0]+b[0])/2,(a[1]+b[1])/2]};moved=true;}});
+  canvas.addEventListener('pointerdown',event=>{if(event.button>0)return;event.preventDefault();oceanGamepadPointer.capture(canvas,event);const p=point(event);pointers.set(event.pointerId,p);if(pointers.size===1){drag={p,x:chartView.x,y:chartView.y};moved=false;}else if(pointers.size===2){const [a,b]=[...pointers.values()];pinch={distance:Math.hypot(a[0]-b[0],a[1]-b[1]),scale:chartView.scale,x:chartView.x,y:chartView.y,center:[(a[0]+b[0])/2,(a[1]+b[1])/2]};moved=true;}});
   canvas.addEventListener('pointermove',event=>{if(!pointers.has(event.pointerId))return;event.preventDefault();const p=point(event);pointers.set(event.pointerId,p);if(pointers.size>=2&&pinch){const [a,b]=[...pointers.values()],center=[(a[0]+b[0])/2,(a[1]+b[1])/2],distance=Math.hypot(a[0]-b[0],a[1]-b[1]);const scale=clamp(pinch.scale*distance/Math.max(1,pinch.distance),1,4);chartView.scale=scale;chartView.x=center[0]-(pinch.center[0]-pinch.x)/pinch.scale*scale;chartView.y=center[1]-(pinch.center[1]-pinch.y)/pinch.scale*scale;constrain();drawPreview(canvas);}else if(drag){const dx=p[0]-drag.p[0],dy=p[1]-drag.p[1];if(Math.hypot(dx,dy)>6)moved=true;if(moved){chartView.x=drag.x+dx;chartView.y=drag.y+dy;constrain();drawPreview(canvas);}}});
-  const release=(event,cancel)=>{if(!pointers.has(event.pointerId))return;const p=point(event),tap=!moved&&!cancel&&pointers.size===1;pointers.delete(event.pointerId);if(canvas.hasPointerCapture(event.pointerId))canvas.releasePointerCapture(event.pointerId);if(pointers.size===1){const next=[...pointers.values()][0];drag={p:next,x:chartView.x,y:chartView.y};pinch=null;moved=true;}else if(!pointers.size){drag=null;pinch=null;}if(tap)select(p);};
+  const release=(event,cancel)=>{if(!pointers.has(event.pointerId))return;const p=point(event),tap=!moved&&!cancel&&pointers.size===1;pointers.delete(event.pointerId);if(oceanGamepadPointer.hasCapture(canvas,event.pointerId))oceanGamepadPointer.release(canvas,event.pointerId);if(pointers.size===1){const next=[...pointers.values()][0];drag={p:next,x:chartView.x,y:chartView.y};pinch=null;moved=true;}else if(!pointers.size){drag=null;pinch=null;}if(tap)select(p);};
   canvas.addEventListener('pointerup',event=>release(event,false));canvas.addEventListener('pointercancel',event=>release(event,true));canvas.addEventListener('lostpointercapture',event=>release(event,true));
  }
  function reset(){setPen(null);currentPickup=null;lastState=state();inkDirty=true;dirty=false;saveClock=0;syncGeometry();renderer.forceShadow=true;paintHUD();}

@@ -53,18 +53,18 @@ const oceanEcology=(()=>{
   return {x:c.left+(p[0]*.5+.5)*c.width,y:c.top+(.5-p[1]*.5)*c.height,r:clamp(c.height*size/(Math.max(.006,distance)*Math.tan((renderer.photoFov||renderer.fov||69)*Math.PI/360)),34,140)};
  }
  function hit(f,x,y){if(!inRange(f,true))return false;const d=targetDisc(f);return Math.hypot(x-d.x,y-d.y)<=d.r;}
- function setTool(tool){runtime.tool=runtime.tool===tool?null:tool;runtime.gesture=null;if(runtime.tool){releaseMouseLook();if(typeof oceanExploration!=='undefined')oceanExploration.setPen(null);}paintHUD();return runtime.tool;}
+ function setTool(tool){if(typeof oceanGamepadPointer!=='undefined')oceanGamepadPointer.contextChanged();runtime.tool=runtime.tool===tool?null:tool;runtime.gesture=null;if(runtime.tool){releaseMouseLook();if(typeof oceanExploration!=='undefined')oceanExploration.setPen(null);}paintHUD();return runtime.tool;}
  function beginGesture(x,y,pointer=0){
   if(!playAllowed())return false;const f=chooseTarget();if(!f||!hit(f,x,y))return false;
   if(runtime.tool==='feed')return feedAt(f,x,y);
   if(runtime.tool!=='pet')return false;
-  runtime.gesture={uid:f.uid,pointer,x,y,start:runtime.now,path:0,turns:0,lastDx:0};return true;
+  runtime.gesture={uid:f.uid,pointer,x,y,start:runtime.now,path:0,turns:0,direction:0,turnX:x};return true;
  }
  function moveGesture(x,y,pointer=0){
   const g=runtime.gesture;if(!g||g.pointer!==pointer||!playAllowed())return false;const f=fishByUID(g.uid);
   if(!f||!hit(f,x,y)){runtime.gesture=null;return false;}
   const dx=x-g.x,dy=y-g.y,step=Math.hypot(dx,dy);if(step>90){runtime.gesture=null;return false;}
-  if(Math.abs(dx)>2&&g.lastDx&&Math.sign(dx)!==Math.sign(g.lastDx))g.turns++;if(Math.abs(dx)>2)g.lastDx=dx;g.path+=step;g.x=x;g.y=y;
+  trackStroke(g,x,y);
   if(g.path>=80&&g.turns>=1&&runtime.now-g.start>=.55&&runtime.now-(runtime.lastStroke.get(f.uid)??-100)>=2.5){
    const r=individual(f);r.trust=Math.min(100,r.trust+6);r.strokes++;addKnowledge(f,2);runtime.lastStroke.set(f.uid,runtime.now);runtime.lastContact.set(f.uid,{kind:'stroke',time:runtime.now});g.completed=true;g.path=0;g.turns=0;g.start=runtime.now;save();say(SPECIES[f.species].name+'慢慢放鬆了 · 信任 '+Math.round(r.trust)+'%');return true;
   }return false;
@@ -165,11 +165,18 @@ const oceanEcology=(()=>{
  }
  function beginTrainingGesture(part,x,y,pointer=0){
   const tr=runtime.training,p=trainingPartPoint(part);if(active||modal!=='training'||!tr||tr.stage!=='ready'||tr.performance||!p||Math.hypot(x-p.x,y-p.y)>44)return false;
-  tr.gesture={part,x,y,pointer,start:runtime.now,path:0,turns:0,lastDx:0};return true;
+  tr.gesture={part,x,y,pointer,start:runtime.now,path:0,turns:0,direction:0,turnX:x};return true;
+ }
+ function trackStroke(g,x,y){
+  // Measure reversal from the horizontal extreme, independent of event rate.
+  const sweep=x-g.turnX;
+  if(g.direction&&sweep*g.direction>0)g.turnX=x;
+  else if(Math.abs(sweep)>2){const direction=Math.sign(sweep);if(g.direction&&direction!==g.direction)g.turns++;g.direction=direction;g.turnX=x;}
+  g.path+=Math.hypot(x-g.x,y-g.y);g.x=x;g.y=y;
  }
  function moveTrainingGesture(x,y,pointer=0){
   const g=runtime.training?.gesture;if(!g||g.pointer!==pointer)return false;const p=trainingPartPoint(g.part);if(!p||Math.hypot(x-p.x,y-p.y)>65){runtime.training.gesture=null;return false;}
-  const dx=x-g.x,dy=y-g.y;if(Math.abs(dx)>2&&g.lastDx&&Math.sign(dx)!==Math.sign(g.lastDx))g.turns++;if(Math.abs(dx)>2)g.lastDx=dx;g.path+=Math.hypot(dx,dy);g.x=x;g.y=y;return true;
+  trackStroke(g,x,y);return true;
  }
  function endTrainingGesture(cancel=false){
   const tr=runtime.training,g=tr?.gesture;if(!g)return false;tr.gesture=null;if(cancel)return false;
@@ -336,10 +343,10 @@ const oceanEcology=(()=>{
   document.body.appendChild(hud);const touch=document.createElement('div');touch.id='ecologyTouch';touch.className='hidden';document.body.appendChild(touch);
   node('ecologyPet').onclick=()=>setTool('pet');node('ecologyFeed').onclick=()=>setTool('feed');node('ecologyBefriend').onclick=inviteTarget;node('ecologyRide').onclick=toggleRide;node('ecologyWhistle').onclick=whistle;
   const canvas=renderer.canvas;
-  canvas.addEventListener('pointerdown',e=>{if(!runtime.tool||oceanFeatures.pointerCaptured())return;if(beginGesture(e.clientX,e.clientY,e.pointerId)){e.preventDefault();e.stopImmediatePropagation();canvas.setPointerCapture(e.pointerId);}},true);
+  canvas.addEventListener('pointerdown',e=>{if(!runtime.tool||oceanFeatures.pointerCaptured())return;if(beginGesture(e.clientX,e.clientY,e.pointerId)){e.preventDefault();e.stopImmediatePropagation();oceanGamepadPointer.capture(canvas,e);}},true);
   canvas.addEventListener('pointermove',e=>{if(!runtime.gesture)return;e.preventDefault();e.stopImmediatePropagation();moveGesture(e.clientX,e.clientY,e.pointerId);},true);
   canvas.addEventListener('pointerup',()=>endGesture(),true);for(const event of ['pointercancel','lostpointercapture'])canvas.addEventListener(event,()=>endGesture(true),true);
-  for(const part of ['mouth','fin']){const el=document.createElement('button');el.id='ecologyPart-'+part;el.className='ecology-part hidden';el.textContent=part==='mouth'?'嘴部':'胸鰭';el.setAttribute('aria-label',part==='mouth'?'嘴部：連點旋轉跳躍、輕撫前空翻、按住後空翻':'胸鰭：連點尾行、輕撫鳴唱、按住握鰭');document.body.appendChild(el);el.addEventListener('pointerdown',e=>{e.preventDefault();e.stopPropagation();if(beginTrainingGesture(part,e.clientX,e.clientY,e.pointerId))el.setPointerCapture(e.pointerId);});el.addEventListener('pointermove',e=>{e.preventDefault();moveTrainingGesture(e.clientX,e.clientY,e.pointerId);});el.addEventListener('pointerup',()=>endTrainingGesture());for(const event of ['pointercancel','lostpointercapture'])el.addEventListener(event,()=>endTrainingGesture(true));}
+  for(const part of ['mouth','fin']){const el=document.createElement('button');el.id='ecologyPart-'+part;el.className='ecology-part hidden';el.textContent=part==='mouth'?'嘴部':'胸鰭';el.setAttribute('aria-label',part==='mouth'?'嘴部：連點旋轉跳躍、輕撫前空翻、按住後空翻':'胸鰭：連點尾行、輕撫鳴唱、按住握鰭');document.body.appendChild(el);el.addEventListener('pointerdown',e=>{e.preventDefault();e.stopPropagation();if(beginTrainingGesture(part,e.clientX,e.clientY,e.pointerId))oceanGamepadPointer.capture(el,e);});el.addEventListener('pointermove',e=>{e.preventDefault();moveTrainingGesture(e.clientX,e.clientY,e.pointerId);});el.addEventListener('pointerup',()=>endTrainingGesture());for(const event of ['pointercancel','lostpointercapture'])el.addEventListener(event,()=>endTrainingGesture(true));}
   const g=new Geometry();g.material=0;g.shadow=false;g.sphere([0,0,0],[.019,.019,.019],[.76,.66,.42],5,4);for(let i=0;i<48;i++)runtime.foodNodes.push({p:[0,-500,0],s:[1,1,1],yaw:0,phase:i});runtime.foodBatch=renderer.batch(g,runtime.foodNodes,0,true);runtime.foodBatch.visible=false;runtime.foodBatch.maxDistance=20;
   const oldPlayer=updatePlayer;updatePlayer=function(dt){
    if(!runtime.grabbedUID||!active||modal||oceanFeatures.pointerCaptured()){oldPlayer(dt);return;}

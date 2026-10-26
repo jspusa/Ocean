@@ -77,7 +77,7 @@ function renderShip(){
  $('shipFinal').classList.toggle('hidden',!s.ended);oceanFeatures.call('shipRender');
 }
 function toggleCruise(){if(!active||modal)return;if(typeof oceanMicrocosm!=='undefined'&&oceanMicrocosm.isViewing())oceanMicrocosm.exit('cruise');voyage.state.cruise=!voyage.state.cruise;stopAuto();$('cruiseBtn').classList.toggle('active',voyage.state.cruise);toast(voyage.state.cruise?'巡航推進已開啟 · 移動速度提高，不自動駕駛':'已回到緩慢觀察速度');}
-function togglePhotoMode(){if(!active)return;if(typeof oceanMicrocosm!=='undefined'&&oceanMicrocosm.isViewing())oceanMicrocosm.exit('camera');voyage.photoMode=!voyage.photoMode;renderer.photoFov=voyage.photoMode?48:null;$('cameraFrame').classList.toggle('hidden',!voyage.photoMode);$('photoModeBtn').classList.toggle('active',voyage.photoMode);renderer.dirty=true;}
+function togglePhotoMode(){if(!active)return;if(typeof oceanGamepadPointer!=='undefined')oceanGamepadPointer.contextChanged();if(typeof oceanMicrocosm!=='undefined'&&oceanMicrocosm.isViewing())oceanMicrocosm.exit('camera');voyage.photoMode=!voyage.photoMode;renderer.photoFov=voyage.photoMode?48:null;$('cameraFrame').classList.toggle('hidden',!voyage.photoMode);$('photoModeBtn').classList.toggle('active',voyage.photoMode);renderer.dirty=true;}
 function readLogger(){
  const p=[95,groundHeight(99,-166)+3,-147];if(V.dist(player.p,p)>8){toast('先靠近沉船旁的黃色記錄器。');return false;}
  voyage.state.reading=true;evaluateOrders();saveVoyage();
@@ -137,6 +137,7 @@ startDive=function(tour=false){
 };
 const legacyHome=goHome;
 goHome=function(){
+ if(typeof oceanGamepadPointer!=='undefined')oceanGamepadPointer.contextChanged();
  if(!active){legacyHome();renderShip();return;}
  saveVoyage();const savedPosition=voyage.state.resume;
  oceanFeatures.call('endDive');
@@ -302,10 +303,16 @@ function voyageTick(dt){
  observeWhale(dt);evaluateOrders();oceanFeatures.call('tick',dt);if(!active)return;paintVoyageHUD();oceanFeatures.call('paintHUD');
  if(t-voyage.lastSave>8){voyage.lastSave=t;saveVoyage();}
 }
+function disconnectGamepad(){
+ if(typeof oceanGamepadPointer!=='undefined')oceanGamepadPointer.disconnect();
+ if(typeof oceanGamepadUI!=='undefined')oceanGamepadUI.disconnect();
+ if(voyage.gamepadAttached||voyage.gamepadDepth){resetInput();voyage.gamepadAttached=false;voyage.gamepadDepth=false;}voyage.gamepadButtons=[];
+}
 function pollGamepad(){
- if(voyage.importing)return;
- let g;try{g=navigator.getGamepads?.()?.find(p=>p?.connected);}catch(_){return;}
- if(!g){if(typeof oceanGamepadUI!=='undefined')oceanGamepadUI.disconnect();if(voyage.gamepadAttached||voyage.gamepadDepth){resetInput();voyage.gamepadAttached=false;voyage.gamepadDepth=false;}voyage.gamepadButtons=[];return;}
+ if(voyage.importing||(typeof oceanSaveGuard!=='undefined'&&!oceanSaveGuard.live)){disconnectGamepad();return;}
+ let g;try{g=navigator.getGamepads?.()?.find(p=>p?.connected);}catch(_){disconnectGamepad();return;}
+ if(!g){disconnectGamepad();return;}
+ if(typeof oceanGamepadPointer!=='undefined'&&oceanGamepadPointer.poll(g,voyage.gamepadButtons)){voyage.gamepadAttached=false;voyage.gamepadDepth=false;voyage.gamepadButtons=g.buttons.map(b=>b.pressed);return;}
  if(typeof oceanGamepadUI!=='undefined'&&oceanGamepadUI.poll(g,voyage.gamepadButtons)){voyage.gamepadButtons=g.buttons.map(b=>b.pressed);return;}
  const dead=v=>Math.abs(v)<.15?0:Math.sign(v)*(Math.abs(v)-.15)/.85;
  if(active&&!modal&&!photoOpen){const move=[dead(g.axes[0]||0),dead(g.axes[1]||0)],look=[dead(g.axes[2]||0),dead(g.axes[3]||0)];if(move.some(v=>v)||look.some(v=>v)){stopAuto();voyage.gamepadAttached=true;stick=move;lookStick=look;}else if(voyage.gamepadAttached){stick=move;lookStick=look;}

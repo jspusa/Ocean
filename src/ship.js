@@ -78,8 +78,14 @@ const oceanShip=(()=>{
   const unproject=z=>{const w=m[3]*px+m[7]*py+m[11]*z+m[15];return [(m[0]*px+m[4]*py+m[8]*z+m[12])/w,(m[1]*px+m[5]*py+m[9]*z+m[13])/w,(m[2]*px+m[6]*py+m[10]*z+m[14])/w]};
   const a=unproject(-1),b=unproject(1),dy=b[1]-a[1];if(Math.abs(dy)<1e-8)return null;const u=(OPEN_WORLD.boat[1]+FLOOR-a[1])/dy;if(u<0)return null;const p=toLocal(V.lerp(a,b,u));return walkable([p[0],p[2]])?[p[0],p[2]]:null;
  }
- function beginVisitor(x,y,pointer){const st=stations.find(s=>s.id==='visitor'),p=screenPoint(st.p);if(runtime.mode!=='deck'||!state().visitor.kind||distance(state().p,st.approach)>.7||!p||Math.hypot(x-p.x,y-p.y)>65)return false;runtime.gesture={pointer,x,y,path:0,turns:0,dx:0,start:runtime.elapsed};return true;}
- function moveVisitor(x,y,pointer){const g=runtime.gesture,p=screenPoint(stations.find(s=>s.id==='visitor').p);if(!g||g.pointer!==pointer||!p||Math.hypot(x-p.x,y-p.y)>90){runtime.gesture=null;return false;}const dx=x-g.x,step=Math.hypot(dx,y-g.y);if(step>80){runtime.gesture=null;return false;}if(Math.abs(dx)>2&&g.dx&&Math.sign(dx)!==Math.sign(g.dx))g.turns++;if(Math.abs(dx)>2)g.dx=dx;g.path+=step;g.x=x;g.y=y;
+ function beginVisitor(x,y,pointer){const st=stations.find(s=>s.id==='visitor'),p=screenPoint(st.p);if(runtime.mode!=='deck'||!state().visitor.kind||distance(state().p,st.approach)>.7||!p||Math.hypot(x-p.x,y-p.y)>65)return false;runtime.gesture={pointer,x,y,path:0,turns:0,direction:0,turnX:x,start:runtime.elapsed};return true;}
+ function moveVisitor(x,y,pointer){const g=runtime.gesture,p=screenPoint(stations.find(s=>s.id==='visitor').p);if(!g||g.pointer!==pointer||!p||Math.hypot(x-p.x,y-p.y)>90){runtime.gesture=null;return false;}const dx=x-g.x,step=Math.hypot(dx,y-g.y);if(step>80){runtime.gesture=null;return false;}
+  // Measure reversal from the sweep's extreme, not from one frame's tiny step.
+  // The same two-pixel hysteresis rejects jitter at every pointer sample rate.
+  const sweep=x-g.turnX;
+  if(g.direction&&sweep*g.direction>0)g.turnX=x;
+  else if(Math.abs(sweep)>2){const direction=Math.sign(sweep);if(g.direction&&direction!==g.direction)g.turns++;g.direction=direction;g.turnX=x;}
+  g.path+=step;g.x=x;g.y=y;
   if(g.path>=60&&g.turns>0&&runtime.elapsed-g.start>.45&&runtime.elapsed-runtime.visitorReply>2){state().visitor.trust=Math.min(20,state().visitor.trust+1);runtime.visitorReply=runtime.elapsed;runtime.gesture=null;save();say(state().visitor.kind==='seal'?'海豹抬起頭，輕輕拍了拍前鰭。':'企鵝搖了搖身體，張開了短短的翅膀。');return true;}return false;
  }
  function avatarMeshes(){
@@ -189,7 +195,7 @@ const oceanShip=(()=>{
   const point=document.createElement('span');point.id='shipPoint';point.className='hidden';document.body.append(point);const back=document.createElement('button');back.id='shipBackCabin';back.className='back-button hidden';back.textContent='← 回到船艙';node('panelBody').before(back);
   node('shipExit').onclick=closePanel;node('shipTurn').onclick=()=>{runtime.turn+=Math.PI/2;renderer.dirty=true;};node('shipGo').onclick=()=>walkToStation(node('shipStation').value);node('shipStand').onclick=()=>oceanFeatures.open('deck');node('shipIdle').onclick=()=>{runtime.restIdle=!runtime.restIdle;document.body.classList.toggle('ship-idle',runtime.restIdle);node('shipIdle').textContent=runtime.restIdle?'顯示控制':'閒置欣賞';};node('shipSound').onclick=toggleSound;node('shipMusicVolume').oninput=e=>{settings.music=Number(e.target.value);persist();oceanAudio.tick();};node('shipLocalMusic').onchange=e=>{settings.sound=true;updateSoundUI();oceanAudio.loadLocal(e.target.files?.[0]);};node('shipOriginalMusic').onclick=()=>oceanAudio.resetMusic();
   const canvas=renderer.canvas;let down=null,tap=null;
-  canvas.addEventListener('pointerdown',e=>{if(!['deck','cabin'].includes(runtime.mode)||!['deck','cabin'].includes(modal)||active||e.button>0)return;e.preventDefault();e.stopImmediatePropagation();tap=null;down={x:e.clientX,y:e.clientY,id:e.pointerId,mode:runtime.mode};down.visitor=beginVisitor(e.clientX,e.clientY,e.pointerId);canvas.setPointerCapture(e.pointerId);},true);
+  canvas.addEventListener('pointerdown',e=>{if(!['deck','cabin'].includes(runtime.mode)||!['deck','cabin'].includes(modal)||active||e.button>0)return;e.preventDefault();e.stopImmediatePropagation();tap=null;down={x:e.clientX,y:e.clientY,id:e.pointerId,mode:runtime.mode};down.visitor=beginVisitor(e.clientX,e.clientY,e.pointerId);oceanGamepadPointer.capture(canvas,e);},true);
   canvas.addEventListener('pointermove',e=>{if(!down||down.id!==e.pointerId)return;e.preventDefault();e.stopImmediatePropagation();if(runtime.gesture)moveVisitor(e.clientX,e.clientY,e.pointerId);},true);
   // Activate on the completed canvas click. Opening a panel on pointer-up would
   // let the same touch's synthesized click press a newly exposed panel button.

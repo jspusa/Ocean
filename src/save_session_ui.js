@@ -18,6 +18,7 @@ const oceanSaveGuard=(()=>{
   $('saveSessionRetry').focus();
  }
  function stop(){
+  if(typeof oceanGamepadPointer!=='undefined')oceanGamepadPointer.disconnect();
   live=false;
   if(active)voyage.state.resume={p:player.p.slice(),yaw:player.yaw,pitch:player.pitch,seconds:diveSeconds};
   ready=false;active=false;

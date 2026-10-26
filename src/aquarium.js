@@ -134,7 +134,7 @@ const oceanAquarium=(()=>{
   for(const batch of renderer.batches){if(runtime.owned.has(batch))continue;if(!runtime.savedVisibility.has(batch))runtime.savedVisibility.set(batch,batch.visible);batch.visible=false;}
   for(const batch of runtime.owned)batch.visible=!batch.dynamic||batch.instances.length>0;
  }
- function releasePointers(){for(const id of runtime.pointers.keys())try{renderer.canvas.releasePointerCapture(id)}catch(_){}runtime.pointers.clear();runtime.pinch=null;}
+ function releasePointers(){for(const id of runtime.pointers.keys())try{oceanGamepadPointer.release(renderer.canvas,id)}catch(_){}runtime.pointers.clear();runtime.pinch=null;}
  function leaveViewer(){
   if(!runtime.viewing)return false;runtime.viewing=false;releasePointers();
   for(const [batch,visible]of runtime.savedVisibility)batch.visible=visible;runtime.savedVisibility.clear();for(const batch of runtime.owned)batch.visible=false;
@@ -189,7 +189,7 @@ const oceanAquarium=(()=>{
   node('aquariumExit').onclick=()=>oceanFeatures.open('aquarium');node('aquariumFocus').onchange=e=>focus(+e.target.value);node('aquariumNear').onclick=()=>adjust(0,0,-.15);node('aquariumFar').onclick=()=>adjust(0,0,.15);node('aquariumReset').onclick=()=>focus(-1);
   const oldCamera=shipCamera;shipCamera=function(){if(runtime.viewing&&!active&&modal==='aquariumView')camera();else oldCamera();};
   const canvas=renderer.canvas,pinchDistance=()=>{const [a,b]=[...runtime.pointers.values()];return a&&b?Math.hypot(a.x-b.x,a.y-b.y):null;};
-  canvas.addEventListener('pointerdown',e=>{if(!runtime.viewing||e.button>0)return;e.preventDefault();e.stopImmediatePropagation();runtime.pointers.set(e.pointerId,{x:e.clientX,y:e.clientY});canvas.setPointerCapture(e.pointerId);runtime.pinch=pinchDistance();},true);
+  canvas.addEventListener('pointerdown',e=>{if(!runtime.viewing||e.button>0)return;e.preventDefault();e.stopImmediatePropagation();runtime.pointers.set(e.pointerId,{x:e.clientX,y:e.clientY});oceanGamepadPointer.capture(canvas,e);runtime.pinch=pinchDistance();},true);
   canvas.addEventListener('pointermove',e=>{const old=runtime.pointers.get(e.pointerId);if(!runtime.viewing||!old)return;e.preventDefault();e.stopImmediatePropagation();runtime.pointers.set(e.pointerId,{x:e.clientX,y:e.clientY});const distance=pinchDistance();if(distance&&runtime.pinch){adjust(0,0,Math.log(runtime.pinch/Math.max(1,distance)));runtime.pinch=distance;}else adjust((e.clientX-old.x)*-.004,(e.clientY-old.y)*.003,0);},true);
   const finish=e=>{if(!runtime.pointers.has(e.pointerId))return;runtime.pointers.delete(e.pointerId);runtime.pinch=pinchDistance();if(!runtime.pointers.size&&runtime.saveDue){runtime.saveDue=false;save();}};for(const name of ['pointerup','pointercancel','lostpointercapture'])canvas.addEventListener(name,finish,true);
   canvas.addEventListener('wheel',e=>{if(!runtime.viewing)return;e.preventDefault();e.stopImmediatePropagation();adjust(0,0,Math.max(-.25,Math.min(.25,e.deltaY*.0015)));},{passive:false,capture:true});

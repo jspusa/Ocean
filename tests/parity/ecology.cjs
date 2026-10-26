@@ -34,6 +34,14 @@ check('An active interaction tool remains available in empty water and closes on
 check('A distant accompanying selected partner keeps whistle access until resting',()=>{const f=friend();f.p=[40,-5,-20];withHUD(visible=>{assert(visible());stored.accompany=false;assert(!visible());stored.accompany=true;stored.selected=null;assert(!visible())})});
 check('A stationary click does not count as a stroke',()=>{fresh();const f=actor(0,'clown-001');actors.push(f);api.setTool('pet');assert(selection.select(f.uid,'test-pointer'));assert(api.beginGesture(500,350));step(.2);assert(!api.endGesture());assert.equal(stored.individuals[f.uid],undefined)});
 check('Back-and-forth gesture earns trust once and cannot be spammed',()=>{fresh();const f=actor(0,'clown-001');actors.push(f);api.setTool('pet');assert(stroke());assert.equal(stored.individuals[f.uid].strokes,1);assert.equal(stored.individuals[f.uid].trust,6);assert(!stroke());assert.equal(stored.individuals[f.uid].strokes,1)});
+check('Smooth underwater petting earns the same single stroke at 30, 60 and 120 Hz',()=>{
+ const outcomes=[];for(const hz of [30,60,120]){
+  fresh();const f=actor(0,'clown-001');actors.push(f);api.setTool('pet');assert(selection.select(f.uid,'test-pointer'));assert(api.beginGesture(500,350));
+  let previous=0;for(const [end,seconds] of [[30,.3],[-30,.6],[0,.3]]){const samples=Math.round(seconds*hz);for(let i=1;i<=samples;i++){step(seconds/samples);api.moveGesture(500+previous+(end-previous)*i/samples,350);}previous=end;}
+  api.endGesture();const record=stored.individuals[f.uid];outcomes.push({hz,strokes:record?.strokes||0,trust:record?.trust||0});
+ }
+ assert.deepEqual(outcomes,[{hz:30,strokes:1,trust:6},{hz:60,strokes:1,trust:6},{hz:120,strokes:1,trust:6}]);
+});
 check('Two short taps are a distinct interaction with visible pose response',()=>{fresh();const f=actor(0,'clown-001');actors.push(f);api.setTool('pet');assert(selection.select(f.uid,'test-pointer'));for(let i=0;i<2;i++){assert(api.beginGesture(500,350));step(.1);const ok=api.endGesture();assert.equal(ok,i===1);step(.1);}assert.equal(stored.individuals[f.uid].strokes,0);assert.equal(stored.individuals[f.uid].trust,1);assert(Math.abs(f.pitch)>.01)});
 check('Cancelled or occluded gestures cannot award contact',()=>{fresh();const f=actor(0,'clown-001');actors.push(f);api.setTool('pet');assert(selection.select(f.uid,'test-pointer'));assert(api.beginGesture(500,350));step(.1);api.endGesture(true);occluded=true;assert(!api.beginGesture(500,350));assert.equal(stored.individuals[f.uid],undefined)});
 check('Feed targets actual small fish and rate-limits food clouds',()=>{fresh();const f=actor(0,'clown-001');actors.push(f);assert(!api.feedAt(f,10,10));assert(api.feedAt(f,500,350));assert.equal(api.snapshot().food,1);assert(!api.feedAt(f,500,350));const p=f.p.slice();step(.1);assert(Math.hypot(...f.p.map((v,i)=>v-p[i]))>0);assert(Math.hypot(...f.p.map((v,i)=>v-p[i]))<=.106);f.species=11;step(8);assert(!api.feedAt(f,500,350));assert.equal(api.snapshot().food,0)});
@@ -51,6 +59,38 @@ check('Six body-part gestures map to distinct basic tricks with a three-command 
 check('Go strength changes real 3D pose; timed feedback is persistent and once only',()=>{const f=training();api.queueGesture('mouth','grab');assert(api.startPerformance(100));assert(!api.commandTrick('jump'));const q=api.snapshot().training.trick;step(q.duration*.6);assert(f.p[1]>2);assert(Math.abs(f.pitch)>3);assert(api.praiseTrick());assert(!api.praiseTrick());assert.equal(stored.partners[0].mastery.backflip,1);step(q.duration*.41);assert.equal(api.snapshot().training.performance,null);const result=api.sanitize(plain(stored)).partners[0].lastPerformance;assert(result.height>2);assert(result.duration>4);assert.equal(result.count,1)});
 check('Multiple queued tricks execute sequentially and retain measured results',()=>{const f=training();for(const id of ['jump','spin','backflip'])api.commandTrick(id);assert(api.startPerformance(40));const seen=[];for(let i=0;i<3;i++){const q=api.snapshot().training.trick;seen.push(q.id);step(q.duration*.6);if(q.id==='spin')assert(f.yaw>7);step(q.duration*.41);}assert.deepEqual(seen,['jump','spin','backflip']);assert.equal(stored.partners[0].lastPerformance.count,3);assert(stored.partners[0].lastPerformance.duration>8);assert.equal(api.snapshot().training.trick,null)});
 check('Training input rejects remote screen taps and requires real part gestures',()=>{training();context.eye=[17,3.4,20];vm.runInContext('renderer.vp=mm(perspective(69*Math.PI/180,1000/700,.1,1000),lookAt(eye,[9,.9,6]))',context);const p=api.trainingPartPoint('mouth');assert(p);assert(!api.beginTrainingGesture('mouth',p.x+200,p.y));assert(api.beginTrainingGesture('mouth',p.x,p.y));step(.7);assert(api.endTrainingGesture());assert.deepEqual(plain(api.snapshot().training.queue),['backflip'])});
+check('Smooth mouth and fin strokes queue the same command at 30, 60 and 120 Hz',()=>{
+ const outcomes=[];
+ for(const hz of [30,60,120])for(const [part,command] of [['mouth','frontflip'],['fin','sing']]){
+  training();context.eye=[17,3.4,20];vm.runInContext('renderer.vp=mm(perspective(69*Math.PI/180,1000/700,.1,1000),lookAt(eye,[9,.9,6]))',context);const p=api.trainingPartPoint(part);assert(p);assert(api.beginTrainingGesture(part,p.x,p.y));
+  let previous=0;for(const [end,seconds] of [[30,.3],[-30,.6],[0,.3]]){const samples=Math.round(seconds*hz);for(let i=1;i<=samples;i++){step(seconds/samples);assert(api.moveTrainingGesture(p.x+previous+(end-previous)*i/samples,p.y));}previous=end;}
+  api.endTrainingGesture();outcomes.push({hz,part,queue:plain(api.snapshot().training.queue),expected:[command]});
+ }
+ for(const result of outcomes)assert.deepEqual(result.queue,result.expected,JSON.stringify(outcomes));
+});
+check('A one-pixel reversal mixed with vertical motion cannot become a petting or training stroke',()=>{
+ for(const hz of [30,60,120])for(const mode of ['pet','training']){
+  let p;if(mode==='training'){training();context.eye=[17,3.4,20];vm.runInContext('renderer.vp=mm(perspective(69*Math.PI/180,1000/700,.1,1000),lookAt(eye,[9,.9,6]))',context);p=api.trainingPartPoint('mouth');assert(api.beginTrainingGesture('mouth',p.x,p.y));}
+  else{fresh();actors.push(actor(0,'clown-001'));api.setTool('pet');assert(selection.select('clown-001','test-pointer'));p={x:500,y:350};assert(api.beginGesture(p.x,p.y));}
+  let previous=[0,0];for(const [x,y,seconds] of [[30,0,.3],[29,0,.1],[30,0,.1],[30,30,.3],[30,-30,.6]]){const samples=Math.round(seconds*hz);for(let i=1;i<=samples;i++){step(seconds/samples);const point=[p.x+previous[0]+(x-previous[0])*i/samples,p.y+previous[1]+(y-previous[1])*i/samples];if(mode==='training')assert(api.moveTrainingGesture(...point));else api.moveGesture(...point);}previous=[x,y];}
+  if(mode==='training'){assert(!api.endTrainingGesture());assert.deepEqual(plain(api.snapshot().training.queue),[]);}else{assert(!api.endGesture());assert.equal(stored.individuals['clown-001'],undefined);}
+ }
+});
+check('Smooth training recognition preserves short, fast, cancelled and out-of-range rejection',()=>{
+ for(const kind of ['short','fast','cancel','outside']){
+  training();context.eye=[17,3.4,20];vm.runInContext('renderer.vp=mm(perspective(69*Math.PI/180,1000/700,.1,1000),lookAt(eye,[9,.9,6]))',context);const p=api.trainingPartPoint('mouth');assert(api.beginTrainingGesture('mouth',p.x,p.y));
+  const distance=kind==='short'?14:30,seconds=kind==='fast'?.075:.3;
+  let previous=0;for(const end of [distance,-distance,0]){for(let i=1;i<=18;i++){step(seconds/18);api.moveTrainingGesture(p.x+previous+(end-previous)*i/18,p.y);}previous=end;}
+  if(kind==='outside')assert(!api.moveTrainingGesture(p.x+66,p.y));assert(!api.endTrainingGesture(kind==='cancel'));assert.deepEqual(plain(api.snapshot().training.queue),[],kind);
+ }
+});
+check('Real double taps and still holds retain all four mouth and fin commands',()=>{
+ for(const [part,touch,hold] of [['mouth','spin','backflip'],['fin','tailwalk','handshake']])for(const kind of ['touch','hold']){
+  training();context.eye=[17,3.4,20];vm.runInContext('renderer.vp=mm(perspective(69*Math.PI/180,1000/700,.1,1000),lookAt(eye,[9,.9,6]))',context);const p=api.trainingPartPoint(part);assert(api.beginTrainingGesture(part,p.x,p.y));
+  if(kind==='hold')step(.7);else{step(.1);assert(!api.endTrainingGesture());step(.1);assert(api.beginTrainingGesture(part,p.x,p.y));step(.1);}
+  assert(api.endTrainingGesture());assert.deepEqual(plain(api.snapshot().training.queue),[kind==='touch'?touch:hold]);
+ }
+});
 check('Reset releases gestures, food, ride and performance without erasing saved knowledge',()=>{friend();const before=plain(stored);api.grabAnimal('dolphin-001');feature.reset();assert.equal(api.snapshot().grabbedUID,null);assert.equal(api.snapshot().training,null);assert.equal(api.snapshot().food,0);assert.deepEqual(plain(stored),before)});
 check('Microfauna individual IDs persist without losing underscore identity',()=>{fresh();const f=actor(12,'pygmy_seahorse-001',[0,-5,-.3]);actors.push(f);record(f,8,4);const next=api.sanitize(stored);assert.equal(next.individuals[f.uid].trust,8);assert.equal(next.individuals[f.uid].seconds,4)});
 check('New microfauna cannot be grabbed as large animals or fed like reef fish',()=>{fresh();const f=actor(12,'pygmy_seahorse-001',[0,-5,-.3]);actors.push(f);record(f,100,10);assert(!api.grabAnimal(f.uid));assert(!api.feedAt(f,500,350));});
