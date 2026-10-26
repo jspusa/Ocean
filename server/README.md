@@ -10,7 +10,7 @@
 
 ## 啟動與測試
 
-需要 Node.js 22 或以上。在 repo 根目錄執行：
+需要 Node.js 24 或以上。在 repo 根目錄執行：
 
 ```sh
 npm ci --prefix server --ignore-scripts
@@ -52,18 +52,34 @@ npm run check --prefix server
 
 以上是本作設計值，不聲稱與 Wii 原作相同。連線數／限流測試可透過 runner 調小時限或額度；正式啟動 CLI 使用預設值。
 
-主持者正常離開會關房；主持者斷線先保留 30 秒，過期關房；客人斷線過期只移除客人。重連取代仍在的舊 socket，舊 socket 後續關閉不會誤傷新世代。重連先傳入安全亂數 nonce；若 joined 在途中遺失，只能在固定期限內重送完全相同的私有請求。收到 joined 後立即保存新能力值並 confirm，後續使用新能力值重連。舊能力值加上不同 nonce、確認後的舊完整請求及舊世代操作均不能取代現行連線；細節見 [PROTOCOL.md](PROTOCOL.md)。過期申請／離開／房間關閉使相關資格失效。所有狀態僅在單一程序記憶體，服務重啟會失去房間與重連能力值；個人進度完全由遊戲正式存檔 owner 保存。
+主持者正常離開會關房；主持者斷線先保留 30 秒，過期關房；客人斷線過期只移除客人。重連取代仍在的舊 socket，舊 socket 後續關閉不會誤傷新世代。重連先傳入安全亂數 nonce；若 joined 在途中遺失，只能在固定期限內重送完全相同的私有請求。收到 joined 後立即保存新能力值並 confirm，後續使用新能力值重連。舊能力值加上不同 nonce、確認後的舊完整請求及舊世代操作均不能取代現行連線；細節見 [PROTOCOL.md](PROTOCOL.md)。過期申請／離開／房間關閉使相關資格失效。未設定 OCEAN_STATE_FILE 時狀態僅在單一程序記憶體，服務重啟會失去房間；明確設定 SQLite 時可在最後已保存的期限內恢復原席位；個人進度完全由遊戲正式存檔 owner 保存。
 
 ## 驗收與部署界線
 
 測試以獨立的真 TCP WebSocket 連線操作，涵蓋未核准隔離、版本、角色、重播、失效能力值、真正 7000 m 海溝座標、慢速接收端及失聯心跳；CLI 測試另啟動 Node 子程序。另用真正 TCP proxy 在資料送達客戶端前切斷三次 joined 回覆，讓另一名成員確認每次交接實際發生，再驗證原席位恢復、確認後舊請求撤銷、確認 ack 遺失及重試不延長期限。首次准入另以 TCP 丟棄房主 joined、客人核准 joined 及 pending，驗證同一房間／席位／申請恢復、晚核准、明確取消、固定期限與有界容量。測試不操作內部房間 Map、不使用 BroadcastChannel、不使用 demo relay。
 
-尚未接到遊戲前端，未加入玩家沒有新增 WebSocket、上傳或遠端模型成本。前端整合時仍須做到使用者進入同遊前不建立連線，姿態建議 10–20 Hz、有變動才傳、插值／過期凍結與有界事件佇列，並保留目前自動畫質和單寫存檔保護。
+0.18.21 已接入可見遊戲前端，桌機與觸控模擬各 67/67。未加入或離房後沒有連線及遠端模型；姿態最多 10 Hz、有變動才傳、兩筆插值與過期凍結，並保留自動畫質和單寫存檔保護。0.18.22 的程序中斷驗證另見本輪報告。
 
-初次 create/request 必須有安全亂數 admissionNonce。不確定回覆時保留原始請求，在新連線用 recover 尋回同一申請或席位；不可盲目重送 create/request。等待中的斷線不再等於取消，必須以 cancel 明確取消，或等待原期限。首次核准的恢復窗口從核准時開始，晚核准者也能恢復；重試不延長窗口。初次證明與現行 resumeToken 是分開的短期能力，詳見協定。這沒有提供服務重啟恢復、持久好友或公開後端。
+初次 create/request 必須有安全亂數 admissionNonce。不確定回覆時保留原始請求，在新連線用 recover 尋回同一申請或席位；不可盲目重送 create/request。等待中的斷線不再等於取消，必須以 cancel 明確取消，或等待原期限。首次核准的恢復窗口從核准時開始，晚核准者也能恢復；重試不延長窗口。初次證明與現行 resumeToken 是分開的短期能力，詳見協定。可選 SQLite 的服務重啟恢復如下；仍沒有持久好友或公開後端。
 
 此 HTTP 本機服務不提供 TLS、不代表正式公開後端。正式部署需自有 WSS／TLS 端點、明確公開存取、身分與邀請權限、監控、額度與費用界限。單程序記憶體不可直接放到多 instance 後端冒充共同房間；推薦每房一個 Durable Object 的 adapter。Origin 檢查是瀏覽器邊界，不是身分認證；原生客戶端可偽造 Origin，不能將 Stage A 當成商用好友帳號系統。
 
 能力值只傳在 WSS JSON 內容，不能放在 query string、子協定、診斷日誌、遊戲存檔匯出或 Git。`server/.gitignore` 排除相依套件、本機環境檔、log 與 local state。
 
 官方依據：[ws 8.22.0 release](https://github.com/websockets/ws/releases/tag/8.22.0)、[ws API](https://github.com/websockets/ws/blob/8.22.0/doc/ws.md)、[Durable Objects WebSocket](https://developers.cloudflare.com/durable-objects/best-practices/websockets/)。正式部署另行核對方案與限制。
+
+## 可選短期房間保存（0.18.22）
+
+未設定檔案仍為原記憶體模式。需要重啟恢復時，在服務主機使用獨立的私有目錄，例如 macOS 本機開發可在專案根目錄執行：
+
+```sh
+OCEAN_STATE_FILE="$HOME/Library/Application Support/Ocean/rooms.sqlite" npm start --prefix server
+```
+
+資料檔必須位於靜態網站根目錄之外，不加入 Git、不提供下載。服務 HTTP 本身只提供 health 與 WebSocket；不提供資料檔路由。檔案建立為 0600，父目錄新建為 0700；應使用本機可靠檔案系統，同一檔案不能多主機共享。停止服務後才做包含完整 journal 的受控備份，不能一邊服務一邊隨意複製單一檔案。
+
+SQLite 使用 DELETE journal、EXTRA、fullfsync 與終身 EXCLUSIVE writer；第二個使用同檔案的程序在開始監聽前失敗。一次保存最長 1 MiB，資料庫限制 4 MiB；只有房間權限、名稱、截止時間及 SHA-256 摘要，不存原始能力值、姿態、訊息歷史或個人航程。固定期限不因重啟延長，連線中的席位每 5 秒保存租約；崩潰可能損失最後幾秒可用恢復時間，最久仍不超過最後保存期限。
+
+權限操作成功提交後才回覆。若保存失敗或結果不明，所有連線以 1011 關閉，health 回 503，新的升級連線拒絕；需修正資料／主機問題後重啟。壞檔、內容版本不一致或時鐘倒退不會自動清空；保留原檔，不以刪檔當作修復。正常 SIGTERM 保留未過期席位，房主在遊戲內離房才會撤銷房間。
+
+這是單主機房間權威的保存 adapter，不是帳號／好友資料庫，也不是 Cloudflare Durable Object 部署。真 SIGKILL 與正常關閉驗證不能替代硬體斷電、磁碟故障、多主機或公網驗收。規格與證據見 [本輪契約](../docs/parity/ROOM-DURABILITY-v01822-SPEC.md) 及 [驗證報告](../docs/TEST_REPORT-v01822.md)。

@@ -2,22 +2,30 @@
  * Two fresh, independent storage contexts. Only native input changes gameplay;
  * CDP Runtime.evaluate is read-only, userGesture:false. No pose, room, save,
  * clock, focus or renderer mutation. A byte-for-byte TCP proxy supplies one
- * ordinary outage. Admission/reply-loss permutations belong to transport tests.
+ * ordinary outage. --durable-service=sqlite instead kills the real CLI while
+ * both connections are live beyond their initial 30-second leases, then
+ * restarts it with the same SQLite file and port after the UI shows recovery.
+ * Admission/reply-loss permutations belong to transport tests.
  * The coordinator serializes GPU runs; author-side execution is node --check.
  * Touch is same-computer emulation. This is not a frame-time benchmark.
  */
 'use strict';
 const fs=require('node:fs'),path=require('node:path'),net=require('node:net'),assert=require('node:assert/strict'),crypto=require('node:crypto');
+const {spawn}=require('node:child_process'),{tmpdir}=require('node:os');
 const {pathToFileURL}=require('node:url');
 const {chromium}=require(process.env.PLAYWRIGHT_PATH||'/Users/jasper/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright');
 const option=(name,fallback)=>process.argv.find(v=>v.startsWith('--'+name+'='))?.slice(name.length+3)||fallback;
 const url=option('url','http://127.0.0.1:8765/'),profile=option('profile','desktop'),touch=profile==='touch';
 const service=option('service','local');
+const durableService=option('durable-service','off');
 const expectedVersion=option('expected-version','0.18.21'),output=path.resolve(__dirname,'../..',option('out','qa/parity/multiplayer-'+profile+'.json'));
 assert(['desktop','touch'].includes(profile));assert(!new URL(url).searchParams.has('still'),'Natural input requires an unfrozen page');
 assert(['local','unavailable'].includes(service));
+assert(['off','sqlite'].includes(durableService),'Use --durable-service=sqlite or omit the option');
+assert(durableService==='off'||service==='local','Durable CLI acceptance requires the local service mode');
 assert(service==='unavailable'||['127.0.0.1','localhost'].includes(new URL(url).hostname),'Local service mode owns a loopback backend; use a loopback game URL');
 const checks=[],errors=[],consoleErrors=[],inputs=[],observations=[],wire=[],images=[],network=[],clients=[],privateValues=new Set();
+const durability={enabled:durableService==='sqlite',processes:[],restart:null,temporaryStateRemoved:false};
 const viewport=touch?{width:390,height:844}:{width:1440,height:900};
 let fatal=null,stage='launch',metadata=[],backend=null,proxy=null,browser=null;
 const artifact=suffix=>output.replace(/\.json$/,'')+suffix;
@@ -48,9 +56,73 @@ function publicFrame(label,direction,event){
  if(message.snapshot)row.memberCount=message.snapshot.members?.length;
  wire.push(row);
 }
+function bounded(promise,ms,message){
+ let timer;return Promise.race([promise,new Promise((_,reject)=>{timer=setTimeout(()=>reject(Error(message)),ms);})]).finally(()=>clearTimeout(timer));
+}
+function durableBackend(){
+ const directory=fs.mkdtempSync(path.join(tmpdir(),'ocean-native-room-')),stateFile=path.join(directory,'rooms.sqlite');
+ const children=[];let current=null,port=0,crash=null;
+ durability.stateFile=stateFile;
+ async function start(requestedPort){
+  const child=spawn(process.execPath,['cli.mjs'],{cwd:path.resolve(__dirname,'../../server'),env:{PATH:process.env.PATH,OCEAN_HOST:'127.0.0.1',OCEAN_PORT:String(requestedPort),OCEAN_CONTENT_VERSION:'ocean-'+expectedVersion,OCEAN_ALLOWED_ORIGINS:new URL(url).origin,OCEAN_STATE_FILE:stateFile},stdio:['ignore','pipe','pipe']});
+  const evidence={pid:child.pid||null,requestedPort,stateFile,startedAt:Date.now(),listening:null,exit:null,stderr:''};durability.processes.push(evidence);
+  const record={child,evidence,exited:null};children.push(record);let output='';
+  record.exited=new Promise(resolve=>{
+   child.once('exit',(code,signal)=>{evidence.exit={at:Date.now(),code,signal};network.push({type:'backend-process-exit',pid:evidence.pid,...evidence.exit});resolve(evidence.exit);});
+   child.once('error',()=>{if(!child.pid){evidence.exit={at:Date.now(),code:null,signal:null,spawnError:true};resolve(evidence.exit);}});
+  });
+  child.stderr.on('data',chunk=>{evidence.stderr=(evidence.stderr+chunk).slice(-8192);});
+  const listening=await bounded(new Promise((resolve,reject)=>{
+   child.stdout.on('data',chunk=>{
+    output+=chunk;if(output.length>8192)return reject(Error('CLI listening metadata exceeds its bound'));
+    if(!output.includes('\n'))return;
+    try{resolve(JSON.parse(output.split('\n')[0]));}catch{reject(Error('CLI listening metadata is invalid'));}
+   });
+   child.once('exit',()=>reject(Error('CLI exited before listening')));
+   child.once('error',()=>reject(Error('CLI process could not start')));
+  }),5000,'CLI did not listen within 5 seconds');
+  assert.equal(listening.event,'listening');assert.equal(listening.contentVersion,'ocean-'+expectedVersion);
+  const http=new URL(listening.http),websocket=new URL(listening.websocket),boundPort=Number(http.port);
+  assert.equal(http.protocol,'http:');assert.equal(http.hostname,'127.0.0.1');assert(Number.isInteger(boundPort)&&boundPort>0&&boundPort<=65535);
+  assert.equal(websocket.href,'ws://127.0.0.1:'+boundPort+'/v1');if(requestedPort)assert.equal(boundPort,requestedPort);
+  assert(fs.statSync(stateFile).isFile()&&fs.statSync(stateFile).size>0,'CLI must create its configured SQLite state file before listening');
+  evidence.listening={event:listening.event,http:http.origin,websocket:websocket.href,contentVersion:listening.contentVersion};
+  current=record;port=boundPort;network.push({at:Date.now(),type:'backend-process-listening',pid:evidence.pid,port,stateFile});
+ }
+ async function stop(record,signal){
+  if(record.evidence.exit)return record.evidence.exit;
+  const sent=record.child.kill(signal);network.push({at:Date.now(),type:'backend-process-signal',pid:record.evidence.pid,signal,sent});
+  assert(sent,'Signal must reach the real CLI child');
+  return bounded(record.exited,3000,'CLI did not terminate after '+signal);
+ }
+ return {
+  start:()=>start(0),address:()=>({port}),
+  async killLive(){
+   assert(current&&!current.evidence.exit,'Crash injection requires the running CLI');const prior=current,priorPort=port;
+   const exit=await stop(prior,'SIGKILL');assert.equal(exit.signal,'SIGKILL');
+   const bytes=fs.readFileSync(stateFile),stateBeforeRestart={bytes:bytes.length,sha256:crypto.createHash('sha256').update(bytes).digest('hex')};
+   crash={prior,priorPort,exit,stateBeforeRestart};
+  },
+  async restart(){
+   assert(crash&&current===crash.prior&&current.evidence.exit?.signal==='SIGKILL','Restart must follow the observed CLI SIGKILL');
+   const {prior,priorPort,exit,stateBeforeRestart}=crash;await start(priorPort);
+   durability.restart={oldPid:prior.evidence.pid,newPid:current.evidence.pid,signal:exit.signal,oldPort:priorPort,newPort:port,stateFile,oldStateFile:prior.evidence.stateFile,newStateFile:current.evidence.stateFile,stateBeforeRestart};
+   assert.notEqual(durability.restart.newPid,durability.restart.oldPid,'Recovery must use a new CLI process');
+   return durability.restart;
+  },
+  async close(){
+   let failure=null;
+   for(const record of children)if(!record.evidence.exit){
+    try{const exit=await stop(record,'SIGTERM');assert.equal(exit.code,0,'CLI cleanup must exit successfully');}catch(error){failure=error;if(!record.evidence.exit)try{await stop(record,'SIGKILL');}catch(forced){failure=forced;}}
+   }
+   if(children.every(record=>record.evidence.exit)){fs.rmSync(directory,{recursive:true,force:true});durability.temporaryStateRemoved=!fs.existsSync(directory);}
+   if(failure)throw failure;
+  }
+ };
+}
 async function startBackend(){
- const {createOceanServer}=await import(pathToFileURL(path.resolve(__dirname,'../../server/server.mjs')).href);
- backend=createOceanServer({contentVersion:'ocean-'+expectedVersion,allowedOrigins:[new URL(url).origin]});await backend.listen(0);
+ if(durability.enabled){backend=durableBackend();await backend.start();}
+ else{const {createOceanServer}=await import(pathToFileURL(path.resolve(__dirname,'../../server/server.mjs')).href);backend=createOceanServer({contentVersion:'ocean-'+expectedVersion,allowedOrigins:[new URL(url).origin]});await backend.listen(0);}
  let enabled=true,next=0;const pairs=new Set();
  const server=net.createServer(downstream=>{
   const id=++next;network.push({at:Date.now(),type:'tcp-accept',id,enabled});
@@ -64,12 +136,14 @@ async function startBackend(){
  await new Promise((resolve,reject)=>{server.once('error',reject);server.listen(8787,'127.0.0.1',resolve);});
  proxy={
   activeConnections:()=>pairs.size,
+  enabled:()=>enabled,
   outage(){enabled=false;network.push({at:Date.now(),type:'outage-start',connections:pairs.size});for(const pair of [...pairs]){pair.downstream.destroy();pair.upstream.destroy();}},
   restore(){enabled=true;network.push({at:Date.now(),type:'outage-end'});},
   async close(){for(const pair of [...pairs]){pair.downstream.destroy();pair.upstream.destroy();}await new Promise(resolve=>server.close(resolve));}
  };
  const response=await fetch('http://127.0.0.1:8787/health',{headers:{Connection:'close'}});
  check('actual HTTP backend health is reached through the TCP proxy',response.status===200&&(await response.json()).status==='ok');
+ if(durability.enabled)check('durable mode starts the shipped CLI as an independent SQLite-backed process',durability.processes.length===1&&durability.processes[0].pid!==process.pid&&!!durability.processes[0].listening&&fs.statSync(durability.stateFile).size>0,{pid:durability.processes[0].pid,parentPid:process.pid,stateFile:durability.stateFile,listening:durability.processes[0].listening});
 }
 async function makeClient(label,origin=url){
  const context=await browser.newContext({viewport,deviceScaleFactor:touch?3:2,isMobile:touch,hasTouch:touch,acceptDownloads:true,serviceWorkers:'block'});
@@ -253,12 +327,29 @@ async function run(){
  const blocked=await guest.context.newPage();await blocked.goto(url);await blocked.locator('#saveSessionGate').waitFor({state:'visible'});
  const blockedSession=await guest.context.newCDPSession(blocked),blockedRead=await blockedSession.send('Runtime.evaluate',{expression:'JSON.stringify({renderer:typeof renderer,gate:document.getElementById("saveSessionGate").open})',returnByValue:true,userGesture:false});
  const blockedState=JSON.parse(blockedRead.result.value);check('existing single-writer save gate remains active in a same-context tab',blockedState.renderer==='undefined'&&blockedState.gate);await blocked.close();await guest.focus();
- stage='tcp-outage';await host.openRoom();await guest.openRoom();const beforeOutage=[await host.snapshot(),await guest.snapshot()],savedBefore=[await host.progress(),await guest.progress()];
- proxy.outage();await waitStatus(host,'reconnecting');await waitStatus(guest,'reconnecting');
+ stage=durability.enabled?'live-service-crash':'tcp-outage';await host.openRoom();await guest.openRoom();const beforeOutage=[await host.snapshot(),await guest.snapshot()],savedBefore=[await host.progress(),await guest.progress()];
+ let crashAt=null;
+ if(durability.enabled){
+  const leases=beforeOutage.map(s=>{const joined=wire.filter(e=>e.direction==='received'&&e.type==='joined'&&e.memberId===s.memberId&&e.roomId===s.roomId).at(-1);assert(joined,'Live-lease test needs an observed joined response for each current seat');return {roomId:s.roomId,memberId:s.memberId,generation:joined.generation,joinedAt:joined.at};});
+  const waitStarted=Date.now(),waitMs=Math.max(0,...leases.map(lease=>lease.joinedAt+31000-waitStarted));
+  if(waitMs>0)await pause(waitMs);
+  const live=[await host.snapshot(),await guest.snapshot()],at=Date.now();
+  durability.liveCrash={at,waitMs,elapsedWaitMs:at-waitStarted,proxyEnabled:proxy.enabled(),activeTcpConnections:proxy.activeConnections(),leases:leases.map(lease=>({...lease,ageMs:at-lease.joinedAt}))};
+  check('both admitted sockets stay live beyond their initial 30-second leases before direct SIGKILL',durability.liveCrash.proxyEnabled&&durability.liveCrash.activeTcpConnections===2&&durability.liveCrash.leases.every(lease=>lease.ageMs>30000)&&live.every((s,i)=>s.status==='joined'&&s.roomId===beforeOutage[i].roomId&&s.memberId===beforeOutage[i].memberId&&s.members.length===2&&s.members.every(m=>m.connected)&&s.members.find(m=>m.id===s.memberId).generation===leases[i].generation),durability.liveCrash);
+  // Do not call proxy.outage() here: the live process must die before any
+  // disconnect handler can replace its periodically persisted seat leases.
+  crashAt=Date.now();await backend.killLive();
+ }else proxy.outage();
+ await waitStatus(host,'reconnecting');await waitStatus(guest,'reconnecting');
  check('real TCP loss is visibly represented as reconnecting',/恢復原房間|重連/.test(await host.page.locator('#roomStatus').textContent())&&/恢復原房間|重連/.test(await guest.page.locator('#roomStatus').textContent()));
- await pause(1800);proxy.restore();await waitStatus(host,'joined');await waitStatus(guest,'joined');
+ if(durability.enabled)await backend.restart();
+ await pause(1800);if(!durability.enabled)proxy.restore();await waitStatus(host,'joined');await waitStatus(guest,'joined');
  const recovered=[await host.snapshot(),await guest.snapshot()];
  check('both real sockets resume the original room and seats with newer generations',recovered.every((s,i)=>s.roomId===beforeOutage[i].roomId&&s.memberId===beforeOutage[i].memberId&&s.members.length===2&&s.members.find(m=>m.id===s.memberId).generation>beforeOutage[i].members.find(m=>m.id===s.memberId).generation),{before:beforeOutage.map(s=>({room:s.roomId,member:s.memberId,generation:s.members.find(m=>m.id===s.memberId).generation})),after:recovered.map(s=>({room:s.roomId,member:s.memberId,generation:s.members.find(m=>m.id===s.memberId).generation}))});
+ if(durability.enabled){
+  const restart=durability.restart,response=await fetch('http://127.0.0.1:8787/health',{headers:{Connection:'close'}});
+  check('real SIGKILL and same-file same-port CLI restart preserve the admitted room and advance both generations without reapproval',restart?.signal==='SIGKILL'&&restart.oldPid!==restart.newPid&&restart.oldPort===restart.newPort&&restart.oldStateFile===restart.newStateFile&&restart.stateBeforeRestart.bytes>0&&response.status===200&&(await response.json()).status==='ok'&&recovered.every((s,i)=>s.roomId===beforeOutage[i].roomId&&s.memberId===beforeOutage[i].memberId&&s.role===beforeOutage[i].role&&s.visitsOpen===beforeOutage[i].visitsOpen&&s.members.length===2&&s.members.find(m=>m.id===s.memberId).generation>beforeOutage[i].members.find(m=>m.id===s.memberId).generation)&&!wire.some(e=>e.at>=crashAt&&e.direction==='sent'&&['create','request','decide'].includes(e.type)),{restart,before:beforeOutage.map(s=>({room:s.roomId,member:s.memberId,role:s.role,visitsOpen:s.visitsOpen,generation:s.members.find(m=>m.id===s.memberId).generation})),after:recovered.map(s=>({room:s.roomId,member:s.memberId,role:s.role,visitsOpen:s.visitsOpen,generation:s.members.find(m=>m.id===s.memberId).generation}))});
+ }
  check('recovery leaves both paused personal saves unchanged',JSON.stringify(savedBefore[0])===JSON.stringify(await host.progress())&&JSON.stringify(savedBefore[1])===JSON.stringify(await guest.progress()));
  const joins=wire.filter(e=>e.direction==='received'&&e.type==='joined');check('every joined response is followed by confirm before gameplay pose',joins.length>=4&&joins.every(join=>wire.slice(wire.indexOf(join)+1).find(e=>e.label===join.label&&e.requestId===join.requestId&&e.direction==='sent')?.type==='confirm'),{joinedResponses:joins.length});
  stage='explicit-leave';await guest.openRoom();const beforeLeave=await guest.progress();await guest.press('#roomLeave');await waitStatus(guest,'closed');await host.wait(()=>oceanMultiplayer.snapshot().members.length===1);
@@ -315,8 +406,8 @@ async function run(){
  catch(error){fatal=redact(error.stack||error);console.error(fatal);for(const c of clients)if(!c.page.isClosed()){await c.shot('failure').catch(()=>{});try{observations.push({stage:'failure',label:c.label,state:await c.state(),room:await c.snapshot()});}catch{}}}
  finally{
   for(const c of clients)if(!c.page.isClosed()){if(c.contacts.size)await c.session.send('Input.dispatchTouchEvent',{type:'touchCancel',touchPoints:[]}).catch(()=>{});if(c.moving)await c.page.keyboard.up('w').catch(()=>{});}
-  if(browser)await browser.close();if(proxy)await proxy.close();if(backend)await backend.close();
-  const report={url,profile,service,expectedVersion,status:fatal||checks.some(c=>!c.pass)?'failed':'passed',stage,metadata,checks,errors,consoleErrors,fatal,inputs,observations,wire,network,images,physicalPhoneTested:false,method:service==='unavailable'?'Actual requested public page, normal room entry and single-player start. No backend, proxy, network routing, endpoint override or gameplay injection. All CDP reads use userGesture:false. Native browser screenshots verify unavailable-service UI; this does not claim public multiplayer service delivery. Touch is same-computer simulation.':'Two independent browser storage contexts, production UI, native keyboard or one CDP touch stream per page, read-only CDP with userGesture:false, actual production HTTP/WebSocket room server behind an unchanged-byte TCP outage proxy. No rooms/poses/saves/progress/time/focus/render calls are injected. The explicit terminal fault uses the actual WEBGL_lose_context extension, not a synthetic error or state write. Raw capability values are retained only transiently in runner memory for leak checks; protocol evidence is allowlisted and final diagnostics redact them. Screenshots and real batch poses prove native presentation; this is not a GPU performance test. The non-loopback HTTPS fixture serves local production bytes and is not a public deployment test. Touch is same-computer simulation.',notClaimed:['persistent identity','42 friends and invitations','shared world clock','shared creatures','synchronized tool effects','complete appearance sync','public multiplayer service','cross-network play','physical phone acceptance']};
+  for(const [label,resource]of [['browser',browser],['proxy',proxy],['backend',backend]])if(resource)try{await resource.close();}catch(error){const message=redact(label+' cleanup: '+(error.stack||error));errors.push({label:'cleanup',message});fatal=fatal||message;}
+  const report={url,profile,service,durableService,durability,expectedVersion,status:fatal||checks.some(c=>!c.pass)?'failed':'passed',stage,metadata,checks,errors,consoleErrors,fatal,inputs,observations,wire,network,images,physicalPhoneTested:false,method:service==='unavailable'?'Actual requested public page, normal room entry and single-player start. No backend, proxy, network routing, endpoint override or gameplay injection. All CDP reads use userGesture:false. Native browser screenshots verify unavailable-service UI; this does not claim public multiplayer service delivery. Touch is same-computer simulation.':'Two independent browser storage contexts, production UI, native keyboard or one CDP touch stream per page, read-only CDP with userGesture:false, actual production HTTP/WebSocket room server behind an unchanged-byte TCP outage proxy. '+(durability.enabled?'The shipped CLI runs in an independent child process with OCEAN_STATE_FILE pointing to a temporary SQLite file. Both admitted sockets remain live with the proxy enabled beyond their initial 30-second leases, using real elapsed time. The CLI receives direct SIGKILL before any proxy outage or graceful disconnect; its actual exit signal and both visible reconnecting states are observed before a different CLI process starts with the exact same state file, port and content version. The proxy stays enabled throughout this crash test. Room authority is obtained only through the normal game UI; no database or room-state injection is used. All child processes and temporary database files are cleaned up. This is a process-crash recovery test, not device power-loss or disk-failure acceptance. ':'')+'No rooms/poses/saves/progress/time/focus/render calls are injected. The explicit terminal fault uses the actual WEBGL_lose_context extension, not a synthetic error or state write. Raw capability values are retained only transiently in runner memory for leak checks; protocol evidence is allowlisted and final diagnostics redact them. Screenshots and real batch poses prove native presentation; this is not a GPU performance test. The non-loopback HTTPS fixture serves local production bytes and is not a public deployment test. Touch is same-computer simulation.',notClaimed:['persistent identity','42 friends and invitations','shared world clock','shared creatures','synchronized tool effects','complete appearance sync','public multiplayer service','cross-network play','physical phone acceptance']};
   const text=redact(JSON.stringify(report,null,2));fs.writeFileSync(output,text);
  }
  console.log(JSON.stringify({output,status:fatal||checks.some(c=>!c.pass)?'failed':'passed',passed:checks.filter(c=>c.pass).length,total:checks.length,stage}));if(fatal||checks.some(c=>!c.pass))process.exitCode=1;

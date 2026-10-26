@@ -2,21 +2,26 @@ import http from 'node:http';
 import { once } from 'node:events';
 import { WebSocketServer, WebSocket } from 'ws';
 import { createRooms } from './rooms.mjs';
+import { openRoomStore } from './room-store.mjs';
 
-export function createOceanServer({ contentVersion, allowedOrigins = ['https://jspusa.github.io'], sweepMs = 1000, messageBurst = 60, messageRate = 40, handshakeTimeoutMs = 5000, heartbeatMs = 15000, maxConnections = 128, maxConnectionsPerIp = 8, maxBufferedBytes = 65536, ...options } = {}) {
+export function createOceanServer({ contentVersion, stateFile = null, stateStore = null, allowedOrigins = ['https://jspusa.github.io'], sweepMs = 1000, messageBurst = 60, messageRate = 40, handshakeTimeoutMs = 5000, heartbeatMs = 15000, maxConnections = 128, maxConnectionsPerIp = 8, maxBufferedBytes = 65536, ...options } = {}) {
   if (typeof contentVersion !== 'string' || !/^[A-Za-z0-9._-]{1,128}$/.test(contentVersion)) throw new TypeError('contentVersion is required');
   if (!Array.isArray(allowedOrigins) || !allowedOrigins.length || allowedOrigins.some(origin => {
     try { const url = new URL(origin); return url.origin !== origin || !['http:', 'https:'].includes(url.protocol); }
     catch { return true; }
   })) throw new TypeError('allowedOrigins must contain exact HTTP(S) origins');
-  const rooms = createRooms({ contentVersion, ...options });
+  if (stateFile && stateStore) throw new TypeError('choose one room store');
+  const store = stateStore || (stateFile ? openRoomStore({ path: stateFile, contentVersion }) : null);
+  let rooms;
+  try { rooms = createRooms({ contentVersion, ...options, store }); }
+  catch (error) { store?.close(); throw error; }
   const sweep = setInterval(() => rooms.sweep(), sweepMs); sweep.unref();
   const server = http.createServer({ maxHeaderSize: 8192, requestTimeout: 10000, headersTimeout: 10000, keepAliveTimeout: 5000 }, (request, response) => {
-    const healthy = request.method === 'GET' && request.url === '/health';
+    const health = request.method === 'GET' && request.url === '/health';
     response.setHeader('Cache-Control', 'no-store');
     response.setHeader('Content-Type', 'application/json');
-    response.writeHead(healthy ? 200 : 404);
-    response.end(JSON.stringify(healthy ? { status: 'ok' } : { error: 'not_found' }));
+    response.writeHead(health ? (rooms.healthy() ? 200 : 503) : 404);
+    response.end(JSON.stringify(health ? { status: rooms.healthy() ? 'ok' : 'unavailable' } : { error: 'not_found' }));
     request.resume();
   });
   server.maxConnections = maxConnections * 2;
@@ -29,6 +34,7 @@ export function createOceanServer({ contentVersion, allowedOrigins = ['https://j
     }
   }, heartbeatMs); heartbeat.unref();
   server.on('upgrade', (request, socket, head) => {
+    if (!rooms.healthy()) { socket.end('HTTP/1.1 503 Service Unavailable\r\nConnection: close\r\n\r\n'); return; }
     if (request.url !== '/v1' || request.headers['sec-websocket-protocol'] !== 'ocean.v1' || !allowedOrigins.includes(request.headers.origin)) {
       socket.end('HTTP/1.1 403 Forbidden\r\nConnection: close\r\n\r\n'); return;
     }
@@ -75,7 +81,7 @@ export function createOceanServer({ contentVersion, allowedOrigins = ['https://j
     address() { return server.address(); },
     async close() {
       for (const ws of wss.clients) ws.terminate();
-      clearInterval(sweep); clearInterval(heartbeat); rooms.shutdown();
+      clearInterval(sweep); clearInterval(heartbeat); rooms.shutdown(); store?.close();
       server.closeAllConnections();
       await new Promise(resolve => server.close(resolve));
       await new Promise(resolve => wss.close(resolve));

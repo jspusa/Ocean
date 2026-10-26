@@ -3,11 +3,11 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "engines": { "node": ">=22" },
+  "engines": { "node": ">=24.0" },
   "scripts": {
     "start": "node cli.mjs",
     "test": "node --test --test-timeout=5000 test/*.test.mjs",
-    "check": "node --check server.mjs && node --check rooms.mjs && node --check cli.mjs"
+    "check": "node --check server.mjs && node --check rooms.mjs && node --check room-state.mjs && node --check room-store.mjs && node --check cli.mjs"
   },
   "dependencies": { "ws": "8.22.0" }
 }

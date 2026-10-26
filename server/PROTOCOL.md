@@ -55,7 +55,7 @@
 
 客戶端收到 joined 後先保存新 resumeToken／generation，立即 confirm。當前 socket／epoch／generation／seq 通過驗證的第一個操作，或使用現行能力值開始 resume，均撤銷首次准入證明。確認後舊原始請求不能恢復；confirm 的 ack 遺失時改用已收到的 resumeToken 走重連流程。舊世代不能確認或撤銷新世代的證明。
 
-伺服器只存 nonce digest 與完整請求 digest。全服務最多 `maxRooms * (maxPendingPerRoom + 2)` 筆首次准入紀錄，預設 192 筆；含短期的已撤銷 nonce 紀錄，不保留歷史或重傳佇列。等待紀錄到期後釋放；第一次准入只更新一次為准入窗口截止時間，重試不更新。超過上限在任何新房／申請配置前回 `recovery_full`，客戶端應等候後重試明確未受理的新意圖，不可迴圈洪泛。取消／拒絕／關房會立即撤銷證明，僅保留至原截止時間的 nonce digest 防止窗口內重用。所有紀錄都在程序記憶體，重啟後無法恢復。
+伺服器只存 nonce digest 與完整請求 digest。全服務最多 `maxRooms * (maxPendingPerRoom + 2)` 筆首次准入紀錄，預設 192 筆；含短期的已撤銷 nonce 紀錄，不保留歷史或重傳佇列。等待紀錄到期後釋放；第一次准入只更新一次為准入窗口截止時間，重試不更新。超過上限在任何新房／申請配置前回 `recovery_full`，客戶端應等候後重試明確未受理的新意圖，不可迴圈洪泛。取消／拒絕／關房會立即撤銷證明，僅保留至原截止時間的 nonce digest 防止窗口內重用。未設定 OCEAN_STATE_FILE 時紀錄只在程序記憶體；設定 SQLite 時依下方固定期限恢復。
 
 ### 可恢復的重連旋轉
 
@@ -69,7 +69,7 @@
 
 每名成員只存現行能力值 digest 與最多一個有界恢復證明，沒有明文能力值、重試歷史或傳出重送佇列。舊能力值加上不同 nonce 一律無效；現行交接一經確認，連完全相同的舊請求都無效。下一次使用現行能力值的正常 resume 取代前次證明。任何舊 socket 的操作、延遲關閉及舊世代封包都不能影響新世代。既有握手、連線、限流、心跳與斷線席位期限仍適用；原生客戶端不能藉重試延長此證明的固定截止時間。
 
-已有 room/member/capability 的重連回覆遺失使用本節 resume 流程；尚未收到第一次 joined 使用前節 admission 恢復流程。兩種流程均只在單一程序的固定期限內有效；Stage B 持久身分／邀請尚未實作，服務重啟仍會失去房間。
+已有 room/member/capability 的重連回覆遺失使用本節 resume 流程；尚未收到第一次 joined 使用前節 admission 恢復流程。兩種流程均只在固定期限內有效。0.18.22 的可選 SQLite 保存可跨單主機程序重啟延續相同權威；Stage B 持久身分／邀請尚未實作。
 
 ## 已准入操作
 
@@ -126,3 +126,11 @@
 主持者斷線 30 秒內可 resume；其他成員保留房間並得到斷線提示，新申請停止。主持者過期為 `host_disconnected`，正常離開為 `host_left`。客人過期為 `resume_expired`，正常離開為 `left`。等待申請拒絕原因包括 `host_rejected`, `visits_closed`, `room_full`, `request_expired` 及關房原因。
 
 HTTP `/health` 只回 `{status:'ok'}`、`Cache-Control:no-store`，沒有房號、成員、token 或存檔。其餘 method/path（含 query）為 404；WebSocket path/origin/subprotocol 不符為 403，連線額度滿為 503。
+
+## 可選程序重啟恢復（0.18.22）
+
+封包形狀與 protocol 1 不變。設定 OCEAN_STATE_FILE 後，准入／交接／撤銷／可靠控制先提交磁碟，再送任何成功事件。不能在沒有 ACK 時猜測結果；初次意圖使用原 admission，交接使用原 resume，依既有恢復程序查明權威狀態。
+
+重啟不建立新房、不改 roomEpoch/memberId、不延長 admission/pending/resumeRetry；全部成員先離線、pose=null。原本連線中的席位依最後已保存的租約截止時間可恢復，租約於存活時每 5 秒更新一次至 30 秒；已斷線者沿用斷線偵測時的固定截止。普通位置不逐包保存，恢復後由新世代新姿態接續。舊 proof 撤銷、訪問設定、離房、拒絕及預設訊息額度跨重啟保留。
+
+提交失敗或不確定時不送當次成功事件，整個權威停止處理，連線關閉碼 1011、固定 reason=storage_unavailable，health 回 503／status=unavailable，新 WebSocket 升級回 503。不得以 invalid_message 偽裝儲存問題，亦不得繼續使用未提交的記憶體。未設定保存仍沿用原記憶體模式；公網服務並未因此開通。

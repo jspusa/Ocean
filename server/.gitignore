@@ -5,3 +5,5 @@ node_modules/
 .state/
 state/
 *.local.json
+*.sqlite
+*.sqlite-*
