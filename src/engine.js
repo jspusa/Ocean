@@ -208,8 +208,17 @@ void main(){vec3 p=aPosition,n=aNormal;vLocal=p;vUV=aUV;vTag=aTag;
    else if(p.y>.40){float w=smoothstep(.40,.65,p.y);p.z+=sin(beat*.48+p.x*9.)*.008*w;}
    else if(p.x>.449)p.y+=sin(beat*1.1+p.z*21.)*.006;
   }else if(uRigClass==3){
-   float w=1.-smoothstep(-.5,.10,p.x),wave=beat+p.x*5.;p.z+=sin(wave)*.033*w*w;n.x-=cos(wave)*.165*w*w*n.z;
-   if(fin&&p.x>.05){float span=smoothstep(.10,.25,abs(p.z));p.y+=sin(beat*.72+sign(p.z)*1.8)*.016*span;}
+   float w=1.-smoothstep(-.5,.10,p.x),wave=beat+p.x*5.;
+   float u=clamp((p.x+.5)/.60,0.,1.),dw=p.x>-.5&&p.x<.10?-6.*u*(1.-u)/.60:0.;
+   p.z+=sin(wave)*.033*w*w;
+   // The tail's growing wave and the pectoral flap are successive shears.
+   // Transform normals with both derivatives in the same order as positions.
+   n.x-=(cos(wave)*.165*w*w+sin(wave)*.066*w*dw)*n.z;
+   if(fin&&p.x>.05){
+    float z=abs(p.z),span=smoothstep(.10,.25,z),v=clamp((z-.10)/.15,0.,1.);
+    float dSpan=z>.10&&z<.25?6.*v*(1.-v)*sign(p.z)/.15:0.;
+    float flap=sin(beat*.72+sign(p.z)*1.8)*.016;p.y+=flap*span;n.z-=flap*dSpan*n.y;
+   }
   }else if(uRigClass==4&&fin){
    // Ribbonfish swim with their long dorsal fin. UV carries its attachment
    // height and slope; displacement vanishes at the body, including the crest.

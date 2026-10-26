@@ -7,7 +7,8 @@ const {chromium}=require(process.env.PLAYWRIGHT_PATH||'playwright');
 const option=(name,fallback)=>process.argv.find(v=>v.startsWith('--'+name+'='))?.slice(name.length+3)||fallback;
 const url=option('url',process.argv.find(v=>/^https?:/.test(v))||'http://127.0.0.1:8765/');
 const profile=option('profile','desktop'),touch=profile==='touch';
-const shadowAudit=process.argv.includes('--shadow-audit');
+const shadowAudit=process.argv.includes('--shadow-audit'),lightAudit=process.argv.includes('--light-audit');
+assert(!(shadowAudit&&lightAudit),'Separate normal investigation and light diagnostics');
 assert(['desktop','touch'].includes(profile));
 assert(!new URL(url).searchParams.has('still'),'A frozen scene cannot prove field investigation');
 const output=path.resolve(__dirname,'../..',option('out','qa/parity/hadal-investigation-'+profile+'.json'));
@@ -234,6 +235,47 @@ const check=(name,pass,detail)=>{results.push({name,pass:!!pass,detail});console
   while(Date.now()-transitStart<240000){await page.waitForTimeout(1000);const s=await state();traces.push({at:Date.now(),p:s.p,target:s.deepsea.travelTarget,records:s.hadal.records.length,scale:s.scale,gl:s.gl});if(!s.deepsea.travelTarget&&s.p[1]<-6990){arrived=true;break;}if(traces.length%15===0)console.log(JSON.stringify({transit:s.deepsea,seconds:(Date.now()-transitStart)/1000}));}
   assert(arrived,'The visible existing current must reach the actual 7 km habitat');
   const arrival=await state();check('continuous normal current reaches 7 km without granting records',arrival.p[1]<-6990&&arrival.hadal.records.length===0&&arrival.adaptive,arrival);await shot('hadal-arrival');
+  if(lightAudit){
+   // An exposure diagnostic reached by the same real current and swimming.
+   // Native controls change optics; observations never assign game state.
+   const fish=await page.evaluate(()=>{const f=life.find(f=>f.uid==='mariana_snailfish-001');return {home:f.home.slice(),uid:f.uid};});
+   await travel([779,-7000,-134]);await travel([fish.home[0],fish.home[1]+.65,fish.home[2]+1.6],.4);
+   const subject=()=>page.evaluate(()=>animalFocusPoint(life.find(f=>f.uid==='mariana_snailfish-001')));
+   async function selectSubject(){
+    await aimAt(await subject());await page.waitForTimeout(500);
+    const d=await page.evaluate(()=>{const f=life.find(f=>f.uid==='mariana_snailfish-001'),d=oceanSelection.disc(f);return {x:d.x,y:d.y,valid:oceanSelection.valid(f),front:document.elementFromPoint(d.x,d.y)?.id};});
+    assert(d.valid&&d.front==='ocean','Visible natural subject required: '+JSON.stringify(d));
+    if(touch){await touchDown(7,d.x,d.y);await touchUp(7);}else await page.mouse.click(d.x,d.y);
+    assert.equal((await state()).selected.uid,fish.uid);
+   }
+   async function optics(ev){
+    await press('#fieldToolsBtn');await press('#panelBody .menu-advanced > summary');await press('#panelBody [data-feature="camera"]');
+    // Standard native keyboard range control; no DOM value or state assignment.
+    for(const [key,steps]of [['zoom',0],['aperture',71],['exposure',Math.round((ev+1.5)/.1)]]){
+     const range=page.locator('#camera-'+key);await range.focus();await page.keyboard.press('Home');
+     for(let i=0;i<steps;i++)await page.keyboard.press('ArrowRight');
+    }
+    await press('#cameraAutofocus');await press('#cameraEnter');
+   }
+   const photos=[];
+   for(const ev of [0,-.5,-1]){
+    await selectSubject();await optics(ev);await aimAt(await subject());await page.waitForTimeout(400);
+    const before=await page.evaluate(()=>{const f=life.find(f=>f.uid==='mariana_snailfish-001'),g=renderer.gl;
+     return {time:t,eye:eye.slice(),target:target.slice(),animal:{p:f.p.slice(),s:f.s.slice(),yaw:f.yaw,pitch:f.pitch||0,uid:f.uid},distance:V.dist(eye,animalFocusPoint(f)),optics:{fov:renderer.photoFov,aperture:renderer.photoAperture,focus:renderer.photoFocus,exposure:renderer.exposure,camera:JSON.parse(JSON.stringify(voyage.state.features.expedition.camera))},adaptive:settings.adaptive,quality:renderer.quality,scale:renderer.dynamicScale,resolution:[g.drawingBufferWidth,g.drawingBufferHeight],floatColor:renderer.floatColor,lamp:renderer.lamp,sunless:renderer.sunless,selected:oceanSelection.snapshot().uid,film:JSON.parse(JSON.stringify(voyage.state.features.photography.film)),batches:renderer.batches.filter(b=>b.species===f.species).map(b=>({count:b.count,drawCount:b.drawCount,kind:b.kind,visible:b.visible}))};});
+    assert.equal(before.optics.camera.exposure,ev);assert(before.adaptive&&before.lamp&&before.sunless);await press('#photoBtn');
+    await page.waitForFunction(n=>!voyage.photoBusy&&!oceanPhotography.snapshot().busy&&voyage.state.features.photography.film.length===n+1,before.film.length);
+    const photo=await page.evaluate(dates=>voyage.state.features.photography.film.find(p=>!dates.includes(p.date)),before.film.map(p=>p.date));
+    assert.equal(photo.individual,fish.uid);assert.equal(photo.camera.exposure,ev);
+    await press('#fieldToolsBtn');await press('#panelBody .menu-advanced > summary');await press('#panelBody [data-feature="photography"]');await press('[data-photo-view="'+photo.date+'"]');
+    await page.waitForFunction(()=>photoOpen&&$('photoImage').complete&&$('photoImage').naturalWidth>0);
+    const im=await page.evaluate(()=>({src:$('photoImage').src,width:$('photoImage').naturalWidth,height:$('photoImage').naturalHeight}));
+    assert(im.src.startsWith('data:image/jpeg;base64,'));const bytes=Buffer.from(im.src.split(',')[1],'base64'),file=output.replace(/\.json$/,'-exposure-'+ev+'.jpg');fs.writeFileSync(file,bytes);
+    photos.push({ev,before,photo,file,width:im.width,height:im.height,bytes:bytes.length,sha256:crypto.createHash('sha256').update(bytes).digest('hex')});
+    check('normal camera exposure '+ev,bytes.length===photo.bytes,photos.at(-1));await press('#closePhoto');await press('#closePanel');
+   }
+   observations.push({lightAudit:{method:'Normal current, native swimming/selection/camera controls and saved original JPEG. Unfrozen animal moves between photographs. Not a matched-pixel benchmark.',photos}});
+   assert.deepEqual(errors,[]);check('no native page errors',errors.length===0,errors);return;
+  }
   const surveyed=await page.evaluate(()=>({points:OceanTrench.studyPoints,route:Array.from({length:11},(_,i)=>{const z=-135-i;return [780,OceanTrench.floorAt(780,z,-6990)+2,z];})}));
   const P=surveyed.points,aimPoint=id=>P[id].p.map((n,k)=>n+(k===1?(id==='hadal-reference'?.55:.35):0)),stance=id=>P[id].p.map((n,k)=>n+(k===1?1.6:0));
   await travel([779,-7000,-134]);await travel(stance('hadal-reference'),.35);
