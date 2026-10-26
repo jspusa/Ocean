@@ -30,10 +30,12 @@ function readVoyage(raw){
  s.features=oceanFeatures.read(raw.features);
  return s;
 }
-const voyage={state:initialVoyage(),storageOK:true,loaded:false,lastSave:0,lastTick:0,sessionDistance:0,sessionSeen:0,sessionStart:0,sessionFirst:true,hasFinished:false,previousPosition:null,awaitingResume:false,gamepadButtons:[],gamepadAttached:false,photoMode:false,radioTimer:null,lastWhale:0,goalFlash:0};
+const voyage={state:initialVoyage(),storageOK:true,storageLoaded:false,storageError:null,loaded:false,lastSave:0,lastTick:0,sessionDistance:0,sessionSeen:0,sessionStart:0,sessionFirst:true,hasFinished:false,previousPosition:null,awaitingResume:false,gamepadButtons:[],gamepadAttached:false,photoMode:false,radioTimer:null,lastWhale:0,goalFlash:0};
 function saveVoyage(){
  if(active)voyage.state.resume={p:player.p.slice(),yaw:player.yaw,pitch:player.pitch,seconds:diveSeconds};
  try{
+  if(typeof oceanSaveHealth!=='undefined'&&!oceanSaveHealth.readable())throw new Error('航程或日誌尚未安全讀取，請先還原備份');
+  if(!voyage.storageLoaded)throw new Error(voyage.storageError||'航程尚未安全讀取，請先還原備份');
   oceanSaveGuard.check();const value=JSON.stringify(voyage.state);let old=localStorage.getItem(VOYAGE_KEY);
   // A recovered good backup must survive even if replacing a corrupt primary fails.
   if(old){try{readVoyage(JSON.parse(old));}catch(_){old=null;}}
@@ -42,9 +44,13 @@ function saveVoyage(){
   oceanSaveGuard.write(VOYAGE_KEY,value);voyage.storageOK=true;return true;
  }
  catch(e){voyage.storageOK=false;$('saveStatus')&&($('saveStatus').textContent='本機儲存受限 · 請匯出存檔');return false;}
+ finally{if(typeof oceanSaveHealth!=='undefined')oceanSaveHealth.refresh();}
 }
 function loadVoyage(){
- for(const key of [VOYAGE_KEY,VOYAGE_KEY+'.backup']){try{const raw=localStorage.getItem(key);if(raw){voyage.state=readVoyage(JSON.parse(raw));voyage.loaded=true;break;}}catch(e){console.warn('Voyage save unavailable',key,e.message);}}
+ let failure=null;
+ for(const key of [VOYAGE_KEY,VOYAGE_KEY+'.backup']){try{const raw=localStorage.getItem(key);if(raw===null)continue;voyage.state=readVoyage(JSON.parse(raw));voyage.loaded=true;voyage.storageLoaded=true;voyage.storageOK=true;voyage.storageError=null;return true;}catch(error){failure=error;}}
+ voyage.storageLoaded=!failure;voyage.storageOK=!failure;voyage.storageError=failure?.message||null;
+ return voyage.storageLoaded;
 }
 function radio(text,who='澄 · 研究船'){clearTimeout(voyage.radioTimer);$('radioWho').textContent=who;$('radioText').textContent=text;$('radioBox').classList.add('visible');voyage.radioTimer=setTimeout(()=>$('radioBox').classList.remove('visible'),7500);}
 function currentOrder(){return ORDERS.find(o=>!voyage.state.completed.includes(o.id))||null;}
@@ -125,6 +131,7 @@ takePhoto=async function(){
 };
 const legacyStart=startDive;
 startDive=function(tour=false){
+ if(typeof oceanSaveHealth!=='undefined'&&!oceanSaveHealth.readable()){oceanSaveHealth.refresh();return;}
  if(!ready)return;voyage.state.mode='free';const resume=voyage.awaitingResume?voyage.state.resume:null;voyage.awaitingResume=false;
  legacyStart(tour);if(!active)return;
  if(resume){player.p=collide(resume.p.slice());player.yaw=resume.yaw;player.pitch=resume.pitch;diveSeconds=resume.seconds;resetInput();}
@@ -202,10 +209,11 @@ drawMap=function(){
 function renderVoyagePanel(){
  panelTitle('THE FIRST EXPEDITION','第一航程 · 歸潮');const s=voyage.state;
  $('panelBody').innerHTML=`<p class="panel-note">你是這趟研究航程的攝影記錄者。沒有評分倒數，也不必依順序完成；一個地標、一位訪客，慢慢留下六段記憶。</p><div class="order-list">${ORDERS.map((o,i)=>`<article class="order ${s.completed.includes(o.id)?'done':''}"><header><small>${String(i+1).padStart(2,'0')} / ${o.en}</small><b>${s.completed.includes(o.id)?'✓ 已記錄':'待完成'}</b></header><h3>${o.title}</h3><p>${o.description}</p><button data-dest="${o.place}" class="muted-btn">標記航向 ↗</button></article>`).join('')}</div><section class="order"><h3>把海帶回去</h3><p>六段記憶完成後返回研究船，完成第一航程。已發現的海域仍能自由重遊。</p><button class="muted-btn" id="voyageHome">返回研究船</button></section><div class="save-actions"><button class="muted-btn" id="exportSave">匯出完整存檔</button><label class="muted-btn">匯入存檔<input id="importSave" type="file" accept="application/json,.json" hidden></label></div><p class="panel-note">存檔包含航程、設定、圖鑑、全部底片及相簿原圖；只在本機處理。不會上傳資料。新存檔匯入後會替換此瀏覽器的進度。</p>`;
- $('panelBody').querySelectorAll('[data-dest]').forEach(b=>b.onclick=()=>markPlace(b.dataset.dest));$('voyageHome').onclick=goHome;$('exportSave').onclick=exportSave;$('importSave').onchange=e=>importSaveFile(e.target.files[0]);
+ $('panelBody').querySelectorAll('[data-dest]').forEach(b=>b.onclick=()=>markPlace(b.dataset.dest));$('voyageHome').onclick=goHome;$('exportSave').onclick=exportSave;$('importSave').onchange=e=>importSaveFile(e.target.files[0]);if(typeof oceanSaveHealth!=='undefined')oceanSaveHealth.mountPanel();
 }
 function downloadSaveArchive(data){const url=URL.createObjectURL(new Blob([JSON.stringify(data)],{type:'application/json'}));download(url,'Return-to-the-Blue-save.json');setTimeout(()=>URL.revokeObjectURL(url),10000);}
 async function exportSave(){
+ if(!voyage.storageLoaded||!journalStorage.loaded){toast('舊資料尚未安全讀取，無法匯出完整存檔；請先下載原始航程資料。');return false;}
  if(voyage.importing||voyage.exporting){toast('存檔正在處理中，請完成後再匯出備份。');return false;}
  voyage.exporting=true;
  try{const photography=await oceanPhotography.exportArchive();const snapshot=JSON.parse(JSON.stringify(voyage.state));if(active)snapshot.resume={p:player.p.slice(),yaw:player.yaw,pitch:player.pitch,seconds:diveSeconds};downloadSaveArchive({format:'return-blue/save',version:1,exported:new Date().toISOString(),voyage:snapshot,journal:oceanPhotography.journalSnapshot(persistent),photography});return true;}
@@ -246,7 +254,7 @@ async function importSaveFile(file){
   prepared=await oceanPhotography.prepareImport(data.photography,checked.photos,checked.state.features.photography,Object.values(checked.state.features.expedition.mail).filter(m=>m.status==='complete'&&m.photoDate>0).map(m=>m.photoDate));
   if(data.photography){const developed=new Set(prepared.state.album.map(p=>p.date));for(const mail of Object.values(checked.state.features.expedition.mail))if(mail.status==='complete'&&mail.photoDate>0&&!developed.has(mail.photoDate))throw new Error('存檔缺少已投稿的相簿附件');}
   oceanSaveGuard.check();
-  backup={state:JSON.parse(JSON.stringify(voyage.state)),journal:{...persistent,seen:persistent.seen.slice(),photos:persistent.photos.slice(),log:persistent.log.slice(),settings:{...settings}}};
+  backup={health:{loaded:voyage.loaded,storageLoaded:voyage.storageLoaded,storageError:voyage.storageError,storageOK:voyage.storageOK,journal:{...journalStorage},journalOK:storageOK},state:JSON.parse(JSON.stringify(voyage.state)),journal:{...persistent,seen:persistent.seen.slice(),photos:persistent.photos.slice(),log:persistent.log.slice(),settings:{...settings}}};
   const before=oceanSaveGuard.snapshot(),after=new Map(before);
   checked.state.features.photography=prepared.state;
   const journal={seen:checked.seen,photos:prepared.state.album.map(p=>({...p})),log:checked.log,settings:checked.settings};
@@ -257,7 +265,7 @@ async function importSaveFile(file){
   await prepared.commit({before,after:[...after]});applied=true;
   for(const [key,value]of after)oceanSaveGuard.write(key,value);
   await prepared.finish();committed=true;
-  voyage.state=checked.state;applyJournal(journal);persistent.photos=prepared.photos;voyage.storageOK=true;voyage.loaded=true;
+  voyage.state=checked.state;applyJournal(journal);persistent.photos=prepared.photos;voyage.storageOK=true;voyage.loaded=true;voyage.storageLoaded=true;voyage.storageError=null;
   oceanFeatures.reset();renderer.quality=settings.quality;renderer.resize();applyVisualSettings();oceanAudio.tick();
   renderShip();setCount();toast('存檔已匯入。');
  }catch(error){
@@ -269,12 +277,13 @@ async function importSaveFile(file){
    try{await prepared.rollback();}catch(rollbackError){restored=false;console.error('Photo restoration failed',rollbackError);}
    // The rescue export must describe one coherent pre-import snapshot even if
    // durable rollback failed. Photography retains its matching original cache.
+   Object.assign(voyage,{loaded:backup.health.loaded,storageLoaded:backup.health.storageLoaded,storageError:backup.health.storageError,storageOK:backup.health.storageOK});Object.assign(journalStorage,backup.health.journal);storageOK=backup.health.journalOK;
    voyage.state=backup.state;persistent.seen=backup.journal.seen;persistent.photos=backup.journal.photos;persistent.log=backup.journal.log;Object.assign(settings,backup.journal.settings);
    try{oceanFeatures.reset();renderer.quality=settings.quality;renderer.resize();applyVisualSettings();renderShip();setCount();}catch(rollbackError){restored=false;console.error('Save restoration failed',rollbackError);}
    if(!restored)oceanSaveGuard.recoveryFailed();
   }
   toast(restored?'未套用新存檔：'+error.message:'還原存檔時儲存失敗，請保留此視窗並下載備份。');
- }finally{$('saveImportProgress').close();voyage.importing=false;finishImport();voyage.importDone=null;}
+ }finally{$('saveImportProgress').close();voyage.importing=false;finishImport();voyage.importDone=null;if(typeof oceanSaveHealth!=='undefined')oceanSaveHealth.refresh();}
 }
 function renderPause(){panelTitle('PAUSE / CONTINUE','在海裡，休息一下');$('panelBody').innerHTML=`<div class="pause-actions"><button class="primary" id="resumeBtn">繼續潛水 ↗</button><button class="muted-btn" id="pauseChart">海域地圖</button><button class="muted-btn" id="pauseVoyage">航程與存檔</button><button class="muted-btn" id="pauseSettings">畫面與聲音</button><button class="muted-btn" id="pauseBoat">儲存並回首頁</button></div><p class="panel-note">此時已暫停游動、動物與航程計時；音樂可以繼續播放。</p>`;$('resumeBtn').onclick=closePanel;$('pauseChart').onclick=()=>openPanel('map');$('pauseVoyage').onclick=()=>openPanel('voyage');$('pauseSettings').onclick=()=>openPanel('settings');$('pauseBoat').onclick=goHome;}
 const legacyPanel=openPanel;

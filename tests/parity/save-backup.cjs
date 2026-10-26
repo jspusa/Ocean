@@ -7,7 +7,7 @@ const sessionSource=fs.readFileSync('src/save_session.js','utf8'),guardSource=fs
 const KEY='return-blue.voyage.1',BACKUP=KEY+'.backup';
 const snapshot=JSON.stringify({schema:1,completed:['arrival','naturalist'],visited:['garden'],distance:1800,dives:4,totalSeconds:900,features:{}});
 const plain=value=>JSON.parse(JSON.stringify(value));
-async function session(storage,failWrite=()=>false){
+async function session(storage,failWrite=()=>false,failRead=()=>false){
  const nodes=new Map(),writes=[];
  const element=id=>{if(!nodes.has(id))nodes.set(id,{textContent:'',addEventListener(){},classList:{add(){}},focus(){},showModal(){this.open=true;}});return nodes.get(id);};
  const status=element('saveStatus');
@@ -19,7 +19,7 @@ async function session(storage,failWrite=()=>false){
   oceanFeatures:{read:raw=>raw||{}},clamp:(n,a,b)=>Math.max(a,Math.min(b,n)),TAU:Math.PI*2,
   active:false,player:{p:[0,-7,0],yaw:0,pitch:0},diveSeconds:0,$:element,
   navigator:{locks},window:{addEventListener(){}},document:{addEventListener(){}},STORE_KEY:'return-blue.shilang.v1',
-  localStorage:{getItem:key=>storage.get(key)??null,setItem(key,value){writes.push(key);if(failWrite(key))throw Object.assign(new Error('Storage is full'),{name:'QuotaExceededError'});storage.set(key,String(value));}}
+  localStorage:{getItem(key){if(failRead(key))throw new Error("Storage read unavailable");return storage.get(key)??null;},setItem(key,value){writes.push(key);if(failWrite(key))throw Object.assign(new Error('Storage is full'),{name:'QuotaExceededError'});storage.set(key,String(value));}}
  });
  vm.runInContext(sessionSource,context);vm.runInContext(saveSource,context);vm.runInContext(guardSource,context);
  // This suite covers voyage save/load, not bootstrap's IndexedDB preflight.
@@ -86,6 +86,28 @@ await check('an unreadable save schema cannot replace the last compatible backup
  const reopened=await session(storage);reopened.run('loadVoyage()');
  assert.equal(reopened.run('voyage.loaded'),true);
  assert.deepEqual(plain(reopened.run('voyage.state.completed')),['arrival','naturalist']);
+});
+await check('unreadable primary and backup cannot be overwritten by an automatic save',async()=>{
+ const storage=new Map([[KEY,'{broken primary'],[BACKUP,'{broken backup']]),before=[...storage];
+ const current=await session(storage);current.run('loadVoyage()');
+ assert.equal(current.run('saveVoyage()'),false,'Unreadable prior progress must not become a new empty voyage');
+ assert.deepEqual([...storage],before,'Preserve the exact original bytes');
+ assert.equal(current.writes.length,0);
+});
+await check('incompatible, empty and temporarily inaccessible records are not new voyages',async()=>{
+ for(const raw of ['','null','[]',JSON.stringify({schema:2,distance:8800})]){
+  const storage=new Map([[KEY,raw],[BACKUP,raw]]),f=await session(storage);f.run('loadVoyage()');
+  assert.equal(f.run('saveVoyage()'),false);assert.equal(f.writes.length,0);assert.equal(storage.get(KEY),raw);
+ }
+ const storage=new Map([[KEY,snapshot]]);let blocked=true;
+ const f=await session(storage,()=>false,()=>blocked);f.run('loadVoyage()');blocked=false;
+ assert.equal(f.run('saveVoyage()'),false,'A later available Storage must not permit an unread initial snapshot to overwrite it');
+ assert.equal(storage.get(KEY),snapshot);assert.equal(f.writes.length,0);
+ f.run('loadVoyage()');assert.equal(f.run('saveVoyage()'),true);assert.equal(f.run('voyage.state.distance'),1800);
+});
+await check('a genuinely new browser can save and reopen its first voyage',async()=>{
+ const storage=new Map(),f=await session(storage);f.run('loadVoyage();voyage.state.distance=37');
+ assert.equal(f.run('saveVoyage()'),true);const reopened=await session(storage);reopened.run('loadVoyage()');assert.equal(reopened.run('voyage.state.distance'),37);
 });
 console.log(checks+' save backup checks passed');
 })().catch(error=>{console.error(error);process.exitCode=1;});

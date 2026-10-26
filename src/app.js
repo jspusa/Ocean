@@ -59,14 +59,16 @@ const timeText=n=>Math.floor(n/60).toString().padStart(2,'0')+':'+Math.floor(n%6
 function toast(s){clearTimeout(toastTimer);$('toast').textContent=s;$('toast').classList.add('show');toastTimer=setTimeout(()=>$('toast').classList.remove('show'),3500);}
 function persist(){
  try{
+  if(typeof oceanSaveHealth!=='undefined'&&!oceanSaveHealth.readable())throw new Error('航程或日誌尚未安全讀取，請先還原備份');
   if(!journalStorage.loaded)throw new Error(journalStorage.error||'日誌尚未安全讀取，請先還原備份');
   oceanSaveGuard.check();const value=JSON.stringify(oceanPhotography.journalSnapshot(persistent));let old=localStorage.getItem(STORE_KEY);
   if(old!==null){try{readJournal(JSON.parse(old));}catch(_){old=null;}}
   // Only a readable primary may replace the fallback. A full optional backup
   // must not prevent Storage.setItem from preserving the latest primary.
   if(old!==null){try{oceanSaveGuard.write(STORE_KEY+'.backup',old);}catch(_){}}
-  oceanSaveGuard.write(STORE_KEY,value);storageOK=true;journalStorage.error=null;return true;
+  oceanSaveGuard.write(STORE_KEY,value);storageOK=true;journalStorage.error=null;saveWarned=false;return true;
  }catch(error){storageOK=false;journalStorage.error=error.message;if(!saveWarned&&active){saveWarned=true;toast('此視窗無法保存更多資料；請下載照片或匯出日誌。');}return false;}
+ finally{if(typeof oceanSaveHealth!=='undefined')oceanSaveHealth.refresh();}
 }
 function log(text){persistent.log.push({text,date:Date.now()});persistent.log=persistent.log.slice(-60);persist();}
 function setCount(){$('seenCount').textContent=persistent.seen.length+'/'+SPECIES.length;}
@@ -530,7 +532,7 @@ async function boot(){try{loadJournal();applyRecoveryGraphics();window.__freeze=
    catch(error){oceanAudio.releasePrepared().catch(()=>{});console.warn('Audio preparation unavailable; retry on sound gesture',error);}
   }
  }
- if(!oceanSaveGuard.live)return;ready=true;renderer.render(eye,target,0);$('startBtn').disabled=false;$('tourStart').disabled=false;$('loading').classList.add('gone');setTimeout(()=>$('loading').classList.add('hidden'),700);lastTime=performance.now();requestAnimationFrame(animate);
+ if(!oceanSaveGuard.live)return;ready=true;oceanSaveHealth.init();renderer.render(eye,target,0);$('startBtn').disabled=false;$('tourStart').disabled=false;$('loading').classList.add('gone');setTimeout(()=>$('loading').classList.add('hidden'),700);lastTime=performance.now();requestAnimationFrame(animate);
  // Read-only diagnostics for browser testing; no network or analytics.
  window.__ocean={get ready(){return ready},get active(){return active},get speciesCount(){return SPECIES.length},get creatureCount(){return life.length+decorLife.length+shoal.length},get position(){return player.p.slice()},get auto(){return auto},get seen(){return persistent.seen.slice()},get photos(){return persistent.photos.length},get modal(){return modal},get view(){return settings.third?'third':'first'},get audio(){return oceanAudio.status},get input(){return {move:stick.slice(),look:lookStick.slice(),vertical:verticalInput}},get lighting(){return settings.lighting}};
  }catch(e){handleFailure(e);}}

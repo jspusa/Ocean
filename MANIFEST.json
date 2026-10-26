@@ -1,5 +1,5 @@
 {
-  "version": "0.18.25",
+  "version": "0.18.26",
   "scope": "served game and build sources",
   "files": [
     {
@@ -19,13 +19,13 @@
     },
     {
       "path": "README.md",
-      "bytes": 36649,
-      "sha256": "d09b9d3098261b6373dd054515d3b1464d0b792e2b85692c524ed2df6fa1077a"
+      "bytes": 37231,
+      "sha256": "38cf5721859e9ff732c69ccdaa36d6bc2d6bdbf672c15ff97d8e2cfb7dd2946a"
     },
     {
       "path": "VERSION",
       "bytes": 8,
-      "sha256": "19f692818530fb6e8eb1d340a938808d76a9308569b57b5e0f93190c6f2f7dfd"
+      "sha256": "e5eace6cc892d3acc3c08c63849529cc53739c18d04cf0bb64ad7e2e1c602da3"
     },
     {
       "path": "assets/caustics.jpg",
@@ -1184,8 +1184,8 @@
     },
     {
       "path": "index.html",
-      "bytes": 15378,
-      "sha256": "96fe9b1c7282871e144d94030d54186b2073d0c9d1e9040c553b87c4810514cc"
+      "bytes": 16399,
+      "sha256": "e1792569ceec7548e1651aa8772943f6658e7b7aa368cc41fd59eaf3fb2c04e8"
     },
     {
       "path": "music/blue_silence.mp3",
@@ -1229,8 +1229,8 @@
     },
     {
       "path": "src/app.js",
-      "bytes": 85032,
-      "sha256": "756931887e6b52f8f692005056d3e5743723489f26f532c896d7303c24486894"
+      "bytes": 85295,
+      "sha256": "605044c141fb652455e051a58648e24b778b09ecdc5346c4562012b38fd6c742"
     },
     {
       "path": "src/aquarium.js",
@@ -1270,7 +1270,7 @@
     {
       "path": "src/config.js",
       "bytes": 2915,
-      "sha256": "f69fb380d9ad89f12d4f9917d360653aaa974bcd79b9c6e5ed5f4de36a18214f"
+      "sha256": "69a40b6bc56f62ba1b4cbc48496c57cb856bf5e2fd9bb41f710b3c8925e2a822"
     },
     {
       "path": "src/deepsea.js",
@@ -1389,8 +1389,8 @@
     },
     {
       "path": "src/photography.js",
-      "bytes": 35590,
-      "sha256": "ea09357279a1a8b17aa6808aca4bac3a0b0355c6f419be0923d091d25095e2c4"
+      "bytes": 35997,
+      "sha256": "32267693faab46adcc0302752cd5ebafac47aac2b28e6d14f4fee41cba955ca1"
     },
     {
       "path": "src/reef_detail.js",
@@ -1419,8 +1419,8 @@
     },
     {
       "path": "src/save_session_ui.js",
-      "bytes": 6637,
-      "sha256": "a76c91cc92051cf4c9d58917eb8c05f5c7030dd2af079451fbcf343d3cf0fe2b"
+      "bytes": 10305,
+      "sha256": "605dac9dfafa59fc51952ebbe86ffc3f3e47242317417e815ea18a636d34bedf"
     },
     {
       "path": "src/scene_cache.js",
@@ -1444,8 +1444,8 @@
     },
     {
       "path": "src/shell.html",
-      "bytes": 11370,
-      "sha256": "f9df944f6c6d0c48c845de69d4fb7fdf5685dac6af6e8b03af077374f0e91dc4"
+      "bytes": 12391,
+      "sha256": "f3999e7e79186c5bed4bac7263f89fb123f7399a3720c5bde3cf3d9ca2776a39"
     },
     {
       "path": "src/ship.js",
@@ -1459,8 +1459,8 @@
     },
     {
       "path": "src/style.css",
-      "bytes": 57987,
-      "sha256": "ab1ede217dba0eab7b11e471f36ee9b838ab78aa6dd19550019e35c404925e42"
+      "bytes": 59658,
+      "sha256": "052d83725b8e72b7d1f7725528572ff38c5af2410fa2cb72d3dc8934d6aa7f44"
     },
     {
       "path": "src/trench.js",
@@ -1479,8 +1479,8 @@
     },
     {
       "path": "src/voyage.js",
-      "bytes": 40975,
-      "sha256": "fbd38a7b46436889c5ddd1d42e57335bd0f615ca9c703edd2bf7ebae8d5cd4b8"
+      "bytes": 42446,
+      "sha256": "daa4bc88fc2b11cdec70a2be11e9d808e6030b75b5d0640e874f8b1cb58c5765"
     },
     {
       "path": "src/world.js",

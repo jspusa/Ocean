@@ -60,6 +60,7 @@ vm.runInContext(read('features'),c);vm.runInContext(read('deepsea').split('const
 const voyageSource=read('voyage');vm.runInContext(voyageSource.slice(0,voyageSource.indexOf('function radio(')),c);
 vm.runInContext(voyageSource.slice(voyageSource.indexOf('function voyageDestination('),voyageSource.indexOf('renderMap=function()')),c);
 check('explicit study markers resolve and survive the real save/load boundary without moving the swimmer',()=>{
+ get('loadVoyage()'); // Match normal startup before the first automatic save.
  const before=plain(c.player),mark=get('markPlace'),readSave=get('readVoyage'),destination=get('voyageDestination');
  for(const [id,site]of Object.entries({...R.points,...T.studyPoints})){
   const key='study:'+id;mark(key);assert.equal(get('voyage.state.waypoint'),key,'new and old markers are accepted');

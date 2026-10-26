@@ -15,7 +15,7 @@ c.oceanSelection={clear:()=>c.selectionClears++};c.toast=text=>c.notices.push(te
 c.stopAuto=()=>{c.auto=false;c.follow=null};c.openPanel=type=>{c.modal=type;c.opened.push(type)};c.closePanel=()=>{c.modal=null};
 c.toggleCruise=()=>{};c.takePhoto=()=>{};c.observeNearest=()=>{};
 vm.runInContext('diverBatch={visible:false,instances:[{p:[0,0,0]}]};',c);
-vm.runInContext(voyageSource.slice(voyageSource.indexOf('const VOYAGE_KEY='),voyageSource.indexOf('function loadVoyage(')),c);
+vm.runInContext(voyageSource.slice(voyageSource.indexOf('const VOYAGE_KEY='),voyageSource.indexOf('function radio(')),c);
 vm.runInContext(app.slice(app.indexOf('function resetInput('),app.indexOf('function handleFailure(')),c);
 vm.runInContext(app.slice(app.indexOf('function collide('),app.indexOf('function startDive(')),c);
 vm.runInContext(app.slice(app.indexOf('function lerpAngle('),app.indexOf('function blocked(')),c);
@@ -44,6 +44,7 @@ function fresh(p=[0,-.8,23]){actions.exit();c.active=true;c.modal=null;c.photoOp
 assert.equal(await get('oceanSaveGuard.start()'),true);
 assert.equal(get('oceanSaveSession.writable && oceanSaveGuard.live'),true);
 assert.equal(recoveryReads,1,'The real save guard must complete startup recovery before controller input');
+get('loadVoyage()'); // Load the actual empty Storage before controller actions save.
 check('deep water rejects surface view without teleporting or cancelling a route',()=>{fresh([0,-8,23]);c.auto=true;c.follow={p:[0,-8,24]};const p=clone(c.player.p);assert.equal(actions.toggleSurface(),false);assert.deepEqual(clone(c.player.p),p);assert(c.auto);assert(c.follow);assert(!actions.isSurface());});
 check('surface view changes the real camera above water without moving the diver or changing preferred view',()=>{fresh();const p=clone(c.player.p);assert(actions.toggleSurface());assert.deepEqual(clone(c.player.p),p);assert(c.eye[1]>0);assert.equal(c.target[1],c.eye[1]);assert.equal(c.settings.third,true);assert.equal(get('diverBatch.visible'),false);});
 check('right-stick look changes surface direction while position remains fixed',()=>{fresh();actions.toggleSurface();const p=clone(c.player.p),yaw=c.player.yaw;c.lookStick=[.5,-.25];c.updatePlayer(.2);c.updateCamera();assert(c.player.yaw>yaw);assert(c.target[1]>c.eye[1]);assert.deepEqual(clone(c.player.p),p);assert(actions.isSurface());});

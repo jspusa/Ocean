@@ -35,25 +35,66 @@ function boundary(initial){
   request.onsuccess?.();
  });return request;}}};
 }
-async function fixture({empty=false,initialize=true,backing=null}={}){
+async function fixture({empty=false,initialize=true,backing=null,productionSaves=false}={}){
  const state={schema:1,revision:4,film:[metadata(101)],album:[]},db=backing||boundary(empty?[]:[{id:'@library',state:plain(state)},{id:'p-101',blob:new Blob([new Uint8Array([255,216,255,217])],{type:'image/jpeg'})}]);
  const locks={request(name,options,callback){return Promise.resolve().then(()=>callback({name,mode:options.mode}));}};
- const calls={save:0,persist:0,progress:0},messages=[],elements=new Map(),element=id=>{if(!elements.has(id))elements.set(id,{innerHTML:'',textContent:'',querySelectorAll:()=>[]});return elements.get(id);};
+ const calls={save:0,persist:0,progress:0},messages=[],elements=new Map(),element=id=>{if(!elements.has(id))elements.set(id,{innerHTML:'',textContent:'',querySelectorAll:()=>[],classList:{add(){},remove(){}}});return elements.get(id);};
  const storage=backing?.storage||new Map([[STORE_KEY,JSON.stringify({seen:['old'],photos:[],log:[{text:'original journal',date:1}],settings:{quality:1}})],[VOYAGE_KEY,JSON.stringify({schema:1,distance:72,features:{photography:state,expedition:{mail:{submission:{status:'complete',photoDate:101}}}}})]]);
- const localStorage={getItem:key=>storage.get(key)??null,setItem(key,value){storage.set(key,String(value));},removeItem(key){storage.delete(key);}};
+ const localStorage={getItem:key=>storage.get(key)??null,setItem(key,value){if(db.hooks.failLocalWrite?.(key))throw Object.assign(new Error('Storage is full'),{name:'QuotaExceededError'});storage.set(key,String(value));},removeItem(key){storage.delete(key);}};
  const context={STORE_KEY,VOYAGE_KEY,localStorage,matchMedia:()=>({matches:false}),confirm:()=>true,crypto:require('node:crypto').webcrypto,console,Blob,Uint8Array,atob,queueMicrotask,setTimeout,clearTimeout,indexedDB:db.indexedDB,navigator:{locks},
   FileReader:class{readAsDataURL(blob){blob.arrayBuffer().then(bytes=>{const complete=()=>{this.result='data:'+blob.type+';base64,'+Buffer.from(bytes).toString('base64');this.onload?.();};if(db.hooks.holdHydration)db.hooks.holdHydration(complete);else complete();},error=>{this.error=error;this.onerror?.();});}},
   voyage:{state:{features:{photography:empty?{schema:1,revision:0,film:[],album:[]}:plain(state)}}},persistent:{photos:[]},active:false,modal:null,
-  document:{getElementById:element},$:element,panelTitle(){},safe:String,dateText:String,renderJournal(){},toast:message=>messages.push(message),saveVoyage(){calls.save++;return true;},persist(){calls.persist++;return true;},recordPhotoProgress(){calls.progress++;}
+  document:{getElementById:element},$:element,panelTitle(){},safe:String,dateText:String,renderJournal(){},toast:message=>messages.push(message),saveVoyage(){calls.save++;return true;},persist(){calls.persist++;return true;},recordPhotoProgress(){calls.progress++;},OceanTrench:{worldBounds:{},stations:[]},life:[]
  };
- vm.createContext(context);vm.runInContext(sessionSource+'\n'+readers+'\n'+source+'\n'+guardSource+'\nthis.api=oceanPhotography;this.session=oceanSaveSession;this.guard=oceanSaveGuard;this.feature=oceanPhotography.feature;',context);
+ const declarations=productionSaves?[engineSource.slice(0,engineSource.indexOf('class Geometry')),worldSource.slice(0,worldSource.indexOf('const obstacles=')),featureSource,appSource.slice(0,appSource.indexOf('function collide(')),voyageSource.slice(0,voyageSource.indexOf('function radio(')),voyageSource.slice(voyageSource.indexOf('function currentOrder('),voyageSource.indexOf('function shipCamera(')),voyageSource.slice(voyageSource.indexOf('function recordPhotoProgress('),voyageSource.indexOf('const legacyPhoto='))].join('\n'):readers;
+ vm.createContext(context);vm.runInContext(sessionSource+'\n'+declarations+'\n'+source+'\n'+guardSource+'\nthis.api=oceanPhotography;this.session=oceanSaveSession;this.guard=oceanSaveGuard;this.feature=oceanPhotography.feature;',context);
  const session=context.session;assert.equal(await session.acquire(),true);assert.equal(session.holdsLock,true);
- const result={...db,storage,session,calls,messages,elements,context,api:context.api,state:()=>plain(context.voyage.state.features.photography)};
+ const run=code=>vm.runInContext(code,context);
+ if(productionSaves)run('loadJournal();loadVoyage();');
+ const result={...db,storage,session,calls,messages,elements,context,run,api:context.api,state:()=>plain(run('voyage.state.features.photography'))};
  if(initialize)await context.feature.init();return result;
 }
 let checks=0,failures=0;
 async function check(name,fn){try{await fn();checks++;console.log('PASS '+name);}catch(error){failures++;console.error('FAIL '+name+'\n'+error.stack);}}
 (async()=>{
+ await check('a committed original keeps its warning visible when either local progress save fails',async()=>{
+  for(const failedKeys of [[VOYAGE_KEY],[STORE_KEY],[VOYAGE_KEY,STORE_KEY]]){
+   const f=await fixture({productionSaves:true});f.hooks.failLocalWrite=key=>failedKeys.includes(key);
+   assert.equal(await f.api.capture(photo(202)),true,'Capture success describes the original-image commit');
+   assert.equal((await f.api.exportArchive()).images.find(p=>p.date===202).url,jpeg);
+   assert.equal(f.run('voyage.storageOK'),!failedKeys.includes(VOYAGE_KEY));
+   assert.equal(f.run('storageOK'),!failedKeys.includes(STORE_KEY));
+   assert.match(f.elements.get('toast').textContent,/航程.*(未|失敗|受限)/);
+   assert.match(f.elements.get('toast').textContent,/原圖|照片|底片/);
+  }
+ });
+ await check('developed originals remain available with a visible warning when either local progress save fails',async()=>{
+  for(const failedKeys of [[VOYAGE_KEY],[STORE_KEY],[VOYAGE_KEY,STORE_KEY]]){
+   const f=await fixture({productionSaves:true});f.hooks.failLocalWrite=key=>failedKeys.includes(key);
+   assert.equal(await f.api.develop([101]),true,'Development success describes the photographic-library commit');
+   const archive=await f.api.exportArchive();assert.equal(archive.state.film.length,0);assert.equal(archive.state.album[0].date,101);assert.equal(archive.images[0].url,jpeg);
+   assert.match(f.elements.get('toast').textContent,/航程.*(未|失敗|受限)/);
+  }
+ });
+ await check('the normal success message returns only after both progress stores can save again',async()=>{
+  const f=await fixture({productionSaves:true});let failedKeys=[VOYAGE_KEY,STORE_KEY];f.hooks.failLocalWrite=key=>failedKeys.includes(key);
+  assert.equal(await f.api.capture(photo(202)),true);assert.match(f.elements.get('toast').textContent,/尚未完整保存/);
+  failedKeys=[STORE_KEY];assert.equal(await f.api.capture(photo(203)),true);assert.match(f.elements.get('toast').textContent,/尚未完整保存/);
+  failedKeys=[];assert.equal(await f.api.capture(photo(204)),true);assert.equal(f.elements.get('toast').textContent,'底片已保存 · 回研究船選片沖印');
+  assert.equal(f.run('voyage.storageOK&&storageOK'),true);const archive=await f.api.exportArchive();assert.deepEqual(plain(archive.images.map(p=>p.date)),[101,202,203,204]);assert(archive.images.every(p=>p.url===jpeg));
+ });
+ await check('unreadable voyage or journal stops photographic initialization before opening or migrating its database',async()=>{
+  for(const key of [VOYAGE_KEY,STORE_KEY]){
+   const f=await fixture({productionSaves:true,initialize:false}),original=f.storage.get(key);
+   f.storage.set(key,'{broken');f.storage.set(key+'.backup','{also-broken');f.run('loadJournal();loadVoyage();');
+   assert.equal(f.run('oceanSaveHealth.readable()'),false);const before={...f.counts},localBefore=[...f.storage];
+   await f.context.feature.init();assert.equal(f.api.snapshot().durable,false);assert.equal(f.api.canCapture(),false);assert.match(f.api.snapshot().error,/航程|圖鑑|日誌/);
+   assert.deepEqual(f.counts,before,'Unrecognized progress must not initiate database reads, upgrades or migration');assert.deepEqual([...f.storage],localBefore);
+   f.storage.set(key,original);f.storage.delete(key+'.backup');f.run('loadJournal();loadVoyage();');assert.equal(f.run('oceanSaveHealth.readable()'),true);
+   f.context.feature.renderPanel('photography');assert.equal(await f.elements.get('photoStorageRetry').onclick(),true);
+   assert.equal((await f.api.exportArchive()).images[0].url,jpeg,'A readable retry hydrates the retained original through the normal API');
+  }
+ });
  await check('startup recovery without a pending import leaves originals untouched',async()=>{
   const f=await fixture({initialize:false});assert.equal(await f.api.recoverImport(),false);await f.context.feature.init();assert.equal((await f.api.exportArchive()).images[0].url,jpeg);
  });

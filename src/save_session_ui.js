@@ -74,3 +74,50 @@ const oceanSaveGuard=(()=>{
  }
  return {start,check,write,snapshot,restoreImport,leave,recoveryFailed(){stop();oceanSaveSession.retire();show('recovery');ending=drain();},get live(){return live;},loaded(){started=true;}};
 })();
+
+/* Event-driven save feedback. Read failures retain the ownership lease so a
+ * validated import can repair them through the existing transaction. */
+const oceanSaveHealth=(()=>{
+ let mounted=false;
+ const readable=()=>!(typeof voyage!=='undefined'&&voyage.storageLoaded===false)&&!(typeof journalStorage!=='undefined'&&journalStorage.loaded===false);
+ function pending(){const parts=[];if(typeof voyage!=='undefined'&&!voyage.storageOK)parts.push('航程');if(typeof storageOK!=='undefined'&&!storageOK)parts.push('圖鑑與設定');return parts;}
+ function refresh(){
+  if(!mounted)return;
+  const blocked=!readable(),parts=pending(),notice=$('saveHealthNotice'),gate=$('saveLoadGate');
+  notice.hidden=blocked||!parts.length;
+  const message=parts.length?parts.join('、')+'尚未保存':'';
+  if($('saveHealthLabel').textContent!==message)$('saveHealthLabel').textContent=message;
+  const footer=blocked?'舊航程尚未讀取 · 原檔已保留':message||'自動保存在此瀏覽器 · 可匯出備份';
+  if($('saveStatus').textContent!==footer)$('saveStatus').textContent=footer;
+  const detail=$('saveHealthDetail');if(detail){detail.hidden=!parts.length;$('saveHealthDetailText').textContent=message+'。本頁仍保留最新成果，請重試保存或匯出完整存檔後再離開。';}
+  if(blocked&&!gate.open&&!voyage.importing){gate.showModal();$('saveLoadRetry').focus();}
+  if(!blocked&&gate.open)gate.close();
+ }
+ function mountPanel(){
+  const section=document.createElement('section');section.id='saveHealthDetail';section.className='save-health-detail';
+  section.innerHTML='<h3>本頁有尚未保存的成果</h3><p id="saveHealthDetailText" role="status"></p><button id="saveHealthRetry" class="muted-btn">重試保存</button>';
+  $('panelBody').prepend(section);
+  $('saveHealthRetry').onclick=()=>{const a=saveVoyage(),b=persist();refresh();toast(a&&b?'本頁航程與圖鑑已保存。':'仍未完整保存；請匯出完整存檔後再離開。');};refresh();
+ }
+ function downloadRaw(){
+  const records=[VOYAGE_KEY,VOYAGE_KEY+'.backup',STORE_KEY,STORE_KEY+'.backup'].map(key=>{
+   try{const raw=localStorage.getItem(key);return {key,status:raw===null?'missing':'read',raw};}
+   catch(error){return {key,status:'unavailable',error:{name:error.name,message:error.message}};}
+  });
+  const data={format:'return-blue/storage-rescue',version:1,exported:new Date().toISOString(),includesPhotoOriginals:false,records};
+  const url=URL.createObjectURL(new Blob([JSON.stringify(data)],{type:'application/json'}));
+  try{download(url,'Return-to-the-Blue-raw-storage.json');$('saveLoadStatus').textContent=records.some(r=>r.status==='unavailable')?'已建立部分原始資料下載；無法讀取的項目已標示。不含照片原圖。':'已建立原始資料下載。不含照片原圖，也不是可直接匯入的完整存檔。';}
+  finally{setTimeout(()=>URL.revokeObjectURL(url),10000);}
+ }
+ function init(){
+  mounted=true;
+  $('saveHealthNotice').onclick=()=>{openPanel('voyage');$('saveHealthRetry')?.focus();};
+  $('saveLoadGate').addEventListener('cancel',event=>event.preventDefault());
+  $('saveLoadRetry').onclick=()=>location.reload();
+  $('saveLoadRaw').onclick=()=>{try{downloadRaw();}catch(error){$('saveLoadStatus').textContent='下載未能建立：'+error.message;}};
+  $('saveLoadChoose').onclick=()=>$('saveLoadImport').click();
+  $('saveLoadImport').onchange=async event=>{const file=event.target.files[0];event.target.value='';if(!file)return;await importSaveFile(file);refresh();if(!readable())$('saveLoadStatus').textContent=$('toast').textContent;};
+  refresh();
+ }
+ return {readable,refresh,mountPanel,init};
+})();
