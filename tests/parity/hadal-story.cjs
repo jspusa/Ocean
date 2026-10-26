@@ -23,6 +23,7 @@ function fixture(raw={}){
  c.life.push(...[1,2].map(i=>({uid:'mariana_snailfish-00'+i,species:6,p:[780,-7001,-130-i],s:[.2,.2,.2],yaw:0,pitch:0,retreat:0,faunaVisibility:1})));c.speciesTraits=()=>({observeDistance:6});
  const renderEmpty=()=>{};c.renderAbout=renderEmpty;c.renderJournal=renderEmpty;c.renderMap=renderEmpty;c.renderSettings=renderEmpty;
  for(const name of ['features','story','expedition'])vm.runInContext(read(name),c,{filename:name+'.js'});
+ const voyageSource=read('voyage');const markerStart=voyageSource.includes('function setVoyageWaypoint(')?voyageSource.indexOf('function setVoyageWaypoint('):voyageSource.indexOf('function markPlace(');c.voyageDestination=id=>id?{id,name:id}:null;vm.runInContext(voyageSource.slice(markerStart,voyageSource.indexOf('renderMap=function',markerStart)),c,{filename:'voyage-marker.js'});
  const app=read('app');vm.runInContext(app.slice(app.indexOf('function openPanel('),app.indexOf('function renderJournal(')),c,{filename:'app-panel-lifecycle.js'});
  features=vm.runInContext('oceanFeatures',c);c.voyage.state.features=features.read(raw);features.call('init');
  const story=vm.runInContext('oceanStory',c),expedition=vm.runInContext('oceanExpedition',c);
@@ -98,5 +99,57 @@ check('load and import accept only a bounded valid evidence prefix with authorit
 });
 check('marking and opening navigation target the selected journal without awarding progress or moving the diver',()=>{
  const f=fixture();f.story.begin();f.story.hadal.begin();const position=plain(f.c.player.p);f.open('hadal');f.click('hadalNavigation');assert.equal(f.c.modal,'deepsea');assert.equal(f.story.hadal.snapshot().records.length,0);assert.deepEqual(plain(f.c.player.p),position);f.open('activities');const buttons=f.nodes.get('panelBody').querySelectorAll('[data-activity-mark]');buttons.find(b=>b.dataset.activityMark==='story').click();assert.equal(f.story.panel(),'story');assert.equal(f.c.voyage.state.waypoint,'study:cave-strata');f.open('activities');f.nodes.get('panelBody').querySelectorAll('[data-activity-mark]').find(b=>b.dataset.activityMark==='hadal-fold').click();assert.equal(f.story.panel(),'hadal');assert.equal(f.c.voyage.state.waypoint,'study:hadal-reference');assert.equal(f.story.hadal.snapshot().records.length,0);assert.deepEqual(plain(f.c.player.p),position);assert.equal(f.c.settings.adaptive,true);
+});
+check('explicit hadal journal tracking advances to the next real point and persists through reload',()=>{
+ let f=fixture();f.story.hadal.begin();f.open('hadal');f.click('hadalMark');
+ assert.equal(f.c.voyage.state.waypoint,'study:hadal-reference');
+ approach(f,'hadal-reference');assert(f.story.hadal.startRecording());f.tick(4);
+ assert.equal(f.c.voyage.state.waypoint,'study:hadal-rim');
+ const saved=JSON.parse(f.saved);assert.equal(saved.features.story.tracking,'hadal');
+ f=fixture(saved.features);assert.equal(f.c.voyage.state.waypoint,'study:hadal-rim');
+ assert.equal(f.story.hadal.snapshot().records.length,1);assert.equal(f.story.hadal.snapshot().elapsed,0);
+ approach(f,'hadal-rim');assert(f.story.hadal.startRecording());f.tick(4);assert.equal(f.c.voyage.state.waypoint,'study:hadal-turn');
+});
+check('a manual marker cancels tracking even for the same destination and cannot be overwritten by later progress',()=>{
+ for(const marker of ['garden','study:hadal-reference']){
+  const f=fixture();f.story.hadal.begin();f.open('hadal');f.click('hadalMark');f.c.markPlace(marker);
+  assert.equal(f.story.snapshot().tracking,null);assert.equal(JSON.parse(f.saved).features.story.tracking,null);
+  approach(f,'hadal-reference');assert(f.story.hadal.startRecording());f.tick(4);
+  assert.equal(f.c.voyage.state.waypoint,marker);assert.equal(f.story.hadal.snapshot().records.length,1);
+ }
+ const f=fixture();f.story.hadal.begin();f.c.markPlace('study:hadal-reference');approach(f,'hadal-reference');assert(f.story.hadal.startRecording());f.tick(4);
+ assert.equal(f.story.snapshot().tracking,null);assert.equal(f.c.voyage.state.waypoint,'study:hadal-reference');
+});
+check('activity tracking has an explicit owner while reading another journal leaves its route intact',()=>{
+ const f=fixture();f.story.begin();f.story.hadal.begin();f.open('activities');
+ f.nodes.get('panelBody').querySelectorAll('[data-activity-mark]').find(b=>b.dataset.activityMark==='story').click();
+ assert.equal(f.story.snapshot().tracking,'story');assert.equal(f.c.voyage.state.waypoint,'study:cave-strata');
+ f.story.openQuest('hadal');assert.equal(f.story.snapshot().tracking,'story');assert.equal(f.c.voyage.state.waypoint,'study:cave-strata');
+ f.c.active=true;f.c.player.p=[0,-10,0];f.c.eye=f.c.player.p.slice();f.story.openQuest('story');assert(f.story.startRecording());f.tick(6);
+ assert.equal(f.c.voyage.state.waypoint,'study:cave-light');f.open('story');f.click('storyMark');
+ assert.equal(f.story.snapshot().tracking,null);assert.equal(f.c.voyage.state.waypoint,null);
+ f.open('story');f.click('storyMark');assert.equal(f.story.snapshot().tracking,'story');
+ assert(f.story.startRecording());f.tick(5);assert.equal(f.c.voyage.state.waypoint,null);assert.equal(f.story.activity().status,'ready');
+ f.c.active=false;f.open('story');f.click('storyReport');assert.equal(f.story.snapshot().tracking,null);assert.equal(f.c.voyage.state.waypoint,null);
+ f.open('activities');f.nodes.get('panelBody').querySelectorAll('[data-activity-mark]').find(b=>b.dataset.activityMark==='hadal-fold').click();
+ assert.equal(f.story.snapshot().tracking,'hadal');assert.equal(f.c.voyage.state.waypoint,'study:hadal-reference');
+});
+check('tracked hadal route follows species and recovery, then clears on a single home report',()=>{
+ const f=fixture();f.story.hadal.begin();f.open('hadal');f.click('hadalMark');
+ for(const [point,next] of [['hadal-reference','study:hadal-rim'],['hadal-rim','study:hadal-turn'],['hadal-turn','study:hadal-bottom'],['hadal-bottom','habitat:mariana_snailfish']]){
+  approach(f,point);assert(f.story.hadal.startRecording());f.tick(4);assert.equal(f.c.voyage.state.waypoint,next);
+ }
+ const fish=f.c.life[0];faceFish(f,fish);f.select(fish);assert(f.story.hadal.startRecording());f.tick(6);assert.equal(f.c.voyage.state.waypoint,'study:hadal-reference');
+ approach(f,'hadal-reference');assert(f.story.hadal.startRecording());f.tick(4);assert.equal(f.c.voyage.state.waypoint,null);assert.equal(f.story.snapshot().tracking,'hadal');assert.match(f.story.hadal.activity().detail,/回首頁/);
+ f.c.active=false;f.open('hadal');f.click('hadalReport');assert.equal(f.story.snapshot().tracking,null);assert.equal(f.c.voyage.state.waypoint,null);
+ const loaded=fixture(JSON.parse(f.saved).features);assert.equal(loaded.story.snapshot().tracking,null);assert.equal(loaded.story.hadal.snapshot().reported,true);
+});
+check('old or malformed tracking preferences are bounded, opt-in only and cannot award progress',()=>{
+ for(const tracking of [undefined,'hadal','story','boat','__proto__',{},['hadal'],true]){
+  const f=fixture({story:{tracking}});assert.equal(f.story.snapshot().tracking,null);assert.equal(f.c.voyage.state.waypoint,'existing-choice');assert.equal(f.story.snapshot().started,false);assert.equal(f.story.hadal.snapshot().started,false);
+ }
+ const f=fixture({story:{started:true,reports:0,step:0,tracking:'hadal'}});assert.equal(f.story.snapshot().tracking,null);
+ f.c.voyage.state.waypoint='study:cave-strata';f.features.reset();assert.equal(f.story.snapshot().tracking,null);assert.equal(f.c.voyage.state.waypoint,'study:cave-strata');
+ const loaded=fixture({story:{started:true,reports:6,tracking:'story'}});assert.equal(loaded.story.snapshot().tracking,null);assert.equal(loaded.story.snapshot().reports,6);
 });
 console.log(JSON.stringify({source:ref||'working tree',passed:checks.filter(Boolean).length,total:checks.length}));if(checks.includes(false))process.exitCode=1;

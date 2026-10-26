@@ -37,7 +37,7 @@ function fixture({lifecycle=false}={}){
    voyage:{state:{}},voyageDestination:id=>({id,name:id}),saveVoyage(){}});
   Object.assign(c.oceanFeatures,{call(){},renderPanel:()=>true});
   for(const [start,end]of [['function startDive(','function goHome('],['function viewPhoto(','function download('],['function openPanel(','function panelTitle(']])vm.runInContext(app.slice(app.indexOf(start),app.indexOf(end)),c,{filename:'app-focus.js'});
-  const voyage=fs.readFileSync('src/voyage.js','utf8'),start=voyage.indexOf('function markPlace(');vm.runInContext(voyage.slice(start,voyage.indexOf('\n',start)),c,{filename:'voyage-mark.js'});
+  const voyage=fs.readFileSync('src/voyage.js','utf8'),start=voyage.indexOf('function setVoyageWaypoint(');vm.runInContext(voyage.slice(start,voyage.indexOf('renderMap=function',start)),c,{filename:'voyage-mark.js'});
  }
  vm.runInContext(app.slice(app.indexOf('const oceanKeyboard='),app.indexOf('function setupControls(')),c,{filename:'app-keyboard.js'});
  vm.runInContext(app.slice(app.indexOf('function setupControls('),app.indexOf('async function boot('))+'\nsetupControls();',c,{filename:'app.js'});

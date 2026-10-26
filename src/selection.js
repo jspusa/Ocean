@@ -88,6 +88,7 @@ const oceanSelection=(()=>{
   const text=$('selectionHint');if(text)text.textContent=f===selected?'':'點一下觀察';
  }
  function atPointer(){if(!allowed()||exclusive())return false;const r=canvas().getBoundingClientRect(),p=document.pointerLockElement===canvas()||!pointer?{x:r.left+r.width/2,y:r.top+r.height/2}:pointer;const f=pick(p.x,p.y);if(f)return select(f.uid,'key');clear();return false;}
+ function atCenter(){if(!allowed()||exclusive())return false;const r=canvas().getBoundingClientRect(),f=pick(r.left+r.width/2,r.top+r.height/2);if(f)return select(f.uid,'key');clear();return false;}
  function init(){const close=$('clearSelection');if(close)close.onclick=()=>{if(follow)stopAuto();clear();};}
- return {init,pick,select,target,observationTarget,clear,suspend,hover,paint,atPointer,valid,disc,allowed,exclusive,snapshot:()=>({uid:selected?.uid||null,source})};
+ return {init,pick,select,target,observationTarget,clear,suspend,hover,paint,atPointer,atCenter,valid,disc,allowed,exclusive,snapshot:()=>({uid:selected?.uid||null,source})};
 })();

@@ -104,10 +104,16 @@ const check=(name,pass,detail)=>{results.push({name,pass:!!pass,detail});console
    while(Date.now()-start<100000){
     const s=await state();assert(s.active&&!s.modal&&!s.hidden&&s.focused&&!s.lost,'Natural swimming stays live');
     const range=distance(s.p,goal);if(range<tolerance){reached=true;break;}
-    await swim(false);if(Math.hypot(goal[0]-s.p[0],goal[2]-s.p[2])<.12&&Math.abs(goal[1]-s.p[1])>.35&&goal[1]>=s.floor+.9){await vertical(goal[1]-s.p[1]);}else{await aimAt(goal);await swim(true);await page.waitForTimeout(Math.min(600,Math.max(70,(range-.2)/5*650)));}
+    if(Math.hypot(goal[0]-s.p[0],goal[2]-s.p[2])<.12&&Math.abs(goal[1]-s.p[1])>.35&&goal[1]>=s.floor+.9){await vertical(goal[1]-s.p[1]);}else{await aimAt(goal);await swim(true);await page.waitForTimeout(Math.min(600,Math.max(70,range*300)));await swim(false);}
+    // Release before judging arrival. On a steep slope the remaining inertia
+    // can move XZ onto higher ground, raising Y well outside the sampling zone.
+    // Short near-target pulses plus settled endpoint checks use normal inputs;
+    // they do not change the game's range, collision or motion rules.
+    await page.waitForFunction(()=>Math.hypot(...player.velocity)<.02,null,{timeout:5000});
+    await page.waitForTimeout(120);
     if(Date.now()-lastLog>10000){lastLog=Date.now();console.log(JSON.stringify({travel:goal,p:s.p,range,seconds:(Date.now()-start)/1000}));}
    }
-   await swim(false);await page.waitForTimeout(420);const end=await state();observations.push({route:{goal,initial:initial.p,end:end.p,seconds:(Date.now()-start)/1000}});assert(reached,'Native route did not reach '+JSON.stringify(goal));
+   await swim(false);const end=await state();observations.push({route:{goal,initial:initial.p,end:end.p,seconds:(Date.now()-start)/1000}});assert(reached&&distance(end.p,goal)<tolerance,'Native route did not settle at '+JSON.stringify(goal));
   }
   async function record(point,expected,seconds=4){
    await aimAt(point);await page.waitForTimeout(550);
@@ -115,6 +121,7 @@ const check=(name,pass,detail)=>{results.push({name,pass:!!pass,detail});console
    const before=await state();await shot('field-'+expected);await press('#storyAction');
    await page.waitForFunction(n=>oceanStory.hadal.snapshot().records.length===n,expected,{timeout:18000});
    const after=await state();check('continuous real-time field operation '+expected,after.hadal.records.length===expected&&after.t-before.t>=seconds-.25,{before,after});assert(results.at(-1).pass);
+   const next=[null,'study:hadal-rim','study:hadal-turn','study:hadal-bottom','habitat:mariana_snailfish','study:hadal-reference',null][expected];check('explicit tracking advances after field operation '+expected,after.story.tracking==='hadal'&&after.waypoint===next,{tracking:after.story.tracking,waypoint:after.waypoint,next});
   }
   async function returnHome(){await press('#pauseBtn');await press('#menuHome');await page.waitForFunction(()=>!active&&!modal);}
   function oldState(s){const {hadal,investigation,...old}=s.story;return old;}
@@ -135,6 +142,7 @@ const check=(name,pass,detail)=>{results.push({name,pass:!!pass,detail});console
    await page.setViewportSize({width:view.width,height:view.height});await session.send('Emulation.setSafeAreaInsetsOverride',{insets:view.insets});await page.waitForTimeout(450);for(const id of ['hadalMark','hadalNavigation','hadalRecord']){await page.locator('#'+id).scrollIntoViewIfNeeded();await layout('journal controls '+view.width+'x'+view.height,[id],view.insets);}await shot('controls-layout-'+view.width);
   }
   if(touch){await page.setViewportSize({width:390,height:844});await session.send('Emulation.setSafeAreaInsetsOverride',{insets:{top:0,right:0,bottom:0,left:0}});await page.waitForTimeout(450);}
+  await press('#hadalMark');check('visible journal explicitly enables tracking',(await state()).story.tracking==='hadal'&&(await state()).waypoint==='study:hadal-reference');await openHadal();
   await press('#hadalNavigation');await press('[data-deepsea-station="hadal"]');
   let arrived=false;const transitStart=Date.now();
   while(Date.now()-transitStart<240000){await page.waitForTimeout(1000);const s=await state();traces.push({at:Date.now(),p:s.p,target:s.deepsea.travelTarget,records:s.hadal.records.length,scale:s.scale,gl:s.gl});if(!s.deepsea.travelTarget&&s.p[1]<-6990){arrived=true;break;}if(traces.length%15===0)console.log(JSON.stringify({transit:s.deepsea,seconds:(Date.now()-transitStart)/1000}));}
@@ -150,7 +158,7 @@ const check=(name,pass,detail)=>{results.push({name,pass:!!pass,detail});console
   await travel(stance('hadal-rim'),.35);await record(aimPoint('hadal-rim'),2);
   const saved=await state();await returnHome();await page.reload();await boot();await openHadal();
   check('mid-investigation reload preserves deployed instrument and next step',(await state()).hadal.records.length===2&&(await state()).referenceSensorCount===1&&(await page.locator('#panelBody').innerText()).includes('記錄坡面轉折'),{before:saved,after:await state()});
-  await press('#hadalMark');check('resumed mark selects the real remaining slope site',(await state()).waypoint==='study:hadal-turn');await press('#shipContinue');await page.waitForFunction(()=>active&&!modal);
+  check('reload preserves tracked remaining slope site',(await state()).story.tracking==='hadal'&&(await state()).waypoint==='study:hadal-turn');await press('#closePanel');await press('#shipContinue');await page.waitForFunction(()=>active&&!modal);
   for(const p of surveyed.route.filter(p=>p[2]<-138&&p[2]>=-140))await travel(p,.45);
   await travel(stance('hadal-turn'),.35);await record(aimPoint('hadal-turn'),3);
   for(const p of surveyed.route.filter(p=>p[2]<-140))await travel(p,.45);
@@ -175,7 +183,7 @@ const check=(name,pass,detail)=>{results.push({name,pass:!!pass,detail});console
    await page.setViewportSize({width:view.width,height:view.height});await session.send('Emulation.setSafeAreaInsetsOverride',{insets:view.insets});await page.waitForTimeout(450);await page.locator('#hadalReport').scrollIntoViewIfNeeded();await layout('report '+view.width+'x'+view.height,['hadalReport'],view.insets);
   }
   if(touch){await page.setViewportSize({width:390,height:844});await session.send('Emulation.setSafeAreaInsetsOverride',{insets:{top:0,right:0,bottom:0,left:0}});await page.waitForTimeout(450);}
-  await press('#hadalReport');
+  await press('#hadalReport');check('home report ends tracking and clears the completed route',(await state()).story.tracking===null&&(await state()).waypoint===null);
   check('home report preserves complete profile and individual',await page.locator('#hadalReportReply').isVisible()&&await page.locator('#hadalIndividual').isVisible()&&(await state()).hadal.reported);
   await shot('report');await page.reload();await boot();await openHadal();
   const final=await state();check('reload keeps report, old story and automatic quality',final.hadal.reported&&final.hadal.records.length===6&&JSON.stringify(oldState(final))===JSON.stringify(legacy)&&final.adaptive&&final.gl===0&&!final.lost,final);

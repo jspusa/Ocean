@@ -264,6 +264,8 @@ function turnCamera(dx,dy){stopAuto();player.yaw+=dx*.0037*settings.sensitivity;
 function mouseLookUnavailable(){if(!settings.lookLock)return;settings.lookLock=false;persist();toast('自由環視未獲瀏覽器允許；已恢復按住畫面拖曳。');}
 async function lockMouseLook(){if(!active||modal||photoOpen||!settings.lookLock||!$('ocean').requestPointerLock)return;try{await $('ocean').requestPointerLock();}catch(_){mouseLookUnavailable();}}
 let simulationAccumulator=0,previousPhysicsPosition=null,hudClock=0,observationClock=0,lastCompleteView=null,lastResizeNotice=null;
+let renderDeadline=0,pendingFrameTime=0,pendingFrameCPU=0,renderMode=null,renderClock=null;
+function resetRenderCadence(){renderDeadline=0;pendingFrameTime=0;pendingFrameCPU=0;simulationAccumulator=0;previousPhysicsPosition=null;}
 function returnToLoadedView(){
  if(!lastCompleteView||!active)return;
  const saved=lastCompleteView,stream=renderer.sceneStream;
@@ -287,29 +289,42 @@ function returnToLoadedView(){
 }
 function animate(ms){
  if(!ready)return;
- if(window.__freeze){lastTime=ms;oceanPerf.pause();requestAnimationFrame(animate);return;}
- const realDt=Math.max(0,(ms-lastTime)/1000||1/60),dt=Math.min(realDt,.10);lastTime=ms;
- if(document.hidden||(document.hasFocus&&!document.hasFocus())){oceanPerf.pause();simulationAccumulator=0;requestAnimationFrame(animate);return;}
+ // Focus/visibility handlers also reset lastTime when the browser delivered
+ // no suspended RAF. Do not carry a partially scheduled frame across that cut.
+ if(renderClock!==null&&renderClock!==lastTime)resetRenderCadence();renderClock=ms;
+ if(window.__freeze){lastTime=ms;oceanPerf.pause();resetRenderCadence();requestAnimationFrame(animate);return;}
+ const realDt=Math.max(0,(ms-lastTime)/1000);let dt=Math.min(realDt,.10);lastTime=ms;
+ if(document.hidden||(document.hasFocus&&!document.hasFocus())){oceanPerf.pause();resetRenderCadence();requestAnimationFrame(animate);return;}
  pollGamepad();
- const liveFeature=!active&&oceanFeatures.shouldAnimate();
- if((modal||photoOpen)&&!renderer.dirty&&!liveFeature){oceanPerf.pause();simulationAccumulator=0;requestAnimationFrame(animate);return;}
+ const liveFeature=!active&&!photoOpen&&oceanFeatures.shouldAnimate();
+ const mode=modal||photoOpen?liveFeature?'viewer':'paused':active?'dive':'home';
+ if(mode!==renderMode){resetRenderCadence();renderMode=mode;oceanPerf.pause();}
+ if((modal||photoOpen)&&!liveFeature){oceanPerf.pause();resetRenderCadence();dt=0;if(!renderer.dirty){requestAnimationFrame(animate);return;}}
  const begin=performance.now();let renderPosition=null;
- if(renderer.sceneStream?.waitStarted){updateCamera(0);oceanFeatures.call('afterCamera',0);applyVisualSettings();if(!renderer.sceneStream.update(eye,false)){oceanPerf.pause();simulationAccumulator=0;requestAnimationFrame(animate);return;}}
+ if(renderer.sceneStream?.waitStarted){updateCamera(0);oceanFeatures.call('afterCamera',0);applyVisualSettings();if(!renderer.sceneStream.update(eye,false)){oceanPerf.pause();resetRenderCadence();requestAnimationFrame(animate);return;}}
  if((!modal&&!photoOpen)||liveFeature){
   t+=dt;
   if(active){diveSeconds+=Math.min(realDt,1);simulationAccumulator+=dt;let steps=0;
-   while(simulationAccumulator>=1/120&&steps<12){previousPhysicsPosition=player.p.slice();updatePlayer(1/120);simulationAccumulator-=1/120;steps++;}
-   if(previousPhysicsPosition&&!cameraCut){renderPosition=V.lerp(previousPhysicsPosition,player.p,simulationAccumulator*120);}
+   while(simulationAccumulator+1e-10>=1/120&&steps<12){previousPhysicsPosition=player.p.slice();updatePlayer(1/120);simulationAccumulator=Math.max(0,simulationAccumulator-1/120);steps++;}
   }
+ }
+ pendingFrameTime+=dt;
+ const frameInterval=1000/(active||liveFeature?60:30);
+ if(!renderer.pendingResize&&ms+.001<renderDeadline){pendingFrameCPU+=performance.now()-begin;requestAnimationFrame(animate);return;}
+ renderDeadline=renderDeadline>ms?ms+frameInterval:renderDeadline+(Math.floor((ms+.001-renderDeadline)/frameInterval)+1)*frameInterval;
+ dt=pendingFrameTime;pendingFrameTime=0;
+ if((!modal&&!photoOpen)||liveFeature){
+  if(active&&previousPhysicsPosition&&!cameraCut)renderPosition=V.lerp(previousPhysicsPosition,player.p,simulationAccumulator*120);
   updateLife(t);
   if(!active)oceanFeatures.call('idleTick',dt);
  }
- updateCamera(dt,renderPosition);oceanFeatures.call('afterCamera',dt);applyVisualSettings();if(renderer.render(eye,target,t)===false){oceanPerf.pause();simulationAccumulator=0;requestAnimationFrame(animate);return;}
+ updateCamera(dt,renderPosition);oceanFeatures.call('afterCamera',dt);applyVisualSettings();if(renderer.render(eye,target,t)===false){oceanPerf.pause();resetRenderCadence();requestAnimationFrame(animate);return;}
  if(active){lastCompleteView={p:player.p.slice(),yaw:player.yaw,pitch:player.pitch,eye:eye.slice(),target:target.slice(),cameraFollowLength,cameraThird:lastCameraThird};if(renderer.sceneStream)renderer.sceneStream.onReturn=returnToLoadedView;}
  if(renderer.resizeFailure&&renderer.resizeFailure!==lastResizeNotice){lastResizeNotice=renderer.resizeFailure;toast('目前畫面已保留，裝置暫時無法切換解析度。可在設定選擇省電畫質。');}
  if(active&&!modal&&!photoOpen){observationClock+=dt;hudClock+=dt;if(observationClock>=1/12){observe(observationClock);voyageTick(observationClock);observationClock=0;}if(hudClock>=.12){updateHUD();checkLandmarks();hudClock=0;}}
  if(modal==='map'&&ms-animatedPanelTime>180){drawMap();animatedPanelTime=ms;}
- if(!modal&&!photoOpen){oceanPerf.record(ms,performance.now()-begin);if(ms-(window.__statsAt||0)>400){window.__statsAt=ms;const v=oceanPerf.stats();window.__oceanStats={fps:+v.fps.toFixed(1),p95FrameMs:+v.p95.toFixed(2),cpuMs:renderer.cpuRenderMs,drawCalls:renderer.drawCalls,creatures:life.length+decorLife.length+shoal.length,submittedTriangles:Math.round(renderer.submittedTriangles),submittedVertices:renderer.submittedVertices,position:player.p.slice(),seen:persistent.seen.length,quality:renderer.quality,renderScale:renderer.dynamicScale,resolution:[renderer.canvas.width,renderer.canvas.height],audio:oceanAudio.status};}}
+ if(active&&!modal&&!photoOpen){oceanPerf.record(ms,performance.now()-begin+pendingFrameCPU,realDt*1000);if(ms-(window.__statsAt||0)>400){window.__statsAt=ms;const v=oceanPerf.stats();window.__oceanStats={fps:+v.fps.toFixed(1),p95FrameMs:+v.p95.toFixed(2),cpuMs:renderer.cpuRenderMs,drawCalls:renderer.drawCalls,creatures:life.length+decorLife.length+shoal.length,submittedTriangles:Math.round(renderer.submittedTriangles),submittedVertices:renderer.submittedVertices,position:player.p.slice(),seen:persistent.seen.length,quality:renderer.quality,renderScale:renderer.dynamicScale,resolution:[renderer.canvas.width,renderer.canvas.height],audio:oceanAudio.status};}}else oceanPerf.pause();
+ pendingFrameCPU=0;
  requestAnimationFrame(animate);
 }
 function initAudio(){return oceanAudio.start();}

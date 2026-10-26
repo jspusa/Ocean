@@ -4,7 +4,7 @@ class OceanPerformance{
  constructor(){this.samples=new Float32Array(240);this.cursor=0;this.count=0;this.previous=0;this.lastUI=0;this.lastAdaptive=0;this.headroom=0;this.benchmark=null;this.lastResult=null;this.visible=false;this.lastCPU=0;this.target=60;this.recoveryAfter=0;}
  pause(){this.previous=0;this.headroom=0;}
  resetSamples(){this.cursor=0;this.count=0;this.previous=0;this.headroom=0;}
- record(ms,cpu){
+ record(ms,cpu,rafInterval=0){
   if(!Number.isFinite(ms))return;
   if(this.benchmark){const b=this.benchmark;if(renderer.quality!==b.startQuality||renderer.dynamicScale!==b.startScale||renderer.canvas.width!==b.resolution[0]||renderer.canvas.height!==b.resolution[1]){this.benchmark=null;toast('畫面尺寸或品質已改變，這次量測已取消。請以新設定重新量測。');}}
   if(this.previous){const dt=ms-this.previous;if(dt>0&&Number.isFinite(dt)){this.samples[this.cursor]=dt;this.cursor=(this.cursor+1)%240;this.count=Math.min(240,this.count+1);if(this.benchmark){this.benchmark.frames.push({ms:dt,cpu:Number.isFinite(cpu)?cpu:0,scale:renderer.dynamicScale});this.benchmark.activeMs+=dt;}}}
@@ -13,12 +13,16 @@ class OceanPerformance{
   if(ms-this.lastUI>350){this.lastUI=ms;this.paint();}
   if(active&&settings.adaptive&&!this.benchmark&&this.count>=90&&ms-this.lastAdaptive>2200){
    this.lastAdaptive=ms;const stat=this.stats(),budget=1000/this.target;
+   // A 60 Hz presentation scheduled on (for example) 75 or 144 Hz RAF has
+   // genuine alternating intervals. Only recovery tolerates that known tick
+   // quantization; samples, exported intervals and the slow-mean gate stay raw.
+   const pacedPeak=rafInterval>0&&rafInterval<budget?Math.ceil((budget-.01)/rafInterval)*rafInterval+.1:0;
    // A 60 Hz display cannot report the old >78 FPS recovery threshold.
    // Probe upward only after several stable windows at the display budget.
    // No CPU duration is presented as GPU headroom; a failed probe backs off.
    if(stat.mean>budget*1.17&&renderer.dynamicScale>.64){
     renderer.dynamicScale=Math.max(.64,renderer.dynamicScale-.065);renderer.resize();this.resetSamples();this.recoveryAfter=ms+8000;
-   }else if(ms>=this.recoveryAfter&&stat.mean<=budget*1.04&&stat.p95<=budget*1.22&&renderer.dynamicScale<1){
+   }else if(ms>=this.recoveryAfter&&stat.mean<=budget*1.04&&stat.p95<=Math.max(budget*1.22,pacedPeak)&&renderer.dynamicScale<1){
     if(++this.headroom>=3){renderer.dynamicScale=Math.min(1,renderer.dynamicScale+.035);renderer.resize();this.resetSamples();this.recoveryAfter=ms+5500;}
    }else this.headroom=0;
   }

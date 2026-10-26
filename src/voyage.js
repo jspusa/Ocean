@@ -54,7 +54,7 @@ function evaluateOrders(){
   voyage.state.completed.push(o.id);changed=true;if(active&&voyage.state.mode==='journey'){toast('航程記憶 · '+o.title);oceanAudio.cue('found');}
  }
  if(changed)saveVoyage();
- if(changed&&voyage.state.mode==='journey'){const o=currentOrder();if(o)voyage.state.waypoint=o.place;else {voyage.state.waypoint='boat';if(active)radio('你已把這一趟海記下來了。慢慢回船吧，留意這一瓶的剩餘氣量。');}saveVoyage();}
+ if(changed&&voyage.state.mode==='journey'){const o=currentOrder();if(o)setVoyageWaypoint(o.place);else {setVoyageWaypoint('boat');if(active)radio('你已把這一趟海記下來了。慢慢回船吧，留意這一瓶的剩餘氣量。');}saveVoyage();}
  return changed;
 }
 function shipCamera(){
@@ -72,7 +72,7 @@ function renderShip(){
  $('shipContinue').textContent='繼續上次潛水 · '+timeText(s.resume?.seconds||0);
  $('shipStats').textContent=`${s.dives} 次航程 · ${persistent.seen.length} / ${SPECIES.length} 類生物 · ${s.visited.length} / ${LANDMARKS.length} 個地標`;
  $('shipCards').innerHTML=ORDERS.map((o,i)=>`<button class="ship-memory ${s.completed.includes(o.id)?'complete':''}" data-order="${o.id}" title="${o.title}"><span>${s.completed.includes(o.id)?'✓':String(i+1).padStart(2,'0')}</span><b>${o.title}</b></button>`).join('');
- $('shipCards').querySelectorAll('button').forEach(b=>b.onclick=()=>{voyage.state.waypoint=ORDERS.find(o=>o.id===b.dataset.order).place;openPanel('voyage');});
+ $('shipCards').querySelectorAll('button').forEach(b=>b.onclick=()=>{setVoyageWaypoint(ORDERS.find(o=>o.id===b.dataset.order).place);saveVoyage();openPanel('voyage');});
  $('saveStatus').textContent=(!storageOK||!voyage.storageOK)?'瀏覽器儲存受限 · 請匯出存檔':voyage.loaded?'航程已讀取 · 自動保存在此瀏覽器':'自動保存在此瀏覽器 · 可匯出備份';
  $('shipFinal').classList.toggle('hidden',!s.ended);oceanFeatures.call('shipRender');
 }
@@ -175,7 +175,8 @@ function voyageDestination(id=voyage.state.waypoint){
   const companion=sp.wildHabitat===false,p=companion||sp.pelagic?f.p:f.home||f.center||f.p;return {id,name:sp.name+(companion?'夥伴':sp.pelagic?'巡游方位':'棲地'),x:p[0],y:p[1]+.6,z:p[2],radius:sp.pelagic?Math.max(8,Math.min(18,sp.size*.6)):3};
  }
  return id==='boat'?{id:'boat',name:'研究船',x:OPEN_WORLD.boat[0],z:OPEN_WORLD.boat[2],radius:12}:LANDMARKS.find(l=>l.id===id);}
-function markPlace(id){const l=voyageDestination(id);if(!l)return;voyage.state.waypoint=id;saveVoyage();closePanel();toast('已標記：'+l.name+' · 跟隨方位前進');}
+function setVoyageWaypoint(id){if(typeof oceanStory!=='undefined')oceanStory.stopTracking();voyage.state.waypoint=id;}
+function markPlace(id){const l=voyageDestination(id);if(!l)return;setVoyageWaypoint(id);saveVoyage();closePanel();toast('已標記：'+l.name+' · 跟隨方位前進');}
 renderMap=function(){
  panelTitle('YOUR EXPEDITION CHART','海，比眼前更遠');
  $('panelBody').innerHTML=`<p class="panel-note">連續海域 · ${voyage.state.visited.length}/${LANDMARKS.length} 個地標。點選地標標記航向，不會直接傳送。所有距離皆為遊戲尺度。</p><canvas id="mapCanvas" class="map-canvas" width="600" height="530" aria-label="可點選地標的遊戲海圖"></canvas><div class="chart-places">${PELAGIC_SPECIES.map(sp=>`<button class="chart-place" data-mark="habitat:${sp.id}"><small>≈</small><span>${sp.name}巡游海域</span><em>${sp.size} m</em></button>`).join('')}${OceanTrench.stations.map(st=>`<button class="chart-place" data-mark="trench:${st.id}"><small>↓</small><span>${st.name}</span><em>${Math.round(-st.p[1])} m</em></button>`).join('')}${LANDMARKS.map((l,i)=>`<button class="chart-place ${voyage.state.visited.includes(l.id)?'known':''}" data-mark="${l.id}"><small>${String(i+1).padStart(2,'0')}</small><span>${l.name}</span><em>${voyage.state.visited.includes(l.id)?'已發現':'待探索'}</em></button>`).join('')}</div><p class="panel-note">這是原創海域，沒有真實經緯度；不是現場路線圖。所有海域都能直接游到；沒有氣量倒數。</p><button id="chartHome" class="muted-btn">儲存並回首頁</button>`;
@@ -312,7 +313,7 @@ function pollGamepad(){
  }
  const press=i=>g.buttons[i]?.pressed&&!voyage.gamepadButtons[i];
  if(press(9)){if(modal)closePanel();else if(active&&!oceanSwimActions.exit())openPanel('diveMenu');}
- if(active&&!modal&&!photoOpen){if(press(0))takePhoto();if(press(1))observeNearest();if(press(2))openPanel('map');if(press(3))toggleCruise();if(press(4))oceanSwimActions.quickTurn();if(press(5))oceanSwimActions.toggleSurface();}
+ if(active&&!modal&&!photoOpen){if(press(0))takePhoto();if(press(1)&&!oceanSelection.atCenter())toast('將附近的生物放在畫面中央，再按 B 觀察。');if(press(2))openPanel('map');if(press(3))toggleCruise();if(press(4))oceanSwimActions.quickTurn();if(press(5))oceanSwimActions.toggleSurface();}
  voyage.gamepadButtons=g.buttons.map(b=>b.pressed);
 }
 function initVoyage(){
