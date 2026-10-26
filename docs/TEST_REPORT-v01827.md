@@ -103,4 +103,8 @@ Root 與另一位只看原始 PNG 的獨立代理皆檢視影像。未見阻擋�
 
 ## 公開交付
 
-本機驗證已完成；尚待指定 runtime 提交的 Pages 建置、300 個公開 manifest 檔案及兩端預設入海核對。此段在公開驗證完成後填入確定提交與結果。
+2026-10-27（臺北時間），runtime 提交 `63971221191730d4a550eae2a0840f6f30442615` 的 GitHub Pages 狀態為 `built`，`updated_at=2026-10-26T16:07:52Z`、`error.message=null`。已從公開站核對 manifest 完整內容及 **300／300 個檔案的 bytes／SHA-256**，並以全新桌機／觸控情境實際開始航程；預設自動畫質分別為 2／1，44 類目錄、8 個 surface programs、編譯與串流場景、自由游動及無自動選魚均通過，GL error=0、無 context loss、page errors=[]。觸控操作鈕最小 44 px 且均在畫面內。
+
+公開原始結果為 `qa/parity/published-v0.18.27-delivery.json`、兩端 PNG、`qa/parity/v01827-public-delivery.log` 與 `v01827-evidence/public-release-runtime.json`。完整鯊魚與 7,000 m 調查流程在本機執行；公開站本輪驗證的是完整發布檔案與兩端預設入海，沒有冒稱公開完整調查重跑。觸控為同一電腦的瀏覽器模擬，不是實體手機驗收。
+
+本輪本機功能、畫面及已知黑閃回歸已完成，公開產物與入海已驗證；**固定路線整體 GPU 成本不增加仍未定**，實體裝置、耗電及完整商用門檻維持未完成。

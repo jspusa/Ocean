@@ -1,6 +1,6 @@
 # Wii 第一代 Endless Ocean 功能對等追蹤
 
-目標：完整 feature parity，維持桌機／手機及自動畫質。0.18.27 候選版正驗證海溝層緣、沉積表面與導覽觀察，狀態及未定 GPU 成本條件見 [本輪報告](docs/TEST_REPORT-v01827.md)。**目標持續進行；0.18.26 已發布並核對 297 個公開檔案、兩端預設入海與 10 組公開保存恢復流程。不可讀航程不再自動覆寫，保存失敗可見並可重試，攝影狀態分列原圖與進度；本機三種布局 15 組恢復、CPU 最終合併 100／100、服務 101／101、靜態 68／68、多分頁 10 組、崩潰恢復 10 組與節奏 55／55 通過，已知 resize 黑閃回歸通過。44 類原創生物、連續海溝與自動畫質保留；完整內容、公網多人、實體裝置／耗電及商用門檻仍未完成。** 歷史盤點：[0.14](docs/FEATURE_PARITY-v014.md)、[0.13](docs/FEATURE_PARITY-v013.md)、[0.12](docs/FEATURE_PARITY-v012.md)、[0.11](docs/FEATURE_PARITY-v011.md)、[0.10](docs/FEATURE_PARITY-v010.md)、[0.9](docs/FEATURE_PARITY-v09.md)、[0.8](docs/FEATURE_PARITY-v08.md)。
+目標：完整 feature parity，維持桌機／手機及自動畫質。**目標持續進行；0.18.27 已發布並核對 300 個公開檔案及兩端預設入海。** 海溝實體層緣、細粒沉積面及皺鰓鯊正常導覽已更新；本機 CPU 最終合併 102／102、靜態 68／68、服務 101／101，兩端鯊魚自然流程各 26／26、完整海溝調查 41／41 與 55／55、已知 resize 黑閃回歸通過。固定路線整體 GPU 成本不增加仍未定，詳見 [本輪報告](docs/TEST_REPORT-v01827.md)。44 類原創生物、連續海溝、自動畫質及主動選魚保留；完整內容、公網多人、實體裝置／耗電與商用門檻仍未完成。0.18.26 的保存恢復驗證保留於 [歷史報告](docs/TEST_REPORT-v01826.md)。歷史盤點：[0.14](docs/FEATURE_PARITY-v014.md)、[0.13](docs/FEATURE_PARITY-v013.md)、[0.12](docs/FEATURE_PARITY-v012.md)、[0.11](docs/FEATURE_PARITY-v011.md)、[0.10](docs/FEATURE_PARITY-v010.md)、[0.9](docs/FEATURE_PARITY-v09.md)、[0.8](docs/FEATURE_PARITY-v08.md)。
 
 0.18.23 的有界時間容差、原始統計、無日光陰影省略、完整 RGBA 與有正有負的 GPU 計時，見 [本輪報告](docs/TEST_REPORT-v01823.md)。CPU 96/96 套、服務 101/101、靜態 66/66；兩軸審查無剩餘 P1/P2，不提升整體商用星級。
 
