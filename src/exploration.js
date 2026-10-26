@@ -256,7 +256,7 @@ const oceanExploration=(()=>{
  }
  function drawPreview(canvas){
   const ctx=canvas.getContext('2d'),w=canvas.width,h=canvas.height;ctx.save();ctx.clearRect(0,0,w,h);ctx.translate(chartView.x,chartView.y);ctx.scale(chartView.scale,chartView.scale);ctx.fillStyle='#153c45';ctx.fillRect(0,0,w,h);ctx.strokeStyle='#c5dac024';for(let i=1;i<8;i++){ctx.beginPath();ctx.moveTo(i*w/8,0);ctx.lineTo(i*w/8,h);ctx.moveTo(0,i*h/8);ctx.lineTo(w,i*h/8);ctx.stroke();}drawMap(ctx,w,h);
-  oceanNavigation.feature.drawMap(ctx,w,h);ctx.font='11px sans-serif';for(const l of LANDMARKS){const p=chartPoint(l.x,l.z,w,h);ctx.fillStyle=voyage.state.visited.includes(l.id)?'#d4e9d0':'#90acae';ctx.beginPath();ctx.arc(...p,3.5,0,TAU);ctx.fill();ctx.fillText(l.name,p[0]+7,p[1]+3);}
+  oceanNavigation.feature.drawMap(ctx,w,h);if(typeof oceanMultiplayer!=='undefined')oceanMultiplayer.drawMap(ctx,w,h);ctx.font='11px sans-serif';for(const l of LANDMARKS){const p=chartPoint(l.x,l.z,w,h);ctx.fillStyle=voyage.state.visited.includes(l.id)?'#d4e9d0':'#90acae';ctx.beginPath();ctx.arc(...p,3.5,0,TAU);ctx.fill();ctx.fillText(l.name,p[0]+7,p[1]+3);}
   if(typeof OceanTrench!=='undefined'){const p=chartPoint(760,-90,w,h);ctx.fillStyle='#b9d5c6';ctx.fillText('海溝 · 700–7,000 m',p[0]+8,p[1]-9);}if(active){const p=chartPoint(player.p[0],player.p[2],w,h);ctx.save();ctx.translate(...p);ctx.rotate(player.yaw);ctx.fillStyle='#eef6e1';ctx.beginPath();ctx.moveTo(0,-8);ctx.lineTo(-5,6);ctx.lineTo(5,6);ctx.closePath();ctx.fill();ctx.restore();}ctx.fillStyle='#b9d5c6';ctx.fillText('N ↑',w-35,20);ctx.restore();if($('explorationZoomValue'))$('explorationZoomValue').textContent=Math.round(chartView.scale*100)+'%';
  }
  function bindChart(canvas){
@@ -282,7 +282,7 @@ const oceanExploration=(()=>{
   init(){if(initialized)return;initialized=true;initGeometry();initUI();lastState=state();oceanFeatures.addMenu({id:'exploration',label:'海圖・水中筆・打撈',panel:'exploration'});},
   startDive({resume}={}){setPen(null);if(R.reveal(state(),player.p))dirty=true;if(R.recordTrail(state(),player.p,!resume))dirty=true;syncGeometry();paintHUD();},endDive(){setPen(null);if(dirty)persistNow();paintHUD();},tick,
   afterLife(){if(!initialized)return;if(penMode&&!penAllowed())setPen(null);if(lastState!==state()){lastState=state();inkDirty=true;renderer.forceShadow=true;}syncGeometry();},
-  panelChanged(){if(penMode)setPen(null);},
+  panelChanged(){if(penMode)setPen(null);},mapChanged(){const chart=$('explorationChart');if(chart)drawPreview(chart);},
   renderPanel,drawMap,reset,pointerCaptured:()=>!!penMode&&penAllowed(),escape(){if(!penMode)return false;setPen(null);return true;}
  };
  return {feature,surveyStats:()=>R.surveyStats(state()),setPen,collectNearest,markTarget,get penMode(){return penMode},get chartView(){return {...chartView}},get mapTarget(){return targetPosition()?.slice()||null},listArtifacts:()=>items.map(item=>({id:item.id,name:item.name,place:item.place,p:item.p.slice(),visible:item.batch.visible,collected:state().collected.includes(item.id)})),get inkSegments(){return inkBatch?.instances.length||0}};

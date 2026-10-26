@@ -18,6 +18,7 @@ const oceanSaveGuard=(()=>{
   $('saveSessionRetry').focus();
  }
  function stop(){
+  if(typeof oceanFeatures!=='undefined')oceanFeatures.call('sessionEnded');
   if(typeof oceanGamepadPointer!=='undefined')oceanGamepadPointer.disconnect();
   live=false;
   if(active)voyage.state.resume={p:player.p.slice(),yaw:player.yaw,pitch:player.pitch,seconds:diveSeconds};
