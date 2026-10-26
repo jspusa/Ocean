@@ -102,4 +102,6 @@
 
 完整 CPU suite 104／104、靜態檢查 68／68 通過；包括原 renderer state 8／8 及新增影像等價工具的正負 self-test。兩軸獨立審查均無未解決項目，詳見 [審查紀錄](parity/REVIEW-v01829.md)。所有原生影像及計時序列執行，沒有同時啟動另一個 GPU 工作。本輪未重跑未改動的房間服務，也沒有據此宣稱公網多人驗收。
 
-Pages 精確提交、完整公開 manifest 與實際入海驗證待發布後記錄。本輪不將完整工作單改為完成。
+Runtime `d5fc90fbff81419888597f14814f9fb37727ed35` 已公開發布。GitHub Pages 於 `2026-10-26T18:39:27Z` 回報精確該提交 `built`，error.message=null。公開 MANIFEST 與本機完整一致，300／300 檔案 bytes／SHA-256 相符；正式網站桌機及觸控透過正常開始按鈕入海，版號 0.18.29、自動畫質啟用、預設 quality 2／1、44 類目錄、8 個 surface programs、GL 0、無 page errors。觸控操作區尺寸及視窗邊界通過。
+
+公開原始收據為 `qa/parity/published-v0.18.29-delivery.json`；整合收據為 `qa/parity/v01829-filter-cost/public-release-runtime.json`。MANIFEST SHA-256 為 `b7789b33e2b007bc77a2d5aece8f57bb3c9bd0d1bf729a1a86b1831b1c087db6`。後續文件提交不修改 runtime 或 manifest；公開產物及基本可玩性不代替實體手機、耗電、全部內容或完整商用驗收。本輪不將完整工作單改為完成。
