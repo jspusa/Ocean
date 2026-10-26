@@ -1,6 +1,8 @@
 # Wii 第一代 Endless Ocean 功能對等追蹤
 
-目標：完整 feature parity，維持桌機／手機及自動畫質。**目標持續進行；0.18.22 靜態遊戲已發布，公開 294 個檔案與雙端正常入海已核對。本機房間跨程序恢復、雙人桌機／觸控各 70/70；公網多人服務仍未配置，不表示完整多人或功能對等完成。** 歷史盤點：[0.14](docs/FEATURE_PARITY-v014.md)、[0.13](docs/FEATURE_PARITY-v013.md)、[0.12](docs/FEATURE_PARITY-v012.md)、[0.11](docs/FEATURE_PARITY-v011.md)、[0.10](docs/FEATURE_PARITY-v010.md)、[0.9](docs/FEATURE_PARITY-v09.md)、[0.8](docs/FEATURE_PARITY-v08.md)。
+目標：完整 feature parity，維持桌機／手機及自動畫質。**目標持續進行；0.18.23 靜態遊戲已發布，公開 294 個檔案與雙端預設入海、正常操作 55/55 已核對。時間精度漏畫／畫質誤降與極深海無效陰影工作已修正，本機完整海溝桌機 54/54、觸控 68/68；公開觸控完整海溝 68/68 亦已通過。公網多人、全內容與實體裝置／商用門檻仍未完成。** 歷史盤點：[0.14](docs/FEATURE_PARITY-v014.md)、[0.13](docs/FEATURE_PARITY-v013.md)、[0.12](docs/FEATURE_PARITY-v012.md)、[0.11](docs/FEATURE_PARITY-v011.md)、[0.10](docs/FEATURE_PARITY-v010.md)、[0.9](docs/FEATURE_PARITY-v09.md)、[0.8](docs/FEATURE_PARITY-v08.md)。
+
+0.18.23 的有界時間容差、原始統計、無日光陰影省略、完整 RGBA 與有正有負的 GPU 計時，見 [本輪報告](docs/TEST_REPORT-v01823.md)。CPU 96/96 套、服務 101/101、靜態 66/66；兩軸審查無剩餘 P1/P2，不提升整體商用星級。
 
 依據：[官方功能研究](docs/WII-PARITY-REFERENCE.md)、[內容與圖鑑盤點](docs/WII-CONTENT-INVENTORY.md)、[完整玩家故事規格](docs/parity/SPEC.md)、[分項工作](docs/parity/issues)。
 

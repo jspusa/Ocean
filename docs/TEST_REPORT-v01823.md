@@ -1,6 +1,6 @@
 # 0.18.23 游泳節奏與極深海運算驗證
 
-基線 `dca9fdbeb77628ac83e079b6aca7704e2ad2bccd`；[規格](parity/FRAME-PACING-v01823-SPEC.md)、[雙軸審查](parity/REVIEW-v01823.md)。本輪最終本機驗證完成，公開交付待核對；完整內容、多人、公網及實體裝置驗收範圍保留。
+基線 `dca9fdbeb77628ac83e079b6aca7704e2ad2bccd`；[規格](parity/FRAME-PACING-v01823-SPEC.md)、[雙軸審查](parity/REVIEW-v01823.md)。本輪最終本機驗證、公開靜態交付及相符正常操作均完成；完整內容、多人、公網及實體裝置驗收範圍保留。
 
 ## 本輪修正與 RED
 
@@ -64,7 +64,20 @@ tests/parity/hadal-investigation-browser.cjs 72329d6810e35d77ef16b011836cd018436
 
 ## 公開交付
 
-待本機與雙軸審查完成後發布，再核對指定 Pages 提交、全 manifest 及公開正常操作。公開多人端點仍為 null；沒有以本輪推論完整商用放行。
+程式提交 `a358dcd2c59746af7e2d60e1cefdf84d1219b335` 已推送 main；Pages 於 `2026-10-26T10:21:45Z` 回報該提交 built、error.message=null。`qa/parity/v01823-runtime-pages-build.json` 保留原始回覆。
+
+| 公開驗證 | 結果與界線 |
+|---|---|
+| 發布內容 | ★★★ 294/294 長度與 SHA-256 相符，manifest 自身逐 byte 相同；`qa/parity/published-v0.18.23-delivery.json` |
+| 預設入海 | ★★★ 桌機／觸控均 0.18.23、adaptive=true、quality 2／1、43 類圖鑑、compiled／streamed=true、8 個 surface programs、GL=0、context 未遺失、無自動中央焦點、errors=[] |
+| 正常操作 | ★★★ 桌機／觸控共 55/55，原生入海／游泳／轉向／暫停／恢復／回首頁／重載；`qa/parity/v01823-public-render-cadence-browser.json` |
+| 完整海溝 | ★★★ 正式網址觸控 68/68，包含 7,000 m 六步調查、原魚主動選取／真快門／重載後原 JPEG 相同、兩次首個 sunlit 恢復、重載後正常再入水；`qa/parity/v01823-public-hadal-touch/report.json` |
+
+公開海溝的原圖及重載原圖逐 byte 相同，共 41,364 bytes，SHA-256 `03e55c3da37a88cf48ba498d5bf686fe79afd2600c3fb054bf58f6dd01a716ec`；errors=[]、fatal=null、adaptive=true。
+
+公開測試直接使用正式網址，沒有請求替換或代用後端；觸控仍為同一台電腦模擬。公開多人端點仍為 null；沒有以本輪推論完整商用放行。
+
+Manifest SHA-256：`619daa120077a047d51f563176c03247f267537d9624ce1a38bb457b020b98a9`。後續文件提交不改 runtime 或 manifest，指定文件提交的 Pages 建置與代表公開檔案另由 `qa/parity/v01823-final-delivery-receipt.json` 核對。
 
 ## 後續可見品質
 

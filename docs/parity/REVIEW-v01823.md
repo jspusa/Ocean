@@ -26,3 +26,5 @@ GPU harness 取固定提交的正式 Renderer，共用實際 linked programs／�
 完整多人、公網服務、實體手機、全內容與商用放行範圍保留，不因單輪回歸通過將持續目標標為完成。
 
 兩軸最終均唯讀核對桌機 54/54、觸控 68/68，errors=[]、fatal=null、3 epochs、2 次 first-sunlit transition、staticDelta=1、shadowDraws>0、有效矩陣與自動畫質。實際原照及重載 JPEG 逐 byte 相同：桌機 100,616 bytes、觸控 46,534 bytes；最後各完成 30 個淺水遊玩幀。本輪本機驗收缺口已關閉，完整目標保留。
+
+root 後續公開驗收完成：指定程式提交 Pages built、294/294 檔案雜湊、雙端正常入海／55 項操作，以及正式網址觸控完整海溝 68/68。此為 root 執行證據，沒有宣稱兩位審查代理親自操作公網站；公開狀態及文件提交收據見本輪報告。
