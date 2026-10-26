@@ -100,18 +100,53 @@ const check=(name,pass,detail)=>{results.push({name,pass:!!pass,detail});console
    await page.waitForTimeout(220);inputs.push({action:'vertical',delta,ms,before,after:await page.evaluate(()=>({p:player.p.slice(),velocity:player.velocity.slice(),keys:[...keys],vertical:verticalInput}))});
   }
   async function travel(goal,tolerance=.6){
-   const start=Date.now(),initial=await state();let lastLog=0,reached=false;
+   const start=Date.now(),initial=await state();let lastLog=0,reached=false,axisPlan=null;
    while(Date.now()-start<100000){
     const s=await state();assert(s.active&&!s.modal&&!s.hidden&&s.focused&&!s.lost,'Natural swimming stays live');
-    const range=distance(s.p,goal);if(range<tolerance){reached=true;break;}
-    if(Math.hypot(goal[0]-s.p[0],goal[2]-s.p[2])<.12&&Math.abs(goal[1]-s.p[1])>.35&&goal[1]>=s.floor+.9){await vertical(goal[1]-s.p[1]);}else{await aimAt(goal);await swim(true);await page.waitForTimeout(Math.min(600,Math.max(70,range*300)));await swim(false);}
+    const range=distance(s.p,goal),horizontal=Math.hypot(goal[0]-s.p[0],goal[2]-s.p[2]),dy=goal[1]-s.p[1];if(range<tolerance){reached=true;break;}
+    // A capped dive angle plus a pulse based on the large vertical distance
+    // overshoots XZ, turns 180 degrees and swims back into the higher floor.
+    // Plan a level approach using the actual terrain, then use native rise/
+    // descend controls. Reading a waypoint never assigns game coordinates.
+    if(!axisPlan&&Math.abs(dy)>Math.max(.7,horizontal*1.5)){
+     axisPlan=await page.evaluate(({from,goal})=>{
+      const samples=Math.max(1,Math.ceil(Math.hypot(goal[0]-from[0],goal[2]-from[2])/.05));let maxFloor=-Infinity;
+      for(let i=0;i<=samples;i++){const u=i/samples;maxFloor=Math.max(maxFloor,groundHeight(from[0]+(goal[0]-from[0])*u,from[2]+(goal[2]-from[2])*u));}
+      const cruiseY=Math.max(from[1],goal[1],maxFloor+1.05),raised=[from[0],cruiseY,from[2]],overGoal=[goal[0],cruiseY,goal[2]];
+      return {cruiseY,maxFloor,samples,raised,overGoal,aligned:false,riseClear:OceanRegions.pathClear(from,raised,.4),levelClear:OceanRegions.pathClear(raised,overGoal,.4)};
+     },{from:s.p,goal});
+     assert(Number.isFinite(axisPlan.cruiseY)&&axisPlan.riseClear&&axisPlan.levelClear,'A steep native route requires a clear rise and level approach: '+JSON.stringify(axisPlan));
+     inputs.push({action:'travel-axis-plan',at:new Date().toISOString(),goal:goal.slice(),from:s.p.slice(),...axisPlan});
+    }
+    // Once aligned, keep the vertical leg: descending must never trigger a
+    // return to cruise height. Any horizontal drift reopens the level leg.
+    if(axisPlan)axisPlan.aligned=horizontal<.12&&goal[1]>=s.floor+.9;
+    let phase='direct',pulseMs=null,inputTarget=goal.slice();
+    if(axisPlan&&!axisPlan.aligned&&s.p[1]<axisPlan.cruiseY-.12){phase='rise-before-level';inputTarget=[s.p[0],axisPlan.cruiseY,s.p[2]];await vertical(axisPlan.cruiseY-s.p[1]);}
+    else if(horizontal<.12&&Math.abs(dy)>.35&&goal[1]>=s.floor+.9){phase='vertical-at-goal';await vertical(dy);}
+    else{
+     if(axisPlan){
+      phase='level-align';inputTarget=[goal[0],s.p[1],goal[2]];
+      // Keep a full .82 m swimmer clearance along the real horizontal leg.
+      // If native settling left us lower than its safe corridor, rise first.
+      const level=await page.evaluate(({from,to})=>{
+       const n=Math.max(1,Math.ceil(Math.hypot(to[0]-from[0],to[2]-from[2])/.05));let floor=-Infinity;
+       for(let i=0;i<=n;i++){const u=i/n;floor=Math.max(floor,groundHeight(from[0]+(to[0]-from[0])*u,from[2]+(to[2]-from[2])*u));}
+       return {floor,clear:OceanRegions.pathClear(from,to,.4)};
+      },{from:s.p,to:inputTarget});
+      assert(level.clear&&s.p[1]>=level.floor+.82,'Level native approach must clear the existing floor and solids');
+      pulseMs=Math.min(180,Math.max(20,horizontal*160));
+     }else pulseMs=Math.min(600,Math.max(70,range*300));
+     await aimAt(inputTarget);await swim(true);await page.waitForTimeout(pulseMs);await swim(false);
+    }
     // Release before judging arrival. On a steep slope the remaining inertia
     // can move XZ onto higher ground, raising Y well outside the sampling zone.
     // Short near-target pulses plus settled endpoint checks use normal inputs;
     // they do not change the game's range, collision or motion rules.
     await page.waitForFunction(()=>Math.hypot(...player.velocity)<.02,null,{timeout:5000});
     await page.waitForTimeout(120);
-    if(Date.now()-lastLog>10000){lastLog=Date.now();console.log(JSON.stringify({travel:goal,p:s.p,range,seconds:(Date.now()-start)/1000}));}
+    const settled=await state();inputs.push({action:'travel-step',at:new Date().toISOString(),phase,goal:goal.slice(),inputTarget,pulseMs,horizontal,before:s.p.slice(),after:settled.p.slice(),rangeBefore:range,rangeAfter:distance(settled.p,goal)});
+    if(Date.now()-lastLog>10000){lastLog=Date.now();console.log(JSON.stringify({travel:goal,phase,p:settled.p,range:distance(settled.p,goal),seconds:(Date.now()-start)/1000}));}
    }
    await swim(false);const end=await state();observations.push({route:{goal,initial:initial.p,end:end.p,seconds:(Date.now()-start)/1000}});assert(reached&&distance(end.p,goal)<tolerance,'Native route did not settle at '+JSON.stringify(goal));
   }
