@@ -4,7 +4,10 @@
  * Biology and authored limits: docs/parity/DUMBO-OCTOPUS-REFERENCE.md. */
 const DumboOctopusArt=(()=>{
  const skin=[.69,.42,.35],pale=[.82,.62,.51],inside=[.66,.43,.37];
- const paint=p=>{const speckle=.014*Math.sin(p[0]*81+p[2]*29)*Math.sin(p[1]*93-p[2]*41),warm=.25+.15*Math.cos(p[1]*5)+.10*Math.sin(p[0]*8+p[2]*5);return cetaceanArt.blend(skin,pale,warm).map(c=>c+speckle);};
+ // Broad authored tissue pigmentation: paler toward the oral crown, with a
+ // restrained rose transition at the fin roots. Vertex-scale speckle aliases
+ // between mesh levels; fine detail belongs to the existing filtered shader.
+ const paint=p=>{const ventral=clamp((.20-p[1])/.60,0,1),front=clamp((p[0]+.24)/.48,0,1),shoulder=Math.exp(-Math.pow((p[1]-.16)/.16,2)-Math.pow((Math.abs(p[2])-.17)/.13,2)-Math.pow(p[0]/.22,2)),warm=.20+.42*ventral+.10*front-.12*shoulder;return cetaceanArt.blend(skin,pale,warm);};
  function exterior(g,begin,color){
   for(let k=begin;k<g.v.length;k+=12)if(typeof color==='function'){const c=color(g.v.slice(k,k+3));for(let i=0;i<3;i++)g.v[k+6+i]=c[i];}
   for(let k=begin;k<g.v.length;k+=36){const a=g.v.slice(k,k+3),b=g.v.slice(k+12,k+15),c=g.v.slice(k+24,k+27),n=[0,1,2].map(i=>g.v[k+3+i]+g.v[k+15+i]+g.v[k+27+i]);if(V.dot(V.cross(V.sub(b,a),V.sub(c,a)),n)<0){const v=g.v.slice(k+12,k+24);for(let i=0;i<12;i++){g.v[k+12+i]=g.v[k+24+i];g.v[k+24+i]=v[i];}}}
@@ -19,7 +22,13 @@ const DumboOctopusArt=(()=>{
  function mantle(g,low){
   g.tag=1;
   const profile=[[-.14,0,0,0],[-.08,0,.17,.17],[-.02,0,.205,.205],[.12,0,.235,.235],[.28,0,.225,.225],[.42,0,.16,.16],[.5,0,0,0]];
-  surface(g,(u,v)=>{const y=.5-.64*u,r=cetaceanArt.profileAt(profile,y)[2],a=v*TAU;return [r*Math.cos(a),y,r*Math.sin(a)];},low?12:24,low?16:32,paint,(u,v,p)=>u<.00001?[0,1,0]:u>.99999?[0,-1,0]:[p[0],(p[1]-.18)*.5,p[2]]);
+  // Interpolate area only across the upper cap. Radius approaching zero
+  // linearly makes a cone even when the pole normal points up. A nonzero
+  // terminal area slope gives a rounded pole while matching the original
+  // radius and first derivative at y=.42; every lower station is unchanged.
+  const capBase=profile.at(-2),capTop=profile.at(-1),capBefore=profile.at(-3),height=capTop[0]-capBase[0],area=capBase[2]*capBase[2],joinSlope=2*capBase[2]*(capTop[2]-capBefore[2])/(capTop[0]-capBefore[0]);
+  const radius=y=>{if(y<=capBase[0])return cetaceanArt.profileAt(profile,y)[2];const t=clamp((y-capBase[0])/height,0,1),t2=t*t,t3=t2*t;return Math.sqrt(Math.max(0,(2*t3-3*t2+1)*area+(t3-2*t2+t)*height*joinSlope-(t3-t2)*area));};
+  surface(g,(u,v)=>{const y=.5-.64*u,r=radius(y),a=v*TAU;return [r*Math.cos(a),y,r*Math.sin(a)];},low?12:24,low?16:32,paint,(u,v,p)=>u<.00001?[0,1,0]:u>.99999?[0,-1,0]:[p[0],(p[1]-.18)*.5,p[2]]);
  }
  function ears(g,low){
   g.tag=3;
@@ -31,31 +40,40 @@ const DumboOctopusArt=(()=>{
   const restPitch=.6,cp=Math.cos(restPitch),sn=Math.sin(restPitch);
   for(const side of [-1,1])surface(g,(u,v)=>{const a=v*TAU,w=.13*Math.sin(Math.PI*u),thickness=.017*Math.sin(Math.PI*u),chord=Math.cos(a)*w,normal=Math.sin(a)*thickness;return [-.018+.045*u+cp*chord-sn*normal,.16+.08*u+sn*chord+cp*normal,side*(.17+.39*u)];},low?8:16,low?8:12,paint,(u,v)=>{const x=Math.cos(v*TAU),y=Math.sin(v*TAU)*3;return [cp*x-sn*y,sn*x+cp*y,side*(u<.5?-.15:.15)];});
  }
- function armPoint(t,a){const r=.17+.225*Math.sin(t*Math.PI*.5);return [Math.cos(a)*r,-.06-.44*t,Math.sin(a)*r];}
+ function armPoint(t,a){
+  // A relaxed cup swells around the middle and turns its free tips inward.
+  // The authored curve is shared by the web, arm tubes and oral detail seats.
+  const r=.17+.245*Math.sin(t*Math.PI*.75);return [Math.cos(a)*r,-.06-.44*t,Math.sin(a)*r];
+ }
+ function armFrame(t,a){
+  const across=[-Math.sin(a),0,Math.cos(a)],tangent=V.sub(armPoint(Math.min(1,t+.0001),a),armPoint(Math.max(0,t-.0001),a));
+  const normal=V.norm(V.cross(tangent,across));return {across,normal,along:V.cross(normal,across)};
+ }
  function crown(g,low){
   g.tag=5;
-  // The scalloped interbrachial web is an open umbrella with an actual inner
-  // surface. Its edge ends above the eight distinct free arm tips.
-  for(const side of [-1,1])surface(g,(u,v)=>{const a=v*TAU,lobe=Math.pow(.5+.5*Math.cos(a*8),2),p=armPoint(u*(.60+.24*lobe),a);return [p[0]+Math.cos(a)*side*.0017,p[1],p[2]+Math.sin(a)*side*.0017];},low?4:8,low?32:64,side>0?paint:inside,(u,v)=>[Math.cos(v*TAU)*side,-.65*side,Math.sin(v*TAU)*side]);
+  // The scalloped web has a real inner surface and slack between curved arm
+  // supports. Sag vanishes on every arm and at the mantle attachment, so the
+  // membrane remains seated on the same armPoint curve without extra sheets.
+  // This relaxed shape is original art, not a measured biological posture.
+  for(const side of [-1,1])surface(g,(u,v)=>{const a=v*TAU,lobe=Math.pow(.5+.5*Math.cos(a*8),2),t=u*(.60+.24*lobe),p=armPoint(t,a),slack=.023*Math.sin(Math.PI*t)*Math.pow(Math.sin(a*4),2),offset=side*.0017-slack;return [p[0]+Math.cos(a)*offset,p[1],p[2]+Math.sin(a)*offset];},low?4:8,low?32:64,side>0?paint:inside,(u,v)=>[Math.cos(v*TAU)*side,0,Math.sin(v*TAU)*side]);
   for(let i=0;i<8;i++){const a=i*TAU/8,points=Array.from({length:(low?6:12)+1},(_,j)=>armPoint(j/(low?6:12),a));tube(g,points,t=>.023*Math.pow(1-t,.85),paint,low?4:6);}
  }
  function oralDetails(g,low){
   g.tag=5;
   for(let i=0;i<8;i++){
-   const a=i*TAU/8,normal=V.norm([-Math.cos(a)*.85,-.6,-Math.sin(a)*.85]),across=[-Math.sin(a),0,Math.cos(a)],along=V.cross(normal,across);
-   const seat=t=>V.add(armPoint(t,a),V.mul(normal,.023*Math.pow(1-t,.85)));
+   const a=i*TAU/8,seat=t=>V.add(armPoint(t,a),V.mul(armFrame(t,a).normal,.023*Math.pow(1-t,.85)));
    // One recessed suction cup row per arm, with no invented second row.
    // The inner face rises to its rim; it is not a flat bright dot on the skin.
    const count=low?3:5;
    for(let j=0;j<count;j++){
-    const t=.22+j*.60/(count-1),center=seat(t),radius=.012*(1-t*.55);
+    const t=.22+j*.60/(count-1),{normal,across,along}=armFrame(t,a),center=seat(t),radius=.012*(1-t*.55);
     surface(g,(u,v)=>V.add(V.add(center,V.mul(normal,.001+.007*u*u)),V.add(V.mul(across,Math.cos(v*TAU)*radius*u),V.mul(along,Math.sin(v*TAU)*radius*u))),low?2:3,low?6:8,[.78,.67,.57],()=>normal);
    }
    // Cirri are slender soft projections beside the oral row. These are not
    // hooks, spines or the two elongated collecting filaments of Vampyroteuthis.
    const pairs=low?2:4;
    for(let j=0;j<pairs;j++)for(const side of [-1,1]){
-    const t=.25+j*.48/(pairs-1),root=V.add(seat(t),V.mul(across,side*.017*(1-t*.3))),tip=V.add(root,V.add(V.mul(normal,.035),V.mul(across,side*.016))),points=low?[root,tip]:[root,V.add(V.lerp(root,tip,.55),V.mul(along,.008)),tip];
+    const t=.25+j*.48/(pairs-1),{normal,across,along}=armFrame(t,a),root=V.add(seat(t),V.mul(across,side*.017*(1-t*.3))),tip=V.add(root,V.add(V.mul(normal,.035),V.mul(across,side*.016))),points=low?[root,tip]:[root,V.add(V.lerp(root,tip,.55),V.mul(along,.008)),tip];
     tube(g,points,u=>.0025*(1-u),[.83,.68,.59],low?3:4);
    }
   }

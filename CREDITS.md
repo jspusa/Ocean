@@ -124,3 +124,7 @@
 `assets/guide_tripod_fish.jpg` 與 `assets/guide_dumbo_octopus.jpg` 由本作同一原創模型透過正式 WebGL 渲染器在隔離棚景生成，是遊戲圖鑑縮圖，不是野外生物照片。
 
 形態依據及界線見 [三腳魚研究](docs/parity/TRIPOD-FISH-REFERENCE.md) 與 [小飛象章魚研究](docs/parity/DUMBO-OCTOPUS-REFERENCE.md)。三腳魚 25 cm 是標準體長，不包含延伸鰭；小飛象章魚只標為 `Grimpoteuthis sp.`，代表全體縱向 20 cm。棲地、數量、比例和節律均為遊戲編排，不是野外共棲或生理精密模擬，兩者也不抵銷未完成的 Wii 圖鑑條目。
+
+## 0.18.35 原創深海曲面修訂
+
+三腳魚的連續鰭膜、曲面張力，小飛象章魚的圓滑外套頂端、彎曲腕蹼與傳遞節律均為本作原創幾何／動畫。形態參考沿用 [三腳魚來源](docs/parity/TRIPOD-FISH-REFERENCE.md) 與 [小飛象章魚來源](docs/parity/DUMBO-OCTOPUS-REFERENCE.md)；代表尺寸、局部色域與運動參數屬設計值，不宣稱精確物種掃描或生理模擬。圖鑑影像由本作正式模型重新繪製，不使用參考網站照片。

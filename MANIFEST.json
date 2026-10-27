@@ -1,5 +1,5 @@
 {
-  "version": "0.18.34",
+  "version": "0.18.35",
   "scope": "served game and build sources",
   "files": [
     {
@@ -9,8 +9,8 @@
     },
     {
       "path": "CREDITS.md",
-      "bytes": 13178,
-      "sha256": "388612990d6c374448b248aea3dfdbeff700b2bec0994f9d49b7a17d36d31c1a"
+      "bytes": 13686,
+      "sha256": "3f0c4bf9899601790db41bdc5cd8a719d8e5f96abb0619b935e274c9990ca1e0"
     },
     {
       "path": "LICENSE",
@@ -19,13 +19,13 @@
     },
     {
       "path": "README.md",
-      "bytes": 40969,
-      "sha256": "87fc1bed1552f16b8399b17e5a5171d5d1a2346ac4657c5adb9956ea77aadf64"
+      "bytes": 41467,
+      "sha256": "af471c4e9daf43cbf20b08ba38a1b35f00fc0829851f13fcf70cd3ce10c91931"
     },
     {
       "path": "VERSION",
       "bytes": 8,
-      "sha256": "00ed5c937b34511fa2b88ad4dc6a37fd980eec4b250e2ba369db34cdf72a0e31"
+      "sha256": "1f8bcba28ec4759daaa35fda7688f59e24449766d35ab58ec8cd166e16400d74"
     },
     {
       "path": "assets/caustics.jpg",
@@ -104,8 +104,8 @@
     },
     {
       "path": "assets/guide_dumbo_octopus.jpg",
-      "bytes": 17319,
-      "sha256": "5888eea6e531dd9202e545813121051a68336aca458e8fa6b55d5c477794093d"
+      "bytes": 16851,
+      "sha256": "c8d3b490dfca5aee4de546543ba7c2c1e59f8a64e8caf94dbf1b7bdf80943abd"
     },
     {
       "path": "assets/guide_false_killer_whale.jpg",
@@ -219,8 +219,8 @@
     },
     {
       "path": "assets/guide_tripod_fish.jpg",
-      "bytes": 14022,
-      "sha256": "af38801cf7c7d8941eec1f0d3569c7334ff0cacf76f076a8852d8ac82f67e158"
+      "bytes": 13843,
+      "sha256": "ffdaa97b32b150f3a06acaed4002e3fe0b61d67e2d6a22a2069dc846e719fc26"
     },
     {
       "path": "assets/guide_turtle.jpg",
@@ -249,8 +249,8 @@
     },
     {
       "path": "assets/reef.mesh.gz",
-      "bytes": 21731839,
-      "sha256": "c9ff6c41791f341fcb7ff1603477fa0dba43c16b26c48cba8d0aad8f1720e195"
+      "bytes": 21750793,
+      "sha256": "7351879d6af65ec8d026aa4ceded842fc1702da4a50c9f95e0cfb4bfd477ad3b"
     },
     {
       "path": "assets/rock_diff.jpg",
@@ -868,11 +868,6 @@
       "sha256": "954852bba1108042086f70b9318e20f6026988945d4d9f01ddda6814322d9d8c"
     },
     {
-      "path": "assets/scene/chunk-9613a4a66334b03156ed.bin.gz",
-      "bytes": 128504,
-      "sha256": "9613a4a66334b03156eddbe08c8215923499f976f1b9b8d036cf3fe20a584b68"
-    },
-    {
       "path": "assets/scene/chunk-99af1805ef4c63c61c06.bin.gz",
       "bytes": 228466,
       "sha256": "99af1805ef4c63c61c06d9e44435f17bea35274e359b42343b95a5ac7e6cd009"
@@ -968,11 +963,6 @@
       "sha256": "ba3c929be92a2848459113e7b7fcfce9e2c8e07b5d4e2008eca50d97f53132b5"
     },
     {
-      "path": "assets/scene/chunk-bb7eaa703b645837ed7d.bin.gz",
-      "bytes": 154544,
-      "sha256": "bb7eaa703b645837ed7dbf57544258965f9ac075b1328a20b86331e6b7183f59"
-    },
-    {
       "path": "assets/scene/chunk-bd8f98f51dd565a92999.bin.gz",
       "bytes": 5679,
       "sha256": "bd8f98f51dd565a929995284ea531732a300125d44f9396a0fc19a163701edd7"
@@ -1003,6 +993,11 @@
       "sha256": "c611571277e8b097859bf33bfeea8d637181f2b13e8867b2636bc3b6dc1ef7da"
     },
     {
+      "path": "assets/scene/chunk-c65eac7551fa64d0bc8a.bin.gz",
+      "bytes": 142040,
+      "sha256": "c65eac7551fa64d0bc8afc90680022ee96dd4b2af6c676c43fdfbe441a83c2d7"
+    },
+    {
       "path": "assets/scene/chunk-c6dbf657ce8e29577b3c.bin.gz",
       "bytes": 129615,
       "sha256": "c6dbf657ce8e29577b3c8902980e4b85489b9f3d2b05984b55e5723dc7374084"
@@ -1016,6 +1011,11 @@
       "path": "assets/scene/chunk-cd85978dc65aaa5142ad.bin.gz",
       "bytes": 33066,
       "sha256": "cd85978dc65aaa5142ad7410cb991240f77603a139f7c5dc90b19357a1133d95"
+    },
+    {
+      "path": "assets/scene/chunk-d00b08ce9fbfcc600f0e.bin.gz",
+      "bytes": 161105,
+      "sha256": "d00b08ce9fbfcc600f0eda6d0c5b6c308a180499f70b9feb07a8fb17db8dd61c"
     },
     {
       "path": "assets/scene/chunk-d038a6706251864bcf00.bin.gz",
@@ -1195,7 +1195,7 @@
     {
       "path": "assets/scene/index.json",
       "bytes": 1809168,
-      "sha256": "67d9096dac83753d3d59d09fac841aca6f5b7c694988bc5839732e41269f67df"
+      "sha256": "589f448c139ae0b90a78f9a8730a7f72acb9da05e80bcfa210bc9a316e41a3e0"
     },
     {
       "path": "assets/shell_diff.jpg",
@@ -1220,7 +1220,7 @@
     {
       "path": "index.html",
       "bytes": 16564,
-      "sha256": "1b27ce66d60181eac8d94c35358ade20cc392ce1a0cbdbc63b5dd390f75c2e17"
+      "sha256": "2f8566e6393ac61aeebdb73bd91280164929be73952789eafc86154360e45598"
     },
     {
       "path": "music/blue_silence.mp3",
@@ -1310,7 +1310,7 @@
     {
       "path": "src/config.js",
       "bytes": 3041,
-      "sha256": "69f2813f3a8e404bd6baec59c1f08f6081b56831549006c2c43defdbffab7f8f"
+      "sha256": "5a62328a07b6d7de2446c2e360ad4e56ffb485fd4df7039f83787d9c8c24eab1"
     },
     {
       "path": "src/deepsea.js",
@@ -1319,8 +1319,8 @@
     },
     {
       "path": "src/dumbo_octopus.js",
-      "bytes": 8231,
-      "sha256": "510e80f8b58a37fe3f52685d1e4bf76e777a95b496b231814402a72a5b339e9d"
+      "bytes": 9846,
+      "sha256": "1e5b48969fd45a1dcd31dc1a2cb9defb141516f9be085b627a718a58ea963024"
     },
     {
       "path": "src/ecology.js",
@@ -1329,8 +1329,8 @@
     },
     {
       "path": "src/engine.js",
-      "bytes": 124021,
-      "sha256": "27caee21bcbce19c4e26dce197cc20a199352a6e3cc6caa69bbe79afaa82ad1b"
+      "bytes": 124158,
+      "sha256": "e345bc0d29910cbf61ee9848c6b85af47e5d468875142f97c6958d2930416b49"
     },
     {
       "path": "src/expedition.js",
@@ -1490,7 +1490,7 @@
     {
       "path": "src/shell.html",
       "bytes": 12391,
-      "sha256": "f94e5b6e3bc44c9e11938121aab4953f6a5aeec520bfcda68725993baf09f3fb"
+      "sha256": "3277040f54b13fda7949044867f05576dfbea1c06149be5d91ab0b8fd7ad8301"
     },
     {
       "path": "src/ship.js",
@@ -1524,8 +1524,8 @@
     },
     {
       "path": "src/tripod_fish.js",
-      "bytes": 7891,
-      "sha256": "02908986de720502ff499071f721dc5f6a677636e3c62d1ab060983d207d745f"
+      "bytes": 10377,
+      "sha256": "3bb099ac638b2a18c0ce86935ac47d82594a5a46c93d693acf462d2cd722a1bb"
     },
     {
       "path": "src/voyage.js",

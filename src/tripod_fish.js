@@ -22,7 +22,9 @@ const TripodFishArt=(()=>{
  }
  function stilts(g,low){
   g.tag=7;return supports.map(s=>{
-   const first=g.v.length/12,end=V.add(s.contact,[0,.008,0]),count=low?10:16,points=Array.from({length:count+1},(_,i)=>V.lerp(s.root,end,i/count));
+   // Eight collinear intervals preserve the straight taper and every support
+   // probe. Spend geometry on the visible fin surface rather than extra rings.
+   const first=g.v.length/12,end=V.add(s.contact,[0,.008,0]),count=8,points=Array.from({length:count+1},(_,i)=>V.lerp(s.root,end,i/count));
    tube(g,points,t=>mix(.0055,.0028,t),[.068,.070,.063],low);
    // A thin, closely applied second pelvic ray ends halfway down the first.
    // It is not an extra leg and never adds a fourth substrate contact.
@@ -32,9 +34,30 @@ const TripodFishArt=(()=>{
    return Object.freeze({...s,range:Object.freeze({first,count:g.v.length/12-first})});
   });
  }
+ function membrane(g,roots,tips,low){
+  // Shared boundary vertices and normals make one thin surface. Independent
+  // per-panel thickness offsets left a crack at every curved sensory ray.
+  const intervals=roots.length-1,spanSteps=intervals*(low?1:2),chordSteps=low?2:3,thickness=.00055;
+  const curve=(points,u)=>{const at=clamp(u,0,1)*intervals,i=Math.min(intervals-1,Math.floor(at)),t=at-i,a=points[i],b=points[i+1],before=points[Math.max(0,i-1)],after=points[Math.min(intervals,i+2)],t2=t*t,t3=t2*t;return a.map((x,k)=>clamp((2*t3-3*t2+1)*x+(t3-2*t2+t)*(b[k]-before[k])*.5+(-2*t3+3*t2)*b[k]+(t3-t2)*(after[k]-x)*.5,Math.min(x,b[k]),Math.max(x,b[k])));};
+  const center=(u,v)=>V.lerp(curve(roots,u),curve(tips,u),v),delta=.0001;
+  const reference=V.norm(V.cross(V.sub(tips[intervals],tips[0]),V.sub(tips[Math.floor(intervals/2)],roots[Math.floor(intervals/2)])));
+  const side=Math.sign(roots[0][2]),bend=side?side*Math.sign(reference[2]):1,amplitude=g.tag===3?.010:.006;
+  // Root and free edge remain anchored. The slight transverse bow is authored
+  // tissue tension, not a measured specimen or a global lighting adjustment.
+  const surface=(u,v)=>V.add(center(u,v),V.mul(reference,bend*amplitude*Math.sin(Math.PI*u)*Math.sin(Math.PI*v)));
+  const grid=Array.from({length:spanSteps+1},(_,i)=>Array.from({length:chordSteps+1},(_,j)=>{
+   const u=i/spanSteps,v=j/chordSteps,p=surface(u,v),du=V.sub(surface(Math.min(1,u+delta),v),surface(Math.max(0,u-delta),v)),dv=V.sub(surface(u,Math.min(1,v+delta)),surface(u,Math.max(0,v-delta))),n=V.norm(V.cross(du,dv));
+   return {p,n,front:V.add(p,V.mul(n,thickness)),back:V.sub(p,V.mul(n,thickness))};
+  })),color=[.095,.104,.107];
+  const face=(a,b,c,side)=>g.tri(a[side],b[side],c[side],color,[a,b,c].map(v=>side==='front'?v.n:V.mul(v.n,-1)));
+  const rim=(a,b)=>{g.tri(a.front,a.back,b.back,color);g.tri(a.front,b.back,b.front,color);};
+  for(let i=0;i<spanSteps;i++){for(let j=0;j<chordSteps;j++){const a=grid[i][j],b=grid[i+1][j],c=grid[i+1][j+1],d=grid[i][j+1];face(a,b,c,'front');face(a,c,d,'front');face(a,c,b,'back');face(a,d,c,'back');}rim(grid[i][0],grid[i+1][0]);rim(grid[i+1][chordSteps],grid[i][chordSteps]);}
+  for(let j=0;j<chordSteps;j++){rim(grid[0][j+1],grid[0][j]);rim(grid[spanSteps][j],grid[spanSteps][j+1]);}
+  return surface;
+ }
  function fin(g,roots,tips,low){
-  faunaArt.fin(g,roots,tips,[.095,.104,.107],.00055);
-  for(let i=0;i<tips.length;i++)tube(g,[roots[i],V.lerp(roots[i],tips[i],.55),tips[i]],t=>mix(.0015,.00065,t),[.205,.215,.220],low);
+  const surface=membrane(g,roots,tips,low);
+  for(let i=0;i<tips.length;i++)tube(g,i===0||i===tips.length-1?[roots[i],tips[i]]:[roots[i],surface(i/(tips.length-1),.5),tips[i]],t=>mix(.0015,.00065,t),[.205,.215,.220],low);
  }
  function ordinaryFins(g,low){
   g.tag=5;

@@ -66,6 +66,55 @@ check('the mantle reaches the web attachment ring instead of leaving a floating 
   assert(hits.some(t=>t>=.172&&t<.22),'Each actual mantle surface must overlap the 0.17-unit web root');
  }
 });
+check('the actual mantle crown rounds toward its pole without widening the cap attachment',()=>{
+ const evidence=[];
+ for(const low of [false,true]){
+  const body=vertices(get('faunaGeometry("dumbo_octopus",'+low+')'),1),top=Math.max(...body.map(v=>v.p[1])),rings=new Map();
+  assert(Math.abs(top-.5)<1e-8,'The upper measurement endpoint stays fixed');
+  for(const vertex of body){const [x,y,z]=vertex.p,r=Math.hypot(x,z);if(y>=.42-1e-8)assert(r<=.160001,'The rounded cap must not bulge beyond its original attachment');if(y<top-1e-8)rings.set(y,Math.max(rings.get(y)||0,r));}
+  const upper=[...rings].sort((a,b)=>b[0]-a[0]).slice(0,2),slopes=upper.map(([y,r])=>r/(top-y));
+  evidence.push({low,top,rings:upper,slopes,rounding:slopes[0]/slopes[1]});
+ }
+ console.log(JSON.stringify({mantleCap:evidence}));
+ // Use real ring positions, not authored normals: a normal pointing upward
+ // at the apex cannot disguise a conical silhouette between the rings.
+ for(const row of evidence)assert(row.rounding>1.35,'The cap needs progressively flatter rings toward its pole: '+JSON.stringify(row));
+});
+check('the actual crown has curved arm supports and slack membrane between them in both drawable levels',()=>{
+ const sub=(a,b)=>a.map((v,i)=>v-b[i]),cross=(a,b)=>[a[1]*b[2]-a[2]*b[1],a[2]*b[0]-a[0]*b[2],a[0]*b[1]-a[1]*b[0]],dot=(a,b)=>a.reduce((sum,v,i)=>sum+v*b[i],0);
+ // Intersect the actual drawable membrane at equal heights. Samples stay
+ // clear of the arm tubes and oral filaments. A flat, taut radial panel has
+ // the same radius throughout its sector even if its color suggests folds.
+ const radiusAt=(g,y,angle)=>{const o=[0,y,0],d=[Math.cos(angle),0,Math.sin(angle)],hits=[];
+  for(let k=0;k<g.v.length;k+=36){if(g.v[k+11]!==5)continue;const p=g.v.slice(k,k+3),e1=sub(g.v.slice(k+12,k+15),p),e2=sub(g.v.slice(k+24,k+27),p),h=cross(d,e2),det=dot(e1,h);if(Math.abs(det)<1e-12)continue;const s=sub(o,p),u=dot(s,h)/det,v=dot(d,cross(s,e1))/det,t=dot(e2,cross(s,e1))/det;if(u>=-1e-8&&v>=-1e-8&&u+v<=1+1e-8&&t>.17&&t<.46)hits.push(t);}
+  assert(hits.length,'A real membrane must span each queried arm gap');return Math.max(...hits);
+ };
+ const evidence=[];
+ for(const low of [false,true]){
+  const g=get('faunaGeometry("dumbo_octopus",'+low+')'),arms=vertices(g,5);
+  for(let i=0;i<8;i++){
+   const a=i*Math.PI/4,along=p=>p[0]*Math.cos(a)+p[2]*Math.sin(a),across=p=>-p[0]*Math.sin(a)+p[2]*Math.cos(a),support=arms.filter(v=>Math.abs(across(v.p))<.008&&along(v.p)>.17),tip=support.filter(v=>v.p[1]<-.47),mid=support.filter(v=>v.p[1]>-.42&&v.p[1]<-.22);
+   assert(tip.length&&mid.length,'Each arm retains a separate middle and distal tip');
+   const curl=Math.max(...mid.map(v=>along(v.p)))-Math.max(...tip.map(v=>along(v.p)));
+   const gaps=[-.22,-.28].map(y=>({y,slack:Math.min(radiusAt(g,y,a+.14),radiusAt(g,y,a+Math.PI/4-.14))-radiusAt(g,y,a+Math.PI/8)}));
+   evidence.push({low,arm:i,curl,gaps});
+  }
+ }
+ console.log(JSON.stringify({softCrown:evidence}));
+ for(const row of evidence){assert(row.curl>.02,'A rounded crown needs inward-returning free arm tips, not eight straight skirt ribs: '+JSON.stringify(row));for(const sample of row.gaps)assert(sample.slack>.006,'A flexible membrane must sit inside its curved arm shoulders: '+JSON.stringify(row));}
+});
+check('the actual mantle skin keeps broad pigmentation continuous when mesh detail changes',()=>{
+ const sub=(a,b)=>a.map((v,i)=>v-b[i]),cross=(a,b)=>[a[1]*b[2]-a[2]*b[1],a[2]*b[0]-a[0]*b[2],a[0]*b[1]-a[1]*b[0]],dot=(a,b)=>a.reduce((sum,v,i)=>sum+v*b[i],0);
+ const colorAt=(g,y,angle)=>{const o=[0,y,0],d=[Math.cos(angle),0,Math.sin(angle)];
+  for(let k=0;k<g.v.length;k+=36){if(g.v[k+11]!==1)continue;const p=g.v.slice(k,k+3),e1=sub(g.v.slice(k+12,k+15),p),e2=sub(g.v.slice(k+24,k+27),p),h=cross(d,e2),det=dot(e1,h);if(Math.abs(det)<1e-12)continue;const s=sub(o,p),u=dot(s,h)/det,v=dot(d,cross(s,e1))/det,t=dot(e2,cross(s,e1))/det;if(u>=-1e-8&&v>=-1e-8&&u+v<=1+1e-8&&t>0)return [0,1,2].map(i=>g.v[k+6+i]*(1-u-v)+g.v[k+18+i]*u+g.v[k+30+i]*v);}
+  assert.fail('Mantle color sample must intersect a real drawable triangle');
+ };
+ const high=get('faunaGeometry("dumbo_octopus")'),low=get('faunaGeometry("dumbo_octopus",true)');let maxChannelJump=0;
+ // Same local surface direction and height, with actual triangle interpolation
+ // in each LOD. Broad tissue color should not pop with tessellation changes.
+ for(const y of [-.04,.04,.12,.20,.28,.36])for(let j=0;j<24;j++){const angle=.071+j*Math.PI/12,a=colorAt(high,y,angle),b=colorAt(low,y,angle);maxChannelJump=Math.max(maxChannelJump,...a.map((c,i)=>Math.abs(c-b[i])));}
+ console.log(JSON.stringify({mantleColorContinuity:{samples:144,maxChannelJump}}));assert(maxChannelJump<.012,'Skin color must stay within 1.2% per channel across actual LOD surfaces');
+});
 check('the two real mesh levels stay cached, finite, outward, nonemissive and inside the small-animal draw budget',()=>{
  const hi=get('faunaGeometry("dumbo_octopus")'),lo=get('faunaGeometry("dumbo_octopus",true)'),sub=(a,b)=>a.map((v,i)=>v-b[i]),cross=(a,b)=>[a[1]*b[2]-a[2]*b[1],a[2]*b[0]-a[0]*b[2],a[0]*b[1]-a[1]*b[0]],dot=(a,b)=>a.reduce((n,v,i)=>n+v*b[i],0);let bytes=0;
  assert.strictEqual(hi,get('faunaGeometry(SPECIES.find(s=>s.id==="dumbo_octopus"))'));assert.strictEqual(hi,get('faunaGeometry(SPECIES.findIndex(s=>s.id==="dumbo_octopus"))'));assert.notStrictEqual(hi.v,lo.v);

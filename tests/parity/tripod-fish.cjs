@@ -43,6 +43,26 @@ check('sensory pectorals are paired forward fans above the body, separate from t
  }
 });
 function hits(g,o,d){const result=[],sub=(a,b)=>a.map((x,i)=>x-b[i]),dot=(a,b)=>a.reduce((v,x,i)=>v+x*b[i],0),cross=(a,b)=>[a[1]*b[2]-a[2]*b[1],a[2]*b[0]-a[0]*b[2],a[0]*b[1]-a[1]*b[0]];for(let k=0;k<g.v.length;k+=36){const a=g.v.slice(k,k+3),e=sub(g.v.slice(k+12,k+15),a),f=sub(g.v.slice(k+24,k+27),a),h=cross(d,f),det=dot(e,h);if(Math.abs(det)<1e-11)continue;const s=sub(o,a),u=dot(s,h)/det,v=dot(d,cross(s,e))/det,t=dot(f,cross(s,e))/det;if(u>=0&&v>=0&&u+v<=1&&t>0)result.push({t,tag:g.v[k+11]});}return result.sort((a,b)=>a.t-b.t);}
+check('each sensory fin membrane is one joined thin surface without open panel seams',()=>{
+ for(const low of [false,true])for(const side of [-1,1]){
+  const g=get('faunaGeometry("tripod_fish",'+low+')'),adj=new Map(),edges=new Map(),key=p=>p.map(x=>x.toFixed(8)).join(',');let triangles=0;
+  // Inspect the rendered dark tissue, excluding the lighter independent ray
+  // tubes. Position welding deliberately ignores shading normals and tags:
+  // panel thickness offsets must not leave literal gaps in one membrane.
+  for(let k=0;k<g.v.length;k+=36){if(g.v[k+11]!==3||g.v[k+2]*side<=0||g.v[k+6]>.14)continue;const ids=[0,12,24].map(o=>key(g.v.slice(k+o,k+o+3)));triangles++;for(let i=0;i<3;i++){const a=ids[i],b=ids[(i+1)%3];if(!adj.has(a))adj.set(a,new Set());if(!adj.has(b))adj.set(b,new Set());adj.get(a).add(b);adj.get(b).add(a);const e=[a,b].sort().join('|');edges.set(e,(edges.get(e)||0)+1);}}
+  let components=0;const seen=new Set();for(const start of adj.keys()){if(seen.has(start))continue;components++;const stack=[start];while(stack.length){const v=stack.pop();if(seen.has(v))continue;seen.add(v);stack.push(...adj.get(v));}}
+  const openEdges=[...edges.values()].filter(n=>n===1).length,nonmanifold=[...edges.values()].filter(n=>n>2).length;
+  console.log('  sensory membrane '+JSON.stringify({low,side,triangles,components,openEdges,nonmanifold}));
+  assert(triangles>30,'The actual pectoral membrane is present');assert.equal(components,1,'One anatomical sensory fin must not consist of disconnected radial panels');assert.equal(openEdges,0,'Its front and back share a continuous perimeter with no internal open seams');assert.equal(nonmanifold,0,'Fin thickness does not overlap at an internal seam');
+ }
+});
+check('the ordinary dorsal membrane has a shallow tension curve between its fixed attachment and free edge',()=>{
+ for(const low of [false,true]){
+  const g=get('faunaGeometry("tripod_fish",'+low+')'),tissue=vertices(g,5).filter(v=>v.p[0]>-.24&&v.p[0]<.17&&v.p[1]>1.035&&v.c[0]>.08&&v.c[0]<.14),b=bounds(tissue);
+  console.log('  dorsal tissue '+JSON.stringify({low,vertices:tissue.length,lateralSpan:b.size[2]}));
+  assert(b.size[2]>.004&&b.size[2]<.016,'A real, bounded membrane bow replaces a flat card; thickness alone is only .0011');
+ }
+});
 check('pelvic and sensory pectoral attachments enter the actual body surface without a root gap',()=>{
  for(const low of [false,true]){const g=get('faunaGeometry("tripod_fish",'+low+')');for(const p of [...g.anatomy.supports.filter(p=>p.fin==='pelvic'),...g.anatomy.sensoryPectorals]){const side=Math.sign(p.root[2]),outward=hits(g,p.root,[0,0,side]).find(h=>h.tag===1);assert(outward&&outward.t<.03,'An outward ray from the anatomical root must exit real body tissue: '+(p.id||'sensory_'+side));}}
 });

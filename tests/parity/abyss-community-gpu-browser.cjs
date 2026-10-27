@@ -9,12 +9,15 @@ const root=path.resolve(__dirname,'../..'),option=(name,fallback)=>process.argv.
 const speciesID=option('species','tripod_fish');assert(['tripod_fish','dumbo_octopus'].includes(speciesID));
 const url=option('url','http://127.0.0.1:8765/?still'),output=path.resolve(root,option('out','qa/parity/v01834-community/gpu-'+speciesID+'.json'));
 const lowLOD=process.argv.includes('--low-lod'),pixelsOnly=process.argv.includes('--pixels-only');
+const requestedTime=option('time',null),sampleTime=requestedTime===null?null:Number(requestedTime);
+assert(sampleTime===null||Number.isFinite(sampleTime)&&sampleTime>=0&&sampleTime<=3600,'--time must be 0..3600 seconds');
 const headless=process.argv.includes('--headless');
 const requested=option('profile','both'),names=requested==='both'?['desktop','touch']:[requested];
 const expectedVersion=option('expected-version',fs.readFileSync(path.join(root,'VERSION'),'utf8').trim());
 assert(names.every(n=>['desktop','touch'].includes(n)),'--profile must be desktop, touch or both');
 const result={url,expectedVersion,speciesID,pixelsOnly,status:'running',profiles:[],errors:[],method:'Controlled native Chrome GPU ABBA. Each block has ten completed warm renders, followed by 25 complete-render EXT_disjoint_timer_query_webgl2 samples. Actual approximately 2400 / 3600 m deep-sea animal position, lamp=true from before warm-up, and the original default quality tier are retained; render scale is 1. Only the new high/low instance batches change visibility between blocks. Camera, formal sampled time, old batch visibility, viewport, DPR, MSAA, lamp, lighting, exposure, clarity and fog remain fixed. A synchronous animal-center readback must be visibly differentiated before any timing. Adaptive quality is disabled only inside this controlled fixture. No natural exploration, native-phone, gameplay FPS or pixel-equivalence claim.'};
 if(lowLOD)result.method='Controlled low-LOD anatomy fixture only, no GPU timing. The actual actor is raised to 6 m depth over its existing deep-water x/z coordinate; a 8 m camera and diagnostic 3 degree lens select the production far batch and resolve its original geometry. This is an explicit open-water studio, not the natural deep-sea habitat, observation, performance or physical-phone evidence.';
+if(sampleTime!==null)result.method+=' Explicit sampled time '+sampleTime+' seconds applies the production subject pose before camera placement; other initial actors remain in their loaded poses.';
 if(pixelsOnly)result.method+=' Explicit --pixels-only disables every timer block; captures are visual diagnostics only.';
 result.method+=' Body diagnostics project tag-1 triangles from the selected production faunaGeometry LOD at the actual rigid body pose, conservatively exclude nonbody anatomy including its animation envelope, and intersect that mask with a synchronous actor-on/off image difference. Display-RGB luma statistics describe those pixels only; no scientific reflectance or quality threshold is inferred. The original center patch can include the seabed and is not body-readability proof.';
 const median=values=>{const a=values.slice().sort((a,b)=>a-b);return a[Math.floor(a.length/2)];};
@@ -33,10 +36,11 @@ result.presentation=headless?'headless native Chrome':'visible native Chrome';
   const wait=async(fn,arg,timeout=30000)=>{const until=Date.now()+timeout;while(Date.now()<until){const value=await read(fn,arg);if(value)return value;await page.waitForTimeout(40);}throw Error('Timed out: '+fn.toString());};
   await page.goto(url);await wait(()=>window.__ocean?.ready,undefined,120000);await page.bringToFront();
   const profile={name,blocks:[],images:[]};result.profiles.push(profile);save();
-  profile.meta=await read(({lowLOD,speciesID})=>{
+  profile.meta=await read(({lowLOD,speciesID,sampleTime})=>{
    const fish=life.find(f=>f.uid===speciesID+'-001');if(!fish)throw Error('Actual new deep-sea animal missing');
    const initial={adaptive:settings.adaptive,quality:renderer.quality,scale:renderer.dynamicScale,msaa:renderer.msaaSamples};
    window.__freeze=true;settings.adaptive=false;settings.third=false;renderer.dynamicScale=1;renderer.resize();renderer.lamp=true;
+   const formalTime=sampleTime===null?t:sampleTime;if(sampleTime!==null)faunaMotionPose(fish,formalTime);
    const originalHabitatPosition=fish.p.slice();if(lowLOD){fish.p[1]=-6;renderer.photoFov=3;renderer.lamp=true;}
    const center=animalFocusPoint(fish);if(speciesID==='tripod_fish'&&!lowLOD)center[1]+=.075;const range=lowLOD?8:1;
    const encounter=AbyssCommunity.encounters.find(e=>e.species===speciesID);
@@ -48,9 +52,9 @@ result.presentation=headless?'headless native Chrome':'visible native Chrome';
    const batches=renderer.batches.filter(b=>b.species===fish.species&&b.sceneRole==='abyss-community');
    if(batches.length!==2||!ext)throw Error('Two actual LOD batches and GPU timer extension are required');
    const others=renderer.batches.filter(b=>!batches.includes(b));
-   window.__abyssCommunityGPU={fish,center,view,batches,others,otherVisible:others.map(b=>b.visible),ext,time:t,query:null,initial};
-   return {version:document.documentElement.dataset.version,renderer:debug?gl.getParameter(debug.UNMASKED_RENDERER_WEBGL):null,initial,originalHabitatPosition,studio:lowLOD,diagnosticFov:renderer.photoFov||null,uid:fish.uid,index:fish.species,position:fish.p.slice(),home:fish.home.slice(),scaleMetres:fish.s.slice(),modelBounds:SPECIES[fish.species].modelBounds,range,viewpointBasis:speciesID==='dumbo_octopus'?'horizontal direction from authored encounter gate toward animal':'anatomical side view',authoredGate:encounter.gate.slice(),camera:view.slice(),target:center.slice(),time:t,oldBatches:others.length,newBatches:batches.map(b=>({indices:b.count,vertices:b.vertexCount,role:b.sceneRole,near:b.minDistance||0,far:b.maxDistance??null,kind:b.kind}))};
-  },{lowLOD,speciesID});
+   window.__abyssCommunityGPU={fish,center,view,batches,others,otherVisible:others.map(b=>b.visible),ext,time:formalTime,query:null,initial};
+   return {version:document.documentElement.dataset.version,renderer:debug?gl.getParameter(debug.UNMASKED_RENDERER_WEBGL):null,initial,originalHabitatPosition,studio:lowLOD,diagnosticFov:renderer.photoFov||null,uid:fish.uid,index:fish.species,position:fish.p.slice(),home:fish.home.slice(),scaleMetres:fish.s.slice(),modelBounds:SPECIES[fish.species].modelBounds,range,viewpointBasis:speciesID==='dumbo_octopus'?'horizontal direction from authored encounter gate toward animal':'anatomical side view',authoredGate:encounter.gate.slice(),camera:view.slice(),target:center.slice(),time:formalTime,oldBatches:others.length,newBatches:batches.map(b=>({indices:b.count,vertices:b.vertexCount,role:b.sceneRole,near:b.minDistance||0,far:b.maxDistance??null,kind:b.kind}))};
+  },{lowLOD,speciesID,sampleTime});
   assert(profile.meta.renderer&&!/swiftshader|llvmpipe|software/i.test(profile.meta.renderer),'Native hardware renderer is required');
   assert.equal(profile.meta.version,expectedVersion);assert.equal(profile.meta.index,speciesID==='tripod_fish'?44:45);assert.equal(profile.meta.initial.scale,1,'Fresh default full scale is required');assert.equal(profile.meta.initial.adaptive,true);
   assert(Math.abs(profile.meta.home[1]+(speciesID==='tripod_fish'?2402:3598.7))<.001);assert(profile.meta.scaleMetres.every(n=>n===(speciesID==='tripod_fish'?.25:.20)));

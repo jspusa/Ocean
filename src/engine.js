@@ -278,11 +278,13 @@ void main(){vec3 p=aPosition,n=aNormal;vLocal=p;vUV=aUV;vTag=aTag;
     float dw=z>.17&&z<.56?6.*u*(1.-u)*sign(p.z)/.39:0.,flap=sin(beat)*.09;
     p.y+=flap*w;n.z-=flap*dw*n.y;
    }else if(limb){
-    // The eight arms, connecting web, suckers and cirri share one smooth
-    // radial pulse, vanishing where the crown attaches below the mantle.
-    float u=clamp((-p.y-.06)/.40,0.,1.),w=u*u*(3.-2.*u),pulse=sin(beat*.6)*.045;
-    float dw=p.y<-.06&&p.y>-.46?-6.*u*(1.-u)/.40:0.,scale=1.+pulse*w;
-    n.xz/=scale;n.y-=pulse*dw*dot(p.xz,n.xz);p.xz*=scale;
+    // A bounded pulse travels down the connected crown; both its envelope
+    // and phase flatten at the pinned mantle root and distal boundary.
+    float u=clamp((-p.y-.06)/.40,0.,1.),w=u*u*(3.-2.*u),phase=beat*.6-1.8*w;
+    float wave=sin(phase),dw=p.y<-.06&&p.y>-.46?-6.*u*(1.-u)/.40:0.,scale=1.+.045*w*wave;
+    // The scale derivative includes the travelling phase for J^-T normals.
+    float slope=.045*dw*(wave-1.8*w*cos(phase));
+    n.xz/=scale;n.y-=slope*dot(p.xz,n.xz);p.xz*=scale;
    }
   }
  }
