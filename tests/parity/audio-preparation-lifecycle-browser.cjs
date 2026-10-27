@@ -10,8 +10,12 @@ const url=option('url','http://127.0.0.1:8765/'),output=path.resolve(root,option
 assert(!new URL(url).searchParams.has('still'),'Natural animation is required');
 const profiles=[{id:'desktop',viewport:{width:1280,height:800},dpr:2,touch:false},{id:'touch',viewport:{width:390,height:844},dpr:3,touch:true}].filter(p=>option('profile','desktop')==='all'||p.id===option('profile','desktop'));
 const cases=['background-boot','pending-suspend-blur','constructor-fallback','constructor-failure','graph-failure','suspend-throw','suspend-reject','suspend-hang-late','close-hang'].filter(id=>option('case','all')==='all'||id===option('case','all'));assert(profiles.length&&cases.length,'Invalid profile/case');
+const headless=process.argv.includes('--headless');
+assert(!headless||cases.every(id=>!['background-boot','pending-suspend-blur','close-hang'].includes(id)),'Native focus-switch cases require visible Chrome');
 const report={url,runnerSHA256:require('node:crypto').createHash('sha256').update(fs.readFileSync(__filename)).digest('hex'),status:'running',method:'Native visible Chrome, strict document-user-activation-required policy verified from actual command line. Real Chrome focus emulation is disabled; on macOS an exact-browser-PID NSRunningApplication activation returns OS focus after the auxiliary window closes, without dispatching DOM events. All observations and fault controls use CDP Runtime.evaluate with userGesture:false. Only the named Web Audio system boundary is fault-controlled; real UI activates entry and the native resumed output path. For unfocused boot only, the unchanged bootstrap script response is held at the network boundary until a separate native window has focus. Background RAF limitations are inconclusive rather than a fabricated pass. No gameplay/save/ownership/pose/time/quality mutation.',cases:[],errors:[]};
 const save=()=>{fs.mkdirSync(path.dirname(output),{recursive:true});fs.writeFileSync(output,JSON.stringify(report,null,2));};
+report.presentation=headless?'headless native Chrome; no native window/focus-switch cases':'visible native Chrome';
+if(headless)report.method=report.method.replace('Native visible Chrome','Native headless Chrome');
 const sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms));
 
 function installBoundary(fault){
@@ -170,7 +174,7 @@ async function runCase(browser,browserCDP,profile,caseID){
 if(process.argv.includes('--check-source-only'))console.log(JSON.stringify({status:'options-valid-no-browser-run',profiles:profiles.map(p=>p.id),cases,url,output}));
 else(async()=>{let browser;try{
  const {chromium}=require(process.env.PLAYWRIGHT_PATH||'/Users/jasper/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright');
- const launch=require('./browser-launch.cjs')(true);browser=await chromium.launch({...launch,headless:false,args:[...(launch.args||[]),'--enable-automation','--autoplay-policy=document-user-activation-required'],ignoreDefaultArgs:['--disable-background-timer-throttling','--disable-backgrounding-occluded-windows','--disable-renderer-backgrounding']});
+ const launch=require('./browser-launch.cjs')(true);browser=await chromium.launch({...launch,headless,args:[...(launch.args||[]),'--enable-automation','--autoplay-policy=document-user-activation-required'],ignoreDefaultArgs:['--disable-background-timer-throttling','--disable-backgrounding-occluded-windows','--disable-renderer-backgrounding']});
  const session=await browser.newBrowserCDPSession();report.commandLine=(await session.send('Browser.getBrowserCommandLine')).arguments;
  assert(report.commandLine.includes('--autoplay-policy=document-user-activation-required')&&!report.commandLine.some(a=>a.includes('no-user-gesture-required')),'Actual Chrome command line must require a document gesture');
  for(const profile of profiles)for(const id of cases)await runCase(browser,session,profile,id);
