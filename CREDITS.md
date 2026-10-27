@@ -116,3 +116,11 @@
 `src/barreleye.js` 的高低模型、膜鰭、透明頭罩、成對銀色管眼、綠色晶狀體及 SVG 備援為原創程序幾何與插圖；`assets/guide_barreleye.jpg` 由本作模型在隔離 WebGL 棚景繪製。未將參考照片、外部模型或 Nintendo 素材納入發布包。生物形態依據與假說界線見 [BARRELEYE-REFERENCE](docs/parity/BARRELEYE-REFERENCE.md)。
 
 代表全長 0.14 m、690 m 遭遇位置、數量、動作與眼動節律是本作編排。透明罩使用既有畫面上的局部薄組織近似，沒有折射、體積液體或完整透明組織光學；綠色晶狀體不自發光。此內容不代表完整圖鑑、科學生態模擬或全面超越 Wii 的驗收。
+
+## 0.18.34 三腳魚與小飛象章魚
+
+`src/tripod_fish.js`、`src/dumbo_octopus.js` 的身體、支撐鰭、耳鰭、腕蹼、吸盤、cirri、材質配色及 SVG 備援均為本專案原創程序幾何與插圖；專屬動作由本作著色器生成。來源僅用於形態研究，沒有納入參考網站的照片、影片、模型或貼圖，尤其未取用 Fishes of Australia 頁面的非商業授權照片。原有 MIT 授權原文保留。
+
+`assets/guide_tripod_fish.jpg` 與 `assets/guide_dumbo_octopus.jpg` 由本作同一原創模型透過正式 WebGL 渲染器在隔離棚景生成，是遊戲圖鑑縮圖，不是野外生物照片。
+
+形態依據及界線見 [三腳魚研究](docs/parity/TRIPOD-FISH-REFERENCE.md) 與 [小飛象章魚研究](docs/parity/DUMBO-OCTOPUS-REFERENCE.md)。三腳魚 25 cm 是標準體長，不包含延伸鰭；小飛象章魚只標為 `Grimpoteuthis sp.`，代表全體縱向 20 cm。棲地、數量、比例和節律均為遊戲編排，不是野外共棲或生理精密模擬，兩者也不抵銷未完成的 Wii 圖鑑條目。

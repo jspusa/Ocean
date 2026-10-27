@@ -1,7 +1,7 @@
 /* One connected ocean. The old deployment field is retained only so existing
  * save files load; depth and position determine the underwater environment. */
 // Compose runtime additions without mutating the immutable baked trench.
-const deepseaEncounters=Object.freeze([...(OceanTrench.encounters||[]),...(typeof OarfishWorld==='undefined'?[]:[OarfishWorld.encounter]),...(typeof FrilledSharkWorld==='undefined'?[]:[FrilledSharkWorld.encounter]),...(typeof BarreleyeWorld==='undefined'?[]:[BarreleyeWorld.encounter])]);
+const deepseaEncounters=Object.freeze([...(OceanTrench.encounters||[]),...(typeof OarfishWorld==='undefined'?[]:[OarfishWorld.encounter]),...(typeof FrilledSharkWorld==='undefined'?[]:[FrilledSharkWorld.encounter]),...(typeof BarreleyeWorld==='undefined'?[]:[BarreleyeWorld.encounter]),...(typeof AbyssCommunity==='undefined'?[]:AbyssCommunity.encounters)]);
 const DeepseaRules=(()=>{
  const initial=()=>({schema:2,deployed:false,station:'midwater',visited:[],guide:null});
  const station=id=>OceanTrench.stations.find(s=>s.id===id);
@@ -83,7 +83,7 @@ const oceanDeepsea=(()=>{
  }
  function approachRoute(id,fish=observationTarget(id)){
   if(!fish)return null;
-  const point=animalFocusPoint(fish),traits=speciesTraits(fish.species),sp=SPECIES[fish.species],size=sp.size,ribbon=sp.id==='oarfish',frilled=sp.id==='frilled_shark',barreleye=sp.id==='barreleye',sideView=ribbon||frilled||barreleye;
+  const point=animalFocusPoint(fish),traits=speciesTraits(fish.species),sp=SPECIES[fish.species],size=sp.size,ribbon=sp.id==='oarfish',frilled=sp.id==='frilled_shark',barreleye=sp.id==='barreleye',sideView=ribbon||frilled||barreleye||sp.id==='tripod_fish';
   const drift=Number.isFinite(fish.radius)?Math.max(0,fish.radius):Math.max(0,SPECIES[fish.species].motionProfile?.radius||0);
   // Leave room for the natural orbit in portrait view. The shark initially
   // receives a closer side view; the swimmer can then look around freely.

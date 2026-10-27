@@ -13,7 +13,7 @@ function world(expansion=true,input=header,compiled=false){
  // Complete its species dependencies in the same order as index.html, without
  // removing later actors or changing their saved numeric species indexes.
  const loaded=new Set([...modules,...(expansion?['oarfish']:[])]);
- const loadArchiveSpecies=()=>{for(const name of ['oarfish','frilled_shark','frilled_shark_world','barreleye','barreleye_world'])if(!loaded.has(name)){vm.runInContext(source(name),ctx,{filename:name});loaded.add(name);}};
+ const loadArchiveSpecies=()=>{for(const name of ['oarfish','frilled_shark','frilled_shark_world','barreleye','barreleye_world','tripod_fish','dumbo_octopus','abyss_community'])if(!loaded.has(name)){vm.runInContext(source(name),ctx,{filename:name});loaded.add(name);}};
  return {ctx,renderer,loadArchiveSpecies,get:s=>vm.runInContext(s,ctx)};
 }
 const current=world(),previous=world(false),species=current.get('SPECIES.find(s=>s.id==="oarfish")');

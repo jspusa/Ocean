@@ -11,16 +11,20 @@ function world(expansion=true,input=header){
  if(expansion)for(const name of ['barreleye','barreleye_world'])if(fs.existsSync(path.join(root,'src',name+'.js')))vm.runInContext(source(name),ctx,{filename:name+'.js'});
  // The accepted addLife boundary records actual meshes and shared actors.
  const renderer={batches:[],batch(g,instances,kind,dynamic){const batch={g,instances,kind,dynamic};this.batches.push(batch);return batch;}};ctx.renderer=renderer;
- return {ctx,renderer,get:s=>vm.runInContext(s,ctx)};
+ // Keep the historical 43 -> 44 registration boundary, then load the later
+ // production catalogue before reading current compiled numeric identities.
+ const catalogue=JSON.parse(vm.runInContext('JSON.stringify(SPECIES.map(s=>s.id))',ctx)),loaded=new Set([...modules,...(expansion?['barreleye','barreleye_world']:[])]);
+ const loadArchiveSpecies=()=>{for(const name of ['barreleye','barreleye_world','tripod_fish','dumbo_octopus','abyss_community'])if(!loaded.has(name)){vm.runInContext(source(name),ctx,{filename:name+'.js'});loaded.add(name);}};
+ return {ctx,renderer,catalogue,loadArchiveSpecies,get:s=>vm.runInContext(s,ctx)};
 }
-function loadScene(w,keepNew=false){w.get('obstacles.push(...header.obstacles);reefPatches.push(...header.reefPatches);life.push(...header.life.filter(i=>'+(keepNew?'true':'!header.nodes[i].barreleye')+').map(i=>header.nodes[i]));decorLife.push(...header.decorLife.map(i=>header.nodes[i]));shoal.push(...header.shoal.map(i=>header.nodes[i]));allLife=life.concat(decorLife);ensureReefFish(renderer);ensureOarfish(renderer);ensureFrilledShark(renderer);initializeIndividuals(renderer);');}
+function loadScene(w,keepNew=false){w.loadArchiveSpecies();w.get('obstacles.push(...header.obstacles);reefPatches.push(...header.reefPatches);life.push(...header.life.filter(i=>'+(keepNew?'true':'!header.nodes[i].barreleye')+').map(i=>header.nodes[i]));decorLife.push(...header.decorLife.map(i=>header.nodes[i]));shoal.push(...header.shoal.map(i=>header.nodes[i]));allLife=life.concat(decorLife);ensureReefFish(renderer);ensureOarfish(renderer);ensureFrilledShark(renderer);initializeIndividuals(renderer);');}
 const previous=world(false),current=world();loadScene(previous);loadScene(current);
 assert.equal(current.get('typeof ensureBarreleye'),'function','The ordinary compiled population seam must append the authored barreleye');
 const existingBatches=current.renderer.batches.length;
 assert.equal(current.get('ensureBarreleye(renderer)'),true);current.get('initializeIndividuals(renderer)');
 const fish=current.get('life.find(f=>f.barreleye)'),sp=current.get('SPECIES.find(s=>s.id==="barreleye")');
-assert.equal(current.get('SPECIES.length'),44);assert.equal(current.get('SPECIES.indexOf(SPECIES.find(s=>s.id==="barreleye"))'),43);
-assert.equal(current.get('JSON.stringify(SPECIES.slice(0,43).map(s=>s.id))'),previous.get('JSON.stringify(SPECIES.map(s=>s.id))'));
+assert.equal(current.catalogue.length,44);assert.equal(current.get('SPECIES.indexOf(SPECIES.find(s=>s.id==="barreleye"))'),43);
+assert.equal(JSON.stringify(current.catalogue.slice(0,43)),JSON.stringify(previous.catalogue));
 assert.equal(fish.uid,'barreleye-001');assert.equal(fish.encounterId,'barreleye-pass');assert.deepEqual(Array.from(fish.home),[768,-690,-96]);assert.deepEqual(Array.from(fish.s),[.14,.14,.14]);
 assert.equal(current.get('JSON.stringify(allLife.filter(f=>!f.barreleye))'),previous.get('JSON.stringify(allLife)'),'All 43 incumbent species retain their existing actors, identities, homes and appearance');
 assert.equal(current.renderer.batches.length,existingBatches+2);const [near,far]=current.renderer.batches.slice(-2);assert.equal(near.instances,far.instances);assert.equal(near.instances.length,1);assert.equal(near.kind,11);assert.equal(near.dynamic,true);assert.equal(far.shadow,false);assert.equal(near.maxDistance,far.minDistance);assert(near.maxDistance>=3);assert(far.maxDistance>=20);

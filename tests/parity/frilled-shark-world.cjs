@@ -14,7 +14,7 @@ function world(expansion=true,input=header){
  // production species before decoding today's archive. Procedural A/B worlds
  // still exercise only the original append boundary.
  const catalogue=JSON.parse(vm.runInContext('JSON.stringify(SPECIES.map(s=>s.id))',ctx)),loaded=new Set([...modules,...(expansion?['frilled_shark','frilled_shark_world']:[])]);
- const loadArchiveSpecies=()=>{for(const name of ['frilled_shark','frilled_shark_world','barreleye','barreleye_world'])if(!loaded.has(name)){vm.runInContext(source(name),ctx,{filename:name+'.js'});loaded.add(name);}};
+ const loadArchiveSpecies=()=>{for(const name of ['frilled_shark','frilled_shark_world','barreleye','barreleye_world','tripod_fish','dumbo_octopus','abyss_community'])if(!loaded.has(name)){vm.runInContext(source(name),ctx,{filename:name+'.js'});loaded.add(name);}};
  return {ctx,renderer,catalogue,loadArchiveSpecies,get:s=>vm.runInContext(s,ctx)};
 }
 function loadScene(w,keepNew=false){w.loadArchiveSpecies();w.get('obstacles.push(...header.obstacles);reefPatches.push(...header.reefPatches);life.push(...header.life.filter(i=>'+(keepNew?'true':'!header.nodes[i].frilledShark')+').map(i=>header.nodes[i]));decorLife.push(...header.decorLife.map(i=>header.nodes[i]));shoal.push(...header.shoal.map(i=>header.nodes[i]));allLife=life.concat(decorLife);initializeIndividuals(renderer);');}

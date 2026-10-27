@@ -265,6 +265,25 @@ void main(){vec3 p=aPosition,n=aNormal;vLocal=p;vUV=aUV;vTag=aTag;
     float z=abs(p.z),u=clamp((z-.118)/.149,0.,1.),w=u*u*(3.-2.*u),dw=z>.118&&z<.267?6.*u*(1.-u)*sign(p.z)/.149:0.;
     float flap=sin(beat+sign(p.z))*.010;p.y+=flap*w;n.z-=flap*dw*n.y;
    }
+  }else if(uRigClass==7&&fin){
+   // Tripodfish sensory pectorals flex independently of the three planted
+   // support rays. A radial envelope pins the entire small attachment patch.
+   vec3 q=p-vec3(.27,.971,sign(p.z)*.043);float d=length(q),u=clamp((d-.03)/.47,0.,1.);
+   float amplitude=sin(beat+sign(p.z)*.7)*.018,w=u*u*(3.-2.*u);
+   vec3 gradient=(d>.03&&d<.5)?amplitude*6.*u*(1.-u)/(.47*d)*q:vec3(0.);
+   p.z+=amplitude*w;n-=gradient*(n.z/(1.+gradient.z));
+  }else if(uRigClass==8){
+   if(fin){
+    float z=abs(p.z),u=clamp((z-.17)/.39,0.,1.),w=u*u*(3.-2.*u);
+    float dw=z>.17&&z<.56?6.*u*(1.-u)*sign(p.z)/.39:0.,flap=sin(beat)*.09;
+    p.y+=flap*w;n.z-=flap*dw*n.y;
+   }else if(limb){
+    // The eight arms, connecting web, suckers and cirri share one smooth
+    // radial pulse, vanishing where the crown attaches below the mantle.
+    float u=clamp((-p.y-.06)/.40,0.,1.),w=u*u*(3.-2.*u),pulse=sin(beat*.6)*.045;
+    float dw=p.y<-.06&&p.y>-.46?-6.*u*(1.-u)/.40:0.,scale=1.+pulse*w;
+    n.xz/=scale;n.y-=pulse*dw*dot(p.xz,n.xz);p.xz*=scale;
+   }
   }
  }
  if(uKind==5){
@@ -1416,7 +1435,7 @@ class Renderer{
  common(p,eye,vp,t){let g=this.gl;g.useProgram(p.p);if(this.textures[8]){this.bindTex(9,this.textures[8]);this.set1i(p,'uCaustic',9);}this.setMatrix4fv(p,'uVP',false,vp===this.vp?this.renderVP:vp===this.lightVP?this.renderLightVP:vp===this.dynamicLightVP?this.renderDynamicLightVP:vp);this.setMatrix4fv(p,'uLightVP',false,this.renderLightVP||this.lightVP);this.setMatrix4fv(p,'uDynamicLightVP',false,this.renderDynamicLightVP||this.renderLightVP||this.lightVP);this.set1i(p,'uSamples',this.msaaSamples||0);this.set1i(p,'uQuality',this.quality);this.set1i(p,'uSunless',this.sunless?1:0);this.set3fv(p,'uRenderOrigin',this.renderOrigin||[0,0,0]);this.set4f(p,'uTorchParams',TorchLightRules.outer,TorchLightRules.inner,TorchLightRules.strength,TorchLightRules.falloff);this.set3fv(p,'uCamera',eye);this.set1f(p,'uTorch',this.lamp?1:0);this.set3fv(p,'uViewForward',this.cameraForward||[0,0,-1]);this.set1f(p,'uTime',t);this.set1f(p,'uSwim',typeof player==='undefined'?.4:Math.min(1,Math.hypot(...player.velocity)/1.6));this.set1f(p,'uSun',this.sun);this.set3fv(p,'uFog',this.fog);this.set3fv(p,'uLightDir',this.lightDir);this.set3fv(p,'uAirLightDir',this.airLightDir||this.lightDir);this.set3fv(p,'uLightColor',this.lightColor);
   if(p===this.pointProgram||p===this.bubbleProgram){this.set1i(p,'uDepth',1);this.set2f(p,'uResolution',this.canvas.width,this.canvas.height);this.set1f(p,'uExposure',this.exposure);this.set1f(p,'uClarity',this.clarity??1);this.set1f(p,'uPhotoAperture',this.photoAperture||0);this.set1f(p,'uPhotoFocus',this.photoFocus||8);}
  }
- speciesUniforms(p,b){const sp=typeof SPECIES!=='undefined'?SPECIES[b.species]:null,m=sp?.materialProfile,r=sp?.motionProfile?.type;this.set1i(p,'uRigClass',r==='vampire'?1:r==='sea_pig'?2:r==='snailfish'?3:r==='oarfish'?4:r==='frilled_shark'?5:r==='barreleye'?6:0);this.set4f(p,'uSurfaceProfile',m?clamp(m.roughness,.12,.98):-1,m?clamp(m.subsurface,0,1):0,m?Math.max(.1,m.patternScale||1):1,m?({fish:0,cetacean:1,cephalopod:2,crustacean:3,shell:4,gelatinous:5,silver:6}[m.skin]??0):-1);}
+ speciesUniforms(p,b){const sp=typeof SPECIES!=='undefined'?SPECIES[b.species]:null,m=sp?.materialProfile,r=sp?.motionProfile?.type;this.set1i(p,'uRigClass',r==='vampire'?1:r==='sea_pig'?2:r==='snailfish'?3:r==='oarfish'?4:r==='frilled_shark'?5:r==='barreleye'?6:r==='tripod_fish'?7:r==='dumbo_octopus'?8:0);this.set4f(p,'uSurfaceProfile',m?clamp(m.roughness,.12,.98):-1,m?clamp(m.subsurface,0,1):0,m?Math.max(.1,m.patternScale||1):1,m?({fish:0,cetacean:1,cephalopod:2,crustacean:3,shell:4,gelatinous:5,silver:6}[m.skin]??0):-1);}
  batchUniforms(p,b,state,kind=b.kind){
   // State is local to one shader pass, so a new frame, a material edit or a
   // shadow/colour transition always reinitializes the relevant uniforms.

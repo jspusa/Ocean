@@ -19,9 +19,12 @@ try{
   const data=await page.evaluate(i=>{
    for(const a of guideOriginal){a.b.instances=a.instances;a.b.visible=false;}
    const f=life.find(f=>f.species===i),sp=SPECIES[i],batch=renderer.batches.find(b=>(b.kind===8||b.kind===9||b.kind===10||b.kind===11)&&b.species===i&&!(b.minDistance>0));
-   batch.instances=[f];batch.visible=true;f.ecologyPresent=true;f.p=[0,-6,0];f.yaw=.08;f.pitch=0;f.bank=0;f.phase=0;f.faunaVisibility=1;f.retreat=0;
+   batch.instances=[f];batch.visible=true;f.ecologyPresent=true;f.p=[0,-6,0];f.yaw=sp.id==='dumbo_octopus'?-Math.PI/2+.12:.08;f.pitch=0;f.bank=0;f.phase=0;f.faunaVisibility=1;f.retreat=0;
    const center=animalFocusPoint(f),span=sp.modelBounds.size,d=Math.max(span[1],span[0]/(640/360),span[2])*sp.size*1.8;
    renderer.photoNear=sp.cetacean?.16:.002;renderer.photoFov=40;renderer.photoAperture=0;renderer.forceShadow=true;
+   // Deep-sea portraits use the same camera-mounted lamp as their encounter,
+   // so black tissue and forward-facing fins remain readable in the catalogue.
+   renderer.lamp=sp.id==='tripod_fish'||sp.id==='dumbo_octopus';
    // The crab's three-metre measure is its lateral leg span. A raised oblique
    // camera separates those limbs; a side-on portrait hid half of the anatomy.
    const offset=sp.id==='japanese_spider_crab'?V.mul(V.norm([.70,.48,.70]),sp.size*1.27):sp.id==='humpback_anglerfish'?[d*.62,d*.20,d*.85]:[d*.12,d*.15,d];

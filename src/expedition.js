@@ -7,7 +7,9 @@ const oceanExpedition=(()=>{
   {id:'editor-ray',kind:'photo',title:'編輯來信：展開的翅膀',from:'禾 · 海岸季刊',body:'這次想記錄鷹魟完整展翼的瞬間。請不要讓輪廓超出相框，照片達 70 分後寄回研究船。',species:'ray',minimum:70,after:'editor-reef',reward:'深海紫潛水衣',outfit:'violet'},
   {id:'guest-gate',kind:'guide',title:'帶路委託：石門另一側',from:'北辰 · 訪客',body:'我想沿西側礁緣游到環礁之門，也想在路上看清鸚哥魚的顏色。請讓我跟得上，再一起回船。',species:'parrot',place:'gate',seconds:5,after:'guest-garden',reward:'夕照金潛水衣',outfit:'gold'},
   {id:'editor-whale',kind:'photo',title:'編輯來信：海的尺度',from:'禾 · 海岸季刊',body:'最後一張跨頁留給大翅鯨。退遠一些，讓長胸鰭與尾部一起入鏡。需要一張 75 分以上的紀錄。',species:'whale',minimum:75,after:'editor-ray',reward:'遠洋攝影紀念章'},
-  {id:'guest-wreck',kind:'guide',title:'帶路委託：眠海號',from:'青嵐 · 訪客',body:'帶我去看看那艘沉船吧。我也想見到常在礁緣游動的隆頭魚。抵達後不用急著離開，一起好好看看。',species:'wrasse',place:'wreck',seconds:5,after:'guest-gate',reward:'航路引導紀念章'}
+  {id:'guest-wreck',kind:'guide',title:'帶路委託：眠海號',from:'青嵐 · 訪客',body:'帶我去看看那艘沉船吧。我也想見到常在礁緣游動的隆頭魚。抵達後不用急著離開，一起好好看看。',species:'wrasse',place:'wreck',seconds:5,after:'guest-gate',reward:'航路引導紀念章'},
+  {id:'editor-tripod',kind:'photo',title:'深海來信：泥上的三個支點',from:'洛 · 深海觀察室',body:'跟著海流前往海溝底站，約 2,400 m 的泥台上有一位安靜的守候者。停下來，主動點選三腳魚並近距離拍攝，讓長鰭與身體一起入鏡。回船沖印後，選一張 60 分以上的照片寄來。',species:'tripod_fish',minimum:60,nearObservation:true,reward:'三點守候觀察紀念'},
+  {id:'editor-dumbo',kind:'photo',title:'深海來信：黑暗中的小飛象',from:'洛 · 深海觀察室',body:'約 3,600 m 的近底水層，小飛象章魚緩慢拍動耳狀鰭。海溝導覽會在附近停留；主動點選、靠近觀察，拍下完整腕蹼與耳鰭。回船沖印並投稿 60 分以上的近距離照片。',species:'dumbo_octopus',minimum:60,nearObservation:true,reward:'深淵懸游觀察紀念'}
  ];
  const palettes={blue:{name:'海藍',tint:[1,1,1]},coral:{name:'珊瑚橘',tint:[2.1,.80,.57]},kelp:{name:'海草綠',tint:[.86,1.33,.75]},violet:{name:'深海紫',tint:[1.58,.84,1.65]},gold:{name:'夕照金',tint:[1.90,1.47,.56]}};
  const initial=()=>({day:1,minute:540,air:AIR_SECONDS,inDive:false,lowAir:false,clockAuto:false,mail:{},outfit:'blue',camera:{zoom:48,aperture:8,focus:8,exposure:0},guest:null});
@@ -34,7 +36,7 @@ const oceanExpedition=(()=>{
  let guestHUD,lastGuestHUD=-Infinity,guestBatch,guestNode={p:[0,-1000,0],s:[.83,.83,.83],yaw:0,pitch:0,phase:0,tint:[1.9,1.3,.70]},lastTime=null,lastHud=0;
  function accept(id){const r=requests.find(r=>r.id===id),s=state();if(active||!r||!unlocked(r)||s.mail[id])return false;if(r.kind==='guide'&&requests.some(q=>q.kind==='guide'&&['accepted','ready'].includes(s.mail[q.id]?.status))){toast('先完成或取消目前的帶路委託。');return false;}s.mail[id]={status:'accepted',acceptedAt:Date.now(),progress:0,visited:false,photoDate:0,read:true};saveVoyage();toast(r.kind==='guide'?'訪客已在船上等候，下一次下水會與你同行。':'已接下攝影委託；拍攝後回船選片投稿。');return true;}
  function cancel(id){const s=state();if(active||!s.mail[id]||s.mail[id].status==='complete')return false;delete s.mail[id];if(s.guest?.id===id)s.guest=null;saveVoyage();return true;}
- function matchingPhotos(r){return persistent.photos.filter(p=>p.species===SPECIES.find(sp=>sp.id===r.species)?.name&&p.grade>=r.minimum&&p.individual&&/^data:image\/jpeg;base64,/.test(p.url));}
+ function matchingPhotos(r){return persistent.photos.filter(p=>p.species===SPECIES.find(sp=>sp.id===r.species)?.name&&p.grade>=r.minimum&&p.individual&&(!r.nearObservation||p.knowledgeEligible===true)&&/^data:image\/jpeg;base64,/.test(p.url));}
  async function submitPhoto(id,date){const r=requests.find(r=>r.id===id),s=state(),m=s.mail[id];if(active||!r||r.kind!=='photo'||!m||m.status==='complete')return false;const p=matchingPhotos(r).find(p=>p.date===date);if(!p||!await oceanPhotography.pin(p.date))return false;if(state()!==s||s.mail[id]!==m||m.status==='complete')return false;m.photoDate=p.date;m.status='complete';saveVoyage();toast('投稿已收件 · 解鎖 '+r.reward);return true;}
  function collectReward(id){const r=requests.find(r=>r.id===id),m=state().mail[id];if(active||!r||r.kind!=='guide'||m?.status!=='ready')return false;m.status='complete';saveVoyage();toast('訪客來信 · 解鎖 '+r.reward);return true;}
  function wear(id){if(!palettes[id]||!unlockedOutfit(state(),id))return false;state().outfit=id;applyOutfit();saveVoyage();return true;}

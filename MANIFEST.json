@@ -1,5 +1,5 @@
 {
-  "version": "0.18.33",
+  "version": "0.18.34",
   "scope": "served game and build sources",
   "files": [
     {
@@ -9,8 +9,8 @@
     },
     {
       "path": "CREDITS.md",
-      "bytes": 12099,
-      "sha256": "431789790ceda8a7b308610ef76a4ad1dbeb9e9399747073bbd00561593ca389"
+      "bytes": 13178,
+      "sha256": "388612990d6c374448b248aea3dfdbeff700b2bec0994f9d49b7a17d36d31c1a"
     },
     {
       "path": "LICENSE",
@@ -19,13 +19,13 @@
     },
     {
       "path": "README.md",
-      "bytes": 40297,
-      "sha256": "56d21faa4d4500b170c39bd1ec47259b76bc502c44bc8213e235ffc721f761e4"
+      "bytes": 40969,
+      "sha256": "87fc1bed1552f16b8399b17e5a5171d5d1a2346ac4657c5adb9956ea77aadf64"
     },
     {
       "path": "VERSION",
       "bytes": 8,
-      "sha256": "9e42bf9ca17fadafb28f4c05d8c7bb14e36ddd06517cea635d1909f78e54bf95"
+      "sha256": "00ed5c937b34511fa2b88ad4dc6a37fd980eec4b250e2ba369db34cdf72a0e31"
     },
     {
       "path": "assets/caustics.jpg",
@@ -101,6 +101,11 @@
       "path": "assets/guide_dolphin.jpg",
       "bytes": 11821,
       "sha256": "6eaf6f4599b18b3d2e28e1136d563ef064e9043f9bd3e1bfa066345776db5fb7"
+    },
+    {
+      "path": "assets/guide_dumbo_octopus.jpg",
+      "bytes": 17319,
+      "sha256": "5888eea6e531dd9202e545813121051a68336aca458e8fa6b55d5c477794093d"
     },
     {
       "path": "assets/guide_false_killer_whale.jpg",
@@ -213,6 +218,11 @@
       "sha256": "1ca4a09381e433a1b33a3a4872a0f6b3dfef86651d0963913fc165c5d112ab45"
     },
     {
+      "path": "assets/guide_tripod_fish.jpg",
+      "bytes": 14022,
+      "sha256": "af38801cf7c7d8941eec1f0d3569c7334ff0cacf76f076a8852d8ac82f67e158"
+    },
+    {
       "path": "assets/guide_turtle.jpg",
       "bytes": 13622,
       "sha256": "9a508d1a69ce637945f7b6018265c39d4852db298b29cb2267c296b84b831fca"
@@ -239,8 +249,8 @@
     },
     {
       "path": "assets/reef.mesh.gz",
-      "bytes": 21443997,
-      "sha256": "b7b660145786840e6a31b7da76b7dd3df1a04660277d82ebb3fb38396a068238"
+      "bytes": 21731839,
+      "sha256": "c9ff6c41791f341fcb7ff1603477fa0dba43c16b26c48cba8d0aad8f1720e195"
     },
     {
       "path": "assets/rock_diff.jpg",
@@ -858,6 +868,11 @@
       "sha256": "954852bba1108042086f70b9318e20f6026988945d4d9f01ddda6814322d9d8c"
     },
     {
+      "path": "assets/scene/chunk-9613a4a66334b03156ed.bin.gz",
+      "bytes": 128504,
+      "sha256": "9613a4a66334b03156eddbe08c8215923499f976f1b9b8d036cf3fe20a584b68"
+    },
+    {
       "path": "assets/scene/chunk-99af1805ef4c63c61c06.bin.gz",
       "bytes": 228466,
       "sha256": "99af1805ef4c63c61c06d9e44435f17bea35274e359b42343b95a5ac7e6cd009"
@@ -951,6 +966,11 @@
       "path": "assets/scene/chunk-ba3c929be92a28484591.bin.gz",
       "bytes": 5669,
       "sha256": "ba3c929be92a2848459113e7b7fcfce9e2c8e07b5d4e2008eca50d97f53132b5"
+    },
+    {
+      "path": "assets/scene/chunk-bb7eaa703b645837ed7d.bin.gz",
+      "bytes": 154544,
+      "sha256": "bb7eaa703b645837ed7dbf57544258965f9ac075b1328a20b86331e6b7183f59"
     },
     {
       "path": "assets/scene/chunk-bd8f98f51dd565a92999.bin.gz",
@@ -1174,8 +1194,8 @@
     },
     {
       "path": "assets/scene/index.json",
-      "bytes": 1805137,
-      "sha256": "7ec695fc7a9ce9afc568d095435203048182629efb5863a1148a1f19c6344e22"
+      "bytes": 1809168,
+      "sha256": "67d9096dac83753d3d59d09fac841aca6f5b7c694988bc5839732e41269f67df"
     },
     {
       "path": "assets/shell_diff.jpg",
@@ -1189,18 +1209,18 @@
     },
     {
       "path": "bake_scene.cjs",
-      "bytes": 3340,
-      "sha256": "50410ce2ff70cac3c352f30f570b862c6dff6d1a3984101293b8bd2718372586"
+      "bytes": 3397,
+      "sha256": "97d1644be8db3cb900d076e17816d1fbce0497f83d8daad973c2bf5c6ab412b3"
     },
     {
       "path": "build.py",
-      "bytes": 5014,
-      "sha256": "4f3f107eb8c27ab058a0833a0d2aeb45749823e0929613b166f0303f3b73d9cf"
+      "bytes": 5071,
+      "sha256": "c82d55c0612c5a1741de1f3624384e5c7208be5c0d99bcda0427970737b52872"
     },
     {
       "path": "index.html",
-      "bytes": 16399,
-      "sha256": "8f6493f07caf346275bc45a34ae7f5e29e18273097287d643b9f5a091314dfc1"
+      "bytes": 16564,
+      "sha256": "1b27ce66d60181eac8d94c35358ade20cc392ce1a0cbdbc63b5dd390f75c2e17"
     },
     {
       "path": "music/blue_silence.mp3",
@@ -1233,6 +1253,11 @@
       "sha256": "c89228d5bbda40c6dcd7f5bbfdcd4ee8b637a4cfb81ef58d6db2f2c6ae7cd942"
     },
     {
+      "path": "src/abyss_community.js",
+      "bytes": 3020,
+      "sha256": "85a63fadd29bbcb69c496331382fd7badbd7f229ede6e0631ba402611377dee6"
+    },
+    {
       "path": "src/abyss_fauna.js",
       "bytes": 21770,
       "sha256": "ff6b1e82a83e2f9e5f5245489ee4b1dc5c3994e3469ec885e2cd187a86ebaca4"
@@ -1244,8 +1269,8 @@
     },
     {
       "path": "src/app.js",
-      "bytes": 85659,
-      "sha256": "d2562b7d36fa541b78efe316c9d0896858e764d1df611f3f12a8508887e66de4"
+      "bytes": 85767,
+      "sha256": "c47be754e00067f7ac7e1b4c58f7ae3b4ec04810caff2f9516ccc9a8f51304da"
     },
     {
       "path": "src/aquarium.js",
@@ -1284,13 +1309,18 @@
     },
     {
       "path": "src/config.js",
-      "bytes": 2915,
-      "sha256": "ef501f9271a82f56d9d0ceaede3cea8f6b0b0e1c0c610dfe7970b0cad176618a"
+      "bytes": 3041,
+      "sha256": "69f2813f3a8e404bd6baec59c1f08f6081b56831549006c2c43defdbffab7f8f"
     },
     {
       "path": "src/deepsea.js",
-      "bytes": 19145,
-      "sha256": "c518619d7521b400adb91db3b401185ab5e84f7939dcb1ee548866c390fca175"
+      "bytes": 19238,
+      "sha256": "e9c30f4c2de67a5b07eab7e0f8eee7aa01ffdb82c3f59d0e6ad73fc9550f84a7"
+    },
+    {
+      "path": "src/dumbo_octopus.js",
+      "bytes": 8231,
+      "sha256": "510e80f8b58a37fe3f52685d1e4bf76e777a95b496b231814402a72a5b339e9d"
     },
     {
       "path": "src/ecology.js",
@@ -1299,13 +1329,13 @@
     },
     {
       "path": "src/engine.js",
-      "bytes": 122922,
-      "sha256": "077165f02196c9085d0a6976f63a26c15ba615c43133a9b97fb9d44dbd046f0b"
+      "bytes": 124021,
+      "sha256": "27caee21bcbce19c4e26dce197cc20a199352a6e3cc6caa69bbe79afaa82ad1b"
     },
     {
       "path": "src/expedition.js",
-      "bytes": 25622,
-      "sha256": "66e33a48ac524275b8d33558f9030d39d81308ce97783febf2be50b2f81ab655"
+      "bytes": 26538,
+      "sha256": "04f6cd8da98fc1e9a92f76a46ef36fb358fccdc441719e21911ba4965da486e4"
     },
     {
       "path": "src/exploration.js",
@@ -1460,7 +1490,7 @@
     {
       "path": "src/shell.html",
       "bytes": 12391,
-      "sha256": "84423a0a77c724a21af1c4f43f7c274d7692ebb6dfd475fb90f4624a083351b4"
+      "sha256": "f94e5b6e3bc44c9e11938121aab4953f6a5aeec520bfcda68725993baf09f3fb"
     },
     {
       "path": "src/ship.js",
@@ -1491,6 +1521,11 @@
       "path": "src/trench_world.js",
       "bytes": 2945,
       "sha256": "b03b66bd09c7004e91fe46a221592ab9f8c83dd9359d8c70531d5d01654c2650"
+    },
+    {
+      "path": "src/tripod_fish.js",
+      "bytes": 7891,
+      "sha256": "02908986de720502ff499071f721dc5f6a677636e3c62d1ab060983d207d745f"
     },
     {
       "path": "src/voyage.js",

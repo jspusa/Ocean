@@ -13,7 +13,7 @@ function world(expansion=true,compiled=false){
  // readers then register the complete current catalogue in production order;
  // otherwise the already-baked later actors have unresolved species indexes.
  const catalogue=JSON.parse(vm.runInContext('JSON.stringify(SPECIES.map(s=>s.id))',ctx));
- for(const n of [...(expansion?[]:['reef_fauna']),'oarfish','frilled_shark','frilled_shark_world','barreleye','barreleye_world'])vm.runInContext(read(n),ctx,{filename:n});
+ for(const n of [...(expansion?[]:['reef_fauna']),'oarfish','frilled_shark','frilled_shark_world','barreleye','barreleye_world','tripod_fish','dumbo_octopus','abyss_community'])vm.runInContext(read(n),ctx,{filename:n});
  vm.runInContext('obstacles.push(...header.obstacles);reefPatches.push(...header.reefPatches);life.push(...header.life.map(i=>header.nodes[i]));decorLife.push(...header.decorLife.map(i=>header.nodes[i]));shoal.push(...header.shoal.map(i=>header.nodes[i]));allLife=life.concat(decorLife);initializeIndividuals({batches:[]});',ctx);
  const renderer={batches:[],batch(g,instances,kind,dynamic){const b={g,instances,kind,dynamic};this.batches.push(b);return b;}};
  if(expansion){ctx.renderer=renderer;vm.runInContext('ensureReefFish(renderer);initializeIndividuals(renderer);',ctx);}
