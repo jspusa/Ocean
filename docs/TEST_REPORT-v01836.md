@@ -20,4 +20,6 @@ Receipts: qa/parity/v01836-audio/{red-clean-observation.json,green-clean-observa
 
 Touch is desktop Chrome emulation; no physical-phone, battery, human-listening or universal startup-time claim. A synchronous native audio call can still cost time when the user actually enables sound. The loader itself no longer requests that work. Existing initial-render and background-tab scheduling paths are unchanged.
 
-Public delivery is pending. It requires the Pages build commit and every manifest hash plus ordinary desktop/touch entry to be verified after publication.
+Public delivery verified on 2026-10-28: Pages built source commit `76f7bf4e0076027a1924c1d1e6afb00bee13c694` (updated `2026-10-28T02:52:04Z`), with no build error. All **307/307** served-file hashes match; normal desktop and touch entry passed with version **0.18.36** and automatic quality enabled. A separate strict-autoplay public audio-entry run passed **32/32** assertions, including zero audio work before the gesture, native output, saved silence/reload, in-game sound-on and exclusive-session handling.
+
+Public receipts: `qa/parity/v01836-audio/public-delivery.json` and `public-audio-entry.json`. Manifest SHA-256: `0b9f137839e10c73021f2a9d26f92b153e05b0a7c48b2deac6df64e178d20501`. Independent [Standards and Spec reviews](parity/REVIEW-v01836.md) found no blockers. Subsequent report-only commit does not change runtime or manifest bytes.
