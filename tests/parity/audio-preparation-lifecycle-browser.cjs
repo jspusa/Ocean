@@ -1,3 +1,6 @@
+/* HISTORICAL v0.18.17–35 prewarm contract; run against an archived build only.
+ * Current entry uses audio-optional-boot-browser.cjs and audio-entry-browser.cjs.
+ * Pre-gesture graph assertions below intentionally describe the retired design. */
 /* Native Web Audio lifecycle/fault evidence at the existing browser/system seam.
  * Only Web Audio construction/node/suspend/close boundaries are fault-controlled.
  * Gameplay, save ownership, camera, simulation time and quality are untouched.

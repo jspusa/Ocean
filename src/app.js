@@ -524,18 +524,9 @@ function setupControls(){initPerformance(); $('viewBtn').onclick=()=>{settings.t
  window.visualViewport?.addEventListener('resize',()=>{if(renderer){renderer.resize();resetInput();}});
  canvas.addEventListener('webglcontextlost',e=>{e.preventDefault();oceanSelection.clear();resetInput();const voyageSaved=typeof saveVoyage==='function'&&saveVoyage(),journalSaved=persist();oceanAudio.pause();ready=false;handleFailure(new Error('WebGL context lost'),{contextLost:true,saved:voyageSaved&&journalSaved});});canvas.addEventListener('contextmenu',e=>e.preventDefault());window.addEventListener('resize',()=>{if(renderer){renderer.resize();resetInput();}});}
 async function boot(){try{loadJournal();applyRecoveryGraphics();window.__freeze=new URLSearchParams(location.search).has('still');const pause=()=>new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));await pause();if(!oceanSaveGuard.live)return;renderer=new Renderer($('ocean'),Math.round(settings.quality));renderer.quality=Math.round(settings.quality);renderer.resize();await renderer.loaded;if(!oceanSaveGuard.live)return;$('loadDetail').textContent='鋪展高密度礁體與材質';await pause();if(!await loadCompiledScene(renderer)){buildReef(renderer);$('loadDetail').textContent='讓魚群與海龜回到水裡';await pause();addLife(renderer);renderer.sceneLoad={compiled:false};}if(!oceanSaveGuard.live)return;if(typeof ensureReefFish!=='undefined')ensureReefFish(renderer);if(typeof ensureOarfish!=='undefined')ensureOarfish(renderer);if(typeof ensureFrilledShark!=='undefined')ensureFrilledShark(renderer);if(typeof ensureBarreleye!=='undefined')ensureBarreleye(renderer);if(typeof ensureAbyssCommunity!=='undefined')ensureAbyssCommunity(renderer);initializeIndividuals(renderer);SPECIES.forEach(makeThumb);setupControls();initIndividualUI();initVoyage();oceanSaveGuard.loaded();await oceanFeatures.init();if(!oceanSaveGuard.live)return;oceanSelection.init();oceanDiveUI.init();setCount();updateSoundUI();document.body.classList.toggle('reduced-motion',settings.reduced);if(matchMedia('(pointer:coarse)').matches)$('introControls').textContent='左搖桿游動 · 拖曳環視 · ↑↓ 浮潛';updateLife(0);updateCamera();applyVisualSettings();if(renderer.sceneStream)await renderer.sceneStream.ready(eye);if(!oceanSaveGuard.live)return;
- // Keep one-time audio device work inside loading, never in an idle-home task.
- if(settings.startWithSound&&!document.hidden&&document.hasFocus()){
-  $('loadDetail').textContent='準備海底聲景';await pause();
-  if(oceanSaveGuard.live&&!document.hidden&&document.hasFocus()){
-   // Audio is optional: native suspend/close can remain pending indefinitely.
-   // Detach an unused graph before retrying on the next real sound gesture.
-   let preparationTimer;
-   try{await Promise.race([oceanAudio.prepare(),new Promise((_,reject)=>{preparationTimer=setTimeout(()=>reject(new Error('Audio preparation timed out')),1500);})]);if(!oceanSaveGuard.live||document.hidden||!document.hasFocus())oceanAudio.releasePrepared().catch(()=>{});}
-   catch(error){oceanAudio.releasePrepared().catch(()=>{});console.warn('Audio preparation unavailable; retry on sound gesture',error);}
-   finally{clearTimeout(preparationTimer);}
-  }
- }
+ // Native audio construction can block synchronously, before any timeout can
+ // run. Keep it out of boot entirely; startDive/toggleSound own the real gesture.
+ $('loadDetail').textContent='呈現海底景色';
  if(!oceanSaveGuard.live)return;ready=true;oceanSaveHealth.init();renderer.render(eye,target,0);$('startBtn').disabled=false;$('tourStart').disabled=false;$('loading').classList.add('gone');setTimeout(()=>$('loading').classList.add('hidden'),700);lastTime=performance.now();requestAnimationFrame(animate);
  // Read-only diagnostics for browser testing; no network or analytics.
  window.__ocean={get ready(){return ready},get active(){return active},get speciesCount(){return SPECIES.length},get creatureCount(){return life.length+decorLife.length+shoal.length},get position(){return player.p.slice()},get auto(){return auto},get seen(){return persistent.seen.slice()},get photos(){return persistent.photos.length},get modal(){return modal},get view(){return settings.third?'third':'first'},get audio(){return oceanAudio.status},get input(){return {move:stick.slice(),look:lookStick.slice(),vertical:verticalInput}},get lighting(){return settings.lighting}};

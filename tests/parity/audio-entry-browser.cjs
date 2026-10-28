@@ -1,13 +1,14 @@
-/* Native, visible, normal-UI audio-entry regression. Observers preserve calls,
+/* Native, normal-UI audio-entry regression (visible, or --headless). Observers preserve calls,
  * arguments, receivers and return values. No pose/clock/quality/save injection.
  * Touch is desktop Chrome emulation; output/RMS is not human listening evidence. */
 'use strict';
 const fs=require('node:fs'),path=require('node:path'),assert=require('node:assert/strict');
 const root=path.resolve(__dirname,'../..'),option=(name,fallback)=>{const prefix='--'+name+'=',v=process.argv.find(a=>a.startsWith(prefix)),i=process.argv.indexOf('--'+name);return v?v.slice(prefix.length):i>=0?process.argv[i+1]:fallback;};
 const url=option('url','http://127.0.0.1:8765/'),profileID=option('profile','all'),output=path.resolve(root,option('out','qa/parity/audio-entry-browser.json'));
+const headless=process.argv.includes('--headless');
 assert(!new URL(url).searchParams.has('still'),'Use the natural animation loop');
 const profiles=[{id:'desktop',viewport:{width:1280,height:800},dpr:2,touch:false},{id:'touch',viewport:{width:390,height:844},dpr:3,touch:true}].filter(p=>profileID==='all'||p.id===profileID);assert(profiles.length,'Invalid --profile');
-const report={url,status:'running',profiles:[],errors:[],method:'Visible native Chrome with explicit document-user-activation-required autoplay policy; normal pointer/touch UI only, default adaptive quality and untouched clock/pose/save. All observer reads and readiness polling use direct CDP Runtime.evaluate with userGesture:false; only normal UI actions may activate the document. Native constructor/resume, OceanAudio synchronous calls, DOM events, full renderer submissions, long tasks and actual music requests are observed. Preparation remains part of loading and does not eliminate native initialization cost. Timings are diagnostic, not universal FPS/power thresholds. Running context, two original stems and nonzero analyser output support the audio path, not perceived audio quality or physical-phone certification.'};
+const report={url,headless,status:'running',profiles:[],errors:[],method:(headless?'Headless installed native Chrome (usable while the Mac screen is locked; no visible-window or listening evidence)':'Visible native Chrome')+' with explicit document-user-activation-required autoplay policy; normal pointer/touch UI only, default adaptive quality and untouched clock/pose/save. All observer reads and readiness polling use direct CDP Runtime.evaluate with userGesture:false; only normal UI actions may activate the document. Native constructor/resume, OceanAudio synchronous calls, DOM events, full renderer submissions, long tasks and actual music requests are observed. Boot and the interactive home perform no Web Audio initialization or music IO; first sound-enabled entry initializes audio inside its user gesture. Timings are diagnostic, not universal FPS/power thresholds. Running context, two original stems and nonzero analyser output support the audio path, not perceived audio quality or physical-phone certification.'};
 const save=()=>{fs.mkdirSync(path.dirname(output),{recursive:true});fs.writeFileSync(output,JSON.stringify(report,null,2));};
 
 function observe(){
@@ -22,7 +23,7 @@ function observe(){
    wrappedPrototypes.add(Native.prototype);
    for(const method of ['resume','suspend']){const original=Native.prototype[method];Native.prototype[method]=function(...args){const row={...lifecycle(),context:identify(this),stateBefore:this.state,startDepth:trace.startDepth};trace[method==='resume'?'resumes':'suspends'].push(row);const begin=performance.now();try{const result=Reflect.apply(original,this,args);row.syncMs=performance.now()-begin;Promise.resolve(result).then(()=>Object.assign(row,{settledAt:performance.now(),stateAfter:this.state}),error=>Object.assign(row,{settledAt:performance.now(),error:String(error)}));return result;}catch(error){row.syncMs=performance.now()-begin;row.error=String(error);throw error;}};}
   }
-  if(!nativeContexts.has(Native)){let Observed;Observed=new Proxy(Native,{construct(Target,args,newTarget){const row={...lifecycle(),options:args[0]||null},begin=performance.now();trace.constructors.push(row);try{const ctx=Reflect.construct(Target,args,newTarget===Observed?Target:newTarget);Object.assign(row,{context:identify(ctx),syncMs:performance.now()-begin,state:ctx.state,sampleRate:ctx.sampleRate});return ctx;}catch(error){row.syncMs=performance.now()-begin;row.error=String(error);throw error;}}});nativeContexts.set(Native,Observed);}
+  if(!nativeContexts.has(Native)){let Observed;Observed=new Proxy(Native,{construct(Target,args,newTarget){const row={...lifecycle(),options:args[0]||null,startDepth:trace.startDepth},begin=performance.now();trace.constructors.push(row);try{const ctx=Reflect.construct(Target,args,newTarget===Observed?Target:newTarget);Object.assign(row,{context:identify(ctx),syncMs:performance.now()-begin,state:ctx.state,sampleRate:ctx.sampleRate});return ctx;}catch(error){row.syncMs=performance.now()-begin;row.error=String(error);throw error;}}});nativeContexts.set(Native,Observed);}
   window[key]=nativeContexts.get(Native);
  }
  const originalFetch=window.fetch;window.fetch=function(...args){const value=args[0],address=typeof value==='string'?value:value?.url||String(value);if(/\/music\/|\.(?:mp3|m4a|wav)(?:\?|$)/i.test(address))trace.musicFetches.push({at:performance.now(),url:address,...activation()});return Reflect.apply(originalFetch,this,args);};
@@ -46,7 +47,7 @@ function observe(){
 
 async function capture(profile){
  const {chromium}=require(process.env.PLAYWRIGHT_PATH||'/Users/jasper/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright'),launch=require('./browser-launch.cjs')(true);
- const browser=await chromium.launch({...launch,headless:false,args:[...(launch.args||[]),'--enable-automation','--autoplay-policy=document-user-activation-required']});let context,page,other;
+ const browser=await chromium.launch({...launch,headless,args:[...(launch.args||[]),'--enable-automation','--autoplay-policy=document-user-activation-required']});let context,page,other;
  const row={profile,checks:[],snapshots:[],documents:[],requests:[],entries:[],observation:{method:'CDP Runtime.evaluate',userGesture:false,reads:0}};report.profiles.push(row);save();
  // Playwright evaluate()/waitForFunction() use Runtime.callFunctionOn with
  // userGesture:true. Never use them here: even a readiness read can unlock
@@ -71,11 +72,12 @@ async function capture(profile){
    if(wantSound)check(label+' resumes directly inside the user-activated audio.start call',data.resumes.some(r=>r.startDepth>0&&r.isActive===true),data.resumes);return snapshot(label);
   };
   await loaded();row.hardware=await read(page,()=>{const g=renderer.gl,e=g.getExtension('WEBGL_debug_renderer_info');return e?g.getParameter(e.UNMASKED_RENDERER_WEBGL):null;});check('native GPU and default adaptive quality',row.hardware&&!/swiftshader|llvmpipe|software/i.test(row.hardware)&&await read(page,()=>settings.adaptive));
-  await page.waitForTimeout(800);const home=await snapshot('prepared-home');await raw('prepared-home');
-  check('sound-enabled home has one silent suspended graph before any gesture',home.preference&&home.checked&&!home.sound&&home.context==='suspended'&&!home.enabled&&home.timer===null&&home.loadingIsNull&&!home.musicReady&&home.sources===0&&home.master===0&&home.musicFetches===0&&row.requests.length===0&&home.resumes===0&&home.constructors.filter(c=>!c.error).length===1,home);
-  check('preparation had no user activation, synthetic autoplay unlock or earlier UI gesture',home.isActive===false&&home.hasBeenActive===false&&home.trustedGestureEvents.length===0&&home.resumes===0&&home.constructors.filter(c=>!c.error).every(c=>c.isActive===false&&c.hasBeenActive===false),home);
-  check('preparation constructor ran within loading, not the interactive home',home.constructors.filter(c=>!c.error).every(c=>!c.ready&&c.loadingVisible&&!c.hidden&&c.focused),home.constructors);
-  const first=await entry('prepared-entry',true);check('prepared entry reuses its graph and starts the two original stems',first.contextID===home.contextID&&first.constructors.filter(c=>!c.error).length===1&&first.sources===2&&first.rms>1e-6,first);
+  await page.waitForTimeout(800);const home=await snapshot('audio-free-home');await raw('audio-free-home');
+  check('sound-enabled home creates no audio graph, timer or music request',home.preference&&home.checked&&!home.sound&&home.context===null&&!home.enabled&&home.timer===null&&home.loadingIsNull&&!home.musicReady&&home.sources===0&&home.master===null&&home.musicFetches===0&&row.requests.length===0&&home.resumes===0&&home.constructors.length===0,home);
+  check('home had no user activation, synthetic autoplay unlock or earlier UI gesture',home.isActive===false&&home.hasBeenActive===false&&home.trustedGestureEvents.length===0&&home.resumes===0,home);
+  const first=await entry('first-audio-entry',true),firstEntry=row.entries.at(-1);
+  check('first entry creates exactly one graph inside the real entry gesture',first.contextID!==null&&first.constructors.length===1&&!first.constructors[0].error&&firstEntry.constructors.length===1&&firstEntry.constructors.every(c=>c.startDepth>0&&c.isActive===true&&c.ready&&!c.loadingVisible),firstEntry.constructors);
+  check('first entry starts the two original stems after its activating gesture',first.sources===2&&first.rms>1e-6&&firstEntry.musicFetches.length===2&&firstEntry.musicFetches.every(f=>f.isActive===true),first);
   await press('#pauseBtn');await press('#settingsBtn');await press('#audioToggle');await waitRead(page,()=>!settings.sound&&oceanAudio.ctx?.state==='suspended');const muted=await snapshot('muted-in-settings');check('normal settings toggle disables sound and saves the preference',!muted.sound&&!muted.preference&&!muted.enabled&&muted.context==='suspended',muted);
   await press('#closePanel');await press('#pauseBtn');await press('#menuHome');await waitRead(page,()=>!active&&!modal);const returned=await snapshot('saved-home');check('saved home retains sound-off preference',!returned.preference&&!returned.checked&&!returned.sound,returned);await raw('before-reload');
   await page.reload();await loaded();await page.waitForTimeout(600);const silentHome=await snapshot('silent-reloaded-home');check('reloaded sound-off home does not prepare or fetch audio',!silentHome.preference&&!silentHome.checked&&silentHome.context===null&&silentHome.timer===null&&!silentHome.loading&&silentHome.sources===0&&silentHome.constructors.length===0&&silentHome.musicFetches===0,silentHome);
@@ -88,5 +90,5 @@ async function capture(profile){
  }catch(error){row.status='failed';row.failure=error.stack;throw error;}
  finally{for(const [label,p]of [['final-owner',page],['final-blocked',other]])if(p&&!p.isClosed())try{row.documents.push({label,...await read(p,()=>{const {identify,mark,...data}=__audioEntry;return data;})});}catch(error){row.documents.push({label,error:String(error)});}save();await context?.close();await browser.close();}
 }
-if(process.argv.includes('--check-source-only'))console.log(JSON.stringify({profiles:profiles.map(p=>p.id),url,output,status:'options-valid-no-browser-run'}));
+if(process.argv.includes('--check-source-only'))console.log(JSON.stringify({profiles:profiles.map(p=>p.id),url,output,headless,status:'options-valid-no-browser-run'}));
 else(async()=>{try{for(const profile of profiles)await capture(profile);report.status='passed';console.log('PASS '+output);}catch(error){report.status='failed';report.failure=error.stack;console.error(error);process.exitCode=1;}finally{save();}})();
