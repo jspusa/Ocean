@@ -535,7 +535,7 @@ const FolioseArt=(()=>{
    for(let i=0;i<nw;i++){const lo=sheet[0][nv],hi=sheet[1][nv];tri(hi[i],hi[i+1],lo[i+1]);tri(hi[i],lo[i+1],lo[i]);}
   }
   for(const v of vertices)v.n=V.norm(v.n);
-  for(const face of faces){const v=face.map(i=>vertices[i]),n=faceNormal(...v.map(p=>p.p)),average=v.reduce((s,p)=>V.add(s,p.n),[0,0,0]);g.tri(...v.map(p=>p.p),color,V.dot(n,average)>1e-8?v.map(p=>p.n):[n,n,n],v.map(p=>p.c));}
+  for(const face of faces){const v=face.map(i=>vertices[i]),n=faceNormal(...v.map(p=>p.p));g.tri(...v.map(p=>p.p),color,v.map(p=>V.dot(n,p.n)>1e-6?p.n:n),v.map(p=>p.c));}
   return g;
  }
  return {build};
