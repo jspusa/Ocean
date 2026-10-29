@@ -121,7 +121,15 @@ void main(){vec3 p=aPosition,n=aNormal;vLocal=p;vUV=aUV;vTag=aTag;
   p.x+=bend*h*h;p.z+=sin(aGenes.x*19.)*.065*h*h;
   n.y-=2.*h*(bend*n.x+sin(aGenes.x*19.)*.065*n.z);
  }
- if(uKind==2){float wing=smoothstep(.51,1.45,abs(p.z));float wave=sin(uTime*1.45+aExtra.x-abs(p.z)*.7);p.y+=wave*.37*wing;p.x-=wing*.07*cos(uTime*1.45+aExtra.x);n.z-=sign(p.z)*cos(uTime*1.45+aExtra.x)*.21*wing;}
+ // Only soft limb skin bends: shell/plastron tags must remain rigid. The
+ // inverse-transpose shear transports normals with the same anchored stroke.
+ if(uKind==2&&aTag>1.5&&aTag<2.5){
+  float z=abs(p.z),u=clamp((z-.51)/.94,0.,1.),wing=u*u*(3.-2.*u);
+  float slope=z>.51&&z<1.45?6.*u*(1.-u)/.94*sign(p.z):0.;
+  float beat=uTime*1.45+aExtra.x,phase=beat-z*.7;
+  float dx=-.07*cos(beat)*slope,dy=.37*(sin(phase)*slope-.7*cos(phase)*wing*sign(p.z));
+  n.z-=dx*n.x+dy*n.y;p.y+=.37*sin(phase)*wing;p.x-=.07*cos(beat)*wing;
+ }
  if(uKind==3){float h=max(0.,p.y);p.x+=sin(uTime*.65+aExtra.x+h*1.2)*.036*h;p.z+=cos(uTime*.48+aExtra.x+h)*.022*h;}
  if(uKind==4){float w=pow(abs(p.z)/1.9,1.5);p.y+=sin(uTime*1.48+aExtra.x-abs(p.z)*1.1)*w*.48;n.z-=cos(uTime*1.48+aExtra.x-abs(p.z))*.25*sign(p.z);}
  if(uKind==7){float tail=(1.-smoothstep(-2.,-.1,p.x));p.y+=sin(uTime*2.3+aExtra.x-p.x)*.26*tail;float wave=sin(uTime*2.3+aExtra.x-p.x);n=normalize(n+vec3(0.,0.,wave*.015*tail));

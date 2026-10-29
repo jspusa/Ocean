@@ -7,9 +7,133 @@ function bioHash(n){n=(n^61)^(n>>>16);n=Math.imul(n,9);n^=n>>>4;n=Math.imul(n,0x
 function bioValue(id,channel){return bioHash((id^Math.imul(channel+1,0x9e3779b9))>>>0)/4294967296;}
 const BIO_NEUTRAL=[1,1,1,1],BIO_DEFAULT=[.5,.5,.5,.5];
 const fishObstacleBuckets=new Map(),NO_FISH_OBSTACLES=[];
+let animalRockProfiles=new WeakMap(),animalRockMotion=new WeakMap();
+let animalContactFrame=null;
+const animalRockModels=new Map();
+const animalTrajectoryFloors=new WeakMap();
+// These catalogue species have explicit anchored/crawling support contracts.
+// Do not turn a new generic "crawl" label into a blanket collision exemption.
+const supportedWorldAnimals=new Set(['pygmy_seahorse','cinderella_slug','garden_eel','pistol_shrimp','frogfish','japanese_spider_crab','sea_pig','tripod_fish']);
+function worldRockContact(){return typeof OceanRockContact!=='undefined'&&OceanRockContact.catalogue()?OceanRockContact:null;}
+function supportedAnimal(f){return f.fauna&&supportedWorldAnimals.has(SPECIES[f.species]?.id);}
+// Gameplay may replace a natural route with feeding or partner movement. Defer
+// its stone query until those hooks finish, so every world actor gets one final
+// contact solve. Direct updateLife/bake calls keep their existing contact path.
+function updateLifeWithEffects(time,update,effects){
+ if(!worldRockContact()||animalContactFrame){update(time);effects();return false;}
+ const frame={time,intents:new Map()};animalContactFrame=frame;
+ try{update(time);effects();}finally{animalContactFrame=null;}
+ for(const f of allLife)contactAnimal(f,time,frame.intents.get(f));
+ for(const f of shoal)contactAnimal(f,time,frame.intents.get(f));
+ return true;
+}
+function setAnimalContactIntent(f,intent){if(animalContactFrame)animalContactFrame.intents.set(f,intent);}
+function animalContactOrigin(f){
+ const state=animalRockMotion.get(f),frame=animalContactFrame;
+ return frame&&state&&state.catalogue===worldRockContact()?.catalogue()&&state.epoch===f.encounterEpoch&&frame.time>=state.time&&frame.time-state.time<=.25?state.p:f.p;
+}
+function initializeAnimalContact(r){
+ animalRockProfiles=new WeakMap();animalRockMotion=new WeakMap();if(!worldRockContact())return;
+ const actors=new Set([...allLife,...shoal]);
+ for(const b of r.batches||[]){const radius=b.radius??b.mesh?.radius;if(!Number.isFinite(radius)||b.shadowProxy)continue;for(const f of b.instances||[]){if(!actors.has(f))continue;const old=animalRockProfiles.get(f);if(!old||radius>old.radius)animalRockProfiles.set(f,{radius,kind:b.kind});}}
+}
+function animalContactEnvelope(f){
+ let profile=animalRockProfiles.get(f);const sp=SPECIES[f.species],m=f.bioMorph||[1,1,1,1];
+ if(!profile){
+  const key=sp?.id||(f.slot!==undefined?'shoal':'decor');profile=animalRockModels.get(key);
+  if(!profile){
+   const kind=sp?.renderKind||(f.species===8?2:f.species===9?4:f.species===10?6:f.species===11?7:1);let radius=0;
+   if(sp?.modelBounds){const b=sp.modelBounds;radius=Math.hypot(...b.min.map((v,i)=>Math.max(Math.abs(v),Math.abs(b.max[i]))));}
+   else{
+    const geometry=f.species===8?turtleGeometry():f.species===9?rayGeometry():f.species===10?whaleGeometry():f.species===11&&typeof dolphinGeometry==='function'?dolphinGeometry():fishGeometry(sp||{id:key,height:.22,width:.075,color:0xbecfc9},true);
+    for(let k=0;k<geometry.v.length;k+=12)radius=Math.max(radius,Math.hypot(geometry.v[k],geometry.v[k+1],geometry.v[k+2]));
+   }
+   profile={radius,kind};animalRockModels.set(key,profile);
+  }profile={radius:profile.radius,kind:profile.kind};animalRockProfiles.set(f,profile);
+ }
+ const s=f.s;if(profile.envelope&&profile.sx===s[0]&&profile.sy===s[1]&&profile.sz===s[2]&&profile.mx===m[0]&&profile.my===m[1]&&profile.mz===m[2])return profile.envelope;
+ // Rotation/bank preserve radius. Morph scaling and bounded swim/fin strokes
+ // are included before maximum nonuniform instance scale. Kind 9 uses the
+ // long body's radial slack: every compiled vertex is separately checked at
+ // maximum tail bend plus full .82 pectoral/handshake excursion in parity QA.
+ const base=profile.radius,kind=profile.kind,morph=kind===1?Math.max(1,m[0]*Math.max(1,m[2]),m[1]):1;
+ const bend=kind===1?.1028+.025*base*morph:kind===2?Math.hypot(.37,.07):kind===4?.48*Math.pow(base/1.9,1.5):kind===6?.62:kind===7?.60:kind===9?.073+base*.10:kind===12?.035+base*.035:base*.15+.15;
+ const scale=Math.max(...f.s),radius=(base*morph+bend)*scale+.012;
+ const bodyY=sp?.modelBounds?Math.max(Math.abs(sp.modelBounds.min[1]),Math.abs(sp.modelBounds.max[1])):f.species===8?.31:f.species===9?.22:f.species===10?1:f.species===11?.6:sp?.height||.22;
+ profile.sx=s[0];profile.sy=s[1];profile.sz=s[2];profile.mx=m[0];profile.my=m[1];profile.mz=m[2];
+ return profile.envelope={radius,vertical:(bodyY*morph+bend)*scale+radius*.35,kind};
+}
+function animalContactFloor(f,hull,p){
+ if(Number.isFinite(f.habitatFloor))return f.habitatFloor;if(f.fauna)return -Infinity;
+ if(Number.isFinite(f.schoolFloor)&&f.schoolHome&&Number.isFinite(f.schoolSpan)&&Math.hypot(p[0]-f.schoolHome[0],p[2]-f.schoolHome[2])+hull.radius<=16*f.schoolSpan+.35)return f.schoolFloor+hull.vertical;
+ const known=animalTrajectoryFloors.get(f);return (known&&Math.abs(p[0]-known.x)+Math.abs(p[2]-known.z)<1e-9?known.y:groundHeight(p[0],p[2]))+hull.vertical;
+}
+function animalContactSpeed(f){const sp=SPECIES[f.species];return f.slot!==undefined?.9:sp?.cetacean?cetaceanProfile(f).cruiseSpeed*1.8:f.fauna?Math.max(.25,(sp?.motionProfile?.speed||.15)*2+.15):Math.max(.25,Math.abs((f.speed||0)*(f.radius||0))*2.5+.35);}
+function recoverAnimalContact(f,hull,raw,radius,api,ceiling=Number.isFinite(f.habitatCeiling)?f.habitatCeiling:-.06-hull.vertical){
+ // Check the exact surface over a fixed, deterministic search. This only runs
+ // on first placement/time discontinuities, never as the normal swim step.
+ for(let ring=0;ring<4;ring++)for(let direction=0;direction<(ring?8:1);direction++){
+  const a=direction*Math.PI/4,reach=ring*(radius*2+.5),p=[raw[0]+Math.cos(a)*reach,raw[1],raw[2]+Math.sin(a)*reach],top=api.topAt(p[0],p[2]);
+  p[1]=Math.max(p[1],animalContactFloor(f,hull,p),Number.isFinite(top)?top+radius+.001:-Infinity);
+  for(let up=0;up<6&&p[1]<=ceiling;up++,p[1]+=Math.max(.25,radius*.5))if(!api.overlaps(p,radius))return p;
+ }
+ return null;
+}
+function contactAnimal(f,time,intent=null){
+ if(animalContactFrame)return;
+ const api=worldRockContact();if(!api||supportedAnimal(f))return;
+ const hull=animalContactEnvelope(f),radius=hull.radius,rx=f.p[0],ry=f.p[1],rz=f.p[2],catalogue=api.catalogue(),state=animalRockMotion.get(f),dt=state?time-state.time:Infinity,ceiling=intent?.allowSurface?Infinity:Number.isFinite(f.habitatCeiling)?f.habitatCeiling:-.06-hull.vertical;
+ const continuous=state&&state.catalogue===catalogue&&state.radius===radius&&state.epoch===f.encounterEpoch&&state.schoolHome===f.schoolHome&&state.schoolGroup===f.schoolGroup&&state.schoolSpan===f.schoolSpan&&dt>=0&&dt<=.25;
+ if(continuous&&dt===0&&(intent||Math.abs(rx-state.raw[0])+Math.abs(ry-state.raw[1])+Math.abs(rz-state.raw[2])<1e-9)){for(let i=0;i<3;i++)f.p[i]=state.p[i];f.yaw=state.yaw;f.pitch=state.pitch;f.bank=state.bank;return;}
+ let desired=[rx,ry,rz],from=null,maxStep=Infinity;
+ if(continuous){
+  from=state.p;const origin=intent?from:state.raw,dx=rx-origin[0],dy=ry-origin[1],dz=rz-origin[2],decay=intent?0:1-Math.exp(-dt/2),ax=(state.raw[0]-from[0])*decay,ay=(state.raw[1]-from[1])*decay,az=(state.raw[2]-from[2])*decay,length=Math.hypot(ax,ay,az),limit=Math.max(.025*dt,Math.hypot(dx,dy,dz)*.65),w=length>limit?limit/length:1;
+  let vx=dx+ax*w,vy=dy+ay*w,vz=dz+az*w;const n=state.normal,inward=n?vx*n[0]+vy*n[1]+vz*n[2]:0;
+  if(inward<0){vx-=inward*n[0];vy-=inward*n[1];vz-=inward*n[2];}
+  maxStep=(Number.isFinite(intent?.speed)?intent.speed:animalContactSpeed(f))*dt;const travel=Math.hypot(vx,vy,vz);if(travel>maxStep){const q=maxStep/travel;vx*=q;vy*=q;vz*=q;}
+  desired[0]=from[0]+vx;desired[1]=from[1]+vy;desired[2]=from[2]+vz;
+ }
+ // Rock certificates cover stone only. The analytic seabed can rise while an
+ // actor remains inside the same empty-rock ball, so retain its height guard.
+ desired[1]=Math.max(desired[1],animalContactFloor(f,hull,desired));
+ if(from&&Math.hypot(desired[0]-from[0],desired[1]-from[1],desired[2]-from[2])>maxStep+1e-7){desired[0]=from[0];desired[2]=from[2];desired[1]=clamp(desired[1],from[1]-maxStep,from[1]+maxStep);}
+ const reserve=.12+Math.min(.13,radius*.08),clear=continuous&&state.clear&&Math.hypot(desired[0]-state.clear[0],desired[1]-state.clear[1],desired[2]-state.clear[2])<=reserve;
+ let nextClear=clear?state.clear:null,normal=continuous?state.normal:null,goal=continuous?state.goal:null;
+ if(!clear){
+  const requested=desired.slice(),report={};let solvedReserve=reserve;
+  if(goal){
+   const distance=Math.hypot(goal.p[0]-from[0],goal.p[1]-from[1],goal.p[2]-from[2]),weight=Math.min(1,maxStep/Math.max(1e-10,distance));desired=from.map((v,i)=>v+(goal.p[i]-v)*weight);solvedReserve=0;api.resolve(desired,radius,from,report);
+  }else api.resolve(desired,radius+reserve,from,report);
+  // The prior body is safe, but it may no longer fit the larger comfort
+  // sphere. Never let that cache refresh choose a distant medial exit.
+  if(from&&Math.hypot(desired[0]-from[0],desired[1]-from[1],desired[2]-from[2])>maxStep+.002){
+   if(solvedReserve>0&&report.valid&&desired[1]>=animalContactFloor(f,hull,desired)&&desired[1]<=ceiling){
+    // Keep the certified wider solution as a short clearance goal. Move
+    // toward it with a swept body-sized step instead of retrying two solves
+    // forever while merely projecting away the inward route velocity.
+    goal={p:desired.slice(),normal:report.normal||null};const distance=Math.hypot(desired[0]-from[0],desired[1]-from[1],desired[2]-from[2]),weight=Math.min(1,maxStep/distance);desired=from.map((v,i)=>v+(goal.p[i]-v)*weight);
+   }else desired=requested;
+   solvedReserve=0;api.resolve(desired,radius,from,report);
+   if(Math.hypot(desired[0]-from[0],desired[1]-from[1],desired[2]-from[2])>maxStep+.002){desired=from.slice();report.valid=false;}
+  }normal=report.normal||null;
+  if(goal&&Math.hypot(desired[0]-goal.p[0],desired[1]-goal.p[1],desired[2]-goal.p[2])<1e-7){nextClear=goal.p.slice();normal=goal.normal;goal=null;}
+  // Contact recovery may otherwise select the buried underside of a stone.
+  // Continuous motion keeps its last safe pose; first/rewound poses recover
+  // deterministically above the actual top, without random medial exits.
+  const floor=animalContactFloor(f,hull,desired);
+  if(desired[1]<floor||desired[1]>ceiling){
+   if(from){desired=from.slice();nextClear=state.clear;normal=state.normal;goal=null;}
+   else {const recovered=recoverAnimalContact(f,hull,[rx,ry,rz],radius+reserve,api,ceiling);if(recovered){desired=recovered;nextClear=recovered.slice();normal=null;}}
+  }else if(!nextClear&&!goal&&(solvedReserve>0&&report.valid===true||!api.overlaps(desired,radius+reserve)))nextClear=desired.slice();
+ }
+ for(let i=0;i<3;i++)f.p[i]=desired[i];
+ const altered=Math.abs(desired[0]-rx)+Math.abs(desired[1]-ry)+Math.abs(desired[2]-rz)>1e-7;
+ if(continuous&&dt>0&&!intent?.preservePose&&(altered||state.altered)){const dx=desired[0]-from[0],dy=desired[1]-from[1],dz=desired[2]-from[2],horizontal=Math.hypot(dx,dz);if(horizontal>1e-6){f.yaw=Math.atan2(-dz,dx);f.pitch=clamp(Math.atan2(dy,horizontal),-.29,.29);}else {f.yaw=state.yaw;f.pitch=state.pitch;}f.bank=clamp(f.bank||0,-.17,.17);}
+ const next=state||{raw:[0,0,0],p:[0,0,0]};next.raw[0]=rx;next.raw[1]=ry;next.raw[2]=rz;for(let i=0;i<3;i++)next.p[i]=desired[i];next.catalogue=catalogue;next.radius=radius;next.time=time;next.clear=nextClear;next.normal=normal;next.goal=goal;next.yaw=f.yaw;next.pitch=f.pitch;next.bank=f.bank;next.altered=altered;next.epoch=f.encounterEpoch;next.schoolHome=f.schoolHome;next.schoolGroup=f.schoolGroup;next.schoolSpan=f.schoolSpan;animalRockMotion.set(f,next);
+}
 function initializeIndividuals(r){
  fishObstacleBuckets.clear();
- for(const ob of obstacles){const rx=(ob.s[0]+.9)*1.613,rz=(ob.s[2]+.9)*1.613;
+ for(const ob of obstacles){if(worldRockContact()?.replacesLegacy(ob))continue;const rx=(ob.s[0]+.9)*1.613,rz=(ob.s[2]+.9)*1.613;
   for(let x=Math.floor((ob.p[0]-rx)/12);x<=Math.floor((ob.p[0]+rx)/12);x++)for(let z=Math.floor((ob.p[2]-rz)/12);z<=Math.floor((ob.p[2]+rz)/12);z++){
    const key=x+','+z;if(!fishObstacleBuckets.has(key))fishObstacleBuckets.set(key,[]);fishObstacleBuckets.get(key).push(ob);
   }
@@ -49,6 +173,7 @@ function initializeIndividuals(r){
   }
  }}
  r.individualCount=allLife.length+shoal.length;
+ initializeAnimalContact(r);
 }
 // A continuously differentiable path, with a different route and pace per animal.
 // No per-frame random numbers: revisiting time t produces exactly the same transform.
@@ -64,9 +189,11 @@ function animalTrajectory(f,t,out,includeHeight=true){
  // Banking reads only the previous sample's x/z. Its height and vertical
  // obstacle avoidance cannot affect either horizontal coordinate.
  if(!includeHeight){out[0]=x;out[2]=z;return;}
+ const terrain=f.fixedDepth===undefined&&f.species!==0?groundHeight(x,z):null;
+ if(terrain!==null&&out===f.p){let sample=animalTrajectoryFloors.get(f);if(!sample){sample={x,z,y:terrain};animalTrajectoryFloors.set(f,sample);}else{sample.x=x;sample.z=z;sample.y=terrain;}}
  let y=f.fixedDepth!==undefined?f.fixedDepth+Math.sin(t*(.19+s0*.09)+f.bob)*.20:
   f.species===0?f.center[1]+f.height+Math.sin(t*(.50+s1*.18)+f.bob)*.075:
-  groundHeight(x,z)+f.height+Math.sin(t*(.24+s1*.10)+f.bob)*.16;
+  terrain+f.height+Math.sin(t*(.24+s1*.10)+f.bob)*.16;
  if(f.species!==0){
   // Smoothly anticipates a reef obstacle instead of suddenly jumping up at its edge.
   for(const ob of (fishObstacleBuckets.get(Math.floor(x/12)+','+Math.floor(z/12))||NO_FISH_OBSTACLES)){const dx=(x-ob.p[0])/(ob.s[0]+.9),dz=(z-ob.p[2])/(ob.s[2]+.9),d=dx*dx+dz*dz;
@@ -269,7 +396,7 @@ function faunaMotionPose(f,time,out=f.p,context=null){
 function updateLife(t){
  updateReefSchool(t);
  for(const f of allLife){
-  if(f.fauna){faunaMotionPose(f,t,f.p);continue;}
+  if(f.fauna){faunaMotionPose(f,t,f.p);contactAnimal(f,t);continue;}
   f.partnerFinPulse=0;
   animalTrajectory(f,t,f.p);animalTrajectory(f,t+.055,trajectoryTmp);animalTrajectory(f,t-.055,trajectoryPrev,false);
   const dx=trajectoryTmp[0]-f.p[0],dy=trajectoryTmp[1]-f.p[1],dz=trajectoryTmp[2]-f.p[2];
@@ -277,9 +404,11 @@ function updateLife(t){
   const px=f.p[0]-trajectoryPrev[0],pz=f.p[2]-trajectoryPrev[2];
   const turn=Math.atan2(px*dz-pz*dx,px*dx+pz*dz)/.055;
   f.bank=clamp(turn*.23,-.17,.17);f.effort=clamp(Math.hypot(dx,dy,dz)/.055/(f.s[0]*1.8),.22,1.);
+  contactAnimal(f,t);
  }
 }
 const reefSchoolMotion=new WeakMap();
+const reefSchoolGroups=new Map();
 function updateReefSchool(t){
  // One current-following shoal. Turns travel along its body instead of every fish
  // endlessly orbiting the same point like particles in a decorative vortex.
@@ -289,17 +418,25 @@ function updateReefSchool(t){
   // of the frame math, while allowing authored edits to invalidate this entry.
   let fixed=reefSchoolMotion.get(f);
   if(!fixed||fixed.id!==id||fixed.phase!==f.phase||fixed.rad!==f.rad){fixed={id,phase:f.phase,rad:f.rad,delay:bioValue(id,17)*1.6,along:Math.cos(f.phase)*f.rad*5.3,spread:Math.sin(f.phase)*f.rad*1.65,vertical:Math.sin(f.phase*1.91)*f.rad*.48};reefSchoolMotion.set(f,fixed);}
-  const tt=t-fixed.delay,a=tt*.044;
-  const sinA=Math.sin(a),cx=1+sinA*8.5,cz=-12-Math.cos(a*.79)*5.5;
-  const dx=Math.cos(a)*.374,dz=Math.sin(a*.79)*.191;
-  const heading=Math.atan2(dz,dx),c=Math.cos(heading),s=Math.sin(heading);
+  const tt=t-fixed.delay,a=tt*.044,grouped=f.schoolHome&&Number.isFinite(f.schoolGroup)&&Number.isFinite(f.schoolSpan);let sinA,cx,cz,heading,c,s,vertical,span=1;
+  if(grouped){
+   const home=f.schoolHome,groupID=f.schoolGroup;span=f.schoolSpan;let group=reefSchoolGroups.get(groupID);
+   if(!group||group.time!==t||group.epoch!==f.encounterEpoch||group.home[0]!==home[0]||group.home[1]!==home[1]||group.home[2]!==home[2]||group.span!==span){
+    const phase=bioValue(bioHash(groupID+7141+(f.encounterEpoch||0)),17)*TAU,angle=t*.044+phase,sa=Math.sin(angle),h=Math.atan2(Math.sin(angle*.79)*.191,Math.cos(angle)*.374);
+    group={time:t,epoch:f.encounterEpoch,home:home.slice(),span,sin:sa,x:home[0]+sa*8.5*span,z:home[2]-Math.cos(angle*.79)*5.5*span,y:home[1]+Math.sin(t*.07+phase)*.38*span,heading:h,c:Math.cos(h),s:Math.sin(h)};reefSchoolGroups.set(groupID,group);
+   }
+   sinA=group.sin;cx=group.x;cz=group.z;vertical=group.y;heading=group.heading;c=group.c;s=group.s;
+  }else{
+   sinA=Math.sin(a);cx=1+sinA*8.5;cz=-12-Math.cos(a*.79)*5.5;
+   const dx=Math.cos(a)*.374,dz=Math.sin(a*.79)*.191;heading=Math.atan2(dz,dx);c=Math.cos(heading);s=Math.sin(heading);vertical=-6.7+Math.sin(tt*.07)*.38;
+  }
   const along=fixed.along,spread=fixed.spread;
   const ripplePhase=Math.sin(tt*.72+along*.65+f.phase),breathing=1+.12*Math.sin(tt*.27),ripple=.12*ripplePhase;
-  f.p[0]=cx+c*along-s*(spread*breathing+ripple)+q[0]*.14;
-  f.p[1]=-6.7+Math.sin(tt*.07)*.38+q[1]*.58+fixed.vertical;
-  f.p[2]=cz+s*along+c*(spread*breathing+ripple)+q[2]*.12;
+  if(grouped){f.p[0]=cx+(c*along-s*(spread*breathing+ripple)+q[0]*.14)*span;f.p[1]=vertical+(q[1]*.58+fixed.vertical)*span;f.p[2]=cz+(s*along+c*(spread*breathing+ripple)+q[2]*.12)*span;}
+  else{f.p[0]=cx+c*along-s*(spread*breathing+ripple)+q[0]*.14;f.p[1]=-6.7+Math.sin(tt*.07)*.38+q[1]*.58+fixed.vertical;f.p[2]=cz+s*along+c*(spread*breathing+ripple)+q[2]*.12;}
   f.yaw=-heading+.06*ripplePhase;
   f.pitch=Math.cos(tt*.07)*.022;f.bank=.025*sinA;f.effort=.53+.15*Math.sin(tt*.72+f.phase);
+  contactAnimal(f,t);
  }
 }
 /* Species contour remains identical across high and low detail meshes. */
@@ -399,7 +536,7 @@ function sculptedColony(type,lod,mound=false){
 }
 // Rounded erosion, slanted bedding and cross fractures break the old stacked-block outline.
 function rockGeometry(variant=0,low=false){
- const g=new Geometry();g.material=2;g.shadow=true;
+ const g=new Geometry();g.material=2;g.shadow=true;g.rockContact={kind:'rock',closed:true,key:'rock:'+variant+':'+(low?'low':'high')};
  const form=(u,v)=>{const a=u*TAU,b=v*Math.PI,s=Math.sin(b),cube=x=>Math.sign(x)*Math.pow(Math.abs(x),.70);
   const x=cube(s*Math.cos(a)),y=cube(Math.cos(b)),z=cube(s*Math.sin(a)),phase=variant*5.31;
   const warp=geoNoise(x*2+phase,y*2.2,z*2)-.5;

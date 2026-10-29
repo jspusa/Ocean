@@ -162,7 +162,8 @@ async function loadStreamedScene(renderer,url){
   if(index.format!=='return-blue/streamed-scene/1'||index.sourceVersion!==OPEN_WORLD.version||index.batches.length>600||index.meshes.length>600||index.nodes.length>20000||index.chunks.length>600)throw Error('unsupported regional scene');
   for(const b of index.batches)if(!index.meshes[b.meshID]||b.instanceIDs.some(id=>!index.nodes[id]))throw Error('invalid regional batch');
   for(const m of index.meshes){const c=index.chunks[m.chunk];if(!c||m.vertexOffset<0||m.indexOffset<0||m.vertexOffset%4||m.indexOffset%4||m.vertexFloats%12||m.indexCount%3||m.vertexOffset+m.vertexFloats*4>c.decodedBytes||m.indexOffset+m.indexCount*4>c.decodedBytes||!Number.isFinite(m.radius))throw Error('invalid regional mesh');}
+  if(typeof OceanRockContact!=='undefined')OceanRockContact.install(index.rockContact);
   stream=new SceneStream(renderer,index,url);renderer.sceneStream=stream;await stream.ready(typeof eye==='undefined'?[0,-7.3,13.5]:eye);
   obstacles.push(...index.obstacles);reefPatches.push(...index.reefPatches);life.push(...index.life.map(id=>index.nodes[id]));decorLife.push(...index.decorLife.map(id=>index.nodes[id]));shoal.push(...index.shoal.map(id=>index.nodes[id]));allLife=life.concat(decorLife);diverBatch=renderer.batches[first+index.diverBatch];stream.stats();return true;
- }catch(error){stream?.dispose();renderer.batches.splice(first);renderer.sceneStream=null;console.warn('Regional scene unavailable; using the complete scene.',error);return false;}
+ }catch(error){if(typeof OceanRockContact!=='undefined')OceanRockContact.reset();stream?.dispose();renderer.batches.splice(first);renderer.sceneStream=null;console.warn('Regional scene unavailable; using the complete scene.',error);return false;}
 }

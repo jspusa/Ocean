@@ -79,17 +79,38 @@ function researchVessel(){
 }
 function wreckVessel(){
  const g=new Geometry();g.material=13;const rusty=[.37,.34,.23],dark=[.16,.20,.17];
+ g.growthSurfaces={panels:[],decks:[]};
  // Broken, open ribs, not a blocked aquarium or a sealed cave.
  for(let k=0;k<18;k++){
   const z=-16+k*1.82,w=4.3*Math.pow(Math.sin(Math.PI*(k+.5)/18),.45);
   for(let j=0;j<10;j++){if((k===4||k===12)&&j>6)continue;const a=Math.PI*j/10,b=Math.PI*(j+1)/10;g.tube([Math.cos(a)*w,1.95-Math.sin(a)*2.25,z],[Math.cos(b)*w,1.95-Math.sin(b)*2.25,z],.13,.11,rusty,6);}
  }
- for(let side of [-1,1])for(let k=0;k<14;k++){if((k+side)%5===0)continue;let z=-14+k*2.05,w=3.8*Math.pow(Math.sin(Math.PI*(k+1)/16),.45);g.box([side*w,1.25,z],[.24,1.9,1.78],rusty);}
- g.box([0,-.08,0],[3.3,.26,24],dark);g.box([0,2.1,4.7],[5.0,.26,5.7],rusty);
+ for(let side of [-1,1])for(let k=0;k<14;k++){if((k+side)%5===0)continue;let z=-14+k*2.05,w=3.8*Math.pow(Math.sin(Math.PI*(k+1)/16),.45);const p=[side*w,1.25,z],s=[.24,1.9,1.78];g.box(p,s,rusty);g.growthSurfaces.panels.push({p,s,side});}
+ g.box([0,-.08,0],[3.3,.26,24],dark);
+ const lowerDeck={p:[0,2.1,4.7],s:[5.0,.26,5.7]};g.box(lowerDeck.p,lowerDeck.s,rusty);g.growthSurfaces.decks.push(lowerDeck);
  for(let x of [-1.9,1.9])for(let z of [2.6,6.8])g.tube([x,2.2,z],[x,5.1,z],.16,.11,rusty,7);
- g.box([0,5.04,4.7],[4.5,.18,4.9],rusty);g.tube([0,.3,-5],[1.5,5.7,-6],.20,.07,rusty,8);
+ const upperDeck={p:[0,5.04,4.7],s:[4.5,.18,4.9]};g.box(upperDeck.p,upperDeck.s,rusty);g.growthSurfaces.decks.push(upperDeck);g.tube([0,.3,-5],[1.5,5.7,-6],.20,.07,rusty,8);
  for(let i=0;i<12;i++){let z=-11+i*2;g.tube([-2,.15,z],[2,.15,z+.55],.11,.12,rusty,6);}
  return g;
+}
+function buildWreckHabitat(r,wy){
+ const geometry=wreckVessel(),pose={p:[99,wy+.10,-166],yaw:-.24},wreck=r.batch(geometry,[pose]);wreck.maxDistance=230;wreck.sceneRole='wreck-hull';
+ const wreckFans=[],wreckSponges=[],wreckPlates=[],{panels,decks}=geometry.growthSurfaces;let fan=0,deckPlant=0;
+ const toWreck=(x,y,z)=>{const c=Math.cos(pose.yaw),s=Math.sin(pose.yaw);return [pose.p[0]+c*x+s*z,pose.p[1]+y,pose.p[2]-s*x+c*z];};
+ for(let k=0;k<28;k++){
+  const isFan=k%5===0,side=k%2?1:-1,scale=.40+.28*random();let x,z,support;
+  if(isFan){support=panels[Math.floor(fan++*panels.length/6)];x=support.p[0];z=support.p[2];}
+  else{const cell=Math.floor(deckPlant/2);support=decks[deckPlant++%2];x=support.p[0]+[-.72,-.24,.24,.72][cell%4]*support.s[0]/2;z=support.p[2]+[-.64,0,.64][Math.floor(cell/4)]*support.s[2]/2;}
+  // The ceiling selects this actual panel/deck, rather than a roof above it.
+  // Broken hull gaps have no attachment sites; broad colonies use intact decks.
+  const y=OceanRockContact.surfaceAt(geometry,x,z,support.p[1]+support.s[1]/2+.05);
+  if(!Number.isFinite(y))throw Error('Wreck growth has no rendered support');
+  const inst={p:toWreck(x,y-.012,z),s:[scale,scale*(1.1+random()*.30),scale],yaw:pose.yaw+side*.70,phase:k*.84};
+  (isFan?wreckFans:k%3===0?wreckSponges:wreckPlates).push(inst);
+ }
+ const wf=r.batch(fanCoral(),wreckFans,3);wf.maxDistance=65;wf.sceneRole='wreck-fans';
+ const ws=r.batch(spongeGeometry(true),wreckSponges);ws.maxDistance=48;ws.sceneRole='wreck-sponges';
+ reefDetailLevel=0;const wp=r.batch(tableCoral(1),wreckPlates);wp.maxDistance=50;wp.sceneRole='wreck-plates';reefDetailLevel=1;
 }
 function dolphinGeometry(low=false){
  const g=new Geometry();g.material=14;g.shadow=true;
@@ -125,20 +146,9 @@ buildReef=function(r){
  for(const [make,items,type] of [[()=>tableCoral(0),plates,3],[()=>branchCoral(2),branches,2],[fanCoral,fans,6]]){reefDetailLevel=0;const hi=r.batch(make(),items,type===6?3:0);hi.maxDistance=32;const lo=r.batch(distantColony(type),items,type===6?3:0);lo.minDistance=32;lo.maxDistance=95;lo.shadow=false;}reefDetailLevel=1;
  // Wider, spatially legible passage. Same generated stone style, different scale/context.
  const gy=groundHeight(-102,-76);r.batch(archGeometry(),[{p:[-102,gy-3,-76],s:[3.25,3.1,2.6],yaw:.12}]).maxDistance=240;
- for(let k=0;k<11;k++){const a=.12+k/10*(Math.PI-.24);obstacles.push({p:[-102+Math.cos(a)*14.3,gy-3+Math.sin(a)*14.2,-76],s:[3.1,3.5,3.4]});}
+ for(let k=0;k<11;k++){const a=.12+k/10*(Math.PI-.24);obstacles.push({p:[-102+Math.cos(a)*14.3,gy-3+Math.sin(a)*14.2,-76],s:[3.1,3.5,3.4],rockContactLegacy:true});}
  const piers=[-1,1].map(side=>{const x=-102+side*14.1,z=-76;return {p:[x,groundHeight(x,z)+.55,z],s:[4.1,2.8,3.8],yaw:side*.6};});r.batch(rockGeometry(1),piers).maxDistance=220;for(const a of piers)obstacles.push({p:a.p.slice(),s:a.s.map(v=>v*.86)});
- const wy=groundHeight(99,-166);r.batch(wreckVessel(),[{p:[99,wy+.10,-166],yaw:-.24}]).maxDistance=230;
- // Decades of attached growth give the wreck a different habitat and scale.
- const wreckFans=[],wreckSponges=[],wreckPlates=[];
- const toWreck=(x,y,z)=>{const c=Math.cos(-.24),s=Math.sin(-.24);return [99+c*x+s*z,wy+.10+y,-166-s*x+c*z];};
- for(let k=0;k<28;k++){
-  const side=k%2?1:-1,z=-12+Math.floor(k/2)*1.83,width=3.8*Math.pow(Math.sin(Math.PI*(z+14.5)/31),.45),scale=.40+.28*random();
-  const inst={p:toWreck(side*width,2.18,z),s:[scale,scale*(1.1+random()*.30),scale],yaw:-.24+side*.70,phase:k*.84};
-  (k%5===0?wreckFans:k%3===0?wreckSponges:wreckPlates).push(inst);
- }
- const wf=r.batch(fanCoral(),wreckFans,3);wf.maxDistance=65;
- const ws=r.batch(spongeGeometry(true),wreckSponges);ws.maxDistance=48;
- reefDetailLevel=0;r.batch(tableCoral(1),wreckPlates).maxDistance=50;reefDetailLevel=1;
+ const wy=groundHeight(99,-166);buildWreckHabitat(r,wy);
 
  // Small research logger outside the hull. Interaction is read-only; no salvage mechanic.
  const logger=new Geometry();logger.material=12;logger.box([0,0,0],[.66,.48,.37],[.84,.64,.25]);logger.box([0,.08,.196],[.4,.17,.035],[.055,.17,.18]);logger.tube([0,-1.8,0],[0,0,0],.025,.025,[.58,.61,.56],8);

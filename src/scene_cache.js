@@ -18,12 +18,13 @@ async function loadCompiledScene(renderer){
   const length=view.getUint32(4,true);base=8+length;if(base>bytes.byteLength||base%4)throw new Error('invalid scene offsets');
   header=JSON.parse(new TextDecoder().decode(new Uint8Array(bytes,8,length)));
   if(header.sourceVersion!==OPEN_WORLD.version||header.format!=='return-blue/indexed-scene/1'||header.batches.length>600||header.nodes.length>20000)throw new Error('unsupported scene');
+  if(typeof OceanRockContact!=='undefined')OceanRockContact.install(header.rockContact);
   for(const b of header.batches){
    if(b.vertexOffset%4||b.indexOffset%4||b.vertexFloats%12||b.indexCount%3||base+b.vertexOffset+b.vertexFloats*4>bytes.byteLength||base+b.indexOffset+b.indexCount*4>bytes.byteLength||!Number.isFinite(b.radius))throw new Error('invalid mesh range');
    transparentShellRange(b.transparentShell,b.indexCount);
    if(b.instanceIDs.some(i=>!Number.isInteger(i)||i<0||i>=header.nodes.length))throw new Error('invalid instance reference');
   }
- }catch(error){console.warn('Compiled scene unavailable; generating original scene instead.',error);return false;}
+ }catch(error){if(typeof OceanRockContact!=='undefined')OceanRockContact.reset();console.warn('Compiled scene unavailable; generating original scene instead.',error);return false;}
  const pause=()=>new Promise(resolve=>requestAnimationFrame(resolve));
  // Keep canonical meshes local to this load. Renderer may share their immutable
  // GPU buffers, but must not retain the CPU views (which own the whole archive).

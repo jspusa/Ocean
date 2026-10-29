@@ -22,9 +22,10 @@ check('compiled scene shares every byte-identical mesh without merging batches',
  const result=await load();assert.equal(result.ok,true);assert.equal(result.calls.length,505);
  const meshes=new Set(result.calls.map(b=>b.geo.indexed));assert.equal(meshes.size,457,'48 duplicate geometry uploads must reuse their canonical mesh');
  let bytes=0;for(const mesh of meshes)bytes+=mesh.vertices.byteLength+mesh.indices.byteLength;
- // Continuous sediment normals share adjacent top corners. The v0.18.35
- // tripod curves add exactly 49,968 indexed bytes; geometry payloads of the other 501 batches stay identical.
- assert.equal(bytes,50787492);assert.equal(result.renderer.sceneLoad.decodedBytes,57457392);
+ // v0.18.37's shared turtle skins remove 139,824 indexed bytes (135,072 near
+ // and 4,752 far). Contact metadata grows the archive, independently of GPU
+ // mesh sharing. These are measured compiler sizes, not expanded safety caps.
+ assert.equal(bytes,50647668);assert.equal(result.renderer.sceneLoad.decodedBytes,58489976);
  const nodes=new Map();for(const [i,batch]of result.calls.entries()){
   const authored=originalHeader.batches[i],mesh=batch.geo.indexed;
   assert.equal(batch.kind,authored.kind);assert.equal(batch.dynamic,authored.dynamic);assert.equal(batch.geo.material,authored.material);assert.equal(batch.geo.species,authored.species);

@@ -1,5 +1,6 @@
-/* Differential checks against the published 0.17 collision rules. Real scene
- * obstacles and regional solids; CPU work counts, not an FPS/GPU benchmark. */
+/* Legacy fallback differential checks against the published 0.17 rules.
+ * Deliberately excludes OceanRockContact. This only preserves old proxy behavior;
+ * rock-contact.cjs verifies current visible mesh contact. No FPS/GPU claim. */
 'use strict';
 const fs=require('node:fs'),vm=require('node:vm'),zlib=require('node:zlib'),assert=require('node:assert/strict');
 const c=vm.createContext({console}),read=n=>fs.readFileSync('src/'+n+'.js','utf8');
@@ -18,10 +19,10 @@ const points=[[0,-8,7],[-24,-4.5,43],[-218,-26,-70],[390,-32,-210],[766,-7000,-1
 let state=19453;const random=()=>{state=(Math.imul(state,1664525)+1013904223)>>>0;return state/4294967296;};
 for(let i=0;i<500;i++)points.push([-280+random()*1180,-1-random()*90,-390+random()*600]);
 for(const o of header.obstacles)for(const offset of [[0,0,0],[.9,0,0],[-.9,.1,.1],[.3,.8,-.3],[1,0,0],[-1+Number.EPSILON,0,0]])points.push(o.p.map((v,k)=>v+offset[k]*(o.s[k]+.4)));
-check('real world collision is identical for open water, rock interiors and boundaries',()=>{
+check('legacy fallback proxy collision preserves open water, interiors and boundaries',()=>{
  for(const p of points)assert.deepEqual(plain(c.collide(p.slice())),plain(c.originalCollide(p.slice())),JSON.stringify(p));
 });
-check('real world line of sight is identical for local, cross-region and zero-length rays',()=>{
+check('legacy fallback line of sight preserves local, cross-region and zero-length rays',()=>{
  for(let i=0;i<points.length;i++){const a=points[i],b=i%11===0?a:points[(i*17+5)%points.length];assert.equal(c.blocked(a,b),c.originalBlocked(a,b),JSON.stringify({a,b}));}
 });
 check('regional swept collision remains identical through cave walls and deep ledges',()=>{

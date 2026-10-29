@@ -39,7 +39,7 @@ const oceanSeasons=(()=>{
   if(force||key!==nextKey||ownedKey!==nextOwned){
    key=nextKey;ownedKey=nextOwned;const companions=new Set(owned.map(p=>p.uid));pending=[];
    for(const f of animals()){
-    const wanted=companions.has(f.uid)||f.wildHabitat!==false&&OceanSeasonRules.available(SPECIES[f.species]?.id,s.day,s.minute);
+    const wanted=companions.has(f.uid)||f.encounterPresent!==false&&f.wildHabitat!==false&&OceanSeasonRules.available(SPECIES[f.species]?.id,s.day,s.minute);
     f.ecologyScheduled=wanted;
     if(force||!active||f.ecologyPresent===undefined){f.ecologyPresent=wanted;continue;}
     if(f.ecologyPresent!==wanted)pending.push(f);

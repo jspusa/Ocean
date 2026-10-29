@@ -52,7 +52,7 @@ function spongeGeometry(){let g=new Geometry();g.material=8;let col=[.42,.30,.46
  for(let j=0;j<28;j++){let a=j/28*TAU,b=(j+1)/28*TAU,p=(t,s)=>[cx+Math.cos(t)*r*s+.12,h,cz+Math.sin(t)*r*s];g.quad(p(a,.75),p(b,.75),p(b,1),p(a,1),col.map(v=>v*1.18));}}
  return g;}
 function grass(){let g=new Geometry();g.material=9;g.shadow=false;for(let k=0;k<15;k++){let a=k/15*TAU,h=rr(.22,.65),c=[Math.cos(a)*.17,0,Math.sin(a)*.17];surface(g,(u,v)=>[c[0]+Math.cos(a)*v*v*.30+(u-.5)*.020*(1-v),h*v,c[2]+Math.sin(a)*v*v*.3],1,5,[.26,.41,.31],1);}return g;}
-function anemoneGeometry(){let g=new Geometry();g.material=3;for(let k=0;k<180;k++){let a=k*2.39996,r=Math.sqrt(k/180)*.75,base=[Math.cos(a)*r,.015,Math.sin(a)*r],h=rr(.23,.47)*(1-.3*r),prev=base;for(let j=1;j<=8;j++){let p=[base[0]+Math.sin(a+j*.25)*j*.012,h*j/8,base[2]+Math.cos(a+j*.38)*j*.009],rad=.016*(1-j*.025);g.tube(prev,p,rad+.0004,rad,[.66,.53,.57],10);prev=p;}g.sphere(prev,[.017,.025,.017],[.75,.64,.66],12,8);}return g;}
+function anemoneGeometry(baseHeight=null){let g=new Geometry();g.material=3;for(let k=0;k<180;k++){let a=k*2.39996,r=Math.sqrt(k/180)*.75,lift=baseHeight?baseHeight(Math.cos(a)*r,Math.sin(a)*r):0,base=[Math.cos(a)*r,.015+lift,Math.sin(a)*r],h=rr(.23,.47)*(1-.3*r),prev=base;for(let j=1;j<=8;j++){let p=[base[0]+Math.sin(a+j*.25)*j*.012,lift+h*j/8,base[2]+Math.cos(a+j*.38)*j*.009],rad=.016*(1-j*.025);g.tube(prev,p,rad+.0004,rad,[.66,.53,.57],10);prev=p;}g.sphere(prev,[.017,.025,.017],[.75,.64,.66],12,8);}return g;}
 const reefPatches=[];
 function buildReef(r){r.batch(makeGround(),[{p:[0,0,0]}]);let rocks=[[],[],[]],groups=[[],[],[],[],[],[],[],[],[]],grasses=[],rubble=[];
  // Designed, uneven reef corridors: a continuous reef instead of objects scattered on a plane.
@@ -117,21 +117,44 @@ function fishGeometry(s,lod=false){if(lod)return distantFishGeometry(s);let g=ne
  for(let sign of [-1,1])surface(g,(u,v)=>{let x=.28-u*.70,t=(.57-x)/1.10,by=Math.pow(Math.sin(t*Math.PI),.82)*H;let lift=Math.sin(u*Math.PI)*H*(sign===1?.28:.19);return [x,sign*(by+v*lift),Math.sin(u*Math.PI)*.005];},lod?10:26,lod?2:5,(p,u,v)=>s.id==='clown'&&v>.82?[.10,.10,.12]:fishColor(s,p[0],p[1],0),sign===1?1:-1);
  if(s.id==='idol'){let pts=[[.14,.34,0],[.09,.55,0],[-.08,.78,0],[-.35,.84,0],[-.62,.82,0],[-.83,.88,0]];for(let i=0;i<pts.length-1;i++)g.tube(pts[i],pts[i+1],.018-i*.0027,.014-i*.0025,[.95,.93,.79],7);}
  return g;}
-function turtleGeometry(){let g=new Geometry();g.material=5;g.tag=1;
- // Sculpted carapace with a low dome and scalloped trailing rim.
- surface(g,(u,v)=>{let a=u*TAU,b=v*Math.PI,s=Math.sin(b),f=1+.025*Math.sin(a*14)*Math.pow(s,12);return [-.16+Math.cos(a)*s*1.00*f,Math.cos(b)*.31-.012,s*Math.sin(a)*.70*f];},80,44,[.55,.52,.32],-1);
- g.tag=3;g.sphere([-.14,-.175,0],[.94,.095,.65],[.72,.70,.53],54,20);
- g.tag=2;g.tube([.62,-.04,0],[.95,-.025,0],.15,.125,[.58,.61,.43],24);g.sphere([1.08,-.015,0],[.23,.14,.155],[.62,.63,.43],40,24);
- g.tag=3;g.sphere([1.236,-.040,0],[.07,.060,.116],[.72,.70,.53],26,16);
+function turtleGeometry(low=false){let g=new Geometry();g.material=5;g.tag=1;
+ const ellipsoid=(center,scale,color,segments,rings)=>{
+  const start=g.v.length;marineSurface(g,(u,v)=>{const a=u*Math.PI,b=v*TAU;return [center[0]+Math.cos(a)*scale[0],center[1]+Math.sin(a)*Math.cos(b)*scale[1],center[2]+Math.sin(a)*Math.sin(b)*scale[2]];},rings,segments,color);
+  for(let k=start;k<g.v.length;k+=12){const n=V.norm(scale.map((s,i)=>(g.v[k+i]-center[i])/(s*s)));for(let i=0;i<3;i++)g.v[k+3+i]=n[i];}
+ };
+ const skinSurface=(point,nu,nv,color,axis,sign,closeRoot=false)=>{
+  const start=g.v.length,tip=point(1,0)[axis],root=point(0,0)[axis];marineSurface(g,point,nu,nv,color);
+  // At a collapsed cap the angular finite difference is zero. Use the one
+  // axial limit for every copy of that pole instead of a radial star of normals.
+  for(let k=start;k<g.v.length;k+=12){const pole=Math.abs(g.v[k+axis]-tip)<1e-9?sign:closeRoot&&Math.abs(g.v[k+axis]-root)<1e-9?-sign:0;if(pole){g.v[k+3]=g.v[k+4]=g.v[k+5]=0;g.v[k+3+axis]=pole;}}
+ };
+ // Dorsal and ventral shell skins share one rim. A full carapace ellipsoid
+ // would hide the pale plastron underneath it and leave two stacked shells.
+ const bodyHalf=under=>{
+  const segments=low?32:80,rings=under?(low?3:12):(low?5:24),color=under?[.72,.70,.53]:[.55,.52,.32];
+  const point=(a,b)=>{const s=Math.sin(b),f=1+.025*Math.sin(a*14)*Math.pow(s,12);return [-.16+Math.cos(a)*s*f,-.075+(under?-.16:.373)*Math.cos(b),Math.sin(a)*s*.70*f];};
+  const sample=(i,j)=>{const a=(i%segments)/segments*TAU,b=j/rings*Math.PI*.5,p=point(a,b);let n;
+   if(j===0)n=[0,under?-1:1,0];else{const da=V.sub(point(a+.00001,b),point(a-.00001,b)),db=V.sub(point(a,b+.00001),point(a,b-.00001));n=V.mul(V.norm(V.cross(da,db)),under?-1:1);}if(j===rings)p[1]=-.075;return {p,n};};
+  const rows=Array.from({length:rings+1},(_,j)=>Array.from({length:segments},(_,i)=>sample(i,j)));
+  const tri=(a,b,c)=>{if(V.dot(V.cross(V.sub(b.p,a.p),V.sub(c.p,a.p)),V.add(V.add(a.n,b.n),c.n))<0)[b,c]=[c,b];g.tri(a.p,b.p,c.p,color,[a.n,b.n,c.n]);};
+  for(let j=0;j<rings;j++)for(let i=0;i<segments;i++){const a=rows[j][i],b=rows[j][(i+1)%segments],c=rows[j+1][(i+1)%segments],d=rows[j+1][i];if(j)tri(a,b,c);tri(a,c,d);}
+ };
+ bodyHalf(false);g.tag=3;bodyHalf(true);
+ // A single soft neck-to-head loft seats inside the shell; the crown grows
+ // continuously from the neck instead of intersecting a cylindrical collar.
+ g.tag=2;const headRows=[[.58,-.04,0,0],[.64,-.04,.12,.12],[.79,-.03,.118,.118],[.95,-.018,.126,.139],[1.08,-.015,.14,.155],[1.20,-.025,.115,.138],[1.275,-.04,.066,.105],[1.31,-.04,0,0]];
+ skinSurface((u,v)=>{const x=.58+.73*(1-Math.cos(u*Math.PI))*.5,p=marineProfile(headRows,x),a=v*TAU;return [x,p[1]+Math.cos(a)*p[2],Math.sin(a)*p[3]];},low?12:44,low?8:24,[.62,.63,.43],0,1,true);
+ g.tag=3;ellipsoid([1.236,-.040,0],[.07,.060,.116],[.72,.70,.53],low?8:26,low?4:16);
  g.tag=2;for(let side of [-1,1]){
  // Each front flipper is a tapered, cambered three-dimensional foil, not a quad.
- const fin=(u,v)=>{let span=u,theta=v*TAU,width=.16+.15*Math.sin(span*Math.PI);let cx=.49-span*.51-span*span*.22,z=side*(.51+span*1.19),y=-.045-span*.045;return [cx+Math.cos(theta)*width*(1-span*.84),y+Math.sin(theta)*.036*(1-span*.87),z];};surface(g,fin,34,18,[.6,.62,.42],side===1?1:-1);
- const back=(u,v)=>{let a=v*TAU;return [-.79-u*.49+Math.cos(a)*.18*(1-u*.76),-.10+Math.sin(a)*.028*(1-u*.6),side*(.48+u*.38)];};surface(g,back,20,14,[.6,.62,.42],side===1?1:-1);
- g.tag=4;g.sphere([1.14,.039,side*.137],[.022,.024,.012],[.052,.064,.045],18,12);g.sphere([1.143,.041,side*.147],[.014,.017,.005],[.012,.02,.022],16,10);g.sphere([1.151,.047,side*.152],[.004,.004,.003],[.80,.89,.78],10,6);
+ const fin=(u,v)=>{const a=v*TAU,cap=Math.sqrt(Math.max(0,1-u*u)),width=(.10+.24*Math.sin(u*Math.PI))*cap*(1-u*.65);return [.35-u*.37-u*u*.22+Math.cos(a)*width,-.045-u*.045+Math.sin(a)*.026*cap*(1-u*.65),side*(.51+u*1.19)];};skinSurface(fin,low?10:34,low?6:18,[.6,.62,.42],2,side);
+ const back=(u,v)=>{const a=v*TAU,cap=Math.sqrt(Math.max(0,1-u*u)),width=(.08+.10*Math.sin(u*Math.PI))*cap*(1-u*.56);return [-.70-u*.58+Math.cos(a)*width,-.09+Math.sin(a)*.020*cap*(1-u*.4),side*(.48+u*.38)];};skinSurface(back,low?6:20,low?6:14,[.6,.62,.42],2,side);
+ g.tag=4;if(low)ellipsoid([1.143,.041,side*.147],[.022,.024,.012],[.012,.02,.022],6,4);else{
+ ellipsoid([1.14,.039,side*.137],[.022,.024,.012],[.052,.064,.045],18,12);ellipsoid([1.143,.041,side*.147],[.014,.017,.005],[.012,.02,.022],16,10);ellipsoid([1.151,.047,side*.152],[.004,.004,.003],[.80,.89,.78],10,6);
  // Small recessed nostrils and a curved beak line.
- g.sphere([1.255,.007,side*.043],[.007,.005,.005],[.06,.08,.05],9,6);let prev=null;for(let i=0;i<15;i++){let a=i/14*Math.PI,p=[1.225+.052*Math.sin(a),-.055,side*.108*Math.cos(a)];if(prev)g.tube(prev,p,.0025,.0025,[.16,.18,.12],5);prev=p;}g.tag=2;
+ ellipsoid([1.255,.007,side*.043],[.007,.005,.005],[.06,.08,.05],9,6);let prev=null;for(let i=0;i<15;i++){let a=i/14*Math.PI,p=[1.225+.052*Math.sin(a),-.055,side*.108*Math.cos(a)];if(prev)g.tube(prev,p,.0025,.0025,[.16,.18,.12],5);prev=p;}}g.tag=2;
  }
- g.tube([-1.07,-.12,0],[-1.32,-.15,0],.060,.010,[.58,.61,.43],18);return g;}
+ g.tube([-1.07,-.12,0],[-1.32,-.15,0],.060,.010,[.58,.61,.43],low?6:18);return g;}
 // A closed, cambered eagle-ray body: ventral belly, swept wings and whip tail.
 function rayGeometry(low=false){
  const g=new Geometry();g.material=6;g.species=9;g.shadow=!low;g.tag=1;
@@ -207,7 +230,7 @@ function diverGeometry(){let g=new Geometry(),suit=rgb(0x223e49),trim=rgb(0x68af
 function addLife(r){let counts=[4,9,8,7,16,62,7,9,3,3,1];
  for(let idx=0;idx<counts.length;idx++){let s=SPECIES[idx],geo=idx<8?fishGeometry(s):idx===8?turtleGeometry():idx===9?rayGeometry():whaleGeometry(),arr=[],anchor=s.zone===0?[-8,-4]:s.zone===1?[10,-16]:[-1,-35];
  for(let k=0;k<counts[idx];k++){let center,rad,height;
- if(idx===0){center=[-5.6,-9.1,1.0];rad=rr(.30,.92);height=.42;}
+ if(idx===0){center=typeof reefAnemoneHome==='undefined'?[-5.6,-9.1,1.0]:reefAnemoneHome.slice();rad=rr(.30,.92);height=.42;}
  else{center=[anchor[0]+rr(-4,4),0,anchor[1]+rr(-5,5)];rad=idx===5?rr(3.5,7.3):idx>=8?rr(7,13):rr(2,6.5);height=idx===8?rr(5.8,7):idx===9?rr(7,10):rr(3.1,5.8);}
  let scale=s.size*rr(.82,1.12),phase=rr(0,TAU);let item={p:[center[0],-7,center[2]],yaw:0,pitch:0,s:[scale,scale,scale],tint:[rr(.94,1.06),rr(.94,1.06),rr(.94,1.06)],phase,species:idx,orbit:k/counts[idx]*TAU+rr(-.2,.2),radius:rad,center,height,speed:idx>=8?.048:idx===0?.25:idx===5?.105:rr(.075,.13),bob:rr(0,TAU)};arr.push(item);life.push(item);}
  if(idx<8){let high=r.batch(geo,arr,1,true);high.maxDistance=3.2;let low=r.batch(fishGeometry(s,true),arr,1,true);low.minDistance=3.2;low.maxDistance=62;low.shadow=true;low.shadowProxy=true;}else {let kind=idx===8?2:idx===9?4:6,hi=r.batch(geo,arr,kind,true);hi.maxDistance=idx===10?35:14;let lo=r.batch(idx===8?distantTurtle():idx===9?distantRay():distantWhale(),arr,kind,true);lo.minDistance=hi.maxDistance;lo.maxDistance=180;lo.shadow=false;}

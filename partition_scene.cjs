@@ -30,6 +30,8 @@ for(const items of groups.values()){
  for(const item of items){const size=item.vertices.length+item.indices.length;if(bytes&&bytes+size>1024*1024){emit(pending);pending=[];bytes=0;}pending.push(item);bytes+=size;}
  emit(pending);
 }
+// The complete contact catalogue stays in metadata when GPU chunks unload.
+if(original.rockContact?.format!=='return-blue/rock-contact/1')throw Error('Rebake the scene with actual stone contacts before partitioning');
 const index={...original,format:'return-blue/streamed-scene/1',sourceArchiveSHA256:hash(packed),batches,meshes,chunks};
 fs.writeFileSync(path.join(folder,'index.json'),JSON.stringify(index)+'\n');
 for(const name of fs.readdirSync(folder))if(/^chunk-[a-f0-9]{20}\.bin\.gz$/.test(name)&&!keep.has(name))fs.unlinkSync(path.join(folder,name));

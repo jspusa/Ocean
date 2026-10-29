@@ -20,7 +20,10 @@ const oceanFeatures=(()=>{
  async function init(){
   if(initialized)return;voyage.state.features=read(voyage.state.features);initialized=true;
   for(const module of systems)await module.init?.();renderMenus();
-  const oldLife=updateLife;updateLife=function(time){oldLife(time);call('afterLife',time)};
+  const oldLife=updateLife;updateLife=function(time){
+   if(typeof updateLifeWithEffects==='function'){if(updateLifeWithEffects(time,oldLife,()=>call('afterLife',time)))call('afterLifeContact',time);}
+   else {oldLife(time);call('afterLife',time);}
+  };
   window.addEventListener('keydown',event=>{if(oceanKeyboard.reserved(event))return;
    if(event.code==='Escape'&&some('escape')){event.preventDefault();event.stopImmediatePropagation();return;}
    if(event.code==='KeyT'&&active&&!modal&&!photoOpen&&!event.repeat){event.preventDefault();event.stopImmediatePropagation();open('fieldTools');}

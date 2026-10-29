@@ -16,8 +16,7 @@ function distantFishGeometry(s){
  g.tag=4;for(const side of [-1,1])g.sphere([.39,.06,side*W*.77],[.025,.027,.013],[.019,.022,.027],6,4);
  return g;
 }
-function distantTurtle(){const g=new Geometry();g.material=5;g.tag=1;g.sphere([-.16,-.012,0],[1.,.31,.70],[.55,.52,.32],26,14);g.tag=2;g.sphere([1.03,-.025,0],[.32,.14,.15],[.58,.61,.43],16,10);
- for(const side of [-1,1]){surface(g,(u,v)=>{const theta=v*TAU,span=u,w=.16+.15*Math.sin(span*Math.PI);return [.49-span*.51-span*span*.22+Math.cos(theta)*w*(1-span*.84),-.045-span*.045+Math.sin(theta)*.036*(1-span*.87),side*(.51+span*1.19)];},12,6,[.60,.62,.42],side===1?1:-1);g.tri([-.60,-.1,side*.40],[-1.30,-.14,side*.83],[-.81,-.12,side*.76],[.60,.62,.42]);}return g;}
+function distantTurtle(){return turtleGeometry(true);}
 function distantRay(){return rayGeometry(true);}
 // One anatomy at both distances: the previous proxy changed body length, fin
 // span and head shape at the LOD boundary, making an approaching whale pop.

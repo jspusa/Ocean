@@ -28,6 +28,8 @@ const oceanEcology=(()=>{
  const save=()=>saveVoyage();
  const say=s=>{if(typeof toast==='function')toast(s);};
  const fishByUID=uid=>life.find(f=>f.uid===uid);
+ const contactOrigin=f=>typeof animalContactOrigin==='function'?animalContactOrigin(f):f.p;
+ const contactIntent=(f,intent)=>{if(typeof setAnimalContactIntent==='function')setAnimalContactIntent(f,intent);};
  const individual=f=>state().individuals[f.uid]||(state().individuals[f.uid]={trust:0,strokes:0,feeds:0,seconds:0});
  const field=f=>{const id=SPECIES[f.species].id;return state().field[id]||(state().field[id]={points:0,seconds:0,encounters:0,photos:0});};
  const partner=()=>state().partners.find(p=>p.uid===state().selected)||null;
@@ -238,7 +240,7 @@ const oceanEcology=(()=>{
   const p=partner(),f=p&&fishByUID(p.uid);if(!f)return;
   const training=runtime.training&&runtime.training.uid===p.uid&&!active&&modal==='training';
   if(!training&&!state().accompany&&!runtime.partnerPos)return;
-  if(runtime.partnerUID!==p.uid||!runtime.partnerPos){runtime.partnerUID=p.uid;runtime.partnerPos=f.p.slice();runtime.partnerYaw=f.yaw;runtime.detour=null;}
+  if(runtime.partnerUID!==p.uid||!runtime.partnerPos){runtime.partnerUID=p.uid;runtime.partnerPos=contactOrigin(f).slice();runtime.partnerYaw=f.yaw;runtime.detour=null;}
   const old=runtime.partnerPos.slice();let desired=f.p.slice(),speed=profile(f)?.swimSpeed||3.7;const dimensions=profile(f)||{length:4},length=dimensions.length;
   if(training){desired=stagePoint();speed=dimensions.approachSpeed||12;
    if(V.dist(old,desired)<.4&&runtime.training.stage==='approach'){runtime.training.stage='ready';runtime.training.lastOutcome='已靠泊。請在畫面中的嘴部／鰭部下達指令。';}
@@ -251,7 +253,7 @@ const oceanEcology=(()=>{
     else if(base==='sing'){pitch=.65+arc*.35;desired[1]=.30+arc*.36;if(u>.18&&!q.sounded){q.sounded=true;if(typeof oceanAudio!=='undefined')oceanAudio.cue('partner-song');}}
     else if(base==='handshake'){pitch=.65-arc*.51;bank=Math.sin(u*Math.PI)*.14;f.partnerFinPulse=arc;desired[1]=.30+arc*.12;f.effort=.2;}
     else {pitch=.65+Math.sin(u*TAU)*.70;desired[0]+=Math.sin(u*TAU)*(.65+q.strength);}
-    runtime.partnerPos=desired;f.p=desired.slice();f.yaw=yaw;f.pitch=pitch;f.bank=bank;f.effort=base==='sing'||base==='handshake'?.25:.9;
+    runtime.partnerPos=desired;f.p=desired.slice();f.yaw=yaw;f.pitch=pitch;f.bank=bank;f.effort=base==='sing'||base==='handshake'?.25:.9;contactIntent(f,{speed:Math.max(dimensions.approachSpeed||12,length*2),allowSurface:true,preservePose:true});
     const pf=runtime.training.performance;pf.height=Math.max(pf.height,Math.max(0,f.p[1]));pf.duration=time-pf.start;
     if(u>=1){pf.index++;runtime.training.trick=null;if(pf.index<pf.ids.length)startNextTrick();else {
      p.lastPerformance={height:Math.round(pf.height*100)/100,duration:Math.round(pf.duration*100)/100,count:pf.ids.length};runtime.training.lastOutcome='表演完成 · 最高離水 '+p.lastPerformance.height.toFixed(1)+' m · '+p.lastPerformance.duration.toFixed(1)+' 秒 · '+pf.ids.length+' 個動作';runtime.training.performance=null;save();
@@ -266,7 +268,7 @@ const oceanEcology=(()=>{
   }else if(!training&&!active){desired=stagePoint();desired[1]=-1.6;speed=8;}
   runtime.partnerPos=partnerStep(old,desired,speed,dt,f,training);f.p=runtime.partnerPos.slice();const delta=V.sub(f.p,old);
   if(V.len(delta)>.0001){const yaw=Math.atan2(-delta[2],delta[0]),prior=runtime.partnerYaw??f.yaw,turn=Math.atan2(Math.sin(yaw-prior),Math.cos(yaw-prior));f.yaw=prior+clamp(turn,-(dimensions.turnRate||1)*dt,(dimensions.turnRate||1)*dt);f.pitch=clamp(Math.atan2(delta[1],Math.hypot(delta[0],delta[2])),-.7,.7);}else if(training){f.yaw=Math.PI+.5;f.pitch=.65;}
-  runtime.partnerYaw=f.yaw;f.bank=0;f.partnerFinPulse=0;f.effort=training?.4:.6;
+  runtime.partnerYaw=f.yaw;f.bank=0;f.partnerFinPulse=0;f.effort=training?.4:.6;contactIntent(f,{speed,allowSurface:!!training,preservePose:!!training});
   if(!training&&!state().accompany&&V.dist(f.p,desired)<.1){runtime.partnerPos=null;runtime.partnerUID=null;}
  }
  function afterLife(time){
@@ -275,15 +277,21 @@ const oceanEcology=(()=>{
   // Without food or a returning animal, this pass has no pose/state effects.
   // Partner movement and contact responses below still run every update.
   if(runtime.food.length||runtime.reactions.size)for(const f of life){if(!speciesTraits(f.species).feedable)continue;let cloud=null,distance=7;
-   for(const c of runtime.food){const d=V.dist(f.p,c.p);if(d<distance&&!blocked(f.p,c.p)){distance=d;cloud=c;}}
+   const position=contactOrigin(f);for(const c of runtime.food){const d=V.dist(position,c.p);if(d<distance&&!blocked(position,c.p)){distance=d;cloud=c;}}
    let current=runtime.reactions.get(f.uid);
-   if(cloud){current=current||f.p.slice();const phase=(f.bioSeed||1)%97+time*.7,target=V.add(cloud.p,[Math.sin(phase)*.48,-.08+Math.cos(phase*1.3)*.20,Math.cos(phase)*.48]);const next=moveToward(current,target,1.05,dt);runtime.reactions.set(f.uid,next);const d=V.sub(next,current);f.p=next.slice();if(V.len(d)>.0001)f.yaw=Math.atan2(-d[2],d[0]);f.effort=.82;
-   }else if(current){const next=moveToward(current,f.p,1.4,dt);if(V.dist(next,f.p)<.04)runtime.reactions.delete(f.uid);else {runtime.reactions.set(f.uid,next);f.p=next.slice();}}
+   if(cloud){current=current||position.slice();const phase=(f.bioSeed||1)%97+time*.7,target=V.add(cloud.p,[Math.sin(phase)*.48,-.08+Math.cos(phase*1.3)*.20,Math.cos(phase)*.48]);const next=moveToward(current,target,1.05,dt);runtime.reactions.set(f.uid,next);const d=V.sub(next,current);f.p=next.slice();if(V.len(d)>.0001)f.yaw=Math.atan2(-d[2],d[0]);f.effort=.82;contactIntent(f,{speed:1.05});
+   }else if(current){const next=moveToward(current,f.p,1.4,dt);if(V.dist(next,f.p)<.04)runtime.reactions.delete(f.uid);else {runtime.reactions.set(f.uid,next);f.p=next.slice();contactIntent(f,{speed:1.4});}}
   }
   if(runtime.foodBatch){runtime.foodBatch.visible=runtime.food.length>0;for(let i=0;i<runtime.foodNodes.length;i++){const f=runtime.foodNodes[i],c=runtime.food[Math.floor(i/24)];if(!c){if(f.p[0]!==0||f.p[1]!==-500||f.p[2]!==0)f.p=[0,-500,0];continue;}const age=time-c.born,a=i*2.39996+age*.42,r=.06+((i%24)/24)*(.18+age*.038);f.p=[c.p[0]+Math.cos(a)*r,c.p[1]-.026*age+.09*Math.sin(a*1.4),c.p[2]+Math.sin(a)*r];}}
   movePartner(time,dt);
   for(const [uid,contact] of runtime.lastContact){const age=time-contact.time,f=fishByUID(uid);if(age>2.4||!f){runtime.lastContact.delete(uid);continue;}if(contact.kind==='stroke'){f.effort=.25;f.bank=Math.sin(age*3)*.06;}else {f.pitch=(f.pitch||0)+Math.sin(age*9)*.12*Math.exp(-age*3);f.effort=.7;}}
 
+ }
+ function afterLifeContact(){
+  // Steering resumes from the position actually rendered after the one final
+  // stone solve; stale food/partner targets must not re-enter the wall next frame.
+  if(runtime.reactions.size)for(const f of life)if(runtime.reactions.has(f.uid))runtime.reactions.set(f.uid,f.p.slice());
+  const f=runtime.partnerPos&&fishByUID(runtime.partnerUID);if(f){runtime.partnerPos=f.p.slice();runtime.partnerYaw=f.yaw;}
  }
  function paintHUD(){
   const hud=node('ecologyHUD');if(!hud)return;const f=chooseTarget();runtime.target=f?.uid||null;document.body.classList.toggle('ecology-tool',!!runtime.tool&&playAllowed());
@@ -368,7 +376,7 @@ const oceanEcology=(()=>{
 
   oceanFeatures.addMenu({id:'ecology',label:'生物互動筆記',panel:'ecology'});oceanFeatures.addMenu({id:'partners',label:'鯨豚夥伴',panel:'partners'});oceanFeatures.addMenu({id:'training',label:'船邊訓練',panel:'training'});
  }
- const hooks={id:'ecology',initial,sanitize,init,renderPanel,reset,afterLife,
+ const hooks={id:'ecology',initial,sanitize,init,renderPanel,reset,afterLife,afterLifeContact,
   panelChanged(type){if(type!=='training'){runtime.training=null;document.body.classList.remove('ecology-training');}paintHUD();paintTraining();},
   panelClosed(){runtime.training=null;document.body.classList.remove('ecology-training');paintHUD();paintTraining();},
   startDive(){runtime.training=null;releaseGrab();paintTraining();state().dives++;voyage.state.companion=false;runtime.encounter=null;runtime.lastObserved.clear();document.body.classList.remove('ecology-training');},
