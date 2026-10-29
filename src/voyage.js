@@ -134,7 +134,7 @@ startDive=function(tour=false){
  if(typeof oceanSaveHealth!=='undefined'&&!oceanSaveHealth.readable()){oceanSaveHealth.refresh();return;}
  if(!ready)return;voyage.state.mode='free';const resume=voyage.awaitingResume?voyage.state.resume:null;voyage.awaitingResume=false;
  legacyStart(tour);if(!active)return;
- if(resume){player.p=collide(resume.p.slice());player.yaw=resume.yaw;player.pitch=resume.pitch;diveSeconds=resume.seconds;resetInput();}
+ if(resume){player.p=collide(resume.p.slice());player.yaw=resume.yaw;player.pitch=resume.pitch;OceanDiverContact.reset();diveSeconds=resume.seconds;resetInput();}
  oceanFeatures.call('prepareDive',{resume:!!resume,tour});
  voyage.sessionStart=diveSeconds;voyage.sessionDistance=0;voyage.sessionSeen=persistent.seen.length;voyage.previousPosition=player.p.slice();voyage.state.cruise=false;
  $('cruiseBtn').classList.remove('active');$('photoResult').classList.add('hidden');$('debrief').classList.add('hidden');
@@ -175,7 +175,7 @@ findSpecies=function(index,specific=null){
   const sp=SPECIES[index],place=sp.fauna?'habitat:'+sp.id:LANDMARKS[sp.zone].id;markPlace(place);toast('已標記棲地。先親自游近，再觀察這位訪客。');return;}
  legacyFind(index,fish);
  followDistance=speciesTraits(index).viewDistance;
- chooseObservationSide(fish);player.p=collide(V.add(fish.p,viewingOffset(fish)));resetInput();auto=true;follow=fish;setAutoUI();
+ chooseObservationSide(fish);player.p=collide(V.add(fish.p,viewingOffset(fish)));OceanDiverContact.reset();resetInput();auto=true;follow=fish;setAutoUI();
 };
 // Chart marks a real game-space destination, never teleports from a route button.
 function voyageDestination(id=voyage.state.waypoint){

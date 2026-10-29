@@ -1,5 +1,5 @@
 {
-  "version": "0.18.43",
+  "version": "0.18.44",
   "scope": "served game and build sources",
   "files": [
     {
@@ -25,7 +25,7 @@
     {
       "path": "VERSION",
       "bytes": 8,
-      "sha256": "de1ece959124e2eae4acd3e7634debf4359b62c15c8710ce574c5293845bdde3"
+      "sha256": "73b4169135a1e7b01f61fd01fa3376b50a5ed637f3bd8c8c04cb2c5309e24f43"
     },
     {
       "path": "assets/barramundi/CC0-1.0.txt",
@@ -300,7 +300,7 @@
     {
       "path": "assets/reef-growth.json",
       "bytes": 462778,
-      "sha256": "36e15cecab80442c97cc1c5d0600e0e44886baf275b93409e8b73f0851c6dcdb"
+      "sha256": "de83efda79a8676bddea66a119a37736906df9fa0579b1f745fae361bd421f37"
     },
     {
       "path": "assets/reef.mesh.gz",
@@ -1274,13 +1274,13 @@
     },
     {
       "path": "build.py",
-      "bytes": 7942,
-      "sha256": "1dc2172f9103ea04d262857808b9d7369d6682e59b99a26bce50574566243509"
+      "bytes": 7962,
+      "sha256": "346c51370ed8643992918a39e4e4bc3a779848de420a3f41142d7a777cd06f77"
     },
     {
       "path": "index.html",
-      "bytes": 16722,
-      "sha256": "c00d19aa66a08bdbc42412b6d603691f33bd0b8899346ad2e149a3eac26477d4"
+      "bytes": 16778,
+      "sha256": "3cfc8b17865071bea184d07b549255363d6949e15ec1878f2a4d21a4e6e5c15f"
     },
     {
       "path": "music/blue_silence.mp3",
@@ -1334,8 +1334,8 @@
     },
     {
       "path": "src/app.js",
-      "bytes": 87783,
-      "sha256": "819f8f1d0a82ce24d3a5a25c44e681d1be436892f28685e4fbec91252d15e585"
+      "bytes": 88256,
+      "sha256": "50d7a26c12b0a1fd190349bb27fae1618c70e3e039cfb277437548b1fbbead14"
     },
     {
       "path": "src/aquarium.js",
@@ -1380,7 +1380,7 @@
     {
       "path": "src/config.js",
       "bytes": 466508,
-      "sha256": "5c28b5661bbd762117c60024bcc4b54375ac4f89440710a4c1c1987f37d69768"
+      "sha256": "7c5d4fb4df4e9deb0d7cf53d4c174937da31fb1cdf799fd7e9b9d25f724cad90"
     },
     {
       "path": "src/deepsea.js",
@@ -1479,8 +1479,8 @@
     },
     {
       "path": "src/navigation.js",
-      "bytes": 5329,
-      "sha256": "275d5c422270131dec0b23c9dfb74b3f92b6bca29c81657d8c13dbd25afefe3a"
+      "bytes": 5381,
+      "sha256": "66d7f0cfc19e23d40aea2aaa2da05d0fab12a32e3a1937e3731ef789853ea034"
     },
     {
       "path": "src/next_reef.js",
@@ -1511,6 +1511,11 @@
       "path": "src/photography.js",
       "bytes": 35997,
       "sha256": "32267693faab46adcc0302752cd5ebafac47aac2b28e6d14f4fee41cba955ca1"
+    },
+    {
+      "path": "src/player_contact.js",
+      "bytes": 6765,
+      "sha256": "57184860061530dbbcbce059ea0823111f84bda44b3a4b2acd2735d60790a19e"
     },
     {
       "path": "src/reef_detail.js",
@@ -1570,12 +1575,12 @@
     {
       "path": "src/shell.html",
       "bytes": 12391,
-      "sha256": "812e5b2178a7ff30ff8a771e2298cc3880e715319854febd97b2728a0bd094e6"
+      "sha256": "eb5c0b4ae28183207d39e74ee422d57e00aaf1342484fb75121ee3528631f84f"
     },
     {
       "path": "src/ship.js",
-      "bytes": 39147,
-      "sha256": "e89a499ed8f38633b247d586970c20b94e2bd04f69f851f19e4e86629681fd60"
+      "bytes": 39166,
+      "sha256": "3b7d825decc1538305c8d66310150fac73a8db0584ed1e08ad3d9fbfafff7264"
     },
     {
       "path": "src/story.js",
@@ -1589,8 +1594,8 @@
     },
     {
       "path": "src/trench.js",
-      "bytes": 21761,
-      "sha256": "f1c1cfe5bac26f3b4d4b788d97ed17f3ef149b4a946bb3af61ddb655b6888db9"
+      "bytes": 24963,
+      "sha256": "66120617e184ca5a75fe36a6e97cfdd44d2d96001aeb2ec835727654c023e419"
     },
     {
       "path": "src/trench_fauna.js",
@@ -1609,8 +1614,8 @@
     },
     {
       "path": "src/voyage.js",
-      "bytes": 42874,
-      "sha256": "a580161dfdc782f82fcae796ac40dd69ec97de7e01e9d8ee7983ad2d0ec8ed12"
+      "bytes": 42926,
+      "sha256": "21e67044c2300a82d21d67f0663ea66a22f24476b6b1ab789e1da3cd82bf2305"
     },
     {
       "path": "src/world.js",

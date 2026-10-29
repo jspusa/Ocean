@@ -148,7 +148,7 @@ const oceanShip=(()=>{
    if(part==='hair')g.sphere([0,.09,-.72],[.215,.18,.15],[1,1,1],16,10);
    if(part==='cap'){g.sphere([0,.14,-.87],[.23,.13,.25],[1,1,1],16,10);g.box([0,.11,-1.10],[.36,.025,.19],[1,1,1]);}
    if(part==='badge')g.box([-.31,.11,-.32],[.13,.05,.11],[.88,.71,.29]);
-   const b=renderer.batch(g,[{p:[0,-1000,0],s:[.85,.85,.85]}],0,true);b.visible=false;runtime.underwater.push({part,batch:b});}
+   const b=renderer.batch(g,[{p:[0,-1000,0],s:[.85,.85,.85]}],5,true);b.visible=false;runtime.underwater.push({part,batch:b});}
  }
  function syncActors(){if(!runtime.initialized)return;const visible=!!runtime.mode&&!active,s=state(),outfit=typeof oceanExpedition==='undefined'?[1,1,1]:(oceanExpedition.palettes?.[voyage.state.features.expedition.outfit]?.tint||diverBatch?.instances[0]?.tint||[1,1,1]);
   for(const {part,batch} of runtime.parts){batch.visible=visible&&runtime.mode!=='cabin'&&runtime.mode!=='rest';for(const f of batch.instances){const npc=f.actor===1,p=npc?[-.66,2.80]:runtime.mode==='appearance'?[0,5.55]:s.p,a=s.appearance,base=npc?[-.66,FLOOR,2.80]:[p[0],FLOOR,p[1]],yaw=npc?Math.atan2(-(s.p[1]-p[1]),s.p[0]-p[0]):runtime.mode==='appearance'?-Math.PI/2:s.yaw,side=f.side,walk=!npc&&runtime.route.length>0?Math.sin(runtime.step)*.50:0,offset=part==='leg'?[0,.75,side*.15]:part==='arm'||part==='hand'?[0,1.28,side*.23]:[0,0,0];
@@ -159,7 +159,7 @@ const oceanShip=(()=>{
   for(const kind of ['seal','penguin']){const b=runtime[kind];b.visible=visible&&runtime.mode!=='cabin'&&s.visitor.kind===kind;const age=runtime.elapsed-runtime.visitorReply,q=age<2?Math.sin(age*7)*Math.exp(-age*1.4):0;b.instances[0].p=toWorld([-.90,FLOOR+(kind==='penguin'?Math.abs(q)*.12:0),-4.65]);b.instances[0].yaw=YAW+Math.sin(runtime.elapsed*.65)*.1;b.instances[0].pitch=kind==='seal'?q*.13:q*.08;b.instances[0].s=[1,1+Math.sin(runtime.elapsed*1.2)*.012,1];}
   runtime.arrow.visible=visible&&runtime.mode==='deck'&&runtime.route.length>0;if(runtime.arrow.visible){const p=runtime.route.at(-1);runtime.arrow.instances[0].p=toWorld([p[0],FLOOR+.025,p[1]]);}
  }
- function afterCamera(){if(!runtime.initialized)return;const a=state().appearance,d=typeof diverBatch!=='undefined'&&diverBatch?.instances[0];for(const {part,batch} of runtime.underwater){batch.visible=!!d&&active&&settings.third&&diverBatch.visible&&(part==='head'||part==='hair'||a.accessory===part&&accessoryAllowed(part));if(batch.visible){const f=batch.instances[0];f.p=d.p.slice();f.yaw=d.yaw;f.pitch=d.pitch;f.s=d.s?.slice()||[.85,.85,.85];f.tint=part==='head'?skins[a.skin]:part==='hair'?hairs[a.hair]:[.54,.72,.70];}}if(runtime.mode)paint();}
+ function afterCamera(){if(!runtime.initialized)return;const a=state().appearance,d=typeof diverBatch!=='undefined'&&diverBatch?.instances[0];for(const {part,batch} of runtime.underwater){batch.visible=!!d&&active&&settings.third&&diverBatch.visible&&(part==='head'||part==='hair'||a.accessory===part&&accessoryAllowed(part));if(batch.visible){const f=batch.instances[0];f.p=d.p.slice();f.yaw=d.yaw;f.pitch=d.pitch;f.phase=d.phase||0;f.s=d.s?.slice()||[.85,.85,.85];f.tint=part==='head'?skins[a.skin]:part==='hair'?hairs[a.hair]:[.54,.72,.70];}}if(runtime.mode)paint();}
  function boatMoved(){if(!runtime.initialized)return;syncActors();renderer.dirty=true;cameraCut=true;}
  function camera(){const mode=runtime.mode;if(!mode||active)return false;let a,b;const portrait=renderer.canvas.clientWidth<renderer.canvas.clientHeight;
   if(mode==='cabin'){a=[0,1.95,1.44];b=[0,1.18,-2.1];}

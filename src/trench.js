@@ -67,6 +67,53 @@ const OceanTrench=(()=>{
   const h00=bedHeight(i,j),h10=bedHeight(i+1,j),h11=bedHeight(i+1,j+1),h01=bedHeight(i,j+1);
   return a>=b?h00+(h10-h00)*a+(h11-h10)*b:h00+(h11-h01)*a+(h01-h00)*b;
  }
+ // A vertical height check at a sphere's center misses steep slopes cutting
+ // through its side. Use the two actual bed planes in every intersected grid
+ // cell. Their upward half-spaces conservatively cover the complete sphere;
+ // finite-cell selection avoids extending a distant steep plane across water.
+ // This reads the existing samples only: no new terrain, mesh or query cache.
+ function groundPlanes(minX,maxX,minZ,maxZ,visit){
+  const q=floorGrid,x0=Math.max(q.xs[0],minX),x1=Math.min(q.xs.at(-1),maxX),z0=Math.max(q.zs[0],minZ),z1=Math.min(q.zs.at(-1),maxZ);
+  if(x0>x1||z0>z1)return;
+  const i0=cell(q.xs,x0),i1=cell(q.xs,x1),j0=cell(q.zs,z0),j1=cell(q.zs,z1);
+  for(let j=j0;j<=j1;j++)for(let i=i0;i<=i1;i++){
+   const dx=q.xs[i+1]-q.xs[i],dz=q.zs[j+1]-q.zs[j],h00=bedHeight(i,j),h10=bedHeight(i+1,j),h11=bedHeight(i+1,j+1),h01=bedHeight(i,j+1);
+   // Both triangle XZ boxes equal their cell box. The diagonal is exactly the
+   // same 00-11 edge as groundHeight and the rendered indexed terrain.
+   for(let triangle=0;triangle<2;triangle++){
+    visit((triangle?h11-h01:h10-h00)/dx,(triangle?h01-h00:h11-h10)/dz,h00,q.xs[i],q.zs[j],q.xs[i+1],q.zs[j+1]);
+   }
+  }
+ }
+ function groundContact(p,r=0){
+  if(!Array.isArray(p)||p.length!==3||!p.every(Number.isFinite)||!Number.isFinite(r)||r<0)return null;
+  let result=null;
+  groundPlanes(p[0]-r,p[0]+r,p[2]-r,p[2]+r,(gx,gz,h,x,z)=>{
+   const len=Math.hypot(gx,1,gz),height=h+gx*(p[0]-x)+gz*(p[2]-z),distance=(height+r*len-p[1])/len;
+   if(distance>0&&(!result||distance>result.distance))result={distance,normal:[-gx/len,1/len,-gz/len]};
+  });
+  return result;
+ }
+ function groundSweep(a,b,r=0){
+  if(!Array.isArray(a)||!Array.isArray(b)||a.length!==3||b.length!==3||!a.every(Number.isFinite)||!b.every(Number.isFinite)||!Number.isFinite(r)||r<0)return null;
+  const dx=b[0]-a[0],dy=b[1]-a[1],dz=b[2]-a[2],epsilon=1e-9;let result=null;
+  groundPlanes(Math.min(a[0],b[0])-r,Math.max(a[0],b[0])+r,Math.min(a[2],b[2])-r,Math.max(a[2],b[2])+r,(gx,gz,h,x0,z0,x1,z1)=>{
+   let enter=0,exit=result?.fraction??1;
+   for(const [origin,speed,min,max] of [[a[0],dx,x0-r,x1+r],[a[2],dz,z0-r,z1+r]]){
+    if(Math.abs(speed)<epsilon){if(origin<min||origin>max)return;}
+    else{let lo=(min-origin)/speed,hi=(max-origin)/speed;if(lo>hi)[lo,hi]=[hi,lo];enter=Math.max(enter,lo);exit=Math.min(exit,hi);if(enter>exit+epsilon)return;}
+   }
+   if(enter>1||exit<0)return;
+   const len=Math.hypot(gx,1,gz),initial=(a[1]-h-gx*(a[0]-x0)-gz*(a[2]-z0))/len-r,speed=(dy-gx*dx-gz*dz)/len,atEntry=initial+speed*enter;let fraction=null;
+   // A newly entered footprint may already lie below its plane even while
+   // rising. Stop at entry; otherwise the sphere can cross a ridge sideways.
+   // An already-penetrating start may retreat along/out of the plane normally.
+   if(atEntry< -epsilon){if(enter>epsilon||speed< -epsilon)fraction=enter;}
+   else if(speed< -epsilon){const t=-initial/speed;if(t>=enter-epsilon&&t<=exit+epsilon)fraction=Math.max(enter,t);}
+   if(fraction!==null&&fraction<=exit+epsilon&&(!result||fraction<result.fraction))result={fraction:clamp(fraction,0,1),normal:[-gx/len,1/len,-gz/len]};
+  });
+  return result;
+ }
  function heightInTriangle(p,x,z){const [a,b,c]=p,den=(b[2]-c[2])*(a[0]-c[0])+(c[0]-b[0])*(a[2]-c[2]);if(Math.abs(den)<1e-12)return null;const u=((b[2]-c[2])*(x-c[0])+(c[0]-b[0])*(z-c[2]))/den,v=((c[2]-a[2])*(x-c[0])+(a[0]-c[0])*(z-c[2]))/den;return u>=-1e-8&&v>=-1e-8&&u+v<=1+1e-8?u*a[1]+v*b[1]+(1-u-v)*c[1]:null;}
  const surfaceCells=new Map();
  function floorAt(x,z,fromY=Infinity){let y=groundHeight(x,z);if(y===null)return null;for(const s of surfaceCells.get(Math.floor(x/10)+','+Math.floor(z/10))||[]){if(s.y>fromY+.002||x<s.minX||x>s.maxX||z<s.minZ||z>s.maxZ)continue;const h=heightInTriangle(s.p,x,z);if(h!==null&&h<=fromY+.002)y=Math.max(y,h);}return y;}
@@ -223,5 +270,5 @@ const OceanTrench=(()=>{
  function build(renderer){for(const {g,origin,distance}of groups.values()){const batch=renderer.batch(g,[{p:origin.slice()}]);batch.sceneRole='region:trench';batch.regionRole='strata';batch.maxDistance=distance;}}
  function freeze(o){if(o&&typeof o==='object'){for(const p of Object.values(o))freeze(p);Object.freeze(o);}return o;}
  freeze(bounds);freeze(worldBounds);freeze(stations);freeze(habitats);freeze(encounters);freeze(solids);freeze(studyPoints);
- return Object.freeze({bounds,worldBounds,stations,habitats,encounters,studyPoints,studyPoint,solids,containsXZ,containsPosition,groundHeight,floorAt,nearbySolids,route,build});
+ return Object.freeze({bounds,worldBounds,stations,habitats,encounters,studyPoints,studyPoint,solids,containsXZ,containsPosition,groundHeight,groundContact,groundSweep,floorAt,nearbySolids,route,build});
 })();

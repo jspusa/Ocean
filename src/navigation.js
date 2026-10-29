@@ -34,7 +34,7 @@ const oceanNavigation=(()=>{
  function entry(){const p=OPEN_WORLD.boat;return collide([p[0]+1.4,-2.2,p[2]+9.5]);}
  function startDive({resume}){
   if(resume){player.p=collide(player.p);return;}
-  player.p=entry();const m=current(),l=LANDMARKS.find(l=>l.id===m.look);player.yaw=Math.atan2(l.x-player.p[0],-(l.z-player.p[2]));player.pitch=-.09;autoT=nearestPathIndex();resetInput();cameraCut=true;
+  player.p=entry();const m=current(),l=LANDMARKS.find(l=>l.id===m.look);player.yaw=Math.atan2(l.x-player.p[0],-(l.z-player.p[2]));player.pitch=-.09;autoT=nearestPathIndex();OceanDiverContact.reset();resetInput();cameraCut=true;
   const guest=voyage.state.features.expedition?.guest;if(guest)guest.p=collide(V.add(player.p,[1,0,1]));
   voyage.previousPosition=player.p.slice();
  }
@@ -49,7 +49,7 @@ const oceanNavigation=(()=>{
  function init(){
   boat=renderer.batches.find(b=>b.sceneRole==='research-vessel');if(!boat)throw new Error('研究船場景缺少定位資料');
   apply();oceanFeatures.addMenu({id:'navigation',label:'海圖與入水地點',panel:'navigation'});
-  const oldJump=jumpTo;jumpTo=function(index){if(index===8&&active){player.p=entry();player.velocity=[0,0,0];resetInput();stopAuto();closePanel();cameraCut=true;toast('已回到研究船旁的入水處。');return;}oldJump(index);};
+  const oldJump=jumpTo;jumpTo=function(index){if(index===8&&active){player.p=entry();player.velocity=[0,0,0];OceanDiverContact.reset();resetInput();stopAuto();closePanel();cameraCut=true;toast('已回到研究船旁的入水處。');return;}oldJump(index);};
  }
  const feature={id:'navigation',initial:R.initial,sanitize:R.sanitize,init,prepareDive:startDive,drawMap,reset:apply,renderPanel(type){if(type!=='navigation')return false;render();return true;}};oceanFeatures.register(feature);
  return {rules:R,feature,current,move,entry,apply,snapshot:()=>({mooring:state().mooring,boat:OPEN_WORLD.boat.slice(),mesh:boat?.instances[0].p.slice(),range:R.range})};

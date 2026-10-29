@@ -151,7 +151,7 @@ function startDive(tour=false){if(!ready)return;oceanSwimActions.exit();oceanPer
  settings.sound=$('welcomeAudio').checked;settings.startWithSound=settings.sound;
  if(settings.sound)oceanAudio.start().catch(e=>toast(e.message));
  closePanel();oceanSelection.clear();photoOpen=false;active=true;visited=new Set();diveSeconds=0;resetInput();
- const entry=LANDMARKS[selectedEntry];player.p=collide(entry.spawn.slice());player.yaw=entry.yaw;player.pitch=entry.pitch;
+ const entry=LANDMARKS[selectedEntry];player.p=collide(entry.spawn.slice());player.yaw=entry.yaw;player.pitch=entry.pitch;OceanDiverContact.reset();
  auto=tour;follow=null;autoT=nearestPathIndex();setAutoUI();
  clearTimeout(welcomeTransition);$('welcome').classList.add('leaving');welcomeTransition=setTimeout(()=>{welcomeTransition=null;if(active)$('welcome').classList.add('hidden');},650);$('hud').classList.remove('hidden');
  document.body.classList.remove('cinematic');log('開始漫遊 · '+oceanNavigation.current().name+'（概念場景）');setCount();updateSoundUI();persist();
@@ -161,7 +161,7 @@ function startDive(tour=false){if(!ready)return;oceanSwimActions.exit();oceanPer
 function goHome(){oceanSwimActions.exit();clearTimeout(welcomeTransition);welcomeTransition=null;releaseMouseLook();oceanPerf.benchmark=null;oceanPerf.pause();oceanPerf.visible=false;$('perfPanel')?.classList.add('hidden');if(active&&diveSeconds>3)log('結束漫遊 · '+timeText(diveSeconds));active=false;auto=false;follow=null;oceanSelection.clear();oceanDiveUI.sync();resetInput();closePanel();$('hud').classList.add('hidden');$('welcome').classList.remove('hidden','leaving');document.body.classList.remove('cinematic');oceanAudio.mute();settings.sound=false;updateSoundUI();persist();}
 function setAutoUI(){$('autoBtn').classList.toggle('active',auto);$('autoBtn').querySelector('span').textContent=auto?'接手探索':'自動漫遊';$('modeName').textContent=auto?(follow?'跟隨觀察':'自動漫遊'):'自由探索';}
 function stopAuto(){if(auto){auto=false;follow=null;setAutoUI();}}
-function jumpTo(index){oceanSwimActions.exit();let l=LANDMARKS[index];if(!active){selectedEntry=index;closePanel();startDive(false);return;}player.p=l.spawn.slice();player.yaw=l.yaw;player.pitch=l.pitch;resetInput();stopAuto();closePanel();$('flash').classList.add('on');setTimeout(()=>$('flash').classList.remove('on'),45);toast('已移至「'+l.name+'」· 遊戲示意位置');}
+function jumpTo(index){oceanSwimActions.exit();let l=LANDMARKS[index];if(!active){selectedEntry=index;closePanel();startDive(false);return;}player.p=l.spawn.slice();player.yaw=l.yaw;player.pitch=l.pitch;OceanDiverContact.reset();resetInput();stopAuto();closePanel();$('flash').classList.add('on');setTimeout(()=>$('flash').classList.remove('on'),45);toast('已移至「'+l.name+'」· 遊戲示意位置');}
 function viewingOffset(fish){let a=fish.yaw+followViewAngle,side=[Math.sin(a),0,Math.cos(a)],f=[Math.cos(a),0,-Math.sin(a)];return V.add(V.mul(side,followDistance),V.add(V.mul(f,followDistance*.12),[0,followDistance*.17,0]));}
 // Choose once on entering observation; do not oscillate the camera every frame.
 // Prefer a clear side-view instead of spawning the eye inside a neighbouring fish.
@@ -179,7 +179,7 @@ function chooseObservationSide(fish){let best=0,bestScore=Infinity;
 }
 function findSpecies(index,specific=null){const fish=specific||life.find(x=>x.species===index);if(!fish||fish.assetReady===false||fish.ecologyPresent===false||!active)return;
  followDistance=speciesTraits(index).viewDistance;
- chooseObservationSide(fish);player.p=V.add(fish.p,viewingOffset(fish));collide(player.p);let v=V.sub(fish.p,player.p);player.yaw=Math.atan2(v[0],-v[2]);player.pitch=Math.atan2(v[1],Math.hypot(v[0],v[2]));resetInput();auto=true;follow=fish;setAutoUI();closePanel();toast('近距離觀察「'+SPECIES[index].name+'」· 移動即可接手');}
+ chooseObservationSide(fish);player.p=V.add(fish.p,viewingOffset(fish));collide(player.p);let v=V.sub(fish.p,player.p);player.yaw=Math.atan2(v[0],-v[2]);player.pitch=Math.atan2(v[1],Math.hypot(v[0],v[2]));OceanDiverContact.reset();resetInput();auto=true;follow=fish;setAutoUI();closePanel();toast('近距離觀察「'+SPECIES[index].name+'」· 移動即可接手');}
 function observeNearest(){if(!oceanSelection.atPointer())toast('把指標移到附近的生物，再點一下觀察。');}
 const path=[[0,-7,23],[-6,-8,3],[-25,-9,-21],[-65,-11,-43],[-101,-13,-67],[-106,-18,-106],[-53,-25,-156],[-12,-30,-204],[15,-30,-229],[70,-28,-201],[98,-31,-158],[101,-15,-95],[55,-10,-46],[8,-8,-15],[0,-7,23]];
 function nearestPathIndex(){let best=0,dist=Infinity;path.forEach((p,i)=>{let d=V.dist(p,player.p);if(d<dist){dist=d;best=i;}});return best;}
@@ -239,6 +239,11 @@ function updatePlayer(dt){if(oceanFeatures.pointerCaptured()){player.velocity=[0
  if(auto){const before=player.p.slice();if(follow){let desired=V.add(follow.p,viewingOffset(follow));player.p=V.lerp(player.p,desired,1-Math.exp(-dt*1.3));let d=V.sub(follow.p,player.p);player.yaw=lerpAngle(player.yaw,Math.atan2(d[0],-d[2]),1-Math.exp(-dt*1.7));player.pitch=mix(player.pitch,Math.atan2(d[1],Math.hypot(d[0],d[2])),1-Math.exp(-dt*1.7));}else{autoT+=dt*.016*settings.speed;let p=pathAt(autoT),q=pathAt(autoT+.15),d=V.sub(q,p);player.p=V.lerp(player.p,p,1-Math.exp(-dt*.9));player.yaw=lerpAngle(player.yaw,Math.atan2(d[0],-d[2]),1-Math.exp(-dt*.6));player.pitch=mix(player.pitch,clamp(Math.atan2(d[1],Math.hypot(d[0],d[2]))-.07,-.38,.25),1-Math.exp(-dt*.6));}collide(player.p,before);player.velocity=V.lerp(player.velocity,V.mul(V.sub(player.p,before),1/Math.max(.0001,dt)),1-Math.exp(-dt*4));return;}
  const forward=(keys.has('KeyW')||keys.has('ArrowUp')?1:0)-(keys.has('KeyS')||keys.has('ArrowDown')?1:0)-stick[1],side=(keys.has('KeyD')||keys.has('ArrowRight')?1:0)-(keys.has('KeyA')||keys.has('ArrowLeft')?1:0)+stick[0],up=(keys.has('KeyE')?1:0)-(keys.has('KeyQ')?1:0)+verticalInput;let f=dir(),right=[Math.cos(player.yaw),0,Math.sin(player.yaw)],wish=V.add(V.mul(f,forward),V.add(V.mul(right,side),[0,up,0]));let length=V.len(wish);if(length>1)wish=V.mul(wish,1/length);let speed=2.35*settings.speed*(keys.has('ShiftLeft')||keys.has('ShiftRight')?1.75:1);let desired=V.mul(wish,speed);player.velocity=V.lerp(player.velocity,desired,1-Math.exp(-dt*(length>.01?3.3:5.3)));player.p=collide(V.add(player.p,V.mul(player.velocity,dt)),player.p);}
 function updateCamera(dt=1/60,renderPosition=null){
+ let bodyPose=null;
+ if(active&&typeof OceanDiverContact!=='undefined'){
+  bodyPose=OceanDiverContact.move({...player,scale:diverBatch?.instances[0]?.s?.[0]||.85},dt);
+  if(bodyPose){player.p=bodyPose.p.slice();if(renderPosition)bodyPose=OceanDiverContact.renderPose(renderPosition);}
+ }
  if(typeof oceanSwimActions!=='undefined'&&oceanSwimActions.camera())return;
  const rocks=typeof OceanRockContact==='undefined'?null:OceanRockContact;
  const regionSafe=(a,b)=>{
@@ -249,7 +254,7 @@ function updateCamera(dt=1/60,renderPosition=null){
   }
   return fraction===1?b:V.lerp(a,b,fraction);
  };
- if(active){const f=dir(),pp=renderPosition||player.p,third=settings.third&&!(auto&&follow);
+ if(active){const f=dir(),pp=bodyPose?.p||renderPosition||player.p,third=settings.third&&!(auto&&follow);
   if(third){const right=[Math.cos(player.yaw),0,Math.sin(player.yaw)],anchor=V.add(pp,[0,.35,0]);let desired=V.add(pp,V.add(V.mul(f,-6.3),V.add(V.mul(right,.40),[0,1.48,0])));
    if(typeof OceanRegions!=='undefined')OceanRegions.resolve(anchor,.23);rocks?.resolve(anchor,.23,pp);
    const ab=V.sub(desired,anchor);let safeFraction=V.dist(anchor,regionSafe(anchor,desired))/Math.max(.001,V.len(ab));
@@ -262,7 +267,7 @@ function updateCamera(dt=1/60,renderPosition=null){
    desired=V.lerp(anchor,desired,cameraFollowLength/6.3);desired[1]=Math.min(-.35,desired[1]);const aim=V.add(pp,V.mul(f,6.6));
    if(cameraCut||lastCameraThird!==third||V.dist(eye,desired)>12){eye=desired;target=aim;}else{const k=1-Math.exp(-dt*14);eye=V.lerp(eye,desired,k);target=V.lerp(target,aim,k);}
    eye=regionSafe(anchor,eye);
-   diverBatch.visible=true;const d=diverBatch.instances[0];d.p[0]=pp[0];d.p[1]=pp[1];d.p[2]=pp[2];d.yaw=-player.yaw;d.pitch=-player.pitch;d.phase=mix(d.phase||0,-stick[0]*.09,1-Math.exp(-dt*5));
+   diverBatch.visible=!!bodyPose;const d=diverBatch.instances[0];d.p[0]=pp[0];d.p[1]=pp[1];d.p[2]=pp[2];d.yaw=-(bodyPose?.yaw??player.yaw);d.pitch=-(bodyPose?.pitch??player.pitch);d.phase=mix(d.phase||0,-stick[0]*.09,1-Math.exp(-dt*5));
   }else{eye=pp.slice();rocks?.resolve(eye,.20,player.p);target=auto&&follow?follow.p.slice():V.add(eye,f);diverBatch.visible=false;}
   lastCameraThird=third;cameraCut=false;
  }else{const l=LANDMARKS[selectedEntry];eye=l.spawn.slice();eye[0]+=settings.reduced?0:Math.sin(t*.032)*.5;const yaw=l.yaw+(settings.reduced?0:Math.sin(t*.019)*.026);target=V.add(eye,[Math.sin(yaw)*10,Math.sin(l.pitch)*10,-Math.cos(yaw)*10]);diverBatch.visible=false;cameraCut=true;}
@@ -296,14 +301,14 @@ function returnToLoadedView(){
  if(typeof oceanEcology!=='undefined'&&oceanEcology.snapshot().grabbedUID)oceanEcology.toggleRide();
  if(typeof oceanMicrocosm!=='undefined'&&oceanMicrocosm.isViewing())oceanMicrocosm.exit();
  oceanSelection.clear();resetInput();
- player.p=saved.p.slice();player.yaw=saved.yaw;player.pitch=saved.pitch;
+ player.p=saved.p.slice();player.yaw=saved.yaw;player.pitch=saved.pitch;OceanDiverContact.reset();
  eye=saved.eye.slice();target=saved.target.slice();cameraFollowLength=saved.cameraFollowLength;lastCameraThird=saved.cameraThird;cameraCut=false;updateCamera(0);
  // Clearing a follow camera can reveal a cold third-person offset. Inspect
  // residency before calling update(), which would otherwise enqueue new work.
  const resident=p=>!stream||[...stream.needed(p)].every(id=>stream.meshes[id].resident);
  let firstPerson=false;
  if(!resident(eye)){
-  settings.third=false;firstPerson=true;player.p=saved.eye.slice();
+  settings.third=false;firstPerson=true;player.p=saved.eye.slice();OceanDiverContact.reset();
   const direction=V.sub(saved.target,saved.eye);player.yaw=Math.atan2(direction[0],-direction[2]);player.pitch=Math.atan2(direction[1],Math.hypot(direction[0],direction[2]));
   cameraCut=true;updateCamera(0);
  }
