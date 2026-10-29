@@ -35,3 +35,5 @@ Standards confirmed one final world contact pass, coherent feeding/partner posit
 Spec confirmed schema-2 saved protection inputs, reuse on init/reset/resume, refresh only at new-dive entry, and documented seed-only migration limits. Real boot loads voyage after actor initialization, so valid saved partner UIDs survive sanitization. The final interaction pass follows all `afterLife` hooks and synchronizes ecology to the rendered position.
 
 Final counts by axis: Standards — 0 unresolved hard findings, 1 nonblocking heuristic; Spec — 0 unresolved findings in this slice. The full realism goal remains open.
+
+The final evidence-only candidate `4aeb59b05aace4e6ae7a165ead730b7f9ce19d69` changed only this review and the test report. Both axes independently found no new actionable issue. Released runtime `bcbd4c5b67c45e00c980fd46508427c9a66762b2` has that candidate's exact tree. Subsequent publication evidence is recorded in the test report; no runtime code was changed by that receipt update.

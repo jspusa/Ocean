@@ -1,6 +1,6 @@
 # v0.18.37 — contact and habitat integration
 
-Status: local acceptance passed; public publication pending. The broader realism goal remains active.
+Status: published and verified on 2026-10-29. The broader realism goal remains active.
 
 ## Scope
 
@@ -16,7 +16,7 @@ The original player seven-centimeter rock penetration, tang route inside the com
 - One frozen full CPU integration run completed 115 suites: 113 passed, two historical assertions failed. Exact scene-byte expectations were updated to the measured smaller turtle payload and separately stored collision metadata (targeted 6/6). Story preservation now distinguishes transient rendered poses from identity, preserves the historical fixture, and verifies exactly four clownfish habitat heights against compiled anemone roots (targeted 9/9). The original failing receipt is retained.
 - Initial native lifecycle checks passed 46/46 per desktop/touch profile. Independent review then exposed two missing cases: ecology overrides could bypass final rock contact; changed waypoint protection could alter a resumed encounter arrangement. Actual feeding and actual native journal/continue RED witnesses are retained. The final interaction regression passes 4/4, including 510 feeding/recovery frames, 180 companion frames, repeated timestamps and exact direct/wrapped equivalence. Six affected existing suites pass 102 assertions; the summary receipt explicitly distinguishes retained tool-output results from raw logs. Encounter continuity passes 18/18 and seasons 19/19 after schema-2 protection is persisted.
 
-Both independent correction reviews have no unresolved blocking finding. Final static checks pass 73/73. Native correction acceptance passes 53/53 for each desktop/touch profile: real journal navigation marks a distant common species, then save/home/continue/reload retains the same arrangement and stable animal identities. No injected state is used. Public delivery remains pending. Evidence files are under `qa/parity/v01837-realism/` and the earlier contact witness directory; local QA receipts are ignored build artifacts, not public download assets.
+Both independent correction reviews have no unresolved blocking finding. Final static checks pass 73/73. Native correction acceptance passes 53/53 for each desktop/touch profile: real journal navigation marks a distant common species, then save/home/continue/reload retains the same arrangement and stable animal identities. No injected state is used. Evidence files are under `qa/parity/v01837-realism/` and the earlier contact witness directory; local QA receipts are ignored build artifacts, not public download assets.
 
 Public v0.18.36 audio entry was rechecked on 2026-10-29: 32/32 normal desktop/touch-emulation assertions passed. This is evidence for the published audio hotfix, not this unreleased integration.
 
@@ -38,3 +38,11 @@ Offline contact audits of the recorded real-input routes found zero rock penetra
 ## Limits
 
 Controlled rendering is not natural-play acceptance. Touch emulation does not establish physical-phone performance, battery use or human audio quality. No full commercial-readiness or Wii-superiority claim is made.
+
+## Public delivery
+
+Runtime commit `bcbd4c5b67c45e00c980fd46508427c9a66762b2` has exactly the reviewed tree `1326200055d4c2251d5ae436bbe1e1be68c47dc0`. GitHub Pages reported that commit built at `2026-10-29T09:43:18Z`. All **309/309** public manifest files matched their local SHA-256 and byte count; the manifest SHA-256 is `18b61351af582a5dd3f6d04f13610e225eb3c4e4b8add1d3646ebb9146aa924c`.
+
+Public desktop and touch entry passed with default automatic quality, all nine native shader programs, no center-target label, valid touch controls and no page, console, warning or network failures. Separate strict-autoplay public audio checks passed **32/32**: no audio graph or music IO before a real gesture, sound-enabled and silent entry, later sound activation and second-tab ownership behavior. An interrupted first audio verification had no live process after the turn interruption; its partial receipt was preserved separately before the complete run.
+
+Receipts: `public-delivery.json`, `public-audio-entry.json`, `pages-runtime-build.json`, and `prepublication-verification.json`. [Play v0.18.37](https://jspusa.github.io/Ocean/?v=0.18.37).
