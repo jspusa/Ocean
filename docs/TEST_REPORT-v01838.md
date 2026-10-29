@@ -1,6 +1,6 @@
 # v0.18.38 — animal surface continuity
 
-Status: candidate validated and independently reviewed; public deployment verification pending. The wider realism goal remains open.
+Status: published and verified on 2026-10-29. The wider realism goal remains open.
 
 ## Change
 
@@ -65,8 +65,19 @@ Stars describe sample validity. Baseline drift is substantial in three rows and 
 
 ## Independent review
 
-[Standards and Spec](parity/REVIEW-v01838.md) found no blocking issue. One optional P3 test-observation deduplication suggestion is deferred. Both reviewers separately checked the final-cost report delta. Runtime and test sources remain identical to the pinned review candidate. Public verification is still required before delivery.
+[Standards and Spec](parity/REVIEW-v01838.md) found no blocking issue. One optional P3 test-observation deduplication suggestion is deferred. Both reviewers separately checked the final-cost report delta. Runtime and test sources remain identical to the pinned review candidate. The public verification below closes the release gate for this slice.
 
 ## Limits
 
 This is a surface-material slice. Several reef fish still have primitive body/fin construction, and the broader lighting, rock and animal fidelity work remains open. Touch checks emulate a phone on the computer; they do not establish physical-phone performance or battery use. No photorealism, commercial-readiness or Wii-superiority claim is made.
+
+
+## Public delivery
+
+Runtime commit `c93f0e7341d5352ec1132ddf2e33387ed5e1744a` was built by GitHub Pages at `2026-10-29T13:19:13Z`. Runtime and test files match the independently reviewed candidate; only final evidence/review documents were added after that pin. Every public manifest file matched its local SHA-256 and byte count: **309/309**. Manifest SHA-256 remains `05c974857a1b9eff28ecfa2380c3703eca623629c091f37c6febfe0f7c7a7e23`.
+
+Public desktop and touch-emulation entry both passed with default automatic quality, all ten native surface programs, no center-focus label and valid touch controls. There were zero page, console, warning or network failures. Root also inspected the actual public touch entry screenshot.
+
+Separate strict-autoplay public audio validation passed **32/32** assertions across desktop and touch. The homepage made no Web Audio initialization or music requests before a trusted gesture. Sound-enabled entry started one graph and both original music stems; saved silent entry and later sound activation passed, as did second-tab ownership handling. The historical loader no longer waits at 準備海底聲景. These checks do not establish physical-phone performance or human listening quality.
+
+Receipts: `pages-runtime-build.json`, `public-delivery.json`, `public-audio-entry.json` and `prepublication-verification.json` under `qa/parity/v01838-materials/`. [Play v0.18.38](https://jspusa.github.io/Ocean/?v=0.18.38).
