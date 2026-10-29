@@ -10,11 +10,11 @@ Independent reviewer `v39_standards` reviewed all 22 changed files against `CONT
 
 Independent reviewer `v39_spec` reviewed `REEF-ANATOMY-ROCK-v01839-SPEC.md`, implementation, actual mesh/material receipts, resource audit and representative fish/rock images. No demonstrated missing requirement, incorrect implementation or scope creep in this bounded slice. The 64 derived model centers and 17 sub-millimetre phase-zero pose differences are reproduced exactly by production APIs and are disclosed separately from unchanged identity/route inputs. Only eight intended model geometries change. Reduced aggregate indexed data, increased compressed download data, increased low-detail triangle count, mixed GPU timings and baseline drift are all disclosed.
 
-At initial review, desktop gameplay passed and touch/public delivery were still pending. Both desktop and touch natural-input runs now pass 11/11. Public file hashes, entry and strict audio validation remain publication gates; the existing v0.18.38 receipt does not substitute for them.
+At initial review, desktop gameplay passed and touch/public delivery were still pending. Both desktop and touch natural-input runs pass 11/11. Both independent reviewers subsequently read the final report-only delta and confirmed no additional blockers. After publication, the current release separately passed 309/309 public file hashes, both entry profiles and 32/32 strict audio assertions; the existing v0.18.38 receipt was not substituted for them. See [the release report](../TEST_REPORT-v01839.md).
 
 | Axis | Hard/blocking findings | Nonblocking item | Disposition |
 |---|---|---|---|
 | Standards | 0 | 1 optional P3 test-helper duplication | ★ Accepted; deferred cleanup |
-| Spec | 0 | Public delivery must be verified after publication | ★ Implementation accepted; release gate retained |
+| Spec | 0 | Public delivery verified separately after publication | ★ Accepted; current release gates passed |
 
 Both reviewers were read-only and performed no tests, GPU work, build or source edits. The larger realism and physical-phone goals remain open.

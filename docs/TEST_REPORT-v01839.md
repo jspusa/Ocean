@@ -1,6 +1,6 @@
 # v0.18.39 — reef anatomy and shallow-rock response
 
-Status: native validation and independent review in progress; not published. The broad realism goal remains active. Baseline public release is `c10b3e197622dedaa6f0daa669e97efc7b8b22c0` / v0.18.38.
+Status: published and publicly verified. The broad realism goal remains active. Baseline public release is `c10b3e197622dedaa6f0daa669e97efc7b8b22c0` / v0.18.38.
 
 ## Actual baseline and corrected evidence
 
@@ -73,4 +73,12 @@ Receipts: `natural-desktop.json` and `natural-touch.json`. An initial command la
 
 ## Limits and outstanding gates
 
-Independent [Standards and Spec review](parity/REVIEW-v01839.md) found no implementation blocker; one optional test-helper duplication cleanup is deferred. Public delivery remains a separate pending gate. Physical-phone performance, battery use, commercial readiness and photorealism are not established. The larger rock silhouettes and other visibly simplistic animals remain part of the unchanged goal.
+Independent [Standards and Spec review](parity/REVIEW-v01839.md) found no implementation blocker; one optional test-helper duplication cleanup is deferred. Physical-phone performance, battery use, commercial readiness and photorealism are not established. The larger rock silhouettes and other visibly simplistic animals remain part of the unchanged goal.
+
+## Public delivery
+
+GitHub Pages built runtime commit `f42f7ddfcf8596ebfa87c4bfd4ca40391b067f1a` successfully at `2026-10-29T14:22:35Z`. All 309/309 published file hashes match the v0.18.39 manifest, SHA-256 `463248b8726a406b1fdeda46ede3622f65838dfa46075fafaeeea4e6ab68df1b`. Public desktop and touch entry both pass with default automatic quality, all ten surface programs and zero page/console/warning/network failures.
+
+A separate current-release strict-autoplay audio run passes 32/32 assertions with zero errors. No Web Audio graph or music IO occurs before the actual entry gesture; sound-enabled entry, saved silent entry, later sound activation and exclusive second-tab handling pass. This directly rechecks the user's loading complaint against the published release, without claiming to identify the contents of an old user tab or certify physical-phone audio.
+
+Receipts: `pages-runtime-build.json`, `public-delivery.json`, `public-audio-entry.json` and `prepublication-verification.json` under `qa/parity/v01839-realism/`. This subsequent receipt-only documentation update leaves runtime and manifest bytes unchanged. [Play v0.18.39](https://jspusa.github.io/Ocean/?v=0.18.39).
