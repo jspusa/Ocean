@@ -23,7 +23,7 @@ const stats=a=>{a=a.slice().sort((x,y)=>x-y);return {n:a.length,mean:a.reduce((s
   const g=renderer.gl,ext=g.getExtension('EXT_disjoint_timer_query_webgl2'),debug=g.getExtension('WEBGL_debug_renderer_info');if(!ext)throw Error('GPU timer unavailable');
   const initial={adaptive:settings.adaptive,third:settings.third,lamp:settings.lamp,quality:renderer.quality,scale:renderer.dynamicScale,resolution:[g.drawingBufferWidth,g.drawingBufferHeight],msaa:renderer.msaaSamples};
   const original=renderer.surfaceProgram,programs=renderer.surfacePrograms,candidate=programs.get('3:3'),fragment=FS.replace('uniform int uKind;','const int uKind=3;').replace('uniform int uMat;','const int uMat=3;');
-  if(programs.size!==9||!candidate||renderer.surfaceProgramFailures.size)throw Error('All nine production programs must compile');
+  if(programs.size!==10||!candidate||renderer.surfaceProgramFailures.size)throw Error('All ten production programs must compile');
   const attached=g.getAttachedShaders(candidate.p).map(s=>({type:g.getShaderParameter(s,g.SHADER_TYPE),source:g.getShaderSource(s)}));
   if(!attached.some(s=>s.type===g.VERTEX_SHADER&&s.source===VS)||!attached.some(s=>s.type===g.FRAGMENT_SHADER&&s.source===fragment))throw Error('Production shaders differ from the original vertex and declaration-only fragment');
   const others=[...programs].filter(([key])=>key!=='3:3');
@@ -104,7 +104,7 @@ const stats=a=>{a=a.slice().sort((x,y)=>x-y);return {n:a.length,mean:a.reduce((s
    restore(){
     const receipt={restored:false,query:null,map:false,settings:false,gl:null,contextLost:g.isContextLost(),errors:[]};
     if(api.lastQuery)receipt.query=releaseQuery(api.lastQuery);
-    try{select(true);receipt.map=renderer.surfaceProgram===original&&programs.size===9&&programs.get('3:3')===candidate;}catch(error){receipt.errors.push(String(error));}
+    try{select(true);receipt.map=renderer.surfaceProgram===original&&programs.size===10&&programs.get('3:3')===candidate;}catch(error){receipt.errors.push(String(error));}
     try{check(!g.getQuery(ext.TIME_ELAPSED_EXT,g.CURRENT_QUERY),'Cannot render during external query');render();}catch(error){receipt.errors.push(String(error));}
     finally{settings.adaptive=initial.adaptive;settings.third=initial.third;settings.lamp=initial.lamp;receipt.settings=settings.adaptive===initial.adaptive&&settings.third===initial.third&&settings.lamp===initial.lamp;}
     try{receipt.gl=g.getError();}catch(error){receipt.errors.push(String(error));}

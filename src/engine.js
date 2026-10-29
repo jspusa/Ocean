@@ -349,6 +349,41 @@ ${NOISE_GLSL}
 ${WATER_OPTICS_GLSL}
 vec3 triMap(sampler2D tex,vec3 p,vec3 n){vec3 w=pow(abs(n),vec3(5.));w/=dot(w,vec3(1.));return texture(tex,p.yz).rgb*w.x+texture(tex,p.xz).rgb*w.y+texture(tex,p.xy).rgb*w.z;}
 vec3 triNormal(sampler2D tex,vec3 p,vec3 n,float strength){vec3 w=pow(abs(n),vec3(5.));w/=dot(w,vec3(1.));vec3 a=texture(tex,p.yz).xyz*2.-1.,b=texture(tex,p.xz).xyz*2.-1.,c=texture(tex,p.xy).xyz*2.-1.;vec3 v=vec3(0.,a.x,a.y)*w.x+vec3(b.x,0.,b.y)*w.y+vec3(c.x,c.y,0.)*w.z;return normalize(n+v*strength);}
+// Transport a continuous local height field on the actual deformed surface.
+// Derivatives are evaluated together, before the finite/flat fallback, so a
+// neighbouring zero-height fragment cannot make the derivative branch diverge.
+// Height must be analytic: apply screen-footprint attenuation only afterwards.
+vec3 materialSurfaceNormal(vec3 normal,float localHeight,float strength){
+ vec2 dh=vec2(dFdx(localHeight),dFdy(localHeight));
+ vec3 dx=dFdx(vRelative),dy=dFdy(vRelative),rx=cross(dy,normal),ry=cross(normal,dx);
+ float determinant=dot(dx,rx);
+ if(abs(determinant)<1.e-10||dot(dh,dh)<1.e-18)return normal;
+ vec3 bumped=normal-(dh.x*rx+dh.y*ry)*(strength/determinant);
+ return bumped*inversesqrt(max(dot(bumped,bumped),1.e-12));
+}
+// Five median and four paired costal shields share continuous boundaries.
+// This bounded partition needs no per-fragment search through shell seeds.
+// x follows the shell's long axis; y follows its normalized half-width.
+vec3 turtleScuteField(vec2 p){
+ float radial=length(p),rim=abs(radial-.90)*.70;
+ if(radial>.90){
+  float sector=(atan(p.y,p.x)+3.14159265)*(22./6.2831853),part=fract(sector);
+  float joint=min(part,1.-part)*(6.2831853/22.)*radial*.70;
+  return vec3(min(rim,joint),13.+floor(sector),2.);
+ }
+ float x=p.x+.022*p.y*p.y,z=abs(p.y);
+ vec4 cuts=vec4(-.64,-.24,.16,.56),distances=abs(vec4(x)-cuts);
+ float row=dot(step(cuts,vec4(x)),vec4(1.));
+ float left=row<.5?-1.:row<1.5?-.64:row<2.5?-.24:row<3.5?.16:.56;
+ float right=row<.5?-.64:row<1.5?-.24:row<2.5?.16:row<3.5?.56:1.;
+ float u=clamp((x-left)/(right-left),0.,1.);
+ float width=(.205+.13*4.*u*(1.-u))*(1.-.13*x*x);
+ float longitudinal=abs(z-width)*.70;
+ if(z<width)return vec3(min(rim,min(longitudinal,min(min(distances.x,distances.y),min(distances.z,distances.w)))),row,0.);
+ float sideX=p.x-.055*z*z;vec3 sideCuts=vec3(-.46,-.035,.39),sideDistances=abs(vec3(sideX)-sideCuts);
+ float sideRow=dot(step(sideCuts,vec3(sideX)),vec3(1.));
+ return vec3(min(rim,min(longitudinal,min(sideDistances.x,min(sideDistances.y,sideDistances.z)))),5.+sideRow+(p.y<0.?0.:4.),1.);
+}
 float visibility(vec3 n){
  if(uShadows<.5)return 1.;vec3 sp=vShadow.xyz/vShadow.w*.5+.5;
  if(any(lessThan(sp,vec3(.001)))||any(greaterThan(sp,vec3(.999))))return 1.;
@@ -382,6 +417,67 @@ float pelagicSpots(vec2 q){
  spots=mix(spots,.085,smoothstep(.7,1.8,footprint));
  float lineWidth=max(footprint*.48,.012),lines=(1.-smoothstep(max(0.,.014-lineWidth),.014+lineWidth,abs(fract(q.y+.5)-.5)))*.065;
  return max(spots*.82,lines);
+}
+// Reef pigment follows the surface, not the colour assigned to a mesh quad.
+// Catalogue 37..40 is checked against the actual compiled species in reef-material.
+// Other material-6 animals keep their existing authored/pelagic response.
+// The caller evaluates this footprint before per-fragment tag branches. Keep
+// pigment filtering pure so helper lanes at triangle edges use the same width.
+float reefFishEdge(float edge,float value,float footprint){float w=max(footprint*.8,.0005);return smoothstep(edge-w,edge+w,value);}
+vec3 reefFishPigment(vec3 base,vec3 localWidth){
+ if(uKind!=1)return base;
+ if(uSpecies>=37&&uSpecies<=40){
+  // Restore the authored coordinate scale after faunaGeometry's length
+  // normalization. One field is shared by near and far mesh tessellations.
+  float authoredScale=uSpecies==39?1.279:uSpecies==40?1.025:1.047;
+  vec3 p=vLocal*authoredScale,pWidth=localWidth*authoredScale;
+  bool fin=vTag>2.5&&vTag<3.5;
+  if(uSpecies==37){
+   vec3 c=mix(vec3(.90,.37,.11),vec3(.96,.67,.31),clamp((.035-p.y)/.22,0.,1.)*.65);
+   return fin?mix(c,vec3(.91,.48,.36),reefFishEdge(.24,p.y,pWidth.y)):c;
+  }
+  if(uSpecies==38){
+   float band=min(min(abs(p.x-.225+p.y*.08),abs(p.x-.018)),abs(p.x+.215-p.y*.11));
+   float dark=1.-reefFishEdge(.047,band,pWidth.x+pWidth.y*.11);
+   if(fin){
+    dark=max(dark,reefFishEdge(.18,p.y,pWidth.y)*reefFishEdge(-.035,p.x,pWidth.x));
+    dark=max(dark,1.-reefFishEdge(-.18,p.y,pWidth.y));
+    float rayX=max(.001,-.405-p.x),ray=atan(p.y,rayX)*9.;
+    float rayWidth=9.*(rayX*pWidth.y+abs(p.y)*pWidth.x)/max(rayX*rayX+p.y*p.y,.000001);
+    dark=max(dark,(1.-reefFishEdge(-.405,p.x,pWidth.x))*(.5+.5*cos(ray)*exp(-rayWidth*rayWidth)));
+   }
+   vec2 q=p.xy*vec2(53.,62.);float footprint=length(pWidth.xy*vec2(53.,62.));
+   q.x+=mod(floor(q.y),2.)*.5;float d=length((fract(q)-.5)*vec2(1.,.92)),w=max(footprint*.5,.008);
+   float spots=1.-smoothstep(max(0.,.15-w),.15+w,d);
+   spots=mix(spots,.077,smoothstep(.7,1.6,footprint));
+   return mix(vec3(.88,.86,.75),vec3(.035,.045,.052),dark*(1.-spots));
+  }
+  if(uSpecies==39){
+   vec3 face=mix(vec3(.89,.88,.78),vec3(.035,.045,.052),reefFishEdge(.005,p.y,pWidth.y));
+   vec3 c=mix(vec3(.96,.72,.13),face,reefFishEdge(.17,p.x,pWidth.x));
+   if(fin){float spot=length((p.xy-vec2(-.205,-.185))/vec2(.034,.033));c=mix(c,vec3(.035,.045,.052),1.-reefFishEdge(1.,spot,length(pWidth.xy/vec2(.034,.033))));}
+   else c=mix(c,vec3(.035,.045,.052),reefFishEdge(.618,p.x,pWidth.x));
+   return c;
+  }
+  vec3 c=mix(vec3(.89,.88,.78),vec3(.71,.18,.13),clamp((.16-p.x)/.42,0.,1.));
+  if(fin){float midline=1.-reefFishEdge(.015,abs(p.z),pWidth.z);float red=max(1.-reefFishEdge(-.40,p.x,pWidth.x),midline*(1.-reefFishEdge(-.065,p.y,pWidth.y)));c=mix(vec3(.89,.88,.78),vec3(.71,.18,.13),red);}
+  return c;
+ }
+ float x=vLocal.x+(vGenes.y-.5)*.027+sin(vLocal.y*13.+vGenes.x*17.)*.004;
+ float y=vLocal.y,widthScale=.87+vGenes.z*.27;
+ if(uSpecies==0){base=vec3(.92,.41,.095);float d=min(min(abs(x-.27+y*.10),abs(x+.08-y*.05)),abs(x+.40));d/=widthScale;base=mix(base,vec3(.035,.038,.044),1.-smoothstep(.069,.087,d));base=mix(base,vec3(.92,.90,.83),1.-smoothstep(.048,.064,d));}
+ if(uSpecies==1){base=mix(vec3(.16,.37,.53),vec3(.10,.22,.37),smoothstep(-.22,.27,y));float oval=(x+.12)*(x+.12)/(.100*widthScale)+(y-.105)*(y-.105)/(.018*(.93+vGenes.z*.14));
+  float ring=(1.-smoothstep(.90,1.17,oval))*smoothstep(.25,.48,oval);
+  float streak=(1.-smoothstep(.019,.037,abs(y+.030+x*.075)))*smoothstep(-.46,-.30,x)*(1.-smoothstep(.14,.30,x));
+  base=mix(base,vec3(.027,.047,.059),max(ring,streak));base*=.88+.12*smoothstep(-.15,.20,y);
+  float cheek=exp(-((x-.27)*(x-.27)*95.+(y+.035)*(y+.035)*170.));base=mix(base,vec3(.09,.28,.48),cheek*.22);
+ }
+ if(uSpecies==2){base=mix(vec3(.96,.74,.22),vec3(.89,.87,.67),smoothstep(-.32,-.22,x));float band=1.-smoothstep(.035,.058,abs(x-.228)/widthScale);base=mix(base,vec3(.075,.085,.094),band);}
+ if(uSpecies==3){float a=min(abs(x-.21),abs(x+.25))/widthScale;base=mix(vec3(.96,.94,.82),vec3(.045,.052,.060),1.-smoothstep(.065,.092,a));base=mix(base,vec3(.94,.73,.16),1.-smoothstep(-.40,-.32,x));}
+ if(uSpecies==4){base=mix(vec3(.78,.79,.70),vec3(.91,.79,.31),smoothstep(.03,.22,y));float a=abs(sin((x+.56)*16.5))/widthScale;base=mix(base,vec3(.07,.11,.13),1.-smoothstep(.37,.57,a));}
+ if(uSpecies==6){base=mix(vec3(.12,.53,.42),vec3(.64,.32,.38),smoothstep(.22,.38,x)*(1.-smoothstep(.0,.12,y)));float ring=abs(sin(y*36.+sin(x*14.)*.5));base*=.81+.19*ring;}
+ if(uSpecies==7)base=mix(vec3(.21,.57,.43),vec3(.65,.28,.33),1.-smoothstep(.18,.38,abs(sin(y*38.+x*4.))));
+ return base;
 }
 vec3 pelagicSkin(vec3 base){
  bool body=vTag>.5&&vTag<1.5,fin=vTag>2.5&&vTag<3.5;
@@ -500,24 +596,60 @@ void main(){
  float lum=dot(base,vec3(.2126,.7152,.0722));base=mix(vec3(lum)*vec3(1.02,1.,.94),base,.72);
  n=triNormal(uCoralN,vWorld*1.28,n,.20);rough=.91;occ=.64+.36*smoothstep(-.1,.44,vLocal.y);}
  if(uMat==4){vec3 q=vLocal*16.;float f=sin(q.x*2.7+sin(q.z*2.8+q.y)*2.3)+sin(q.z*2.9+sin(q.y*2.8+q.x)*2.0);float ridW=max(fwidth(f),.03),ridge=smoothstep(.18-ridW,.18+ridW,abs(f));float ridgeResolve=exp(-pow(max(length(dFdx(q)),length(dFdy(q))),2.)*.22);ridge=mix(.65,ridge,ridgeResolve);base*=.74+.32*ridge;vec3 gro=vec3(cos(q.x*2.7)*.1,0.,cos(q.z*2.9)*.1);n=normalize(n+gro*(1.-ridge)*1.35*ridgeResolve);base*=mix(vec3(.85),triMap(uCoral,vWorld*1.7,n)*1.4,.35);rough=.84;}
- if(uMat==5){if(vTag<1.5){vec2 uv=vec2((vLocal.x+.13)/2.10+.5,vLocal.z/1.5+.5);base=texture(uShell,uv).rgb;vec3 nn=texture(uShellN,uv).rgb*2.-1.;n=normalize(n+vec3(nn.x,0.,nn.y)*.23);rough=.46;}
- else if(vTag<2.5){vec3 q=vLocal*25.;vec2 p=abs(n.y)>.42?q.xz:q.xy;vec2 cell=floor(p);float row=mod(cell.y,2.);p.x+=row*.5;vec2 f=fract(p)-.5;float d=length(f*vec2(1.,.83));float scaleW=max(fwidth(d),.018),border=smoothstep(.425-scaleW,.425+scaleW,d);float tone=.61+noise(vLocal*16.)*.29;base=mix(vec3(.27,.30,.21)*tone*1.3,vec3(.62,.63,.47),border*.64);n=normalize(n+vec3(f.x,0.,f.y)*.09*(1.-border));rough=.72;}
- else if(vTag<3.5){base*=.91+noise(vLocal*28.)*.15;rough=.75;}else{rough=.12;}}
- if(uMat==6){base/=max(vTint,vec3(.001));if(vTag<2.5&&uSpecies>=0){float x=vLocal.x+(vGenes.y-.5)*.027+sin(vLocal.y*13.+vGenes.x*17.)*.004;
- float y=vLocal.y;float widthScale=.87+vGenes.z*.27;
- if(uSpecies==0){base=vec3(.92,.41,.095);float d=min(min(abs(x-.27+y*.10),abs(x+.08-y*.05)),abs(x+.40));d/=widthScale;base=mix(base,vec3(.035,.038,.044),1.-smoothstep(.069,.087,d));base=mix(base,vec3(.92,.90,.83),1.-smoothstep(.048,.064,d));}
- if(uSpecies==1){base=mix(vec3(.16,.37,.53),vec3(.10,.22,.37),smoothstep(-.22,.27,y));float oval=(x+.12)*(x+.12)/(.100*widthScale)+(y-.105)*(y-.105)/(.018*(.93+vGenes.z*.14));
- float ring=(1.-smoothstep(.90,1.17,oval))*smoothstep(.25,.48,oval);
- float streak=(1.-smoothstep(.019,.037,abs(y+.030+x*.075)))*smoothstep(-.46,-.30,x)*(1.-smoothstep(.14,.30,x));
- base=mix(base,vec3(.027,.047,.059),max(ring,streak));base*=.88+.12*smoothstep(-.15,.20,y);
- float cheek=exp(-((x-.27)*(x-.27)*95.+(y+.035)*(y+.035)*170.));base=mix(base,vec3(.09,.28,.48),cheek*.22);}
- if(uSpecies==2){base=mix(vec3(.96,.74,.22),vec3(.89,.87,.67),smoothstep(-.32,-.22,x));float band=1.-smoothstep(.035,.058,abs(x-.228)/widthScale);base=mix(base,vec3(.075,.085,.094),band);}
- if(uSpecies==3){float a=min(abs(x-.21),abs(x+.25))/widthScale;base=mix(vec3(.96,.94,.82),vec3(.045,.052,.060),1.-smoothstep(.065,.092,a));base=mix(base,vec3(.94,.73,.16),1.-smoothstep(-.40,-.32,x));}
- if(uSpecies==4){base=mix(vec3(.78,.79,.70),vec3(.91,.79,.31),smoothstep(.03,.22,y));float a=abs(sin((x+.56)*16.5))/widthScale;base=mix(base,vec3(.07,.11,.13),1.-smoothstep(.37,.57,a));}
- if(uSpecies==6){base=mix(vec3(.12,.53,.42),vec3(.64,.32,.38),smoothstep(.22,.38,x)*(1.-smoothstep(.0,.12,y)));float ring=abs(sin(y*36.+sin(x*14.)*.5));base*=.81+.19*ring;}
- if(uSpecies==7){base=mix(vec3(.21,.57,.43),vec3(.65,.28,.33),1.-smoothstep(.18,.38,abs(sin(y*38.+x*4.))));}
- base*=clamp(.98-vLocal.y*.25,.87,1.07);
+ if(uMat==5){
+  // One continuous local material at every LOD. The old radial wood-ring
+  // texture and world-normal-selected skin grid no longer enter this branch.
+  vec3 p=vLocal,seed=vec3(vGenes.x*23.,vGenes.y*17.,vGenes.z*29.);
+  float head=smoothstep(.84,1.02,p.x);
+  vec3 broadP=p*vec3(4.3,8.,5.7)+seed,fineP=p*mix(54.,28.,head)+seed*1.37;
+  float broadFoot=max(length(dFdx(broadP)),length(dFdy(broadP)));
+  float fineFoot=max(length(dFdx(fineP)),length(dFdy(fineP))),detail=1.-smoothstep(.35,1.3,fineFoot);
+  float rawMottle=noise(broadP),mottle=mix(.5,rawMottle,1.-smoothstep(.6,1.6,broadFoot)),fine=noise(fineP),height=0.;
+  if(vTag<1.5){
+   vec3 shield=turtleScuteField(vec2(p.x+.16,p.z/.70));
+   float tone=hash21(vec2(shield.y+vGenes.z*3.,vGenes.x*17.));
+   float seam=skinLine(shield.x,.0022),rawSeam=1.-smoothstep(.001,.004,shield.x);
+   float wear=smoothstep(.55,.78,mottle)*smoothstep(.008,.04,shield.x)*(.55+.45*mix(.5,fine,detail));
+   base=mix(vec3(.26,.265,.18),vec3(.39,.345,.22),.22+.55*tone)*(.78+.44*mottle);
+   base=mix(base,vec3(.49,.43,.29),wear*.26);base*=1.-seam*.16;
+   base*=1.+(fine-.5)*.035*detail;
+   rough=.64+.12*mottle-.10*wear;
+   height=-.00065*rawSeam+.00025*(fine-.5);
+  }else if(vTag<2.5){
+   base=mix(vec3(.21,.23,.16),vec3(.345,.33,.215),smoothstep(.20,.80,mottle));
+   float grainDistance=abs(fine-.48),grainWidth=max(fwidth(fine),.006);
+   float grain=1.-smoothstep(max(0.,.035-grainWidth),.035+grainWidth,grainDistance);
+   float rawGrain=1.-smoothstep(.022,.055,grainDistance),grainArea=1.-head*.65;
+   base*=1.+((fine-.5)*.055+grain*.085*grainArea)*detail;
+   float underside=head*(1.-smoothstep(-.085,-.018,p.y));
+   base=mix(base,vec3(.52,.53,.39)*(.91+.15*mottle),underside*.55);
+   // Two larger forehead scales sit between the existing eyes. The neck and
+   // flippers retain soft fine leather instead of the same bright honeycomb.
+   vec2 forehead=vec2((p.x-1.145)/.105,p.z/.10);
+   float plate=max(abs(forehead.x)*.9+abs(forehead.y)*.14,abs(forehead.y));
+   float crown=smoothstep(.015,.065,p.y),plateArea=(1.-smoothstep(.90,1.08,plate))*crown;
+   float plateDistance=min(abs(p.z),abs(plate-1.)*.085),plateMask=crown*(1.-smoothstep(1.04,1.16,plate));
+   float plateEdge=skinLine(plateDistance,.0013)*plateMask,rawPlateEdge=(1.-smoothstep(.0007,.0026,plateDistance))*plateMask;
+   base*=1.-plateArea*.08-plateEdge*.13;
+   float neck=smoothstep(.59,.65,p.x)*(1.-smoothstep(.76,.88,p.x))*(1.-smoothstep(.12,.20,abs(p.z)));
+   float creaseDistance=abs(sin((p.x-.62)*44.+rawMottle*.6))*.012;
+   float crease=skinLine(creaseDistance,.0014)*neck,rawCrease=(1.-smoothstep(.0007,.0028,creaseDistance))*neck;
+   base*=1.-crease*.045;rough=mix(.84,.75,head)+.025*(mottle-.5);
+   height=.00022*(fine-.5)-.00020*rawGrain*grainArea-.00025*rawCrease-.00028*rawPlateEdge;
+  }else if(vTag<3.5){
+   if(p.x<.95){
+    // Tag 3 also contains the beak; ventral seams belong only to the body.
+    float seam=skinLine(abs(p.z),.0018),rim=smoothstep(.66,.97,length(vec2(p.x+.16,p.z/.70)));
+    base=vec3(.755,.715,.565)*(.94+.10*mottle);base=mix(base,vec3(.61,.58,.445),rim*.18);
+    base*=1.-seam*.075;rough=.82+.045*mottle;height=.00012*(fine-.5)-.0003*(1.-smoothstep(.0008,.0032,abs(p.z)));
+   }else {base=vec3(.69,.675,.515)*(.94+.10*mottle);rough=.61;height=.00008*(fine-.5);}
+  }else rough=.12;
+  if(vTag<3.5)base*=vTint;
+  // Uniform quality gate; tag branches have reconverged before derivatives.
+  if(uQuality>0)n=materialSurfaceNormal(n,height,detail);
  }
+ if(uMat==6){base/=max(vTint,vec3(.001));float fishScaleHeight=0.,fishScaleFade=0.;vec3 fishLocalWidth=fwidth(vLocal);
+ if(vTag<2.5&&uSpecies>=0){base=reefFishPigment(base,fishLocalWidth);base*=clamp(.98-vLocal.y*.25,.87,1.07);}
  rough=.38+(vGenes.w-.5)*.16;
  if(vTag<2.5){
   base*=vTint;
@@ -529,15 +661,36 @@ void main(){
   float sd=length(f*vec2(1.08,.94));float edge=max(fwidth(sd),.016);
   float scale=1.-smoothstep(.40-edge,.40+edge,sd);
   float fade=(1.-smoothstep(.24,1.3,footprint))*(1.-smoothstep(4.,12.,distance(uCamera,vWorld)));
-  base*=1.-(1.-scale)*.020*fade;n=normalize(n+vec3(f.x*.020,f.y*.020,0.)*fade);
+  base*=1.-(1.-scale)*.020*fade;
+  // Differentiate an analytic dome only. Its value is already zero before
+  // every cell boundary; derivative-based filtering is applied afterwards.
+  if(uKind==1){fishScaleHeight=(1.-smoothstep(.24,.44,sd))*.000012;fishScaleFade=fade;}
+  else n=normalize(n+vec3(f.x*.020,f.y*.020,0.)*fade);
   // A lateral line and cheek detail stay attached to this animal, not world coordinates.
   float line=abs(vLocal.y-.028-sin(vLocal.x*2.)*.028);
   base*=1.-(1.-smoothstep(.003,.006+fwidth(line),line))*.065;
  }else if(vTag<3.5){
+  if(uKind==1&&uSpecies>=0&&uSpecies<8){
+   vec3 skin=reefFishPigment(base,fishLocalWidth)*clamp(.98-vLocal.y*.25,.87,1.07);float root=1.;
+   if(vTag<3.08){
+    float H=uSpecies==0?.29:uSpecies==1?.33:uSpecies==2?.40:uSpecies==3?.39:uSpecies==4?.27:uSpecies==5?.19:uSpecies==6?.31:.20;
+    float W=uSpecies==0?.14:uSpecies==1?.10:uSpecies==2?.085:uSpecies==3?.09:uSpecies==4?.095:uSpecies==5?.08:uSpecies==6?.16:.10;
+    float pectoral=length(vec3(vLocal.x-.22,vLocal.y+.018,abs(vLocal.z)-W*.92));
+    float pelvic=length(vec3(vLocal.x-.10,vLocal.y+H*.80,abs(vLocal.z)-W*.25));
+    root=1.-smoothstep(.008,.09,min(pectoral,pelvic));
+   }else if(vTag<3.18)root=1.-smoothstep(.49,.59,-vLocal.x);
+   // Retain the authored black fin edging, yellow tails and idol banner.
+   if(uSpecies==0)root*=smoothstep(.13,.20,max(base.r,max(base.g,base.b)));
+   if(uSpecies==3)root*=1.-smoothstep(.40,.49,vLocal.y);
+   base=mix(base,skin,root);
+  }else if(uKind==1&&uSpecies>=37&&uSpecies<=40)base=reefFishPigment(base,fishLocalWidth)*clamp(.98-vLocal.y*.25,.87,1.07);
   float ray=vTag<3.08?atan(vLocal.y+.018,.22-vLocal.x)*22.:vTag<3.18?atan(vLocal.y,-.46-vLocal.x)*30.:vLocal.x*112.+vLocal.y*4.;float rayFilter=exp(-pow(fwidth(ray),2.)*1.5);
   base*=vTint*(.94+.027*sin(ray)*rayFilter);rough=.63;thickness=.16;
   coverage=uSamples>0?.83:1.;
  }else rough=.16;
+ // Rejoin tags before derivatives; the height follows the transformed fish
+ // surface instead of adding local scale directions to a world-space normal.
+ if(uKind==1)n=materialSurfaceNormal(n,fishScaleHeight,fishScaleFade);
  }
 
  if(uMat==8){vec3 al=triMap(uCoral,vWorld*2.1,n);base*=mix(vec3(.85),al*1.15,.55);rough=.87;}
@@ -639,7 +792,10 @@ void main(){
   else if(vTag>.5&&vTag<1.5){float f=max(.1,uSurfaceProfile.z),footprint=max(length(dFdx(vLocal*f)),length(dFdy(vLocal*f))),detail=exp(-footprint*footprint*.8);base*=1.+(noise(vLocal*f)-.5)*.035*detail;}
  }
  vec3 albedo=pow(clamp(base,vec3(0.),vec3(1.)),vec3(2.2));float depth=max(0.,-vWorld.y);
- vec3 ddx=dFdx(n),ddy=dFdy(n);
+ // Height-gradient materials already filter their micro detail. Differentiate
+ // the original smooth normal here, not a derivative-derived bump normal.
+ vec3 varianceNormal=(uMat==5||(uMat==6&&uKind==1))?geomN:n;
+ vec3 ddx=dFdx(varianceNormal),ddy=dFdy(varianceNormal);
  float normalVariance=.20*(dot(ddx,ddx)+dot(ddy,ddy));
  float a2=clamp(pow(rough,4.)+min(normalVariance,.16),.008,.97);
  float F0=(uMat==6||uMat==5)?(vTag>3.5?.018:.006):uMat==11?.019:.005;
@@ -1052,7 +1208,7 @@ float lb=L(b);frag=vec4(lb<lo||lb>hi?a:b,1.);
 // These common surfaces keep the original arithmetic while allowing the
 // compiler to remove every unrelated rig and material branch ahead of play.
 function surfaceShaderSource(source,kind,material){
- if(!((kind===0&&(material===1||material===2||material===3||material===12||material===16||material===17))||(kind===1&&material===6)||(kind===11&&material===0)||(kind===3&&material===3)))throw new RangeError('Unsupported surface shader');
+ if(!((kind===0&&(material===1||material===2||material===3||material===12||material===16||material===17))||(kind===1&&material===6)||(kind===2&&material===5)||(kind===11&&material===0)||(kind===3&&material===3)))throw new RangeError('Unsupported surface shader');
  for(const [name,value]of [['uKind',kind],['uMat',material]]){
   const declaration='uniform int '+name+';';if(!source.includes(declaration))throw new Error('Missing surface shader uniform: '+name);
   source=source.replace(declaration,'const int '+name+'='+value+';');
@@ -1075,10 +1231,10 @@ class Renderer{
  setupSurfacePrograms(){
   if(this.surfacePrograms)return this.surfacePrograms;
   const programs=this.surfacePrograms=new Map();this.surfaceProgramFailures=new Map();
-  for(const [kind,material]of [[0,1],[0,2],[0,3],[1,6],[0,12],[0,16],[0,17],[11,0],[3,3]]){const key=kind+':'+material;
-   // Preserve vessel, deep-terrain, trench-fauna and anemone vertex arithmetic;
+  for(const [kind,material]of [[0,1],[0,2],[0,3],[1,6],[0,12],[0,16],[0,17],[11,0],[3,3],[2,5]]){const key=kind+':'+material;
+   // Preserve turtle, vessel, deep-terrain, trench-fauna and anemone vertex arithmetic;
    // these variants specialize fragment work only, including every shared rig.
-   try{programs.set(key,this.makeProgram(kind===3&&material===3||kind===11&&material===0||kind===0&&(material===12||material===16||material===17)?VS:surfaceShaderSource(VS,kind,material),surfaceShaderSource(FS,kind,material)));}
+   try{programs.set(key,this.makeProgram(kind===2&&material===5||kind===3&&material===3||kind===11&&material===0||kind===0&&(material===12||material===16||material===17)?VS:surfaceShaderSource(VS,kind,material),surfaceShaderSource(FS,kind,material)));}
    catch(error){this.surfaceProgramFailures.set(key,String(error?.message||error));}
   }return programs;
  }
@@ -1088,6 +1244,7 @@ class Renderer{
   if(b.kind===0&&b.material===2)return programs.get('0:2')||this.program;
   if(b.kind===0&&b.material===3)return programs.get('0:3')||this.program;
   if(b.kind===1&&b.material===6)return programs.get('1:6')||this.program;
+  if(b.kind===2&&b.material===5)return programs.get('2:5')||this.program;
   if(b.kind===0&&b.material===12)return programs.get('0:12')||this.program;
   if(b.kind===0&&b.material===16)return programs.get('0:16')||this.program;
   if(b.kind===0&&b.material===17)return programs.get('0:17')||this.program;

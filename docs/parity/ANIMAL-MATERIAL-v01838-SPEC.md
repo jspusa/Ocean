@@ -1,0 +1,19 @@
+# Animal surface continuity within the continuing realism goal
+
+The full requested goal remains believable underwater animals, lighting, rock layers, physical contact, populated and varied habitats, automatic desktop/mobile quality and verified public delivery. This material work does not establish commercial readiness or Wii superiority.
+
+## Observed defects and intended result
+
+1. Actual v0.18.37 turtle views show repeated radial woodgrain and growth rings on every shell tile, plus a regular bright honeycomb across the entire head and flippers. Replace these visible patterns with a coherent five-median/four-paired-costal shell layout, restrained irregular pigment/wear and differentiated skin. Keep the pale plastron externally visible and use the established green-turtle references; procedural surface details remain original art, not a scanned animal.
+2. Turtle skin currently chooses its local projection using a world-space normal threshold, and normal perturbations are added in world axes. Rigidly rotating the animal must preserve pigment at each anatomical point and rotate surface detail with the body. Verify the production material branch in native GPU diagnostics before/after, plus actual game renders; diagnostic albedo/normal output alone does not prove appearance.
+3. Legacy reef fish use different body and fin pigment rules, while four added reef species bake sharp patterns per polygon. Keep intentional species markings, blend anatomical attachment pigmentation and evaluate body markings continuously at the fragment stage so pigment does not track mesh tessellation or jump across LODs. Actual compiled close views are required to judge improvement. Separate ellipsoid/body topology issues remain open if not changed.
+4. Preserve existing UID, genes, morphology, routes, saves, geometry, rig tags and quality controls. No extra actors, draw calls, mesh density or runtime asset work. Filter fine detail by its screen footprint; record native rendering cost with its limits, and retain audio-independent entry.
+5. Use the existing approved seams: actual world geometry/identity, production native Renderer and real save/UI paths. Root serializes GPU checks. Start from retained visual defects and failing production-material probes; do not replace visual acceptance with assertions that mirror the new shader formula.
+
+## Evidence and release gates
+
+Current visual witnesses: `qa/parity/v01837-realism/turtle-desktop-views-oblique.png`, the six other turtle views, and `habitat-reef-anemone.png`. Native material RED/GREEN, fixed-camera before/after images at both LODs, appropriate affected regressions, source/asset identity checks, independent Standards and Spec review, and public release verification are required before claiming this slice delivered. The next version is not published merely because this spec exists.
+
+The first valid controlled timing run found additional whole-frame cost for the new materials. Reuse the existing surface-program specialization mechanism for turtle kind 2/material 5 to remove unrelated material branches, without changing its shader equations or draw workload. Require actual full-frame pixel parity against the new generic shader and repeat the original/candidate cost measurement. This adds one compiled program and no asset, actor or draw call; generic fallback remains available.
+
+Pixel acceptance uses full unfiltered RGBA. Generic repeat must stay byte exact; the specialized arm may differ by at most 1/255 in at most 0.001% of channels, with alpha exact. The initial exact attempt and its eight changed RGB channels are retained; this narrow policy follows the existing anemone specialization precedent, was independently reviewed, and does not assert an unproven cause. Work, source, LOD and GL invariants remain exact.
