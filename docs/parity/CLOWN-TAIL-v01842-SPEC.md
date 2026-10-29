@@ -1,0 +1,14 @@
+# Rounded clownfish caudal outline
+
+This is one visible anatomy improvement within the user's ongoing realism goal. It does not close the larger requirements for realistic animals, coral attachment, rock detail, collisions, varied encounters, lighting or device performance.
+
+Baseline: v0.18.41, commit `fa546d6da912bc8920a138caccffee7f33d4784d`. The actual `clown-001` node is 2881, sharing high/low meshes 404/405 with three other clownfish. An immutable 312-file baseline is retained under `qa/parity/v01842-assets/baseline-v01841/`.
+
+- Replace the straight caudal boundary with a continuous rounded arc and smooth shoulders in both LODs. Preserve complete tail-root positions, colors, tags and sampling counts. Positions, normals and position-derived UVs may change only in the clown tail. Other fish and all non-tail geometry remain exact.
+- Keep 7,768/1,180 whole-fish triangles and 384/60 tail triangles. No new material textures, render passes, shaders, per-frame work or random draws. Native paired images must show a visible contour improvement, continuous attachment and no severe new dark surface at both stroke phases. A CPU pass alone cannot accept the art. Refresh the existing clown catalogue JPEG from the actual compiled model so the guide does not retain the old silhouette; this is an explicitly isolated portrait, not a habitat screenshot.
+- Preserve the prior conservative contact distance with an authored clown `contactRadius` of `0.8845636438380226`. The moving-body envelope uses the greater of this clearance and the actual geometry radius; larger future models must remain covered. Do not inflate renderer bounds or silently shrink collision clearance with the new visual outline.
+- Rebuild and verify the complete compiled/streamed scene. All node identities, genes, poses, counts, non-target meshes, rock contacts, LOD and shadow policies must remain unchanged, except the two target geometry radii. Verify source fallback and both ordinary desktop/touch entry paths with automatic quality.
+- Compare same-actor native images in the complete scene using baseline cameras, poses, neighbors and production shaders. Confirm actual submitted geometry and high/low LODs. Touch is desktop emulation, not a physical-phone result. Do not claim FPS, battery savings or whole-animal photorealism from this change.
+- Publish the reviewed result and independently verify the exact Pages commit, all public manifest hashes and playable desktop/touch entry. Preserve saves and the absence of audio preparation from boot.
+
+The geometry-only B prototype is frozen at SHA `4882511223e472a7831d00a87100143ebede07dd2ab56eef7b879894f43172b8`; production may change its QA wording and add the separate contact-radius contract. The older candidate A and its endpoint-normal failure remain recorded. Primary morphology reference is the National Museum of Nature and Science's Fishes of Bitung entry linked in CREDITS; its photograph is not a production asset.

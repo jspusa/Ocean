@@ -1,3 +1,7 @@
+# 0.18.42 小丑魚尾鰭形態參考
+
+原創程序尾鰭的圓弧輪廓參考日本國立科學博物館 [Fishes of Bitung — Amphiprion ocellaris](https://www.kahaku.go.jp/research/db/zoology/Fishes_of_Bitung/data/p130_02b.html) 的形態說明與標本照片。參考照片未納入遊戲素材；模型尺寸、曲線與取樣為原創美術設定，遊戲仍標示為 Amphiprion spp. 類群示意，不宣稱完成種級重建。研究中的 Smithsonian 珊瑚掃描模型尚未納入本版。
+
 # 0.11 微小生命：新增原創內容
 
 新增八種原創程序生物、棲地幾何、分物種動作、微觀鏡頭与聲音提示。新圖鑑縮圖由本作 WebGL 模型實際渲染；沒有使用生成圖片、任天堂資產或外部模型。博物館、水族館及分類資料只作生物形態／尺寸的参考，完整來源及量測定義在 [FAUNA-REFERENCE](docs/parity/FAUNA-REFERENCE.md)。

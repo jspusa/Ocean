@@ -56,7 +56,9 @@ function animalContactEnvelope(f){
  // are included before maximum nonuniform instance scale. Kind 9 uses the
  // long body's radial slack: every compiled vertex is separately checked at
  // maximum tail bend plus full .82 pectoral/handshake excursion in parity QA.
- const base=profile.radius,kind=profile.kind,morph=kind===1?Math.max(1,m[0]*Math.max(1,m[2]),m[1]):1;
+ // An authored clearance can outlive a smaller visual outline. Keep established
+ // routes and floor clearance while still allowing larger models to expand it.
+ const base=Math.max(profile.radius,sp?.contactRadius||0),kind=profile.kind,morph=kind===1?Math.max(1,m[0]*Math.max(1,m[2]),m[1]):1;
  const bend=kind===1?.1028+.025*base*morph:kind===2?Math.hypot(.37,.07):kind===4?.48*Math.pow(base/1.9,1.5):kind===6?.62:kind===7?.60:kind===9?.073+base*.10:kind===12?.035+base*.035:base*.15+.15;
  const scale=Math.max(...f.s),radius=(base*morph+bend)*scale+.012;
  const bodyY=sp?.modelBounds?Math.max(Math.abs(sp.modelBounds.min[1]),Math.abs(sp.modelBounds.max[1])):f.species===8?.31:f.species===9?.22:f.species===10?1:f.species===11?.6:sp?.height||.22;
@@ -473,6 +475,9 @@ function fishGeometry(s,lod=false){
  }
  g.tag=3.1;const tail=['tang','idol'].includes(s.id)?[.74,.65,.31]:rgb(s.color).map(v=>v*.90);
  surface(g,(u,v)=>{const a=(u-.5)*2,edge=1-Math.abs(a),fork=round?-.022:edge*(slender?.19:.12);
+  // A rounded caudal edge with a regular shoulder patch; retain the full root.
+  if(round){const angle=a*Math.PI*.5,rootY=a*H*.82*.20,endX=-.73-.122*Math.cos(angle),endY=H*.82*Math.sin(angle);
+   return [-.49+v*(endX+.49),rootY+(endY-rootY)*v*(1.75-.75*v),Math.sin(u*Math.PI)*.004];}
   return [-.49-v*(.34-fork),a*H*(slender?.96:.82)*(.20+.80*v),Math.sin(u*Math.PI)*.004];},lod?10:24,lod?3:8,(p,u,v)=>round&&Math.min(u,1-u,1-v)<.06?[.10,.09,.08]:tail,1);
  g.tag=3.2;for(const sign of [-1,1])surface(g,(u,v)=>{const x=.30-u*.73,p=fishContour(s,(.57-x)/1.10);
   const crest=Math.sin(Math.PI*u)*(sign>0?(s.id==='butterfly'?.34:.23):.18)*H;

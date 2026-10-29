@@ -1,6 +1,7 @@
 /* Scene is an original, procedural interpretation, NOT a measured reconstruction. */
 const SPECIES=[
- {id:'clown',name:'小丑魚',latin:'Amphiprion spp. · 類群示意',en:'ANEMONEFISH',color:0xe78b42,height:.29,width:.14,zone:0,hint:'橘色身體，白色直帶，深色鰭緣。',detail:'本版以橘色海葵魚造型呈現。停在珊瑚花園附近，慢慢觀察牠轉身時的條帶。模型未經物種鑑定，不作種級辨識依據。',size:.43},
+ // Retain the established caudal clearance after rounding the visual fin.
+ {id:'clown',name:'小丑魚',latin:'Amphiprion spp. · 類群示意',en:'ANEMONEFISH',color:0xe78b42,height:.29,width:.14,contactRadius:0.8845636438380226,zone:0,hint:'橘色身體，白色直帶，深色鰭緣。',detail:'本版以橘色海葵魚造型呈現。停在珊瑚花園附近，慢慢觀察牠轉身時的條帶。模型未經物種鑑定，不作種級辨識依據。',size:.43},
  {id:'tang',name:'藍倒吊',latin:'Paracanthurus hepatus · 簡化模型',en:'BLUE TANG',color:0x3b79d7,height:.33,width:.10,zone:0,hint:'藍色側身、深色花紋與黃色尾部。',detail:'本版以鮮明的藍、黑、黃配色提供觀察線索。你可在遊戲的珊瑚平台旁遇見牠；這不是石朗的現場出現紀錄。',size:.53},
  {id:'butterfly',name:'蝴蝶魚',latin:'Chaetodontidae · 類群示意',en:'BUTTERFLYFISH',color:0xe6ce76,height:.40,width:.085,zone:1,hint:'側扁的輪廓、黃色尾側與深色眼帶。',detail:'這是蝴蝶魚類的合成造型，不對應某一特定物種。可練習觀察輪廓和條帶，不能用本模型判斷真實魚種。',size:.47},
  {id:'idol',name:'角鐮魚',latin:'Zanclus cornutus · 簡化模型',en:'MOORISH IDOL',color:0xe5dcaa,height:.39,width:.09,zone:1,hint:'黑白黃配色，以及向後延伸的長背鰭。',detail:'本版刻意保留長背鰭的剪影，方便從不同方向觀看。模型形態、尺寸與游動行為皆有簡化。',size:.56},
