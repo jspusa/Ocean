@@ -1,5 +1,5 @@
 {
-  "version": "0.18.38",
+  "version": "0.18.39",
   "scope": "served game and build sources",
   "files": [
     {
@@ -19,13 +19,13 @@
     },
     {
       "path": "README.md",
-      "bytes": 42945,
-      "sha256": "520b86107a89986a15b284c9dfba643a4d9fca2bff6166d412b5ccd4c36170b3"
+      "bytes": 43425,
+      "sha256": "5a6cbcdf8376aaf34b35cb0d7da95abeab18a9f99dcce0719c374b5e91de27e3"
     },
     {
       "path": "VERSION",
       "bytes": 8,
-      "sha256": "d2a8980967ed20efcde766225330c11654f6c3875e67bfd70a9d3d15f092771b"
+      "sha256": "318f906d56fd8ff228741aa9a82b0aeec405a1c32c6ca84664f9199a5ea954b8"
     },
     {
       "path": "assets/caustics.jpg",
@@ -249,8 +249,8 @@
     },
     {
       "path": "assets/reef.mesh.gz",
-      "bytes": 22184102,
-      "sha256": "20e4bf757ce712bf35d41324ddfb7e24ae969f74581e2739dfa13d598503954e"
+      "bytes": 22236850,
+      "sha256": "aa19c0136a14d9d483217d1fb9b8dbf4af995c69b8bb33ef4c3546823c2ce700"
     },
     {
       "path": "assets/rock_diff.jpg",
@@ -346,6 +346,11 @@
       "path": "assets/scene/chunk-11fac5230c6a495b89c2.bin.gz",
       "bytes": 5687,
       "sha256": "11fac5230c6a495b89c2ec9e72af619181e6533d2ab896f68375ec5033a6ba45"
+    },
+    {
+      "path": "assets/scene/chunk-1251cc7ce4d9b83b779f.bin.gz",
+      "bytes": 264805,
+      "sha256": "1251cc7ce4d9b83b779f4e06b9606c20b25e4e12fdf6be549ef8f6446a3048eb"
     },
     {
       "path": "assets/scene/chunk-14cc7302fca0e0063c30.bin.gz",
@@ -548,6 +553,11 @@
       "sha256": "44135d18bd5722307624537037d2e0c9f91f44fe83c5e5174bdd24bd59fe268c"
     },
     {
+      "path": "assets/scene/chunk-4b481ecbe5b28951fa78.bin.gz",
+      "bytes": 254903,
+      "sha256": "4b481ecbe5b28951fa78ddddf93d8f5d437a8ae0b65a5ab0c8fd15514dcbd5d5"
+    },
+    {
       "path": "assets/scene/chunk-4ed14b7085d7394cfcee.bin.gz",
       "bytes": 5693,
       "sha256": "4ed14b7085d7394cfcee58ee04532eca5a0f991c9959dc34385934e5108b4a85"
@@ -713,6 +723,11 @@
       "sha256": "6c17a8fb14269480b666dfc4d5c9b5f80f8a603a46b9bb3907742b63c1cce759"
     },
     {
+      "path": "assets/scene/chunk-6cddbf1d7dfa6b256c93.bin.gz",
+      "bytes": 243970,
+      "sha256": "6cddbf1d7dfa6b256c93ede6a9d03f439de6801dad1d4704b9aee03c66510cb9"
+    },
+    {
       "path": "assets/scene/chunk-6ce90f47332e0b3e3f25.bin.gz",
       "bytes": 321784,
       "sha256": "6ce90f47332e0b3e3f25620b16692b2d04a89f7fd74b5aa386fc9f06257260e2"
@@ -778,11 +793,6 @@
       "sha256": "7b3c058e9d96161a4a8c26ffd819c003dbc13606fb04d323e06cc1e8c75de2ac"
     },
     {
-      "path": "assets/scene/chunk-7b41066776a330ae23db.bin.gz",
-      "bytes": 246155,
-      "sha256": "7b41066776a330ae23db59a96b91e8c4398f7cf473e6c650e14b6351d46f2f91"
-    },
-    {
       "path": "assets/scene/chunk-7b858a2896752a33e595.bin.gz",
       "bytes": 149193,
       "sha256": "7b858a2896752a33e595973328320ef2ad5685be5fda47348008237efa583205"
@@ -816,11 +826,6 @@
       "path": "assets/scene/chunk-87daeeef6e4653661436.bin.gz",
       "bytes": 10401,
       "sha256": "87daeeef6e465366143656cd459cc4cf4da97775712a3a5a936faa8c69fe2674"
-    },
-    {
-      "path": "assets/scene/chunk-88d82e46fde21331401f.bin.gz",
-      "bytes": 257585,
-      "sha256": "88d82e46fde21331401ff0d3489c7b9ebb0138cbad495bf251c47f2e7cc15557"
     },
     {
       "path": "assets/scene/chunk-8afc7320df8420610a68.bin.gz",
@@ -871,11 +876,6 @@
       "path": "assets/scene/chunk-954852bba1108042086f.bin.gz",
       "bytes": 10378,
       "sha256": "954852bba1108042086f70b9318e20f6026988945d4d9f01ddda6814322d9d8c"
-    },
-    {
-      "path": "assets/scene/chunk-99af1805ef4c63c61c06.bin.gz",
-      "bytes": 228466,
-      "sha256": "99af1805ef4c63c61c06d9e44435f17bea35274e359b42343b95a5ac7e6cd009"
     },
     {
       "path": "assets/scene/chunk-9dc811ebe64567ce112b.bin.gz",
@@ -1016,6 +1016,11 @@
       "path": "assets/scene/chunk-cd85978dc65aaa5142ad.bin.gz",
       "bytes": 33066,
       "sha256": "cd85978dc65aaa5142ad7410cb991240f77603a139f7c5dc90b19357a1133d95"
+    },
+    {
+      "path": "assets/scene/chunk-cdd8b12104a15e04a7fd.bin.gz",
+      "bytes": 83757,
+      "sha256": "cdd8b12104a15e04a7fd5b900a323c528bdb76c4f036e311ce0b30899b776c5e"
     },
     {
       "path": "assets/scene/chunk-d00b08ce9fbfcc600f0e.bin.gz",
@@ -1163,11 +1168,6 @@
       "sha256": "fa6edde62cb0b556279436cf65c9f1a26dec7b2ec9a5b17a687f6c3668f8189b"
     },
     {
-      "path": "assets/scene/chunk-fa8fc9d58dc69cd7861c.bin.gz",
-      "bytes": 60904,
-      "sha256": "fa8fc9d58dc69cd7861c16cc890595a7e6e007db0ec7bf69dd3ecc28e0eb7b3b"
-    },
-    {
       "path": "assets/scene/chunk-fac79e380da322dc2a7f.bin.gz",
       "bytes": 6491,
       "sha256": "fac79e380da322dc2a7f3976d343e838b14338778f8b698396e38eafc29810c6"
@@ -1194,8 +1194,8 @@
     },
     {
       "path": "assets/scene/index.json",
-      "bytes": 2981583,
-      "sha256": "3e176ef15f6bc970de9ebd1524d1c599c50c8749f49af808327905e23f24a65e"
+      "bytes": 2981553,
+      "sha256": "e1ab52a49e374686bb4fc3b83911a3ee94c831715a1e808d33c143d228cc3bdd"
     },
     {
       "path": "assets/shell_diff.jpg",
@@ -1220,7 +1220,7 @@
     {
       "path": "index.html",
       "bytes": 16670,
-      "sha256": "3c7942ea7c9c93193090c71eb0871c37e0f39cd746f8fcfa82c2308dc612a454"
+      "sha256": "64b44e7b524dc7543d736b9018a25057fc6ddc646b1b6c0c101e9ac3ab97e627"
     },
     {
       "path": "music/blue_silence.mp3",
@@ -1310,7 +1310,7 @@
     {
       "path": "src/config.js",
       "bytes": 3041,
-      "sha256": "c60c9ff75d391c43be1a0240b969dc181347fb317d198c751f768d6cd2ea171e"
+      "sha256": "7d584e9fa67595fac522ddab78a916fd47510f41d271868ee2c70a5915637c83"
     },
     {
       "path": "src/deepsea.js",
@@ -1334,8 +1334,8 @@
     },
     {
       "path": "src/engine.js",
-      "bytes": 134183,
-      "sha256": "f1ef55fe3a9f512749a62be0738364d92db8c20c3190770ade481f183fecaf40"
+      "bytes": 135888,
+      "sha256": "8777baa93e00f67f7440707ab667c1bd37541df31d8db3ee754ca881bf4373f1"
     },
     {
       "path": "src/expedition.js",
@@ -1449,8 +1449,8 @@
     },
     {
       "path": "src/reef_fauna.js",
-      "bytes": 13255,
-      "sha256": "a9ac8e6c4ad870f665e8cf4849216a9c93f4a71f1b14c035b15cd3808448b0a8"
+      "bytes": 21135,
+      "sha256": "f4389b46269c66e91c8cff4f3591a19f1b1dd8e936327f77a77c10e8beb937c9"
     },
     {
       "path": "src/regions.js",
@@ -1500,7 +1500,7 @@
     {
       "path": "src/shell.html",
       "bytes": 12391,
-      "sha256": "da487e66cf9aca2dbf5f1b081e4a9c4f45390b02ab9d749935fa00f34c220109"
+      "sha256": "6d862cc5b5b4cd9da71790dbd0d36327d6403aedbe0774e1e406418eb9ae80bb"
     },
     {
       "path": "src/ship.js",

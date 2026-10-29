@@ -349,6 +349,18 @@ ${NOISE_GLSL}
 ${WATER_OPTICS_GLSL}
 vec3 triMap(sampler2D tex,vec3 p,vec3 n){vec3 w=pow(abs(n),vec3(5.));w/=dot(w,vec3(1.));return texture(tex,p.yz).rgb*w.x+texture(tex,p.xz).rgb*w.y+texture(tex,p.xy).rgb*w.z;}
 vec3 triNormal(sampler2D tex,vec3 p,vec3 n,float strength){vec3 w=pow(abs(n),vec3(5.));w/=dot(w,vec3(1.));vec3 a=texture(tex,p.yz).xyz*2.-1.,b=texture(tex,p.xz).xyz*2.-1.,c=texture(tex,p.xy).xyz*2.-1.;vec3 v=vec3(0.,a.x,a.y)*w.x+vec3(b.x,0.,b.y)*w.y+vec3(c.x,c.y,0.)*w.z;return normalize(n+v*strength);}
+// Rock-only projection uses one geometric weight set for colour and both
+// normal layers. Keep the other authored materials on their existing path.
+vec3 rockTextureColor(vec3 p,vec3 weights){return texture(uRock,p.yz).rgb*weights.x+texture(uRock,p.xz).rgb*weights.y+texture(uRock,p.xy).rgb*weights.z;}
+// Mikkelsen, JCGT 9(3), section 4.4: convert a tangent normal to height
+// derivatives, accumulate the volume gradient, then project it once onto
+// the original surface. Adapted to this renderer's yz/xz/xy lookup order.
+// https://jcgt.org/published/0009/03/04/
+vec3 rockTextureGradient(vec3 p,vec3 weights){
+ vec3 a=texture(uRockN,p.yz).xyz*2.-1.,b=texture(uRockN,p.xz).xyz*2.-1.,c=texture(uRockN,p.xy).xyz*2.-1.;
+ vec2 da=-a.xy/max(a.z,.08),db=-b.xy/max(b.z,.08),dc=-c.xy/max(c.z,.08);
+ return vec3(0.,da.x,da.y)*weights.x+vec3(db.x,0.,db.y)*weights.y+vec3(dc.x,dc.y,0.)*weights.z;
+}
 // Transport a continuous local height field on the actual deformed surface.
 // Derivatives are evaluated together, before the finite/flat fallback, so a
 // neighbouring zero-height fragment cannot make the derivative branch diverge.
@@ -557,15 +569,25 @@ void main(){
  float sandPatch=noise(vWorld*.14);base*=.92+.14*sandPatch;
  float slope=1.-smoothstep(.3,.76,n.y);vec3 stone=triMap(uRock,vWorld*.32,n);base=mix(base,stone,slope);
  }
- if(uMat==2){vec3 q=vWorld*.40;vec3 al=triMap(uRock,q,n);
- vec3 micro=triMap(uRock,q*3.17+vec3(.39,.71,.15),n);base=al*mix(vec3(1.),micro*1.75,.11)*vColor*1.04;
- n=triNormal(uRockN,q,n,.26);n=triNormal(uRockN,q*3.17,n,.07);rough=.88+.09*noise(vWorld*1.6);
- float patchMask=fbm(vWorld*.72+vec3(vGenes.x*13.));
- vec3 encrust=mix(vec3(.46,.50,.38),vec3(.55,.37,.38),smoothstep(.56,.77,patchMask));
- base=mix(base,encrust,smoothstep(.46,.72,patchMask)*.38);
+ if(uMat==2){
+ vec3 q=vWorld*.40,detailPoint=q*3.17+vec3(.39,.71,.15),weights=pow(abs(geomN),vec3(5.));weights/=dot(weights,vec3(1.));
+ vec3 al=rockTextureColor(q,weights),micro=rockTextureColor(detailPoint,weights);
+ float tone=dot(al,vec3(.2126,.7152,.0722)),grain=dot(micro,vec3(.2126,.7152,.0722));
+ // The existing limestone map already carries localized green and rose
+ // crust. Preserve those pigments instead of painting a second green fbm.
+ float greenCrust=smoothstep(.012,.065,al.g-al.r),roseCrust=smoothstep(.075,.14,al.r-al.g),crust=max(greenCrust,roseCrust);
+ vec3 limestone=vec3(1.10,1.065,.95)*tone;
+ base=mix(limestone,al,crust)*clamp(.99+(grain-.40)*.22,.94,1.04);
+ // Fine pale sediment rests on upward geometry; the normal map must not
+ // make dust crawl up a vertical face. Bright patches reuse the grain map.
+ float sandDust=smoothstep(.68,.94,geomN.y)*smoothstep(.40,.58,grain)*(1.-crust*.60)*.33;
+ base=mix(base,vec3(.67,.64,.54),sandDust)*vColor;
+ rough=mix(clamp(.83+(grain-.45)*.15,.79,.91),.94,crust*.65);rough=mix(rough,.98,sandDust);
  occ=.82+dot(al,vec3(.05,.09,.04));
- float sandDust=smoothstep(.73,.96,n.y)*smoothstep(.54,.76,noise(vWorld*.85));
- base=mix(base,vec3(.63,.59,.47),sandDust*.30);
+ // Six colour + six normal samples, as before; no additional noise or
+ // derivative-of-derivative work. Mipmaps filter both registered layers.
+ vec3 gradient=rockTextureGradient(q,weights)*.23+rockTextureGradient(detailPoint,weights)*(.055*(1.-sandDust*.65));
+ gradient-=geomN*dot(geomN,gradient);n=normalize(geomN-gradient);
  }
  if(uMat==16){
   vec3 q=vWorld*.31,stone=triMap(uRock,q,n);

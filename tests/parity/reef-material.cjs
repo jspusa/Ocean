@@ -1,29 +1,33 @@
-/* Actual compiled body vertices expose two authored colours at the same seam.
+/* Actual compiled body vertices anchor a controlled incoming-colour intervention.
  * Native mode probes the production FS immediately before lighting: identical
  * surface position, genes and footprint must not inherit polygon colour tiles.
+ * Historical RED receipts retain the original broken shared-position seams;
+ * a repaired mesh must not be required to keep those colour discontinuities.
  * This is a material-interface test, not natural-play or realism acceptance. */
 'use strict';
 const fs=require('node:fs'),path=require('node:path'),vm=require('node:vm'),zlib=require('node:zlib'),crypto=require('node:crypto'),assert=require('node:assert/strict');
 const root=path.resolve(__dirname,'../..'),option=(name,fallback)=>process.argv.find(x=>x.startsWith('--'+name+'='))?.slice(name.length+3)||fallback;
 const out=path.resolve(root,option('out','qa/parity/v01838-material/reef-material.json')),cpu=process.argv.includes('--cpu'),baseline=option('baseline',null);
-const hash=data=>crypto.createHash('sha256').update(data).digest('hex'),source=fs.readFileSync(path.join(root,'src/engine.js'),'utf8'),context=vm.createContext({console});
+const engineRef=option('engine-ref',null);
+const hash=data=>crypto.createHash('sha256').update(data).digest('hex'),source=engineRef?require('node:child_process').execFileSync('git',['show',engineRef+':src/engine.js'],{cwd:root,encoding:'utf8'}):fs.readFileSync(path.join(root,'src/engine.js'),'utf8'),context=vm.createContext({console});
 const modules=JSON.parse('['+fs.readFileSync(path.join(root,'bake_scene.cjs'),'utf8').match(/for\(const n of \[([^\]]+)\]/)[1].replaceAll("'",'"')+']');
-for(const name of modules)vm.runInContext(fs.readFileSync(path.join(root,'src',name),'utf8'),context,{filename:name});
+for(const name of modules)vm.runInContext(name==='engine.js'?source:fs.readFileSync(path.join(root,'src',name),'utf8'),context,{filename:name});
 const species=vm.runInContext('SPECIES.map(s=>({id:s.id,renderKind:s.renderKind}))',context),fragment=vm.runInContext('FS',context);
 const bytes=fs.readFileSync(path.join(root,'assets/reef.mesh.gz')),raw=zlib.gunzipSync(bytes),offset=8+raw.readUInt32LE(4),header=JSON.parse(raw.subarray(8,offset));
 const ids=['lyretail_anthias','banggai_cardinal','longnose_butterfly','fire_goby'],fixtures=[],witnesses=[];
-const report={status:'running',method:'Actual archive shared-position colour discontinuities; native production fragment pigment before lighting at controlled identical surface samples. No natural-play, GPU-cost or photorealism claim.',engineSHA256:hash(source),fragmentSHA256:hash(fragment),archiveSHA256:hash(bytes),witnesses,checks:[]};
+const report={status:'running',method:'Actual compiled candidate body vertices anchor a controlled incoming vertex-colour intervention: keep local position, genes and footprint identical, change only incoming colour. The second colour is deliberately contrasting test input, not claimed to come from a broken candidate seam. Historical shared-position discontinuities are diagnostic only; repaired meshes need not retain them. The diagnostic varying vertex stage feeds the production fragment pigment boundary before lighting, not the complete production VS. No natural-play, GPU-cost or photorealism claim.',engineRef,engineSHA256:hash(source),fragmentSHA256:hash(fragment),archiveSHA256:hash(bytes),witnesses,checks:[]};
 function check(name,fn){try{const detail=fn();report.checks.push({name,passed:true,detail});}catch(error){report.checks.push({name,passed:false,error:error.message});}}
 const distance=(a,b)=>Math.max(...a.map((v,k)=>Math.abs(v-b[k])));
 for(const id of ids){const index=species.findIndex(s=>s.id===id),batches=header.batches.filter(b=>b.species===index&&b.sceneRole==='reef-fish-expansion');
  assert.equal(batches.length,2,id+' has both compiled LODs');assert.equal(species[index].renderKind,1,id+' uses fish rig, not fauna kind 8');
  for(const [lod,b] of batches.entries()){
-  assert.equal(b.kind,1);assert.equal(b.material,6);const vertices=new Float32Array(raw.buffer,raw.byteOffset+offset+b.vertexOffset,b.vertexFloats),seen=new Map();let best=null;
+  assert.equal(b.kind,1);assert.equal(b.material,6);const vertices=new Float32Array(raw.buffer,raw.byteOffset+offset+b.vertexOffset,b.vertexFloats),seen=new Map();let best=null,sample=null;
   for(let k=0;k<vertices.length;k+=12){if(Math.abs(vertices[k+11]-1)>.0001)continue;const p=Array.from(vertices.slice(k,k+3)),color=Array.from(vertices.slice(k+6,k+9)),key=p.map(v=>Math.round(v*1e6)).join(','),previous=seen.get(key);
+   const proximity=Math.hypot(p[0]-.08,p[1]-.02,p[2]-.08);if(!sample||proximity<sample.proximity)sample={p,color,vertex:k/12,proximity};
    if(previous){const delta=distance(previous.color,color);if(!best||delta>best.delta)best={p,colorA:previous.color,colorB:color,delta,vertexA:previous.vertex,vertexB:k/12};}else seen.set(key,{color,vertex:k/12});
   }
-  assert(best&&best.delta>.003,id+' actual quad colour discontinuity exists');const witness={id,index,lod:lod?'low':'high',...best};witnesses.push(witness);
-  for(const [suffix,color]of [['a',best.colorA],['b',best.colorB]])fixtures.push({name:id+'-'+witness.lod+'-'+suffix,id,index,kind:1,tag:1,p:best.p,color});
+  assert(sample,id+' has an actual compiled body sample');const colorA=sample.color,colorB=colorA.map(v=>v>.5?.025:.975);assert(distance(colorA,colorB)>.45,'Intervention must change incoming colour substantially');const witness={id,index,lod:lod?'low':'high',p:sample.p,vertex:sample.vertex,colorA,colorB,delta:distance(colorA,colorB),intervention:'incoming-colour-only',largestBakedJump:best?.delta||0};witnesses.push(witness);
+  for(const [suffix,color]of [['a',colorA],['b',colorB]])fixtures.push({name:id+'-'+witness.lod+'-'+suffix,id,index,kind:1,tag:1,p:sample.p,color});
  }
 }
 for(const [id,width]of [['clown',.14],['tang',.10]]){
@@ -33,7 +37,7 @@ for(const [id,width]of [['clown',.14],['tang',.10]]){
  fixtures.push({name:id+'-body-root',id,index,kind:1,tag:1,p:closest.p,color:closest.color},{name:id+'-fin-root',id,index,kind:1,tag:3,p:closest.p,color:closest.color});
 }
 for(const [id,kind]of [['ray',4],['dolphin',7],['oarfish',10]])for(const tag of [1,3,4])fixtures.push({name:'preserve-'+id+'-'+tag,id,index:species.findIndex(s=>s.id===id),kind,tag,p:[.12,-.025,.04],color:[.23,.41,.32]});
-check('compiled witnesses cover exact production species mapping and both LODs',()=>({mapping:ids.map(id=>({id,index:species.findIndex(s=>s.id===id)})),witnesses:witnesses.length,largestBakedJump:Math.max(...witnesses.map(w=>w.delta))}));
+check('compiled witnesses cover exact production species mapping and both LODs',()=>({mapping:ids.map(id=>({id,index:species.findIndex(s=>s.id===id)})),witnesses:witnesses.length,largestBakedJump:Math.max(...witnesses.map(w=>w.largestBakedJump))}));
 async function main(){let browser;
  try{
   if(cpu){report.status='witness-ready';return;}
@@ -64,7 +68,7 @@ void main(){vec2 q=vec2(float((gl_VertexID<<1)&2),float(gl_VertexID&2));gl_Posit
   },{fragment:fsProbe,fixtures});Object.assign(report,result);
   check('production fragment probe runs on native GPU without errors',()=>{assert(result.renderer&&!/swiftshader|software|llvmpipe/i.test(result.renderer));assert.equal(result.error,0);});
   const pixels=new Map(result.pixels.map(x=>[x.name,x.rgba]));
-  for(const w of witnesses)check(w.id+' '+w.lod+': same surface pigment is independent of baked quad colour',()=>{const a=pixels.get(w.id+'-'+w.lod+'-a'),b=pixels.get(w.id+'-'+w.lod+'-b'),delta=distance(a,b);assert(delta<=1,'Baked colour changes the same surface by '+delta+'/255');return {a,b,delta};});
+  for(const w of witnesses)check(w.id+' '+w.lod+': same actual surface pigment is independent of incoming vertex colour',()=>{const a=pixels.get(w.id+'-'+w.lod+'-a'),b=pixels.get(w.id+'-'+w.lod+'-b'),delta=distance(a,b);assert(delta<=1,'Incoming colour changes the same surface by '+delta+'/255');return {a,b,delta};});
   for(const id of ['clown','tang'])check(id+': pectoral root has no separate paint seam',()=>{const body=pixels.get(id+'-body-root'),fin=pixels.get(id+'-fin-root'),delta=distance(body,fin);assert(delta<=26,'Attached root colour jump '+delta+'/255');return {body,fin,delta};});
   if(baseline){const old=JSON.parse(fs.readFileSync(path.resolve(root,baseline))),prior=new Map(old.pixels.map(x=>[x.name,x.rgba]));check('ray, dolphin and oarfish material-6 body/fin/eye behavior is unchanged',()=>{for(const row of result.pixels.filter(x=>x.name.startsWith('preserve-')))assert.deepEqual(row.rgba,prior.get(row.name),row.name);return {samples:9};});}
   report.status=report.checks.every(c=>c.passed)?'passed':'failed';

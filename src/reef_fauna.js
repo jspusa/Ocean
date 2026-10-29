@@ -21,57 +21,132 @@ const ReefFishArt=(()=>{
   if(id==='longnose_butterfly'){if(x>.17)return y>.005?ink:white;return gold;}
   const rear=clamp((.16-x)/.42,0,1);return white.map((v,i)=>mix(v,red[i],rear));
  }
+ // One longitudinal skin joins the jaws, shoulder, trunk and peduncle. Each
+ // section stores x, centre height, dorsal radius, ventral radius and width.
+ // The terminal sections and tail edge deliberately retain the authored x
+ // limits used by the pigment field, in both LODs.
+ const profiles={
+  lyretail_anthias:[[-.435,-.003,0,0,0],[-.405,-.002,.027,.027,.020],[-.34,0,.043,.046,.026],[-.25,.005,.085,.075,.044],[-.12,.009,.125,.113,.064],[.03,.009,.136,.133,.071],[.16,.002,.123,.119,.063],[.255,-.008,.083,.081,.043],[.315,-.015,.046,.052,.029],[.357,-.012,.020,.028,.017],[.382,-.013,0,0,0]],
+  banggai_cardinal:[[-.435,-.004,0,0,0],[-.405,-.002,.029,.029,.019],[-.34,0,.055,.055,.028],[-.25,.009,.118,.103,.050],[-.12,.012,.163,.151,.069],[.035,.008,.172,.166,.075],[.16,.002,.151,.137,.066],[.255,-.009,.103,.089,.049],[.315,-.021,.060,.047,.034],[.359,-.025,.024,.025,.019],[.382,-.024,0,0,0]],
+  longnose_butterfly:[[-.435,0,0,0,0],[-.405,0,.026,.026,.016],[-.33,.002,.095,.094,.027],[-.24,.009,.177,.174,.039],[-.10,.014,.221,.218,.052],[.065,.014,.221,.219,.055],[.18,.002,.185,.171,.048],[.255,-.013,.131,.114,.037],[.315,-.030,.072,.063,.026],[.39,-.040,.028,.025,.019],[.51,-.044,.017,.016,.013],[.609,-.045,.011,.010,.009],[.627,-.045,.007,.007,.006],[.636,-.045,0,0,0]],
+  fire_goby:[[-.435,0,0,0,0],[-.405,0,.018,.018,.014],[-.29,0,.032,.035,.020],[-.12,.003,.058,.054,.039],[.06,.005,.068,.064,.049],[.22,.008,.059,.055,.047],[.30,.003,.043,.040,.034],[.355,-.007,.019,.022,.020],[.382,-.012,0,0,0]]
+ };
+ // Monotone Hermite sections keep the shoulder and snout smooth without
+ // overshooting the explicit silhouette or making the narrow peduncle fold.
+ const slopes={};
+ for(const [id,rows] of Object.entries(profiles))slopes[id]=rows.map((row,i)=>row.map((_,k)=>{
+  if(!k)return 1;
+  if(!i)return (rows[1][k]-row[k])/(rows[1][0]-row[0]);
+  if(i===rows.length-1)return (row[k]-rows[i-1][k])/(row[0]-rows[i-1][0]);
+  const left=(row[k]-rows[i-1][k])/(row[0]-rows[i-1][0]),right=(rows[i+1][k]-row[k])/(rows[i+1][0]-row[0]);
+  return left*right>0?2*left*right/(left+right):0;
+ }));
+ function section(id,x){
+  const rows=profiles[id];let i=0;while(i<rows.length-2&&x>rows[i+1][0])i++;
+  const a=rows[i],b=rows[i+1],h=b[0]-a[0],t=clamp((x-a[0])/h,0,1),t2=t*t,t3=t2*t;
+  return [x,...[1,2,3,4].map(k=>(2*t3-3*t2+1)*a[k]+(t3-2*t2+t)*h*slopes[id][i][k]+(-2*t3+3*t2)*b[k]+(t3-t2)*h*slopes[id][i+1][k])];
+ }
+ function skinPoint(id,x,a){const s=section(id,x),v=Math.sin(a);return [x,s[1]+v*(v>=0?s[2]:s[3]),Math.cos(a)*s[4]];}
+ function skinNormal(id,x,a){
+  const rows=profiles[id],lo=rows[0][0],hi=rows[rows.length-1][0];if(x<=lo)return [-1,0,0];if(x>=hi)return [1,0,0];
+  const dx=V.sub(skinPoint(id,Math.min(hi,x+.00001),a),skinPoint(id,Math.max(lo,x-.00001),a)),da=V.sub(skinPoint(id,x,a+.0001),skinPoint(id,x,a-.0001));return V.norm(V.cross(dx,da));
+ }
+ function emit(g,a,b,c,color){
+  const face=V.cross(V.sub(b.p,a.p),V.sub(c.p,a.p));if(V.len(face)<1e-11)return;
+  if(V.dot(face,V.add(a.n,V.add(b.n,c.n)))<0)[b,c]=[c,b];
+  g.tri(a.p,b.p,c.p,color,[a.n,b.n,c.n],[a.c||color,b.c||color,c.c||color]);
+ }
  function body(g,id,low){
-  const f=forms[id],segments=low?18:40,rings=low?11:24;g.tag=1;
-  faunaArt.ellipsoid(g,[.015,0,0],[.36,f.height,f.width],p=>paint(id,p),segments,rings);
-  faunaArt.ellipsoid(g,[-.337,-.002,0],[.095,f.height*.30,f.width*.36],p=>paint(id,p),low?10:20,low?7:12);
-  if(id==='longnose_butterfly'){
-   // Forceps-like jaws extend from the compact head, rather than stretching
-   // the whole fish. The lower face and beak stay pale below a black forehead.
-   faunaArt.tube(g,[[.28,-.025,0],[.39,-.038,0],[.54,-.044,0],[.625,-.045,0]],t=>.039*(1-t*.69),white,low?10:18);
-   faunaArt.ellipsoid(g,[.624,-.045,0],[.012,.012,.015],ink,low?8:14,low?5:8);
-  }else faunaArt.ellipsoid(g,[.333,-.015,0],[.049,.035,.042],p=>paint(id,p),low?10:20,low?7:12);
+  const rows=profiles[id],xs=[],steps=low?2:3,around=low?12:28;g.tag=1;
+  for(let i=0;i<rows.length-1;i++)for(let j=0;j<steps;j++)xs.push(mix(rows[i][0],rows[i+1][0],j/steps));xs.push(rows[rows.length-1][0]);
+  const rings=xs.map(x=>Array.from({length:around},(_,i)=>{const a=i/around*TAU,p=skinPoint(id,x,a);return {p,n:skinNormal(id,x,a),c:paint(id,p)};}));
+  for(let j=0;j<rings.length-1;j++)for(let i=0;i<around;i++){
+   const next=(i+1)%around,a=rings[j][i],b=rings[j+1][i],c=rings[j+1][next],d=rings[j][next];emit(g,a,b,c,forms[id].color);emit(g,a,c,d,forms[id].color);
+  }
+  face(g,id,low);
+ }
+ function sidePoint(id,x,y,side,offset=0){
+  const s=section(id,x),radius=y>=s[1]?s[2]:s[3],q=radius?(y-s[1])/radius:0;
+  return [x,y,side*(s[4]*Math.sqrt(Math.max(0,1-q*q))+offset)];
+ }
+ function sideNormal(point,x,y,side){
+  const dx=V.sub(point(x+.00001,y),point(x-.00001,y)),dy=V.sub(point(x,y+.00001),point(x,y-.00001));return V.mul(V.norm(V.cross(dx,dy)),side);
+ }
+ function face(g,id,low){
+  g.tag=4;
+  const long=id==='longnose_butterfly',goby=id==='fire_goby',cardinal=id==='banggai_cardinal',ex=long?.253:goby?.271:.269,ey=long?.052:goby?.029:.042,er=cardinal?.021:goby?.0145:.018;
   for(const side of [-1,1]){
-   const x=id==='longnose_butterfly'?.254:.26,y=id==='longnose_butterfly'?.048:.035;
-   const width=f.width*Math.sqrt(Math.max(0,1-((x-.015)/.36)**2-(y/f.height)**2));
-   faunaArt.eye(g,[x,y,side*(width+.002)],id==='fire_goby'?.017:.019,low);
+   // A shallow corneal patch follows the head; the restrained iris is part of
+   // that patch, rather than a pale eyeball sitting outside the fish.
+   const point=(x,y)=>{const r=Math.hypot((x-ex)/er,(y-ey)/er);return sidePoint(id,x,y,side,.00065+.0032*Math.max(0,1-r*r));};
+   const n=low?12:20,radii=[0,.57,.72,1],rings=radii.map(r=>Array.from({length:n},(_,i)=>{const a=i/n*TAU,x=ex+Math.cos(a)*er*r,y=ey+Math.sin(a)*er*r;return {p:point(x,y),n:sideNormal(point,x,y,side),c:r<.6?[.016,.021,.024]:r<.8?(cardinal?[.28,.24,.14]:[.29,.24,.15]):[.12,.13,.105]};}));
+   for(let j=0;j<rings.length-1;j++)for(let k=0;k<n;k++){const next=(k+1)%n,a=rings[j][k],b=rings[j+1][k],c=rings[j+1][next],d=rings[j][next];emit(g,a,b,c,ink);emit(g,a,c,d,ink);}
+   const mouth=long?[[.611,-.045],[.621,-.045],[.630,-.045],[.634,-.045]]:goby?[[.328,-.021],[.348,-.019],[.365,-.015],[.379,-.012]]:cardinal?[[.310,-.039],[.339,-.034],[.363,-.029],[.379,-.024]]:[[.316,-.029],[.343,-.025],[.363,-.019],[.379,-.013]];
+   lineOnSkin(g,id,side,mouth,long?.0008:.0011,[.095,.083,.062],low);
+   const s=section(id,long?.184:goby?.205:.181),x=long?.184:goby?.205:.181;
+   lineOnSkin(g,id,side,[[x+.006,s[1]+s[2]*.64],[x-.013,s[1]+s[2]*.22],[x-.010,s[1]-s[3]*.27],[x+.029,s[1]-s[3]*.67]],goby?.00065:.00095,long?[.16,.15,.10]:[.24,.19,.12],low);
   }
  }
- function fin(g,root,edge,color,thickness=.0018){g.tag=3;faunaArt.fin(g,root,edge,color,thickness);}
+ // Shape-preserving cubic margins keep a swept fin smooth without folding
+ // back over its neighbouring section at a narrow ray or rounded tip.
+ function curve(points,t){
+  const q=clamp(t,0,1)*(points.length-1),i=Math.min(points.length-2,Math.floor(q)),u=q-i,a=points[Math.max(0,i-1)],b=points[i],c=points[i+1],d=points[Math.min(points.length-1,i+2)],tangent=(l,r)=>l*r>0?2*l*r/(l+r):0;
+  return b.map((v,k)=>{const delta=c[k]-v,m0=i===0?delta:tangent(v-a[k],delta),m1=i===points.length-2?delta:tangent(delta,d[k]-c[k]);return (2*u*u*u-3*u*u+1)*v+(u*u*u-2*u*u+u)*m0+(-2*u*u*u+3*u*u)*c[k]+(u*u*u-u*u)*m1;});
+ }
+ function lineOnSkin(g,id,side,points,width,color,low){
+  const n=low?8:16,point=(x,y)=>sidePoint(id,x,y,side,.00055),rows=[];
+  for(let i=0;i<=n;i++){const t=i/n,p=curve(points,t),before=curve(points,Math.max(0,t-.001)),after=curve(points,Math.min(1,t+.001)),d=V.norm([after[0]-before[0],after[1]-before[1],0]),w=width*(.35+.65*Math.sin(Math.PI*t));rows.push([-1,1].map(sign=>{const x=p[0]-d[1]*w*sign,y=p[1]+d[0]*w*sign;return {p:point(x,y),n:sideNormal(point,x,y,side)};}));}
+  for(let i=0;i<n;i++){emit(g,rows[i][0],rows[i+1][0],rows[i+1][1],color);emit(g,rows[i][0],rows[i+1][1],rows[i][1],color);}
+ }
+ function membrane(g,root,edge,color,tag,low,camber=.003,span=16){
+  g.tag=tag;const n=low?Math.max(6,Math.round(span*.4)):span,m=low?2:3;
+  const point=(t,u,side)=>{
+   const p=V.lerp(root(t),edge(t),u),taper=Math.sin(Math.PI*t);p[2]+=camber*taper*Math.sin(Math.PI*u)+side*taper*(.00065*(1-u)+.00018);return p;
+  };
+  const normal=(t,u,side)=>{
+   // Evaluate away from the collapsed end of a fin for a stable shared normal.
+   const tt=clamp(t,.0001,.9999),uu=clamp(u,.0001,.9999),dt=V.sub(point(Math.min(1,tt+.0001),uu,side),point(Math.max(0,tt-.0001),uu,side)),du=V.sub(point(tt,Math.min(1,uu+.0001),side),point(tt,Math.max(0,uu-.0001),side));let n=V.norm(V.cross(dt,du));if(n[2]<0)n=V.mul(n,-1);return V.mul(n,side);
+  };
+  const sheets=[-1,1].map(side=>Array.from({length:n+1},(_,i)=>Array.from({length:m+1},(_,j)=>({p:point(i/n,j/m,side),n:normal(i/n,j/m,side)}))));
+  for(const sheet of sheets)for(let i=0;i<n;i++)for(let j=0;j<m;j++){const a=sheet[i][j],b=sheet[i+1][j],c=sheet[i+1][j+1],d=sheet[i][j+1];emit(g,a,b,c,color);emit(g,a,c,d,color);}
+  // Join only the perimeter. Interior subdivisions share their vertices and
+  // smooth normals, avoiding the old stack of separately extruded fin panels.
+  const wall=(a,b,c,d,outward)=>{const cross=V.cross(V.sub(b,a),V.sub(c,a));let n=V.len(cross)>1e-12?V.norm(cross):faceNormal(a,c,d);if(V.dot(n,outward)<0)n=V.mul(n,-1);const A={p:a,n},B={p:b,n},C={p:c,n},D={p:d,n};emit(g,A,B,C,color);emit(g,A,C,D,color);};
+  for(let i=0;i<n;i++)for(const j of [0,m]){const t=(i+.5)/n,u=j/m,outward=V.sub(point(t,u,0),point(t,u===0?.001:.999,0));wall(sheets[0][i][j].p,sheets[0][i+1][j].p,sheets[1][i+1][j].p,sheets[1][i][j].p,outward);}
+ }
+ function median(g,id,low,x0,x1,edgePoints,color,bottom=false,span=18){
+  const outline=t=>curve(edgePoints,t),root=t=>{const x=clamp(outline(t)[0],Math.min(x0,x1),Math.max(x0,x1)),s=section(id,x);return [x,s[1]+(bottom?-s[3]+.003:s[2]-.003),0];};
+  const edge=t=>{const p=outline(t),s=section(id,p[0]),limit=s[1]+(bottom?-s[3]+.001:s[2]-.001);return [p[0],bottom?Math.min(limit,p[1]):Math.max(limit,p[1]),0];};membrane(g,root,edge,color,3.2,low,.0022,span);
+ }
  function fins(g,id,low){
-  const f=forms[id],h=f.height,n=low?8:18,root=[],edge=[];
-  for(let k=0;k<=n;k++){const u=k/n,v=u*2-1;root.push([-.405,v*.027,0]);edge.push([f.fork?-.665+.155*(1-Math.abs(v)):-.57-.073*Math.sqrt(Math.max(0,1-v*v)),v*f.tail,0]);}
-  fin(g,root,edge,id==='banggai_cardinal'?(i=>i%3===0?cream:ink):id==='fire_goby'?red:forms[id].color);
-  const top=(x)=>h*Math.sqrt(Math.max(0,1-((x-.015)/.36)**2))*.94;
-  if(id==='banggai_cardinal'){
-   // Separate tall first dorsal and swept second dorsal/anal retain its
-   // recognisable cardinalfish outline even when body colour is not resolved.
-   const xs=[.20,.12,.035,-.025],ys=[top(.20),top(.12),top(.035),top(-.025)];
-   fin(g,xs.map((x,i)=>[x,ys[i],0]),[[.20,ys[0],0],[.125,.395,0],[.02,.315,0],[-.025,ys[3],0]],ink);
-   fin(g,[[-.04,top(-.04),0],[-.14,top(-.14),0],[-.27,top(-.27),0],[-.32,top(-.32),0]],[[-.04,.20,0],[-.12,.34,0],[-.34,.235,0],[-.32,top(-.32),0]],cream);
-   fin(g,[[.015,-h*.95,0],[-.11,-h*.90,0],[-.26,-h*.55,0]],[[.015,-h*.95,0],[-.14,-.325,0],[-.345,-.205,0]],ink);
-   faunaArt.tube(g,[[.125,.395,0],[.08,.445,0],[.012,.46,0]],t=>.0048*(1-t*.55),cream,low?5:8);
-   if(!low)for(const side of [-1,1])for(const [x,y]of [[-.22,.06],[-.22,-.045],[.02,.08],[.02,-.07],[.22,-.035]]){
-    const z=side*f.width*Math.sqrt(Math.max(0,1-((x-.015)/.36)**2-(y/h)**2));g.tag=1;faunaArt.ellipsoid(g,[x,y,z],[.009,.010,.0015],white,8,5);
-   }
+  const f=forms[id],cardinal=id==='banggai_cardinal',goby=id==='fire_goby',long=id==='longnose_butterfly',peduncle=goby?.014:long?.021:.023;
+  const tailRoot=t=>[-.405,(2*t-1)*peduncle,0],tailEdge=t=>{const v=2*t-1;return [f.fork?-.665+.155*(1-Math.pow(Math.abs(v),.7)):-.57-.073*Math.sqrt(Math.max(0,1-v*v)),v*f.tail,0];};
+  membrane(g,tailRoot,tailEdge,cardinal?cream:goby?red:f.color,3.1,low,.004,20);
+  const top=x=>{const s=section(id,x);return s[1]+s[2];},bottom=x=>{const s=section(id,x);return s[1]-s[3];};
+  if(cardinal){
+   median(g,id,low,.205,-.025,[[.205,top(.205)-.002],[.148,.320],[.105,.429],[.043,.452],[.014,.331],[-.025,top(-.025)-.002]],ink,false,24);
+   median(g,id,low,-.041,-.35,[[-.041,top(-.041)-.002],[-.111,.330],[-.235,.289],[-.334,.215],[-.35,top(-.35)-.002]],cream,false,20);
+   median(g,id,low,.022,-.36,[[.022,bottom(.022)+.002],[-.075,-.259],[-.161,-.321],[-.281,-.249],[-.340,-.178],[-.36,bottom(-.36)+.002]],ink,true,20);
+  }else if(goby){
+   median(g,id,low,.035,-.335,[[.035,top(.035)-.002],[-.054,.103],[-.179,.106],[-.286,.072],[-.335,top(-.335)-.002]],white,false,18);
+   median(g,id,low,.215,.036,[[.215,top(.215)-.002],[.165,.165],[.131,.350],[.111,.369],[.094,.153],[.036,top(.036)-.002]],white,false,24);
+   median(g,id,low,.155,-.335,[[.155,bottom(.155)+.002],[.049,-.084],[-.124,-.101],[-.278,-.065],[-.335,bottom(-.335)+.002]],red,true,18);
+  }else if(long){
+   median(g,id,low,.233,-.337,[[.233,top(.233)-.002],[.142,.289],[-.007,.322],[-.175,.281],[-.290,.168],[-.337,top(-.337)-.002]],gold,false,22);
+   median(g,id,low,.202,-.338,[[.202,bottom(.202)+.002],[.089,-.259],[-.091,-.284],[-.237,-.224],[-.319,-.116],[-.338,bottom(-.338)+.002]],gold,true,22);
   }else{
-   const upper=[],upperEdge=[],lower=[],lowerEdge=[];
-   for(let k=0;k<=n;k++){const u=k/n,x=.245-u*.55,rise=Math.sin(Math.PI*u),y=top(x);upper.push([x,y,0]);lower.push([x,-y,0]);
-    upperEdge.push([x,y+rise*h*(id==='longnose_butterfly'?.45:.39),0]);lowerEdge.push([x,-y-rise*h*.24,0]);}
-   fin(g,upper,upperEdge,id==='fire_goby'?white:forms[id].color);fin(g,lower,lowerEdge,id==='fire_goby'?red:forms[id].color);
-   if(id==='lyretail_anthias'){
-    // A slender, swept third dorsal ray, not the long banner of a Moorish idol.
-    faunaArt.tube(g,[[.12,top(.12),0],[.095,.267,0],[.033,.29,0]],t=>.0045*(1-t*.72),[.91,.48,.36],low?5:8);
-   }
-   if(id==='fire_goby')fin(g,[[.215,top(.215),0],[.10,top(.10),0],[.035,top(.035),0]],[[.215,top(.215),0],[.105,.37,0],[.035,top(.035),0]],white,.0013);
-   if(id==='longnose_butterfly'){
-    // The black anal-fin spot is behind/below the body, not a false eye.
-    for(const side of [-1,1]){g.tag=3;faunaArt.ellipsoid(g,[-.205,-.185,side*.003],[.034,.033,.0017],ink,low?10:18,low?7:12);}
-   }
+   median(g,id,low,.251,-.322,[[.251,top(.251)-.002],[.174,.176],[.115,.267],[.053,.290],[.032,.211],[-.097,.198],[-.243,.146],[-.322,top(-.322)-.002]],orange,false,28);
+   median(g,id,low,.160,-.319,[[.160,bottom(.160)+.002],[.054,-.158],[-.106,-.172],[-.247,-.112],[-.319,bottom(-.319)+.002]],orange,true,18);
   }
   for(const side of [-1,1]){
-   fin(g,[[.16,-h*.15,side*f.width*.83],[.055,-h*.36,side*f.width*.94]],[[.07,-h*.80,side*f.width*1.65],[-.07,-h*.60,side*f.width*1.75]],id==='banggai_cardinal'?cream:forms[id].color);
-   fin(g,[[.08,-h*.90,side*f.width*.35],[-.015,-h*.94,side*f.width*.35]],[[.015,-h*1.36,side*f.width*.64],[-.11,-h*1.15,side*f.width*.65]],id==='banggai_cardinal'?ink:forms[id].color);
+   // Parallel swept chords produce a curved fan without crossing one another.
+   // Both ends converge on the skin, with the entire hinge slightly inset.
+   const root=t=>{const s=section(id,.146),y=s[1]-s[3]*mix(.12,.47,t);return sidePoint(id,.146,y,side,-.004);};
+   const edge=t=>V.add(root(t),V.mul([-.215,-f.height*.45,side*f.width*.68],Math.sin(Math.PI*t)));
+   membrane(g,root,edge,cardinal?cream:f.color,3,low,side*.006,16);
+   const pelvicRoot=t=>{const s=section(id,.055),y=s[1]-s[3]*mix(.80,.95,t);return sidePoint(id,.055,y,side,-.003);};
+   const pelvicEdge=t=>V.add(pelvicRoot(t),V.mul([-.170,-f.height*.48,side*f.width*.28],Math.sin(Math.PI*t)));
+   membrane(g,pelvicRoot,pelvicEdge,cardinal?ink:f.color,3,low,side*.002,12);
   }
  }
  function build(id,g,low){g.material=6;body(g,id,low);fins(g,id,low);g.tag=1;}
