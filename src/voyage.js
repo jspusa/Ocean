@@ -94,7 +94,7 @@ function observeWhale(dt){const f=life.find(f=>f.species===10);if(!f)return;cons
 }
 function gradePhoto(){
  let chosen=null,best=Infinity;const macro=typeof oceanMicrocosm!=='undefined'&&oceanMicrocosm.isViewing()?oceanMicrocosm.target():null;
- for(const fish of macro?[macro]:life){if(fish.ecologyPresent===false)continue;const aim=animalFocusPoint(fish),p=project(aim,renderer.vp),dist=V.dist(eye,aim);if(p[2]<=0||Math.abs(p[0])>.97||Math.abs(p[1])>.95||dist>110||fish.retreat>.8||fish.faunaVisibility<.8||blocked(eye,aim,fish.fauna?.001:.13))continue;
+ for(const fish of macro?[macro]:life){if(fish.assetReady===false||fish.ecologyPresent===false)continue;const aim=animalFocusPoint(fish),p=project(aim,renderer.vp),dist=V.dist(eye,aim);if(p[2]<=0||Math.abs(p[0])>.97||Math.abs(p[1])>.95||dist>110||fish.retreat>.8||fish.faunaVisibility<.8||blocked(eye,aim,fish.fauna?.001:.13))continue;
   if(fish.fauna&&dist>speciesTraits(fish.species).observeDistance*2)continue;
   const ctr=Math.hypot(p[0],p[1]);if(ctr<best){chosen={fish,p,dist};best=ctr;}}
  if(!chosen)return {score:0,subject:null,breakdown:'風景留念 · 畫面內沒有可評分的生物',metrics:{}};
@@ -141,6 +141,8 @@ startDive=function(tour=false){
  document.body.classList.toggle('free-voyage',voyage.state.mode==='free');
  if(!resume)voyage.state.dives++;
  oceanFeatures.call('startDive',{resume:!!resume,tour});renderer.forceShadow=true;saveVoyage();
+ // Optional assets never participate in the entrance or audio readiness chain.
+ void oceanBarramundi.load(renderer);
 };
 const legacyHome=goHome;
 goHome=function(){
@@ -164,7 +166,8 @@ updatePlayer=function(dt){
 const legacyFind=findSpecies;
 findSpecies=function(index,specific=null){
  const deep=typeof oceanDeepsea!=='undefined'&&oceanDeepsea.isActive();
- const candidates=life.filter(f=>f.species===index&&f.ecologyPresent!==false);let fish=specific||candidates.reduce((a,f)=>!a||V.dist(f.p,player.p)<V.dist(a.p,player.p)?f:a,null);
+ if(SPECIES[index]?.id==='barramundi'&&!oceanBarramundi.status(renderer).ready){toast('金目鱸素材尚未備妥，可在圖鑑重試。');return;}
+ const candidates=life.filter(f=>f.species===index&&f.ecologyPresent!==false&&f.assetReady!==false);let fish=specific||candidates.reduce((a,f)=>!a||V.dist(f.p,player.p)<V.dist(a.p,player.p)?f:a,null);
  if(!fish||fish.ecologyPresent===false){const sp=SPECIES[index];if(sp.fauna&&sp.wildHabitat!==false)markPlace('habitat:'+sp.id);toast(oceanSeasons.hint(sp.id));return;}
  if(!active||V.dist(animalFocusPoint(fish),player.p)>speciesTraits(index).observeDistance){markPlace('habitat:'+SPECIES[index].id);toast('已標記棲地，直接游近就能觀察。');return;}
  if(SPECIES[index].traits?.micro){closePanel();if(typeof oceanMicrocosm!=='undefined'&&V.dist(animalFocusPoint(fish),player.p)<=speciesTraits(index).observeDistance){oceanMicrocosm.enter(fish.uid);}else{markPlace('habitat:'+SPECIES[index].id);toast('已標記棲地；游近後開啟微觀探索，尋找細小的身影。');}return;}
@@ -179,7 +182,7 @@ function voyageDestination(id=voyage.state.waypoint){
  if(typeof id==='string'&&id.startsWith('trench:')){const station=OceanTrench.stations.find(st=>id==='trench:'+st.id);return station?{id,name:station.name,x:station.p[0],y:station.p[1],z:station.p[2],radius:20}:null;}
  if(typeof id==='string'&&id.startsWith('study:')){const key=id.slice(6),a=typeof OceanRegions!=='undefined'&&Object.hasOwn(OceanRegions.points,key)?OceanRegions.points[key]:OceanTrench.studyPoint?.(key);return a?{id,name:a.name,x:a.p[0],y:a.p[1],z:a.p[2],radius:4}:null;}
  if(typeof id==='string'&&id.startsWith('habitat:')){
-  const sp=SPECIES.find(s=>'habitat:'+s.id===id),owned=voyage.state.features?.ecology?.partners||[],f=sp&&life.find(f=>SPECIES[f.species]===sp&&(sp.wildHabitat!==false||owned.some(p=>p.uid===f.uid)));if(!f)return null;
+  const sp=SPECIES.find(s=>'habitat:'+s.id===id),owned=voyage.state.features?.ecology?.partners||[],f=sp&&life.find(f=>SPECIES[f.species]===sp&&f.assetReady!==false&&(sp.wildHabitat!==false||owned.some(p=>p.uid===f.uid)));if(!f)return null;
   const companion=sp.wildHabitat===false,p=companion||sp.pelagic?f.p:f.home||f.center||f.p;return {id,name:sp.name+(companion?'夥伴':sp.pelagic?'巡游方位':'棲地'),x:p[0],y:p[1]+.6,z:p[2],radius:sp.pelagic?Math.max(8,Math.min(18,sp.size*.6)):3};
  }
  return id==='boat'?{id:'boat',name:'研究船',x:OPEN_WORLD.boat[0],z:OPEN_WORLD.boat[2],radius:12}:LANDMARKS.find(l=>l.id===id);}

@@ -38,7 +38,7 @@ const oceanEcology=(()=>{
  const inResearchVehicle=()=>typeof oceanDeepsea!=='undefined'&&oceanDeepsea.isActive();
  const playAllowed=()=>active&&!modal&&!photoOpen&&!voyage.photoMode&&!document.body.classList.contains?.('cinematic');
  function inRange(f,contact=false){
-  if(!f||f.ecologyPresent===false||!f.uid||f.species<0||!SPECIES[f.species])return false;
+  if(!f||f.assetReady===false||f.ecologyPresent===false||!f.uid||f.species<0||!SPECIES[f.species])return false;
   // A long ribbonfish can remain visibly selected while its centre is outside
   // the frame or behind a rock. Observation and photo credit share the same
   // revalidated body sightline; touching still requires the original limits.

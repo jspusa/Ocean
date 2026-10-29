@@ -26,7 +26,7 @@ const oceanSelection=(()=>{
   return visible.every(a=>a.p.every(Number.isFinite)&&a.p[2]>0)?visible:null;
  }
  function projectedCandidate(f,fromLife=false){
-  if(!f||!f.uid||(!fromLife&&life.find(x=>x.uid===f.uid)!==f)||f.ecologyPresent===false||f.retreat>.8||(f.faunaVisibility??1)<.8)return null;
+  if(!f||!f.uid||(!fromLife&&life.find(x=>x.uid===f.uid)!==f)||f.assetReady===false||f.ecologyPresent===false||f.retreat>.8||(f.faunaVisibility??1)<.8)return null;
   const sp=SPECIES[f.species];if(!sp)return null;let point=animalFocusPoint(f);const traits=speciesTraits(f.species),distance=V.dist(eye,point);
   if(V.dist(player.p,point)>traits.observeDistance||distance>traits.observeDistance+V.dist(eye,player.p)+2)return null;
   const axis=sp.id==='oarfish'?longAxis(f):null;

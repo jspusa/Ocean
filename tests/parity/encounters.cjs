@@ -5,7 +5,7 @@
 const fs=require('node:fs'),vm=require('node:vm'),zlib=require('node:zlib'),crypto=require('node:crypto'),assert=require('node:assert/strict');
 const source=n=>fs.readFileSync('src/'+n+'.js','utf8'),raw=zlib.gunzipSync(fs.readFileSync('assets/reef.mesh.gz')),offset=8+raw.readUInt32LE(4),header=JSON.parse(raw.subarray(8,offset));
 const originalActors=new Map(header.life.map(i=>[header.nodes[i].uid,JSON.parse(JSON.stringify(header.nodes[i]))]));
-const files=JSON.parse('['+fs.readFileSync('bake_scene.cjs','utf8').match(/for\(const n of \[([^\]]+)\]/)[1].replaceAll("'",'"')+']');
+const files=require('../../scene_inputs.cjs').MODULES;
 let entropyCalls=0;const c=vm.createContext({console,header,active:false,renderer:{},player:{p:[0,-5,0],velocity:[0,0,0]},eye:[0,-5,0],t:0,modal:null,photoOpen:false,persistent:{photos:[{individual:'tang-001',date:123,grade:90}]},voyage:{state:{features:{expedition:{day:1,minute:540,mail:{}},ecology:{partners:[]}},waypoint:null}},crypto:{getRandomValues(a){a[0]=[123456789,987654321,231567891,831235677][entropyCalls++%4];return a;}},collide:p=>p,resetInput(){},nearestPathIndex:()=>0,stopAuto(){},document:{body:{classList:{remove(){}}}},$:()=>null});
 for(const file of files)vm.runInContext(fs.readFileSync('src/'+file,'utf8'),c,{filename:file});
 const get=s=>vm.runInContext(s,c),api=get('OceanRockContact'),mesh=b=>({vertices:new Float32Array(raw.buffer,raw.byteOffset+offset+b.vertexOffset,b.vertexFloats),indices:new Uint32Array(raw.buffer,raw.byteOffset+offset+b.indexOffset,b.indexCount)});

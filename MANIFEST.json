@@ -1,5 +1,5 @@
 {
-  "version": "0.18.42",
+  "version": "0.18.43",
   "scope": "served game and build sources",
   "files": [
     {
@@ -9,8 +9,8 @@
     },
     {
       "path": "CREDITS.md",
-      "bytes": 14187,
-      "sha256": "a9e43a26e751e9f21aa75c874864b290c983c5b0eab4141518bc518cd64c9b2a"
+      "bytes": 14959,
+      "sha256": "b5dac906fc2ed0b72a4b68d23422d56e0fb608498836714c2bddbf98a625261b"
     },
     {
       "path": "LICENSE",
@@ -19,13 +19,58 @@
     },
     {
       "path": "README.md",
-      "bytes": 45016,
-      "sha256": "e2383545c93ce903b1cc02aec62db677d7bbd5349e2b9197204e637793dccb68"
+      "bytes": 45708,
+      "sha256": "1a19c95c4a46ccadc40c7912fa0140fc16d7c8ad2bc9a92f9ba1478cf41746ed"
     },
     {
       "path": "VERSION",
       "bytes": 8,
-      "sha256": "add02fe5256fc5e57766603c3cb9d9eff28a63b654ea88dffac6132f15c77058"
+      "sha256": "de1ece959124e2eae4acd3e7634debf4359b62c15c8710ce574c5293845bdde3"
+    },
+    {
+      "path": "assets/barramundi/CC0-1.0.txt",
+      "bytes": 6533,
+      "sha256": "a43fc2004d1e073f1107a1f6146664d08dae6cea93cb828742a4bec6da828e91"
+    },
+    {
+      "path": "assets/barramundi/LICENSE.md",
+      "bytes": 975,
+      "sha256": "646bbbb4d6b3df8b9c35b3294eff7686be670e64a42bb474d51cfb60f24d12f0"
+    },
+    {
+      "path": "assets/barramundi/baseColor-1024.png",
+      "bytes": 1234001,
+      "sha256": "8113c3829a6af3f28b316187acefa24b56f5dcc288d326a0b0c19d85502df992"
+    },
+    {
+      "path": "assets/barramundi/baseColor-512.png",
+      "bytes": 337265,
+      "sha256": "ba3e6d6bfec74ec0a184f9d221f19e0edfe2ccf60558bde7395813acea981834"
+    },
+    {
+      "path": "assets/barramundi/geometry.bin",
+      "bytes": 128224,
+      "sha256": "3bef66e5a231ee6429832c6b0be1b1a56022dd21ea2f379a440f41598aa563c9"
+    },
+    {
+      "path": "assets/barramundi/normal-1024.png",
+      "bytes": 863789,
+      "sha256": "6da8c248158c116d2ac5ade0b4fb589def0abd1f5c154cae3827476eec910b3d"
+    },
+    {
+      "path": "assets/barramundi/normal-512.png",
+      "bytes": 245310,
+      "sha256": "0edda1a26c6a6e8efcd26ec63dea4976e131aa329241693d27cbf9fbea85071e"
+    },
+    {
+      "path": "assets/barramundi/orm-1024.png",
+      "bytes": 925661,
+      "sha256": "e260f2241dc5f0ae6824cbd657d30b6a63765c345b44244bc1b4399a1129ff65"
+    },
+    {
+      "path": "assets/barramundi/orm-512.png",
+      "bytes": 250166,
+      "sha256": "c663baca84c5e535d6205a82aff066200ef7214a6ff5c0a38688af60a4e39aed"
     },
     {
       "path": "assets/caustics.jpg",
@@ -46,6 +91,11 @@
       "path": "assets/coral_nor_gl.jpg",
       "bytes": 230833,
       "sha256": "da8ef709fa49db13083b1c312155b3aa8a3eae81fee230678bff30767c48703f"
+    },
+    {
+      "path": "assets/guide_barramundi.jpg",
+      "bytes": 16626,
+      "sha256": "e6cb54c478aa9736c4d48f9310d62f9dbb04ddf3393c39155645a8118224cb2d"
     },
     {
       "path": "assets/guide_barreleye.jpg",
@@ -249,8 +299,8 @@
     },
     {
       "path": "assets/reef-growth.json",
-      "bytes": 462659,
-      "sha256": "780c64fdd10a3c3440891fccad0ace630cab43fad0615e80e200bbbd7543976a"
+      "bytes": 462778,
+      "sha256": "36e15cecab80442c97cc1c5d0600e0e44886baf275b93409e8b73f0851c6dcdb"
     },
     {
       "path": "assets/reef.mesh.gz",
@@ -1224,13 +1274,13 @@
     },
     {
       "path": "build.py",
-      "bytes": 7178,
-      "sha256": "b3d80f14fe356fef8888c387da9d50546da70dad9d0310f6e6a6b74438faea5f"
+      "bytes": 7942,
+      "sha256": "1dc2172f9103ea04d262857808b9d7369d6682e59b99a26bce50574566243509"
     },
     {
       "path": "index.html",
-      "bytes": 16670,
-      "sha256": "e0a225f456c7c28160439c2b3948a3696ada040932cc4c17367dbc97e1828cca"
+      "bytes": 16722,
+      "sha256": "c00d19aa66a08bdbc42412b6d603691f33bd0b8899346ad2e149a3eac26477d4"
     },
     {
       "path": "music/blue_silence.mp3",
@@ -1264,8 +1314,8 @@
     },
     {
       "path": "scene_inputs.cjs",
-      "bytes": 2632,
-      "sha256": "afa963f2652773aae8b9732a63cf46ce9a5b6a342a391d4710b1eb6e2cc78b77"
+      "bytes": 2648,
+      "sha256": "85229a7966e40911a12382ec5f3447df7be3cff01fff040a6243e8e9ff5bc315"
     },
     {
       "path": "src/abyss_community.js",
@@ -1284,18 +1334,23 @@
     },
     {
       "path": "src/app.js",
-      "bytes": 86887,
-      "sha256": "d89c56e8ff2e0b9ee2a15d8f3b85822a54278ca95cade9f0fcf2208e8f9adf46"
+      "bytes": 87783,
+      "sha256": "819f8f1d0a82ce24d3a5a25c44e681d1be436892f28685e4fbec91252d15e585"
     },
     {
       "path": "src/aquarium.js",
-      "bytes": 29677,
-      "sha256": "d28b95e40519af67c18b262bdc56a9b95d319356d10e5aed883dc625cc7c3ded"
+      "bytes": 31465,
+      "sha256": "64febdd9811ee5d3311b439fa840f7c38f645927e22d2294ce7b40888bd526bd"
     },
     {
       "path": "src/audio.js",
       "bytes": 12277,
       "sha256": "ec30470c4adc4e5a943bae3891c7bd0696c135d9d8e37b5fe30bdbd1fb849b14"
+    },
+    {
+      "path": "src/barramundi.js",
+      "bytes": 14506,
+      "sha256": "f866d00c4ea12cfdd1ba0be952e53a3e38ccecba77cfe58a76b653c4b1d454db"
     },
     {
       "path": "src/barreleye.js",
@@ -1324,8 +1379,8 @@
     },
     {
       "path": "src/config.js",
-      "bytes": 465901,
-      "sha256": "16a0445c0ee350f9a4cfbb945449020e225f715b7fb2376ca4300483b5fe1205"
+      "bytes": 466508,
+      "sha256": "5c28b5661bbd762117c60024bcc4b54375ac4f89440710a4c1c1987f37d69768"
     },
     {
       "path": "src/deepsea.js",
@@ -1339,18 +1394,18 @@
     },
     {
       "path": "src/ecology.js",
-      "bytes": 48863,
-      "sha256": "6acd82d604000b7a79ddd7a4fae1bb1a6b6667b318eeab5abf40c4dad0ead2b2"
+      "bytes": 48885,
+      "sha256": "1609b7784e514b9ef35f0cdacdc4ee3bb39bc9533ab1ac122287eb2541c0b164"
     },
     {
       "path": "src/encounters.js",
-      "bytes": 8750,
-      "sha256": "52e31fb763abd83dcc367d26c0578042a9a6a639402259a6f625c4433a74cf5f"
+      "bytes": 8769,
+      "sha256": "c499ae03935c04e2675289acba1d2d68864ca507a4c2497b5a373b0a8bcefbe4"
     },
     {
       "path": "src/engine.js",
-      "bytes": 136030,
-      "sha256": "839a589b90b75ea9be87ff89f0dbb7de24759c48dae6bc3035a1472eed40b0e4"
+      "bytes": 147158,
+      "sha256": "286b79b251760695fa025ca3543f0f19fb77c70b4eb3761e1d01469d323674dd"
     },
     {
       "path": "src/expedition.js",
@@ -1364,8 +1419,8 @@
     },
     {
       "path": "src/fauna.js",
-      "bytes": 32618,
-      "sha256": "f5208471552c20b7fa000a4d69ef20d1a07c07186379251e7a7edfd413ac8d12"
+      "bytes": 32637,
+      "sha256": "0371607e32ca3291958db2f76ca4483e924ee8f48f0f9f4625bf474c9d518297"
     },
     {
       "path": "src/fauna_world.js",
@@ -1399,8 +1454,8 @@
     },
     {
       "path": "src/individuals.js",
-      "bytes": 54206,
-      "sha256": "1bff81af62835e21721fa3fafce2b4f9b6e9589b0b216e6970b9fac28626be14"
+      "bytes": 54404,
+      "sha256": "aa387b3060d114036e45eeb9a42f96cff7e3f456fa5607970eb84196db9e544d"
     },
     {
       "path": "src/microcosm.js",
@@ -1509,13 +1564,13 @@
     },
     {
       "path": "src/selection.js",
-      "bytes": 8325,
-      "sha256": "d371da5981094107db3d279ce5922dba5aa868ac4c2fa7fa9d6779f2830ec3f8"
+      "bytes": 8347,
+      "sha256": "c5af922993b0efecd043a22a34b9b9f4849be9fa511dc802b80f5fb812f7c74d"
     },
     {
       "path": "src/shell.html",
       "bytes": 12391,
-      "sha256": "4fa39f3b70bbec05416df5335485ef13710754d5cbd12f497adbce38390e2e46"
+      "sha256": "812e5b2178a7ff30ff8a771e2298cc3880e715319854febd97b2728a0bd094e6"
     },
     {
       "path": "src/ship.js",
@@ -1554,8 +1609,8 @@
     },
     {
       "path": "src/voyage.js",
-      "bytes": 42537,
-      "sha256": "d918e1ea8cc26f5b973bfd9f446027353c57e4e8509ff2195e636e093fe80d24"
+      "bytes": 42874,
+      "sha256": "a580161dfdc782f82fcae796ac40dd69ec97de7e01e9d8ee7983ad2d0ec8ed12"
     },
     {
       "path": "src/world.js",

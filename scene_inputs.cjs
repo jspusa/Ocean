@@ -2,7 +2,7 @@
  * excluded: including generated output in its own source digest is circular. */
 'use strict';
 const fs=require('node:fs'),path=require('node:path'),crypto=require('node:crypto');
-const MODULES=Object.freeze(['engine.js','world.js','reef_detail.js','next_reef.js','individuals.js','open_world.js','trench.js','fauna.js','cetaceans.js','abyss_fauna.js','trench_fauna.js','fauna_world.js','cetacean_world.js','regions.js','abyss_world.js','trench_world.js','pelagic_life.js','reef_fauna.js','oarfish.js','frilled_shark.js','frilled_shark_world.js','barreleye.js','barreleye_world.js','tripod_fish.js','dumbo_octopus.js','abyss_community.js','rock_contact.js']);
+const MODULES=Object.freeze(['engine.js','world.js','reef_detail.js','next_reef.js','individuals.js','open_world.js','trench.js','fauna.js','cetaceans.js','abyss_fauna.js','trench_fauna.js','fauna_world.js','cetacean_world.js','regions.js','abyss_world.js','trench_world.js','pelagic_life.js','reef_fauna.js','oarfish.js','frilled_shark.js','frilled_shark_world.js','barreleye.js','barreleye_world.js','tripod_fish.js','dumbo_octopus.js','abyss_community.js','barramundi.js','rock_contact.js']);
 const SOURCE_FILES=Object.freeze(['scene_inputs.cjs','bake_scene.cjs',...MODULES.map(file=>'src/'+file),'assets/coral_forms.json']);
 const sha=bytes=>crypto.createHash('sha256').update(bytes).digest('hex');
 function fingerprint(root){

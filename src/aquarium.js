@@ -38,9 +38,10 @@ const oceanAquarium=(()=>{
  const state=()=>oceanFeatures.state('aquarium');
  const knowledge=id=>oceanEcology.knowledge(oceanEcology.state().field[id]);
  const unlocked=()=>SPECIES.filter(sp=>knowledge(sp.id)>=1).length>=limits.unlockSpecies;
- const eligible=id=>!!species(id)&&knowledge(id)>=limits.knowledge;
+ const materialReady=id=>id!=='barramundi'||oceanBarramundi.status(renderer).ready;
+ const eligible=id=>!!species(id)&&materialReady(id)&&knowledge(id)>=limits.knowledge;
  const node=id=>typeof document==='undefined'?null:document.getElementById(id);
- const runtime={initialized:false,viewing:false,pools:new Map(),supports:new Map(),owned:new Set(),savedVisibility:new Map(),savedOptics:null,selected:null,cell:0,level:1,pointers:new Map(),pinch:null,lastTime:0,saveDue:false,saveClock:0};
+ const runtime={initialized:false,viewing:false,pools:new Map(),supports:new Map(),owned:new Set(),savedVisibility:new Map(),savedOptics:null,selected:null,cell:0,level:1,pointers:new Map(),pinch:null,importedGeneration:-1,lastTime:0,saveDue:false,saveClock:0};
  const save=()=>saveVoyage();
  const say=text=>{if(typeof toast==='function')toast(text);};
  const canEdit=()=>!active&&unlocked();
@@ -52,16 +53,17 @@ const oceanAquarium=(()=>{
  function clear(){if(active)return false;state().slots=[];focus(-1);syncExhibits();save();return true;}
  function autoArrange(){if(!canEdit())return false;state().slots=arrange(SPECIES.filter(sp=>eligible(sp.id)).map(sp=>sp.id));focus(-1);syncExhibits();save();return true;}
  function center(cell,level=1){return [ORIGIN[0]+(cell%4-1.5)*8,-5-level*3,ORIGIN[2]+(Math.floor(cell/4)-1)*8];}
- function minimumDistance(slot){const sp=slot&&species(slot.species),span=sp?.modelBounds?Math.max(...sp.modelBounds.size):1;return sp?.fauna?Math.max(.018,sp.size*span*.9):3;}
+ function minimumDistance(slot){const sp=slot&&species(slot.species),span=sp?.modelBounds?Math.max(...sp.modelBounds.size):1;return sp?.fauna?Math.max(.018,(sp.modelMetres?1:sp.size)*span*.9):3;}
  // A pure layout seam keeps physical scale and support placement reviewable.
  // Older large-animal exhibits retain their established presentation scale.
  function exhibitLayout(slot){
   const sp=species(slot.species),type=traits(slot.species),base=center(slot.cell,slot.level),home=base.slice(),size=sp?.size||1;
   const support=sp?.id==='pistol_shrimp'?'burrow':type.motion,supported=sp?.fauna&&['attached','crawl','burrow'].includes(support),abyssCrab=sp?.abyss&&support==='crawl',pad=abyssCrab?size+.8:Math.max(.13,size*(support==='burrow'?1.6:3));
   if(support==='attached'){home[0]+=.009;home[1]+=.042;}
-  return {home,base,supported:!!supported,support,pad,scale:sp?.fauna?size:null,radius:sp?.abyss?(abyssCrab?.30:Math.min(1.15,sp.motionProfile.radius)):sp?.cetacean?Math.min(2.4,size*.6):support==='crawl'?size*.45:support==='burrow'?size*.35:size*1.6};
+  return {home,base,supported:!!supported,support,pad,scale:sp?.modelMetres?1:sp?.fauna?size:null,radius:sp?.abyss?(abyssCrab?.30:Math.min(1.15,sp.motionProfile.radius)):sp?.cetacean?Math.min(2.4,size*.6):support==='crawl'?size*.45:support==='burrow'?size*.35:size*1.6};
  }
  function cloneMesh(source){
+  if(source.importedMaterial){const b=renderer.cloneImportedBatch(source,[],limits.cells);Object.assign(b,{minDistance:0,maxDistance:300,visible:false,shadow:false,shadowProxy:false});runtime.owned.add(b);return b;}
   const gl=renderer.gl,vao=gl.createVertexArray();gl.bindVertexArray(vao);gl.bindBuffer(gl.ARRAY_BUFFER,source.vb);
   for(const [loc,size,offset]of [[0,3,0],[1,3,12],[2,3,24],[7,2,36],[8,1,44]])renderer.attr(loc,size,48,offset);
   gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,source.eb);const ib=gl.createBuffer(),data=new Float32Array(limits.cells*24);gl.bindBuffer(gl.ARRAY_BUFFER,ib);gl.bufferData(gl.ARRAY_BUFFER,data.byteLength,gl.DYNAMIC_DRAW);
@@ -90,7 +92,7 @@ const oceanAquarium=(()=>{
   const sourceBatches=renderer.batches.slice();
   SPECIES.forEach((sp,index)=>{
    const candidates=sourceBatches.filter(b=>b.dynamic&&b.instances.some(f=>f.species===index));const source=candidates.sort((a,b)=>(a.minDistance||0)-(b.minDistance||0)||b.count-a.count)[0];if(!source)return;
-   const representative=source.instances.find(f=>f.species===index),batch=cloneMesh(source);runtime.pools.set(sp.id,{batch,representative,radius:source.radius});
+   const representative=source.instances.find(f=>f.species===index),batch=cloneMesh(source);runtime.pools.set(sp.id,{batch,representative,radius:source.radius});if(sp.id==='barramundi')runtime.importedGeneration=oceanBarramundi.status(renderer).generation;
   });
   const floor=new Geometry();floor.material=1;floor.box([0,-16.5,0],[45,.7,35],[.78,.82,.76]);own(floor,[{p:ORIGIN.slice()}]);
   const walls=new Geometry();walls.material=0;walls.shadow=false;const dark=[.095,.21,.24],stone=[.27,.38,.37],metal=[.38,.47,.43];
@@ -109,13 +111,26 @@ const oceanAquarium=(()=>{
   const previousSeed=seed;
   try{const tables=tableCoral(0),fans=fanCoral();own(tables,[-1,1].flatMap(side=>[0,1,2].map(row=>({p:[ORIGIN[0]+side*(11+row%2*3),-14.7,ORIGIN[2]-9+row*8],s:[2.2,2.0,2.2],yaw:side*.6+row*.7}))));own(fans,[-1,1].flatMap(side=>[0,1,2].map(row=>({p:[ORIGIN[0]+side*(17-row),-15.3,ORIGIN[2]-10+row*9],s:[2.4,2.9,2.4],yaw:side*.65,phase:row}))),3);}finally{seed=previousSeed;seaFanGeometryCache.clear();}
  }
+ // Late optional loads can arrive after the gallery first opens. Invalidate
+ // only their pools; regular species and saved exhibit slots retain identity.
+ function refreshImportedPool(){
+  if(!runtime.owned.size)return false;
+  const status=oceanBarramundi.status(renderer),old=runtime.pools.get('barramundi');
+  if(status.generation===runtime.importedGeneration&&(!old||renderer.batches.includes(old.batch)))return false;
+  runtime.importedGeneration=status.ready?status.generation:-1;
+  if(old){renderer.releaseImportedBatch(old.batch);runtime.owned.delete(old.batch);runtime.savedVisibility.delete(old.batch);runtime.pools.delete('barramundi');}
+  const source=status.ready&&renderer.batches.find(b=>b.importedMaterial?.ready&&!runtime.owned.has(b)&&b.instances.some(f=>SPECIES[f.species]?.id==='barramundi'&&f.assetReady));
+  if(source){const representative=source.instances.find(f=>SPECIES[f.species]?.id==='barramundi'),batch=cloneMesh(source);runtime.pools.set('barramundi',{batch,representative,radius:source.radius});}
+  return !!old||!!source;
+ }
  function syncExhibits(){
+  refreshImportedPool();
   if(!runtime.pools.size)return;
   for(const pool of runtime.pools.values())pool.batch.instances=[];
   for(const batch of runtime.supports.values())batch.instances=[];
   for(const slot of state().slots){const pool=runtime.pools.get(slot.species);if(!pool||!eligible(slot.species))continue;const base=pool.representative;
    const sp=species(slot.species),layout=exhibitLayout(slot),displayRadius=cost(slot.species)>=8?2.6:cost(slot.species)>=2?1.4:.95,scale=layout.scale??displayRadius/Math.max(.05,pool.radius);
-   pool.batch.instances.push({p:layout.home.slice(),home:layout.home.slice(),center:layout.home.slice(),homeYaw:0,floorOffset:0,radius:layout.radius,fauna:!!sp.fauna,cetacean:!!sp.cetacean,bioSeed:base.bioSeed,species:SPECIES.indexOf(sp),modelCenter:base.modelCenter?.slice(),s:[scale,scale,scale],yaw:0,pitch:0,phase:slot.cell*.71,effort:.4,bank:0,tint:(base.tint||[1,1,1]).slice(),bioMorph:(base.bioMorph||[1,1,1,1]).slice(),bioGenes:(base.bioGenes||[.5,.5,.5,.5]).slice(),finWear:base.finWear||0,exhibit:{...slot}});
+   pool.batch.instances.push({assetReady:true,p:layout.home.slice(),home:layout.home.slice(),center:layout.home.slice(),homeYaw:0,floorOffset:0,radius:layout.radius,fauna:!!sp.fauna,cetacean:!!sp.cetacean,bioSeed:base.bioSeed,species:SPECIES.indexOf(sp),modelCenter:base.modelCenter?.slice(),s:[scale,scale,scale],yaw:0,pitch:0,phase:slot.cell*.71,effort:.4,bank:0,tint:(base.tint||[1,1,1]).slice(),bioMorph:(base.bioMorph||[1,1,1,1]).slice(),bioGenes:(base.bioGenes||[.5,.5,.5,.5]).slice(),finWear:base.finWear||0,exhibit:{...slot}});
    if(layout.supported){
     const put=(id,item)=>runtime.supports.get(id)?.instances.push(item);
     // Stop the pier inside the substrate, not coplanar with its visible top.
@@ -146,10 +161,10 @@ const oceanAquarium=(()=>{
   oceanFeatures.open('aquariumView');return runtime.viewing;
  }
  function beginViewer(){
-  if(runtime.viewing)return;createScene();runtime.viewing=true;runtime.savedOptics={photoFov:renderer.photoFov,photoAperture:renderer.photoAperture,photoFocus:renderer.photoFocus,photoNear:renderer.photoNear,exposure:renderer.exposure};
+  if(runtime.viewing)return;createScene();runtime.viewing=true;if(state().slots.some(slot=>slot.species==='barramundi'))void oceanBarramundi.load(renderer);runtime.savedOptics={photoFov:renderer.photoFov,photoAperture:renderer.photoAperture,photoFocus:renderer.photoFocus,photoNear:renderer.photoNear,exposure:renderer.exposure};
   resetInput();releaseMouseLook();syncExhibits();isolateScene();document.body.classList.add('aquarium-view');node('aquariumViewer').classList.remove('hidden');runtime.lastTime=t;paintViewer();renderer.forceShadow=true;renderer.dirty=true;setTimeout(()=>{if(runtime.viewing)node('aquariumExit').focus()},60);
  }
- function focus(cell){const s=state(),slot=s.slots.find(slot=>slot.cell===cell);if(cell!==-1&&!slot)return false;s.camera.focus=cell;const sp=slot&&species(slot.species),weight=slot?cost(slot.species):0,span=sp?.modelBounds?Math.max(...sp.modelBounds.size):1;s.camera.distance=cell===-1?36:sp.fauna?Math.max(.065,sp.size*span*2.65):weight>=8?11:weight>=2?6:4.6;s.camera.azimuth=0;s.camera.elevation=.10;runtime.saveDue=true;runtime.saveClock=0;renderer.dirty=true;paintViewer();return true;}
+ function focus(cell){const s=state(),slot=s.slots.find(slot=>slot.cell===cell);if(cell!==-1&&!slot)return false;s.camera.focus=cell;const sp=slot&&species(slot.species),weight=slot?cost(slot.species):0,span=sp?.modelBounds?Math.max(...sp.modelBounds.size):1;s.camera.distance=cell===-1?36:sp.fauna?Math.max(.065,(sp.modelMetres?1:sp.size)*span*2.65):weight>=8?11:weight>=2?6:4.6;s.camera.azimuth=0;s.camera.elevation=.10;runtime.saveDue=true;runtime.saveClock=0;renderer.dirty=true;paintViewer();return true;}
  function viewOptics(slot){const sp=slot&&species(slot.species);return {fov:sp?.fauna?46:56,near:sp?.fauna&&sp.size<.6?.003:.16};}
  function camera(){
   const c=state().camera,slot=state().slots.find(s=>s.cell===c.focus),fish=slot?runtime.pools.get(slot.species)?.batch.instances.find(f=>f.exhibit.cell===slot.cell):null,fauna=fish?.fauna,aim=fish?(fauna&&typeof animalFocusPoint==='function'?animalFocusPoint(fish):fish.p.slice()):slot?center(slot.cell,slot.level):[ORIGIN[0],-9,ORIGIN[2]],portrait=renderer.width<renderer.height,dist=c.distance*(portrait?(slot?1.16:1.48):1);
@@ -158,7 +173,7 @@ const oceanAquarium=(()=>{
   const optics=viewOptics(slot);eye=[clamp(aim[0]+Math.sin(c.azimuth)*dist,-21.5,21.5),Math.min(-.7,aim[1]+Math.sin(c.elevation)*dist),Math.max(-16.5,aim[2]+Math.cos(c.azimuth)*dist)];target=aim;diverBatch.visible=false;cameraCut=true;renderer.photoFov=optics.fov;renderer.photoNear=optics.near;renderer.photoAperture=0;renderer.exposure=1.14;
  }
  function afterLife(time){
-  if(!runtime.viewing)return;if(active||modal!=='aquariumView'){leaveViewer();return;}runtime.lastTime=time;
+  if(!runtime.viewing)return;if(active||modal!=='aquariumView'){leaveViewer();return;}if(refreshImportedPool()){syncExhibits();paintViewer();}runtime.lastTime=time;
   for(const pool of runtime.pools.values())for(const f of pool.batch.instances){if(f.fauna&&typeof faunaMotionPose==='function'){faunaMotionPose(f,time,f.p,{react:false,exhibit:true});continue;}const s=f.exhibit,c=center(s.cell,s.level),a=time*(cost(s.species)>=2?.13:.22)+s.cell*.73,r=cost(s.species)>=8?.8:1.1;f.p=[c[0]+Math.cos(a)*r,c[1]+Math.sin(a*.7+s.cell)*.30,c[2]+Math.sin(a)*r*.55];f.yaw=Math.atan2(-Math.cos(a)*.55,-Math.sin(a));f.pitch=Math.cos(a*.7+s.cell)*.03;f.bank=Math.sin(a)*.025;f.effort=.37;}
   isolateScene();paintCaption();
  }
@@ -177,7 +192,7 @@ const oceanAquarium=(()=>{
   if(type==='aquariumView'&&!active&&unlocked()){panelTitle('YOUR LIVING AQUARIUM','海中的收藏館');beginViewer();return true;}
   if(runtime.viewing)leaveViewer();const s=state(),open=unlocked(),known=SPECIES.filter(sp=>knowledge(sp.id)>=1).length;panelTitle('AQUARIUM / YOUR COLLECTION','海中的收藏館');
   const current=s.slots.find(slot=>slot.cell===runtime.cell);if(!runtime.selected||!eligible(runtime.selected))runtime.selected=SPECIES.find(sp=>eligible(sp.id))?.id||null;
-  node('panelBody').innerHTML=`<p class="panel-note">${open?'收藏你的相遇，再走進水光裡欣賞。':`先讓 ${limits.unlockSpecies} 類生物達到第一層筆記，即可開館。目前 ${known} / ${limits.unlockSpecies}。`}<br>達到第二層筆記的生物可加入展示。${active?'配置與觀賞請先回船。':''}</p><div class="aquarium-summary"><b>${capacity(s.slots)} / ${limits.capacity}</b><span>展示容量 · ${s.slots.length} / ${limits.cells} 個位置</span></div><div class="aquarium-grid" aria-label="展示位置">${Array.from({length:limits.cells},(_,cell)=>{const slot=s.slots.find(row=>row.cell===cell);return `<button data-aquarium-cell="${cell}" class="${cell===runtime.cell?'selected':''}"><small>${String(cell+1).padStart(2,'0')}</small><span>${slot?safe(species(slot.species).name):'空位'}</span>${slot?`<i>${['上層','中層','下層'][slot.level]}</i>`:''}</button>`}).join('')}</div><section class="feature-section"><h3>位置 ${runtime.cell+1}${current?' · '+safe(species(current.species).name):''}</h3><label class="aquarium-field">選擇住客<select id="aquariumSpecies">${SPECIES.map(sp=>`<option value="${safe(sp.id)}" ${eligible(sp.id)?'':'disabled'} ${runtime.selected===sp.id?'selected':''}>${safe(sp.name)} · ${cost(sp.id)} 格${eligible(sp.id)?'':` · 筆記 ${knowledge(sp.id)}/2`}</option>`).join('')}</select></label><label class="aquarium-field">活動水層<select id="aquariumLevel">${['上層','中層','下層'].map((label,index)=>`<option value="${index}" ${runtime.level===index?'selected':''}>${label}</option>`).join('')}</select></label><div class="feature-toolbar"><button class="primary" id="aquariumPlace" ${!canEdit()||!runtime.selected?'disabled':''}>${current?'更換配置':'加入展示'}</button><button class="muted-btn" id="aquariumRemove" ${active||!current?'disabled':''}>移除此位</button></div></section><div class="feature-toolbar"><button class="muted-btn" id="aquariumAuto" ${!canEdit()?'disabled':''}>自動配置</button><button class="muted-btn" id="aquariumClear" ${active||!s.slots.length?'disabled':''}>全部移除</button><button class="primary" id="aquariumEnter" ${active||!open?'disabled':''}>進入 3D 觀賞 ↗</button></div><p class="panel-note">展示館有 ${limits.cells} 個位置與 ${limits.capacity} 格容量，較大的住客需要更多格。配置會隨航程保存；住客是依照相遇紀錄建立的數位展示，觀賞比例經過調整。</p>`;
+  node('panelBody').innerHTML=`<p class="panel-note">${open?'收藏你的相遇，再走進水光裡欣賞。':`先讓 ${limits.unlockSpecies} 類生物達到第一層筆記，即可開館。目前 ${known} / ${limits.unlockSpecies}。`}<br>達到第二層筆記的生物可加入展示。${active?'配置與觀賞請先回船。':''}</p><div class="aquarium-summary"><b>${capacity(s.slots)} / ${limits.capacity}</b><span>展示容量 · ${s.slots.length} / ${limits.cells} 個位置</span></div><div class="aquarium-grid" aria-label="展示位置">${Array.from({length:limits.cells},(_,cell)=>{const slot=s.slots.find(row=>row.cell===cell);return `<button data-aquarium-cell="${cell}" class="${cell===runtime.cell?'selected':''}"><small>${String(cell+1).padStart(2,'0')}</small><span>${slot?safe(species(slot.species).name):'空位'}</span>${slot?`<i>${['上層','中層','下層'][slot.level]}</i>`:''}</button>`}).join('')}</div><section class="feature-section"><h3>位置 ${runtime.cell+1}${current?' · '+safe(species(current.species).name):''}</h3><label class="aquarium-field">選擇住客<select id="aquariumSpecies">${SPECIES.map(sp=>`<option value="${safe(sp.id)}" ${eligible(sp.id)?'':'disabled'} ${runtime.selected===sp.id?'selected':''}>${safe(sp.name)} · ${cost(sp.id)} 格${eligible(sp.id)?'':!materialReady(sp.id)?' · 素材尚未備妥':` · 筆記 ${knowledge(sp.id)}/2`}</option>`).join('')}</select></label><label class="aquarium-field">活動水層<select id="aquariumLevel">${['上層','中層','下層'].map((label,index)=>`<option value="${index}" ${runtime.level===index?'selected':''}>${label}</option>`).join('')}</select></label><div class="feature-toolbar"><button class="primary" id="aquariumPlace" ${!canEdit()||!runtime.selected?'disabled':''}>${current?'更換配置':'加入展示'}</button><button class="muted-btn" id="aquariumRemove" ${active||!current?'disabled':''}>移除此位</button></div></section><div class="feature-toolbar"><button class="muted-btn" id="aquariumAuto" ${!canEdit()?'disabled':''}>自動配置</button><button class="muted-btn" id="aquariumClear" ${active||!s.slots.length?'disabled':''}>全部移除</button><button class="primary" id="aquariumEnter" ${active||!open?'disabled':''}>進入 3D 觀賞 ↗</button></div><p class="panel-note">展示館有 ${limits.cells} 個位置與 ${limits.capacity} 格容量，較大的住客需要更多格。配置會隨航程保存；住客是依照相遇紀錄建立的數位展示，觀賞比例經過調整。</p>`;
   node('panelBody').querySelectorAll('[data-aquarium-cell]').forEach(button=>button.onclick=()=>{runtime.cell=+button.dataset.aquariumCell;const slot=s.slots.find(row=>row.cell===runtime.cell);if(slot){runtime.selected=slot.species;runtime.level=slot.level;}renderPanel('aquarium');});
   node('aquariumSpecies').onchange=e=>{runtime.selected=e.target.value};node('aquariumLevel').onchange=e=>{runtime.level=+e.target.value};
   for(const [id,action]of [['aquariumPlace',()=>place(runtime.selected)],['aquariumRemove',()=>remove(runtime.cell)],['aquariumAuto',autoArrange],['aquariumClear',clear]])node(id).onclick=()=>{action();renderPanel('aquarium')};node('aquariumEnter').onclick=enterViewer;return true;

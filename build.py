@@ -6,7 +6,7 @@ from pathlib import Path
 import base64,hashlib,json,subprocess,sys
 from urllib.parse import urlsplit
 ROOT=Path(__file__).resolve().parent
-JS_FILES=['engine.js','world.js','reef_detail.js','next_reef.js','individuals.js','open_world.js','trench.js','fauna.js','cetaceans.js','abyss_fauna.js','trench_fauna.js','fauna_world.js','cetacean_world.js','regions.js','abyss_world.js','trench_world.js','pelagic_life.js','reef_fauna.js','oarfish.js','frilled_shark.js','frilled_shark_world.js','barreleye.js','barreleye_world.js','tripod_fish.js','dumbo_octopus.js','abyss_community.js','rock_contact.js','scene_stream.js','scene_cache.js','seasons.js','audio.js','performance.js','selection.js','save_session.js','app.js','gamepad_ui.js','gamepad_pointer.js','voyage.js','features.js','encounters.js','ecology.js','exploration.js','expedition.js','aquarium.js','photography.js','navigation.js','ship.js','microcosm.js','story.js','deepsea.js','room_client.js','multiplayer.js','mobile-controls.js','save_session_ui.js','bootstrap.js']
+JS_FILES=['engine.js','world.js','reef_detail.js','next_reef.js','individuals.js','open_world.js','trench.js','fauna.js','cetaceans.js','abyss_fauna.js','trench_fauna.js','fauna_world.js','cetacean_world.js','regions.js','abyss_world.js','trench_world.js','pelagic_life.js','reef_fauna.js','oarfish.js','frilled_shark.js','frilled_shark_world.js','barreleye.js','barreleye_world.js','tripod_fish.js','dumbo_octopus.js','abyss_community.js','barramundi.js','rock_contact.js','scene_stream.js','scene_cache.js','seasons.js','audio.js','performance.js','selection.js','save_session.js','app.js','gamepad_ui.js','gamepad_pointer.js','voyage.js','features.js','encounters.js','ecology.js','exploration.js','expedition.js','aquarium.js','photography.js','navigation.js','ship.js','microcosm.js','story.js','deepsea.js','room_client.js','multiplayer.js','mobile-controls.js','save_session_ui.js','bootstrap.js']
 def main():
     snapshot={}
     def read_input(file):
@@ -52,12 +52,17 @@ def main():
     images=sorted((ROOT/'assets').glob('*.jpg')); tracks=sorted((ROOT/'music').glob('*.mp3'))
     assets={p.stem:'data:image/jpeg;base64,'+base64.b64encode(read_input(p)).decode() for p in images}
     music={p.stem:'data:audio/mpeg;base64,'+base64.b64encode(read_input(p)).decode() for p in tracks}
-    config=room_js+growth_js+'const ASSETS='+json.dumps(assets,separators=(',',':'))+';\nconst MUSIC='+json.dumps(music,separators=(',',':'))+';\n'
+    fish_files={'geometry':'geometry.bin',**{name+str(size):name+'-'+str(size)+'.png' for size in [512,1024] for name in ['baseColor','normal','orm']}}
+    fish_bytes={key:read_input(ROOT/'assets/barramundi'/name) for key,name in fish_files.items()}
+    for name in ['LICENSE.md','CC0-1.0.txt']:
+        read_input(ROOT/'assets/barramundi'/name)
+    fish_portable={key:'data:'+('application/octet-stream' if key=='geometry' else 'image/png')+';base64,'+base64.b64encode(data).decode() for key,data in fish_bytes.items()}
+    config='const BARRAMUNDI_ASSETS='+json.dumps(fish_portable,separators=(',',':'))+';\n'+room_js+growth_js+'const ASSETS='+json.dumps(assets,separators=(',',':'))+';\nconst MUSIC='+json.dumps(music,separators=(',',':'))+';\n'
     config+='const WORLD='+json.dumps('data:application/octet-stream;base64,'+base64.b64encode(archive).decode())+';\n'
     config+='let SCULPTED_CORAL;\nconst CORAL_FORMS='+json.dumps('data:application/json;base64,'+base64.b64encode(read_input(ROOT/'assets/coral_forms.json')).decode())+';\n'
     js=config+'\n'.join(source_text(ROOT/'src'/n) for n in JS_FILES)
     portable=shell.replace('/*__CSS__*/',source_text(ROOT/'src/style.css')+'\n'+source_text(ROOT/'src/mobile-controls.css')).replace('/*__JS__*/',js.replace('</script','<\\/script'))
-    config=room_js+growth_js+'const ASSETS='+json.dumps({p.stem:'assets/'+p.name+'?v='+version for p in images},separators=(',',':'))+';\nconst MUSIC='+json.dumps({p.stem:'music/'+p.name for p in tracks},separators=(',',':'))+';\n'
+    config='const BARRAMUNDI_ASSETS='+json.dumps({key:'assets/barramundi/'+name+'?v='+version for key,name in fish_files.items()},separators=(',',':'))+';\n'+room_js+growth_js+'const ASSETS='+json.dumps({p.stem:'assets/'+p.name+'?v='+version for p in images},separators=(',',':'))+';\nconst MUSIC='+json.dumps({p.stem:'music/'+p.name for p in tracks},separators=(',',':'))+';\n'
     config+='const WORLD="assets/reef.mesh.gz?v='+version+'";\n'
     config+='const WORLD_STREAM="assets/scene/index.json?v='+version+'";\n'
     config+='let SCULPTED_CORAL;\nconst CORAL_FORMS="assets/coral_forms.json?v='+version+'";\n'

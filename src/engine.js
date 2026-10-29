@@ -1239,6 +1239,62 @@ function surfaceShaderSource(source,kind,material){
  }return source;
 }
 
+// The imported fish is optional: derive its two programs only after the asset
+// owner requests them. Existing world shaders and the entry texture promise
+// remain unchanged. Source metres, +X head; timing is an authored animation.
+const IMPORTED_FISH_MOTION_GLSL=`
+uniform float uImportedMotionAmplitude;
+void deformImportedFish(inout vec3 p,inout vec3 n,inout vec3 tangent,float time){
+ float amplitude=clamp(uImportedMotionAmplitude,0.,0.025);
+ if(amplitude==0.||p.x>=0.12)return;
+ float u=clamp((0.12-p.x)/0.44,0.,1.);
+ float w=u*u*u*(10.+u*(-15.+6.*u));
+ float dw=-30.*u*u*(u-1.)*(u-1.)/0.44;
+ float phase=6.911503837897546*time-1.6*w;
+ float wave=sin(phase),slope=amplitude*dw*(wave-1.6*w*cos(phase));
+ p.z+=amplitude*w*wave;
+ // J = [1 0 0; 0 1 0; slope 0 1], det J=1. Preserve tangent.w outside.
+ n.x-=slope*n.z;
+ tangent.z+=slope*tangent.x;
+}
+`;
+function importedFishShaderSources(){
+ const replace=(source,anchor,value)=>{if(source.split(anchor).length!==2)throw Error('Imported fish shader anchor changed');return source.replace(anchor,value);};
+ const specialize=source=>replace(replace(source,'uniform int uKind;','const int uKind=13;'),'uniform int uMat;','const int uMat=18;');
+ let vertex=specialize(VS),fragment=specialize(FS);
+ vertex=replace(vertex,'layout(location=0) in vec3 aPosition;','layout(location=12) in vec4 aImportedTangent;out vec4 vImportedTangent;\nlayout(location=0) in vec3 aPosition;');
+ vertex=replace(vertex,'void main(){',IMPORTED_FISH_MOTION_GLSL+'\nvoid main(){');
+ vertex=replace(vertex,'float pitch=aExtra.y;','vec3 tangent=aImportedTangent.xyz;deformImportedFish(p,n,tangent,uTime);\n float pitch=aExtra.y;');
+ vertex=replace(vertex,'vRelative=p+aOffset;',`tangent=vec3(tangent.x*cos(pitch)-tangent.y*sin(pitch),tangent.x*sin(pitch)+tangent.y*cos(pitch),tangent.z)*aTransform.yzw;
+ tangent=vec3(c*tangent.x+s*tangent.z,tangent.y,-s*tangent.x+c*tangent.z);
+ vImportedTangent=vec4(normalize(tangent),aImportedTangent.w);
+ vRelative=p+aOffset;`);
+ fragment=replace(fragment,'out vec4 frag;',`in vec4 vImportedTangent;
+uniform sampler2D uImportedColor;uniform sampler2D uImportedORM;uniform sampler2D uImportedNormal;
+uniform float uImportedNormalStrength;
+out vec4 frag;`);
+ fragment=replace(fragment,'void main(){','void main(){\n if(!gl_FrontFacing)discard;');
+ // A positive species index must not replace source roughness/colour with a
+ // procedural fish profile, including the lamp's subsurface approximation.
+ fragment=replace(fragment,'uniform vec4 uSurfaceProfile;','const vec4 uSurfaceProfile=vec4(-1.,0.,1.,-1.);');
+ fragment=replace(fragment,' vec3 L=normalize(vWorld.y<0.?uLightDir:uAirLightDir);',` // Base colour has already undergone the texture's single sRGB decode.
+ vec3 importedAlbedo=texture(uImportedColor,vUV).rgb;
+ vec3 importedORM=texture(uImportedORM,vUV).rgb;
+ float metallic=importedORM.b;rough=importedORM.g;occ=importedORM.r;
+ vec3 tangent=normalize(vImportedTangent.xyz-n*dot(n,vImportedTangent.xyz));
+ vec3 bitangent=cross(n,tangent)*vImportedTangent.w;
+ vec3 mapNormal=texture(uImportedNormal,vUV).xyz*2.-1.;mapNormal.xy*=uImportedNormalStrength;
+ n=normalize(mat3(tangent,bitangent,n)*mapNormal);
+ vec3 L=normalize(vWorld.y<0.?uLightDir:uAirLightDir);`);
+ fragment=replace(fragment,'vec3 albedo=pow(clamp(base,vec3(0.),vec3(1.)),vec3(2.2));','vec3 albedo=importedAlbedo*(1.-metallic);');
+ fragment=replace(fragment,'vec3 varianceNormal=(uMat==5||(uMat==6&&uKind==1))?geomN:n;','vec3 varianceNormal=geomN;');
+ fragment=replace(fragment,'float F0=(uMat==6||uMat==5)?(vTag>3.5?.018:.006):uMat==11?.019:.005;','vec3 F0=mix(vec3(.006),importedAlbedo,metallic);');
+ fragment=replace(fragment,'F0=.12;','F0=vec3(.12);');
+ fragment=replace(fragment,'float F=F0+(1.-F0)*pow(1.-VoH,5.);','vec3 F=F0+(1.-F0)*pow(1.-VoH,5.);');
+ fragment=replace(fragment,'float lampSpec=lampD*lampG*F0*NoV;','vec3 lampSpec=lampD*lampG*F0*NoV;');
+ return {vertex,fragment};
+}
+
 class Renderer{
  constructor(canvas,initialQuality=null){this.canvas=canvas;const g=canvas.getContext('webgl2',{alpha:false,antialias:false,depth:true,preserveDrawingBuffer:false,powerPreference:'high-performance'});if(!g)throw new Error('請以支援 WebGL 2 的一般瀏覽器開啟。');this.gl=g;this.maxTextureSize=g.getParameter(g.MAX_TEXTURE_SIZE);this.mobile=matchMedia('(pointer:coarse)').matches;this.batches=[];this.fog=[.0008,.005,.028];this.lightDir=V.norm([-.36,1.,.30]);this.lightColor=[1.05,1.02,.93];this.clarity=1.;this.lamp=false;this.dynamicScale=1;this.lighting="day";this.fogDensity=.034;this.sun=1.02;this.quality=initialQuality??(this.mobile?1:2);this.exposure=1.11;this.drawCalls=0;this.frame=0;
   this.program=this.makeProgram(VS,FS);this.setupSurfacePrograms();this.shellProgram=this.makeProgram(SHELL_VS,SHELL_FS);this.shellImageProgram=this.makeProgram(VS,SHELL_IMAGE_FS);this.shellFilterProgram=this.makeProgram(POST_VS,SHELL_FILTER_FS);this.shadowProgram=this.makeProgram(VS,SHADOW_FS);this.waterProgram=this.makeProgram(WATER_VS,WATER_FS);this.pointProgram=this.makeProgram(POINT_VS,POINT_FS);this.rayProgram=this.makeProgram(RAY_VS,RAY_FS);this.postProgram=this.makeProgram(POST_VS,POST_FS);this.volumeProgram=this.makeProgram(POST_VS,VOLUME_FS);this.volumeFilterProgram=this.makeProgram(POST_VS,VOLUME_FILTER_FS);this.bubbleProgram=this.makeProgram(BUBBLE_VS,BUBBLE_FS);this.aaProgram=this.makeProgram(POST_VS,AA_FS);this.skyProgram=this.makeProgram(POST_VS,SKY_FS);this.msaaSamples=0;
@@ -1263,6 +1319,7 @@ class Renderer{
   }return programs;
  }
  surfaceProgram(b){
+  if(b.kind===13)return this.importedBatchReady(b)?this.surfacePrograms.get('13:18'):null;
   const programs=this.surfacePrograms;if(!programs)return this.program;
   if(b.kind===0&&b.material===1)return programs.get('0:1')||this.program;
   if(b.kind===0&&b.material===2)return programs.get('0:2')||this.program;
@@ -1276,6 +1333,17 @@ class Renderer{
   if(b.kind===3&&b.material===3)return programs.get('3:3')||this.program;
   return this.program;
  }
+ prepareImportedMaterial(){
+  if(this.surfacePrograms?.has('13:18'))return true;
+  if(this.surfaceProgramFailures?.has('13:18'))return false;
+  let surface=null,shadow=null;
+  try{
+   const g=this.gl;if(g.getParameter(g.MAX_VERTEX_ATTRIBS)<13||g.getParameter(g.MAX_TEXTURE_IMAGE_UNITS)<14)throw Error('Imported fish GPU limits');
+   const source=importedFishShaderSources();surface=this.makeProgram(source.vertex,source.fragment);shadow=this.makeProgram(source.vertex,SHADOW_FS);
+   this.surfacePrograms.set('13:18',surface);this.importedShadowProgram=shadow;return true;
+  }catch(error){if(surface)this.gl.deleteProgram(surface.p);if(shadow)this.gl.deleteProgram(shadow.p);this.surfaceProgramFailures.set('13:18',String(error?.message||error));return false;}
+ }
+ importedBatchReady(b){return !!(b.material===18&&b.importedGeometry&&!b.importedGeometry.released&&b.importedMaterial?.ready&&b.importedMaterial.textures?.length===3&&b.importedMaterial.textures.every(Boolean)&&this.importedShadowProgram&&this.surfacePrograms?.has('13:18'));}
  uniform(p,n){if(!(n in p.u))p.u[n]=this.gl.getUniformLocation(p.p,n);return p.u[n];}
  // Programs omit uniforms they do not use. Their cached null locations are
  // WebGL no-ops; skip those calls while forwarding active values unchanged.
@@ -1323,6 +1391,7 @@ class Renderer{
  upgradeTextures(){if(this.textureFull)return Promise.resolve();if(!this._textureUpgrade)this._textureUpgrade=this.loadTextures(true).finally(()=>this._textureUpgrade=null);return this._textureUpgrade;}
 
  batch(geo,instances,kind=0,dynamic=false){
+  if(kind===13)return this.importedBatch(geo,instances,dynamic);
   const g=this.gl,mesh=geo.indexed||indexGeometry(geo.v),transparentShell=transparentShellRange(geo.transparentShell,mesh.indices.length),vao=g.createVertexArray();g.bindVertexArray(vao);
   // Compiled meshes are immutable. Loader-canonicalized copies may share only
   // geometry buffers; each draw batch still owns its VAO and instance state.
@@ -1351,6 +1420,53 @@ class Renderer{
    if(Math.hypot(...bounds.center)>mesh.radius*.25||mesh.radius>2*Math.min(...bounds.half))b.cullBounds=bounds;
   }
   this.updateBatch(b);this.batches.push(b);g.bindVertexArray(null);return b;
+ }
+ importedBatch(geo,instances,dynamic=true){
+  const mesh=geo.indexed,material=geo.importedMaterial,g=this.gl;
+  if(geo.material!==18||!material?.ready||material.textures?.length!==3||!material.textures.every(Boolean)||!mesh||!(mesh.vertices instanceof Float32Array)||!(mesh.tangents instanceof Float32Array)||mesh.vertices.length%12||mesh.tangents.length!==mesh.vertices.length/3||!Number.isFinite(mesh.radius)||mesh.radius<=0)throw Error('Imported fish mesh/material is incomplete');
+  if(!this.prepareImportedMaterial())throw Error('Imported fish shader is unavailable');
+  if(!this.importedMeshBuffers)this.importedMeshBuffers=new WeakMap();let shared=this.importedMeshBuffers.get(mesh);
+  if(!shared||shared.released){
+   shared={owner:this,refs:0,released:false,vb:null,eb:null,tb:null,count:mesh.indices.length,vertexCount:mesh.vertices.length/12,radius:mesh.radius+.025+.00001};
+   try{
+    const indices=meshIndexData(mesh.indices);shared.indexType=indices.BYTES_PER_ELEMENT===2?g.UNSIGNED_SHORT:g.UNSIGNED_INT;
+    shared.vb=g.createBuffer();shared.eb=g.createBuffer();shared.tb=g.createBuffer();if(!shared.vb||!shared.eb||!shared.tb)throw Error('Imported fish buffer allocation failed');
+    // ELEMENT_ARRAY_BUFFER binding belongs to a VAO. Do not overwrite the
+    // last world batch's index binding while creating this optional mesh.
+    g.bindVertexArray(null);g.bindBuffer(g.ARRAY_BUFFER,shared.vb);g.bufferData(g.ARRAY_BUFFER,mesh.vertices,g.STATIC_DRAW);
+    g.bindBuffer(g.ELEMENT_ARRAY_BUFFER,shared.eb);g.bufferData(g.ELEMENT_ARRAY_BUFFER,indices,g.STATIC_DRAW);
+    g.bindBuffer(g.ARRAY_BUFFER,shared.tb);g.bufferData(g.ARRAY_BUFFER,mesh.tangents,g.STATIC_DRAW);
+    if(g.getError()!==g.NO_ERROR)throw Error('Imported fish geometry upload failed');
+    this.importedMeshBuffers.set(mesh,shared);
+   }catch(error){for(const key of ['vb','eb','tb'])if(shared[key])g.deleteBuffer(shared[key]);shared.released=true;throw error;}
+  }
+  try{return this.createImportedBatch(shared,material,instances,{species:geo.species??-1,dynamic,shadow:geo.shadow!==false});}
+  catch(error){if(!shared.refs){for(const key of ['vb','eb','tb'])g.deleteBuffer(shared[key]);shared.released=true;}throw error;}
+ }
+ createImportedBatch(shared,material,instances,options={},capacity=instances.length){
+  if(shared.owner!==this||shared.released||!Number.isInteger(capacity)||capacity<instances.length||capacity<0)throw Error('Invalid imported fish batch owner/capacity');
+  const g=this.gl;let vao=null,ib=null;
+  try{
+   vao=g.createVertexArray();ib=g.createBuffer();if(!vao||!ib)throw Error('Imported fish instance allocation failed');g.bindVertexArray(vao);
+   g.bindBuffer(g.ARRAY_BUFFER,shared.vb);for(const [loc,size,offset]of [[0,3,0],[1,3,12],[2,3,24],[7,2,36],[8,1,44]])this.attr(loc,size,48,offset);
+   g.bindBuffer(g.ARRAY_BUFFER,shared.tb);this.attr(12,4,16,0);g.bindBuffer(g.ELEMENT_ARRAY_BUFFER,shared.eb);
+   const data=new Float32Array(Math.max(1,capacity)*24);g.bindBuffer(g.ARRAY_BUFFER,ib);g.bufferData(g.ARRAY_BUFFER,data.byteLength,g.DYNAMIC_DRAW);
+   for(const [loc,size,offset]of [[3,3,0],[4,4,12],[5,3,28],[6,2,40],[9,4,48],[10,4,64],[11,4,80]])this.attr(loc,size,96,offset,1);
+   const b={...options,vao,ib,vb:shared.vb,eb:shared.eb,tb:shared.tb,count:shared.count,vertexCount:shared.vertexCount,indexType:shared.indexType,radius:shared.radius,instances,data,kind:13,material:18,importedGeometry:shared,importedMaterial:material,visible:true,drawCount:0,_lastVisible:null};
+   this.updateBatch(b);if(g.getError()!==g.NO_ERROR)throw Error('Imported fish instance upload failed');shared.refs++;this.batches.push(b);return b;
+  }catch(error){if(vao)g.deleteVertexArray(vao);if(ib)g.deleteBuffer(ib);throw error;}
+  finally{g.bindVertexArray(null);}
+ }
+ cloneImportedBatch(source,instances=[],capacity=instances.length){
+  if(!this.importedBatchReady(source)||source.importedGeometry.owner!==this)throw Error('Imported fish source batch is unavailable');
+  const b=this.createImportedBatch(source.importedGeometry,source.importedMaterial,instances,{species:source.species,dynamic:true,shadow:source.shadow},capacity);
+  for(const key of ['minDistance','maxDistance','shadowProxy','sceneRole'])if(source[key]!==undefined)b[key]=source[key];return b;
+ }
+ releaseImportedBatch(b){
+  const shared=b?.importedGeometry;if(!shared||shared.owner!==this)return false;
+  const g=this.gl,index=this.batches.indexOf(b);if(index>=0)this.batches.splice(index,1);
+  g.deleteVertexArray(b.vao);g.deleteBuffer(b.ib);b.vao=b.ib=b.vb=b.eb=b.tb=null;b.drawCount=0;b.visible=false;b.instances=[];b.data=null;b.importedGeometry=null;b.importedMaterial=null;
+  if(--shared.refs===0){for(const key of ['vb','eb','tb']){g.deleteBuffer(shared[key]);shared[key]=null;}shared.released=true;}return true;
  }
  deferredBatch(meta,instances){
   const transparentShell=transparentShellRange(meta.transparentShell,meta.indexCount);
@@ -1633,6 +1749,14 @@ class Renderer{
   if(state.kind!==kind){this.set1i(p,'uKind',kind);state.kind=kind;}
   if(state.material!==b.material){this.set1i(p,'uMat',b.material);state.material=b.material;}
   if(state.species!==b.species){this.set1i(p,'uSpecies',b.species);this.speciesUniforms(p,b);state.species=b.species;}
+  if(b.kind===13){
+   const material=b.importedMaterial;
+   this.set1f(p,'uImportedMotionAmplitude',Number.isFinite(material.motionAmplitude)?material.motionAmplitude:.025);
+   if(p===this.surfacePrograms.get('13:18')){
+    if(state.importedMaterial!==material){for(let i=0;i<3;i++){this.gl.bindSampler(11+i,null);this.bindTex(11+i,material.textures[i]);this.set1i(p,['uImportedColor','uImportedORM','uImportedNormal'][i],11+i);}state.importedMaterial=material;}
+    this.set1f(p,'uImportedNormalStrength',Number.isFinite(material.normalStrength)?material.normalStrength:1);
+   }
+  }
  }
  bindTex(unit,tex){let g=this.gl;g.activeTexture(g.TEXTURE0+unit);g.bindTexture(g.TEXTURE_2D,tex);}
  render(eye,target,t){
@@ -1663,17 +1787,22 @@ class Renderer{
   if(this.sunless)this._shadowMapDirty=true;
   else if(refreshShadow){
    g.bindFramebuffer(g.FRAMEBUFFER,this.shadowFBO);g.viewport(0,0,this.shadowSize,this.shadowSize);g.clear(g.DEPTH_BUFFER_BIT);g.colorMask(false,false,false,false);g.enable(g.POLYGON_OFFSET_FILL);g.polygonOffset(1.2,2.);
-   this.common(this.shadowProgram,eye,this.lightVP,t);const planes=this.frustum(this.lightVP),state={};
+   this.common(this.shadowProgram,eye,this.lightVP,t);const planes=this.frustum(this.lightVP),state={},importedState={};let activeShadow=this.shadowProgram;
    for(const b of this.batches){if(!b.visible||!b.shadow||b.dynamic||b.kind===3)continue;
-    this.updateBatch(b,center,planes,true);if(!b.drawCount)continue;this.batchUniforms(this.shadowProgram,b,state,0);this.drawBatch(b);this.shadowDraws++;}
+    if(b.kind===13&&!this.importedBatchReady(b))continue;
+    this.updateBatch(b,center,planes,true);if(!b.drawCount)continue;const p=b.kind===13?this.importedShadowProgram:this.shadowProgram;
+    if(p!==activeShadow){this.common(p,eye,this.lightVP,t);activeShadow=p;}this.batchUniforms(p,b,b.kind===13?importedState:state,b.kind===13?13:0);this.drawBatch(b);this.shadowDraws++;}
    g.disable(g.POLYGON_OFFSET_FILL);g.colorMask(true,true,true,true);this.staticShadowUpdates=(this.staticShadowUpdates||0)+1;this.forceShadow=false;this._shadowMapDirty=false;
   }
   // Small, independent actor map; moving silhouettes do not invalidate the reef cache.
   this.renderDynamicLightVP=stableLightMatrix(mm(ortho(-17,17,-17,17,.1,150),lookAt(V.add(relativeEye,V.mul(this.lightDir,65)),relativeEye)),this.dynamicShadowSize);this.dynamicLightVP=origin.some(n=>n!==0)?worldProjection(this.renderDynamicLightVP,origin):this.renderDynamicLightVP;
   if(!this.sunless){
   g.bindFramebuffer(g.FRAMEBUFFER,this.dynamicShadowFBO);g.viewport(0,0,this.dynamicShadowSize,this.dynamicShadowSize);g.clear(g.DEPTH_BUFFER_BIT);g.colorMask(false,false,false,false);this.common(this.shadowProgram,eye,this.dynamicLightVP,t);
-  const lightPlanes=this.frustum(this.dynamicLightVP),shadowState={};
-  for(const b of this.batches){if(!b.visible||!b.dynamic||!b.shadow||![0,1,2,4,5,6,7,8,9,10,11,12].includes(b.kind)||(b.minDistance>0&&!b.shadowProxy))continue;this.updateBatch(b,eye,lightPlanes,true);if(!b.drawCount)continue;this.batchUniforms(this.shadowProgram,b,shadowState);this.drawBatch(b);this.shadowDraws++;}
+  const lightPlanes=this.frustum(this.dynamicLightVP),shadowState={},importedShadowState={};let activeDynamicShadow=this.shadowProgram;
+  for(const b of this.batches){if(!b.visible||!b.dynamic||!b.shadow||![0,1,2,4,5,6,7,8,9,10,11,12,13].includes(b.kind)||(b.minDistance>0&&!b.shadowProxy))continue;
+   if(b.kind===13&&!this.importedBatchReady(b))continue;
+   this.updateBatch(b,eye,lightPlanes,true);if(!b.drawCount)continue;const p=b.kind===13?this.importedShadowProgram:this.shadowProgram;
+   if(p!==activeDynamicShadow){this.common(p,eye,this.dynamicLightVP,t);activeDynamicShadow=p;}this.batchUniforms(p,b,b.kind===13?importedShadowState:shadowState);this.drawBatch(b);this.shadowDraws++;}
   g.colorMask(true,true,true,true);
   }
   g.bindFramebuffer(g.FRAMEBUFFER,this.msaaFBO||this.sceneFBO);if(this.msaaSamples)g.enable(g.SAMPLE_ALPHA_TO_COVERAGE);g.viewport(0,0,this.canvas.width,this.canvas.height);g.clearColor(.002,.025,.045,1);g.clear(g.COLOR_BUFFER_BIT|g.DEPTH_BUFFER_BIT);
@@ -1681,7 +1810,7 @@ class Renderer{
   const surfaceStates=new Map();let activeSurface=null;
   const names=['uSand','uSandN','uRock','uRockN','uShell','uShellN','uCoral','uCoralN'];for(let i=0;i<8;i++)this.bindTex(i,this.textures[i]);this.bindTex(8,this.shadowTexture);g.bindSampler(8,this.shadowSampler);this.bindTex(10,this.dynamicShadowTexture);g.bindSampler(10,this.shadowSampler);
   this.submittedTriangles=0;this.submittedVertices=0;const planes=this.frustum(this.vp),ls=this.mobile?(this.quality===0?.64:.82):(this.quality===0?.75:1);
-  for(const b of this.batches){if(!b.visible)continue;this.updateBatch(b,eye,planes);if(!b.drawCount)continue;
+  for(const b of this.batches){if(!b.visible||(b.kind===13&&!this.importedBatchReady(b)))continue;this.updateBatch(b,eye,planes);if(!b.drawCount)continue;
    this.submittedTriangles+=(b.transparentShell?.first??b.count)/3*b.drawCount;this.submittedVertices+=b.vertexCount*b.drawCount;
    const p=this.surfaceProgram(b);let state=surfaceStates.get(p);
    if(!state){this.common(p,eye,this.vp,t);this.set1f(p,'uFogDensity',this.fogDensity);this.set1f(p,'uShadowTexel',1/this.shadowSize);this.set1f(p,'uShadows',1);

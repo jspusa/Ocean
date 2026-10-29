@@ -58,8 +58,8 @@ function animalContactEnvelope(f){
  // maximum tail bend plus full .82 pectoral/handshake excursion in parity QA.
  // An authored clearance can outlive a smaller visual outline. Keep established
  // routes and floor clearance while still allowing larger models to expand it.
- const base=Math.max(profile.radius,sp?.contactRadius||0),kind=profile.kind,morph=kind===1?Math.max(1,m[0]*Math.max(1,m[2]),m[1]):1;
- const bend=kind===1?.1028+.025*base*morph:kind===2?Math.hypot(.37,.07):kind===4?.48*Math.pow(base/1.9,1.5):kind===6?.62:kind===7?.60:kind===9?.073+base*.10:kind===12?.035+base*.035:base*.15+.15;
+ const kind=profile.kind,base=kind===13?oceanBarramundi.motion.localRadius:Math.max(profile.radius,sp?.contactRadius||0),morph=kind===1?Math.max(1,m[0]*Math.max(1,m[2]),m[1]):1;
+ const bend=kind===13?0:kind===1?.1028+.025*base*morph:kind===2?Math.hypot(.37,.07):kind===4?.48*Math.pow(base/1.9,1.5):kind===6?.62:kind===7?.60:kind===9?.073+base*.10:kind===12?.035+base*.035:base*.15+.15;
  const scale=Math.max(...f.s),radius=(base*morph+bend)*scale+.012;
  const bodyY=sp?.modelBounds?Math.max(Math.abs(sp.modelBounds.min[1]),Math.abs(sp.modelBounds.max[1])):f.species===8?.31:f.species===9?.22:f.species===10?1:f.species===11?.6:sp?.height||.22;
  profile.sx=s[0];profile.sy=s[1];profile.sz=s[2];profile.mx=m[0];profile.my=m[1];profile.mz=m[2];
@@ -367,6 +367,7 @@ function trenchMotionPose(f,time,out=f.p,context=null){
 // Public seam used by the world, aquarium and tests. It updates only pose/state;
 // home, uid and s are immutable. react:false is a deterministic exhibit playback.
 function faunaMotionPose(f,time,out=f.p,context=null){
+ if(SPECIES[f.species]?.id==='barramundi')return oceanBarramundi.motionPose(f,time,out,context);
  if(SPECIES[f.species]?.trench)return trenchMotionPose(f,time,out,context);
  if(SPECIES[f.species]?.abyss)return abyssMotionPose(f,time,out,context);
  if(SPECIES[f.species]?.cetacean||SPECIES[f.species]?.traits?.motion==='cetacean')return cetaceanMotionPose(f,time,out,context);
@@ -549,11 +550,11 @@ function tableCoral(type=0,lod=null){return FolioseArt.build(type,lod||(reefDeta
 // Runtime observation interface: inspect another real instance, no representative clone.
 function initIndividualUI(){
  const panel=document.createElement('div');panel.id='individualCard';panel.className='hidden';panel.innerHTML='<div><small>THIS ENCOUNTER</small><b id="individualLabel"></b><span id="individualTraits"></span></div><button id="nextIndividual" title="觀察同種下一隻">下一隻 ↗</button>';$('hud').appendChild(panel);
- $('nextIndividual').onclick=()=>{if(!follow)return;const set=life.filter(f=>f.species===follow.species&&f.ecologyPresent!==false);const i=set.indexOf(follow);findSpecies(follow.species,set[(i+1)%set.length]);paintIndividualUI();};
+ $('nextIndividual').onclick=()=>{if(!follow)return;const set=life.filter(f=>f.species===follow.species&&f.ecologyPresent!==false&&f.assetReady!==false);const i=set.indexOf(follow);findSpecies(follow.species,set[(i+1)%set.length]);paintIndividualUI();};
 }
 function paintIndividualUI(){
  const panel=$('individualCard');if(!panel)return;panel.classList.toggle('hidden',!follow||!active||!!modal);
- if(!follow||!active)return;const set=life.filter(f=>f.species===follow.species&&f.ecologyPresent!==false),i=set.indexOf(follow)+1;
+ if(!follow||!active)return;const set=life.filter(f=>f.species===follow.species&&f.ecologyPresent!==false&&f.assetReady!==false),i=set.indexOf(follow)+1;
  $('individualLabel').textContent=SPECIES[follow.species].name+' · '+String(i).padStart(2,'0')+' / '+String(set.length).padStart(2,'0');
  $('individualTraits').textContent='固定個體 '+follow.uid+' · 體型／花紋／泳姿各有差異';
  $('nextIndividual').disabled=set.length<2;

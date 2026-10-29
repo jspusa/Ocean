@@ -77,7 +77,7 @@ const oceanEncounters=(()=>{
   if(!saved.protection)saved.protection=captureProtection();
   const seed=saved.seed,protectedIDs=new Set(saved.protection.species),owned=new Set(saved.protection.uids),groups=new Map();
   for(const f of life){
-   const b=original(f),sp=SPECIES[f.species],id=sp?.id||'',protectedActor=owned.has(f.uid)||protectedIDs.has(id),mobile=f.species>0&&f.species<12||sp?.pelagic||sp?.cetacean||f.reefFish&&!['fire_goby','banggai_cardinal'].includes(id);
+   const b=original(f),sp=SPECIES[f.species],id=sp?.id||'',protectedActor=owned.has(f.uid)||protectedIDs.has(id),mobile=id==='barramundi'||f.species>0&&f.species<12||sp?.pelagic||sp?.cetacean||f.reefFish&&!['fire_goby','banggai_cardinal'].includes(id);
    f.encounterPresent=true;f.encounterEpoch=seed;
    if(Number.isFinite(b.phase))f.phase=b.phase;if(Number.isFinite(b.orbit))f.orbit=b.orbit;
    if(mobile&&!protectedActor){const offset=value(seed,f.uid,3)*Math.PI*2;if(Number.isFinite(b.phase))f.phase=b.phase+offset;if(Number.isFinite(b.orbit))f.orbit=b.orbit+offset;}

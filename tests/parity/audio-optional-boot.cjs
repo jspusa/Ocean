@@ -17,6 +17,9 @@ async function fixture({startWithSound,focused=true,hidden=false}){
   setTimeout(fn,ms){events.push({event:'timer',ms,ready:context.ready});return events.length;},clearTimeout(){},
   requestAnimationFrame(fn){if(!context.ready)queueMicrotask(fn);},animate(){},
   oceanSaveGuard:{live:true,loaded(){}},oceanSaveHealth:{init(){events.push({event:'saveHealth',ready:context.ready});}},oceanFeatures:{async init(){}},oceanSelection:{init(){}},oceanDiveUI:{init(){}},loadCompiledScene:async()=>true,
+  // The optional fish synchronously registers its logical actor. Its actual
+  // loader/fault lifecycle is exercised by barramundi-owner-contract.cjs.
+  oceanBarramundi:{ensure(){events.push({event:'ensureBarramundi',ready:context.ready});}},
   Renderer:class{constructor(){this.loaded=Promise.resolve();this.frame=0;}resize(){}render(){events.push({event:'firstRender',ready:context.ready});}},
   handleFailure(error){events.push({event:'failure',error:error.message});}
  };
@@ -42,6 +45,8 @@ async function fixture({startWithSound,focused=true,hidden=false}){
    results.push({name,passed:true});
   }catch(error){results.push({name,passed:false,error:error.message});}
  }
- console.log(JSON.stringify({scope:'CPU production boot dependency; controlled native constructor boundary, no native-hang or visual claim',passed:results.filter(x=>x.passed).length,total:results.length,results},null,2));
+ const report={scope:'CPU production boot dependency; controlled native constructor boundary, no native-hang or visual claim',passed:results.filter(x=>x.passed).length,total:results.length,results},out=process.argv.find(x=>x.startsWith('--out='))?.slice(6);
+ if(out){const file=path.resolve(root,out);fs.mkdirSync(path.dirname(file),{recursive:true});fs.writeFileSync(file,JSON.stringify(report,null,2)+'\n');}
+ console.log(JSON.stringify(report,null,2));
  if(results.some(x=>!x.passed))process.exitCode=1;
 })().catch(error=>{console.error(error);process.exitCode=1;});

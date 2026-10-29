@@ -1,3 +1,9 @@
+# 0.18.43 完整貼圖金目鱸
+
+近岸新增 Microsoft 製作、以 CC0-1.0 釋出的 BarramundiFish 模型，來源為 Khronos glTF Sample Assets 固定版本。保留原網格、UV、法線與切線，轉為公尺尺寸，縮製 512／1024 貼圖；游動、路線與碰撞接入由本專案完成。來源模型沒有游動動畫，本站動作是簡化美術設定。完整來源、授權及轉換資訊見 [素材聲明](assets/barramundi/LICENSE.md) 與 [CC0 全文](assets/barramundi/CC0-1.0.txt)。金目鱸圖鑑縮圖由遊戲內相同模型渲染，不是實景照片。
+
+此魚生活於近岸／河口等環境，遊戲中的潟湖位置不是現地觀測座標。以下舊版的「沒有外部模型」說明僅適用該版，不適用本版新增素材。
+
 # 0.18.42 小丑魚尾鰭形態參考
 
 原創程序尾鰭的圓弧輪廓參考日本國立科學博物館 [Fishes of Bitung — Amphiprion ocellaris](https://www.kahaku.go.jp/research/db/zoology/Fishes_of_Bitung/data/p130_02b.html) 的形態說明與標本照片。參考照片未納入遊戲素材；模型尺寸、曲線與取樣為原創美術設定，遊戲仍標示為 Amphiprion spp. 類群示意，不宣稱完成種級重建。研究中的 Smithsonian 珊瑚掃描模型尚未納入本版。
