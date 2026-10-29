@@ -708,7 +708,9 @@ void main(){
   }else if(uKind==1&&uSpecies>=37&&uSpecies<=40)base=reefFishPigment(base,fishLocalWidth)*clamp(.98-vLocal.y*.25,.87,1.07);
   float ray=vTag<3.08?atan(vLocal.y+.018,.22-vLocal.x)*22.:vTag<3.18?atan(vLocal.y,-.46-vLocal.x)*30.:vLocal.x*112.+vLocal.y*4.;float rayFilter=exp(-pow(fwidth(ray),2.)*1.5);
   base*=vTint*(.94+.027*sin(ray)*rayFilter);rough=.63;thickness=.16;
-  coverage=uSamples>0?.83:1.;
+  // Thin-tissue backlighting is handled above. A constant fractional sample
+  // mask makes these opaque-pass fins look like a screen-aligned checkerboard.
+  coverage=1.;
  }else rough=.16;
  // Rejoin tags before derivatives; the height follows the transformed fish
  // surface instead of adding local scale directions to a world-space normal.

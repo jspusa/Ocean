@@ -1,7 +1,7 @@
 /* Exercise the real compiled-scene loader with deterministic streams and a
  * recording renderer. Geometry identity is the renderer's sharing seam. */
 'use strict';
-const fs=require('node:fs'),path=require('node:path'),vm=require('node:vm'),zlib=require('node:zlib'),assert=require('node:assert/strict');
+const fs=require('node:fs'),path=require('node:path'),vm=require('node:vm'),zlib=require('node:zlib'),crypto=require('node:crypto'),assert=require('node:assert/strict');
 const root=path.resolve(__dirname,'../..'),source=['engine.js','scene_stream.js','scene_cache.js'].map(file=>fs.readFileSync(path.join(root,'src',file),'utf8')).join('\n');
 const packed=fs.readFileSync(path.join(root,'assets/reef.mesh.gz')),decoded=zlib.gunzipSync(packed),base=8+decoded.readUInt32LE(4),originalHeader=JSON.parse(decoded.subarray(8,base));
 function archive(header,payload=Buffer.alloc(0)){
@@ -17,15 +17,13 @@ async function load({body=chunked(packed),streamOnly=false,compression=Decompres
 }
 const tests=[];function check(name,fn){tests.push({name,fn});}
 check('compiled scene shares every byte-identical mesh without merging batches',async()=>{
- // The community adds four high/low meshes for two new species to the
- // previous 501 batches. All 48 shared uploads must still stay shared.
- const result=await load();assert.equal(result.ok,true);assert.equal(result.calls.length,505);
- const meshes=new Set(result.calls.map(b=>b.geo.indexed));assert.equal(meshes.size,457,'48 duplicate geometry uploads must reuse their canonical mesh');
+ // Count byte-equivalent resources independently from the actual archive.
+ // Release-specific population and resource envelopes have a separate audit.
+ const groups=new Map();for(const [i,b]of originalHeader.batches.entries()){const bytes=Buffer.concat([decoded.subarray(base+b.vertexOffset,base+b.vertexOffset+b.vertexFloats*4),decoded.subarray(base+b.indexOffset,base+b.indexOffset+b.indexCount*4)]),key=b.radius+':'+crypto.createHash('sha256').update(bytes).digest('hex');if(!groups.has(key))groups.set(key,{bytes:bytes.length,batches:[]});groups.get(key).batches.push(i);}
+ const result=await load();assert.equal(result.ok,true);assert.equal(result.calls.length,originalHeader.batches.length);
+ const meshes=new Set(result.calls.map(b=>b.geo.indexed));assert.equal(meshes.size,groups.size,'Every byte-equivalent geometry reuses its canonical mesh');
  let bytes=0;for(const mesh of meshes)bytes+=mesh.vertices.byteLength+mesh.indices.byteLength;
- // v0.18.37's shared turtle skins remove 139,824 indexed bytes (135,072 near
- // and 4,752 far). Contact metadata grows the archive, independently of GPU
- // mesh sharing. These are measured compiler sizes, not expanded safety caps.
- assert.equal(bytes,50647668);assert.equal(result.renderer.sceneLoad.decodedBytes,58489976);
+ assert.equal(bytes,[...groups.values()].reduce((sum,g)=>sum+g.bytes,0));assert.equal(result.renderer.sceneLoad.decodedBytes,decoded.length);
  const nodes=new Map();for(const [i,batch]of result.calls.entries()){
   const authored=originalHeader.batches[i],mesh=batch.geo.indexed;
   assert.equal(batch.kind,authored.kind);assert.equal(batch.dynamic,authored.dynamic);assert.equal(batch.geo.material,authored.material);assert.equal(batch.geo.species,authored.species);
@@ -33,8 +31,7 @@ check('compiled scene shares every byte-identical mesh without merging batches',
   assert.deepEqual(Buffer.from(mesh.indices.buffer,mesh.indices.byteOffset,mesh.indices.byteLength),decoded.subarray(base+authored.indexOffset,base+authored.indexOffset+authored.indexCount*4));
   for(const [j,id]of authored.instanceIDs.entries()){if(nodes.has(id))assert.equal(batch.instances[j],nodes.get(id));else nodes.set(id,batch.instances[j]);}
  }
- assert.equal(result.calls[201].geo.indexed,result.calls[277].geo.indexed);assert.notEqual(result.calls[201].geo.material,result.calls[277].geo.material);
- assert.equal(result.calls[227].geo.indexed,result.calls[244].geo.indexed);assert.notEqual(result.calls[227].kind,result.calls[244].kind);
+ for(const g of groups.values())for(const id of g.batches)assert.equal(result.calls[id].geo.indexed,result.calls[g.batches[0]].geo.indexed);
  assert.equal(result.warnings.length,0);
 });
 check('compressed fetch is consumed as a stream without an archive ArrayBuffer',async()=>{
@@ -50,7 +47,7 @@ check('geometry comparison preserves negative zero bits and distinct indices',as
  assert.equal(new Set(result.calls.map(b=>b.geo.indexed)).size,3);assert(Object.is(result.calls[2].geo.indexed.vertices[0],-0));
 });
 check('oversized compressed stream fails before decoding or constructing batches',async()=>{
- const passThrough=class{constructor(){return new TransformStream();}},result=await load({body:chunked(new Uint8Array(24*1024*1024+1),1024*1024),streamOnly:true,compression:passThrough});assert.equal(result.ok,false);assert.equal(result.calls.length,0);assert.match(String(result.warnings[0]),/archive is oversized/);
+ const passThrough=class{constructor(){return new TransformStream();}},result=await load({body:chunked(new Uint8Array(26*1024*1024+1),1024*1024),streamOnly:true,compression:passThrough});assert.equal(result.ok,false);assert.equal(result.calls.length,0);assert.match(String(result.warnings[0]),/archive is oversized/);
 });
 check('oversized decoded stream stops before parsing or constructing batches',async()=>{
  // Produce one transient MiB per compressed byte and discard consumed chunks;

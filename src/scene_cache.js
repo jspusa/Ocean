@@ -1,5 +1,19 @@
 /* Precompiled scene: decode off the hot path and upload bounded slices to WebGL.
    Original generation remains as a fallback; no server, CDN or API key needed. */
+async function prepareProceduralReef(){
+ if(typeof SCULPTED_CORAL!=='undefined')return;
+ try{
+  // Fetch only when both compiled paths are unavailable. The compiler uses
+  // these same authored forms; choosing the legacy generator changes RNG
+  // consumption and cannot replay its recorded attachment positions.
+  const forms=await fetchSceneData(CORAL_FORMS,response=>{
+   let size=0;const bounded=new TransformStream({transform(chunk,controller){size+=chunk.byteLength;if(size>4*1024*1024)throw Error('Coral forms are oversized');controller.enqueue(chunk);}});
+   return new Response(response.body.pipeThrough(bounded)).json();
+  },undefined,15000);
+  for(const level of ['high','medium']){const mesh=forms?.[level];if(!Array.isArray(mesh?.positions)||!mesh.positions.length||!Array.isArray(mesh.normals)||mesh.normals.length!==mesh.positions.length||!Array.isArray(mesh.indices)||!mesh.indices.length||mesh.indices.length%3)throw Error('Coral forms are incomplete');}
+  SCULPTED_CORAL=forms;
+ }catch(cause){const error=new Error('Procedural reef source could not be loaded');error.code='OCEAN_ASSET_UNAVAILABLE';error.cause=cause;throw error;}
+}
 async function loadCompiledScene(renderer){
  if(typeof WORLD_STREAM!=='undefined'&&await loadStreamedScene(renderer,WORLD_STREAM))return true;
  if(typeof DecompressionStream==='undefined'||typeof WORLD==='undefined')return false;
@@ -11,7 +25,7 @@ async function loadCompiledScene(renderer){
   // The complete archive is larger than a region. Its one-minute budget also
   // covers body consumption and decompression, not only response headers.
   bytes=await fetchSceneData(WORLD,response=>{
-   const stream=response.body.pipeThrough(bounded(24*1024*1024,'scene archive is oversized')).pipeThrough(new DecompressionStream('gzip')).pipeThrough(bounded(80*1024*1024,'decoded scene is oversized'));
+   const stream=response.body.pipeThrough(bounded(26*1024*1024,'scene archive is oversized')).pipeThrough(new DecompressionStream('gzip')).pipeThrough(bounded(80*1024*1024,'decoded scene is oversized'));
    return new Response(stream).arrayBuffer();
   },undefined,60000);const view=new DataView(bytes);
   if(bytes.byteLength<8||bytes.byteLength>80*1024*1024||view.getUint32(0,true)!==0x35424652)throw new Error('invalid scene header');

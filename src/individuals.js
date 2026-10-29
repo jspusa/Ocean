@@ -482,24 +482,65 @@ function fishGeometry(s,lod=false){
  return g;
 }
 function distantFishGeometry(s){return fishGeometry(s,true);}
-// Thick, scalloped foliose colonies with irregular edge growth, not stacked dinner plates.
-function tableCoral(type=0){
- const g=new Geometry();g.material=3;g.shadow=true;
- const colors=type?[.53,.56,.46]:[.60,.51,.37];
- const detail=typeof reefDetailLevel==='undefined'||reefDetailLevel;
- const ns=detail?72:32,nr=detail?12:6;
- for(let k=0;k<3;k++){
-  const cx=Math.cos(k*3.5)*k*.13,cz=Math.sin(k*3.5)*k*.14,rad=1.0-k*.18;
-  const form=(u,v,under=false)=>{const a=u*TAU,r=v*rad*(.86+.065*Math.sin(a*5+k)+.045*Math.sin(a*9+k*4)+.024*Math.sin(a*17.));
-   const bowl=.13+k*.155+.18*v*v+(.045*Math.sin(a*4+k)+.015*Math.sin(a*14.))*Math.pow(v,3);
-   return [cx+Math.cos(a)*r,bowl-(under?.026*(1-.30*v):0),cz+Math.sin(a)*r];};
-  surface(g,(u,v)=>form(u,v),ns,nr,(p,u,v)=>colors.map(c=>mix(c,.80,Math.pow(v,24)*.33)),1);
-  surface(g,(u,v)=>form(u,v,true),ns,Math.max(3,nr>>1),colors.map(c=>c*.82),-1);
-  for(let j=0;j<ns;j++)g.quad(form(j/ns,1),form(j/ns,1,true),form((j+1)/ns,1,true),form((j+1)/ns,1),colors.map(c=>mix(c,.77,.3)));
-  g.tube([cx,.01,cz],[cx,.12+k*.15,cz],.14,.10,colors.map(c=>c*.7),10);
+// Foliose growth is a continuous folded lamina rising from a common basal
+// attachment. These are original growth-form studies, not species scans.
+const FolioseArt=(()=>{
+ // COTW photo studies 0255_C01_02 / 0255_C01_01 / 0255_C04_02: broad
+ // incomplete funnels, saddle folds and smaller central whorls arise from a
+ // low shared growth region. There is no tall exposed support axis.
+ // Each row is [core side, height, reach, sweep, lift, fold phase].
+ const leaves=[
+  [[0,.126,1.05,-.20,.23,.4],[2,.181,1.12,.25,.27,2.1],[1,.236,.94,-.14,.19,4.6],[3,.291,.83,.30,.25,1.3],[0,.346,.56,.38,.24,3.7],[2,.401,.36,-.31,.26,.2]],
+  [[1,.126,1.03,.20,.30,1.1],[3,.181,1.12,-.15,.24,3.8],[0,.236,.94,.36,.31,5.2],[2,.291,.86,.12,.27,2.3],[1,.346,.59,-.25,.30,.1],[3,.401,.36,.33,.24,4.1]]
+ ];
+ const center=y=>[.065*Math.sin(y*7),y,.045*Math.sin(y*11)];
+ function mid(type,leaf,t,u){
+  const [side,height,reach,sweep,lift,phase]=leaf,ease=t*t*(3-2*t),spread=Math.PI/4+((type?1.39:1.53)-Math.PI/4)*Math.sin(Math.PI*.5*t);
+  const angleU=mix(u,Math.sin(u*Math.PI/2),ease),a=(side+.5)*Math.PI/2+sweep*.6*ease+angleU*spread;
+  const taper=Math.min(.18,Math.max(.04,(reach-.26)*.65)),edgeScale=Math.min(1,(reach-.26)/.25),scallop=(.012*Math.sin(u*9+phase)+.006*Math.sin(u*13-phase))*edgeScale,r=(.26+(reach-.26)*t)*(1-taper*u*u*ease)+scallop*t*t;
+  const c=center(height),x=c[0]+Math.cos(a)*r,z=c[2]+Math.sin(a)*r,rad=Math.hypot(x,z),az=Math.atan2(z,x),root=.5*(rad-.18+Math.sqrt((rad-.18)**2+.0004));
+  // Shared broad growth curvature lets neighbouring laminae overlap without
+  // cutting through one another. Individual small relief stays below the
+  // separation between growth layers. Smooth angular sampling rounds the
+  // shelf corners instead of ending each radial edge in a straight knife cut.
+  const folds=(.085*Math.sin(az*2+.4+type)+.034*Math.sin(az*4+rad*.3+type*.7)+.008*Math.sin(az*10+rad*.7))*rad*rad/(rad+.20);
+  const y=height+.026+.27*root+folds+.003*Math.sin(u*3+phase)*t;
+  return [x,y,z];
  }
- return g;
-}
+ function build(type,lod){
+  type=type?1:0;const g=new Geometry();g.material=3;g.shadow=lod!=='far';g.reefGrowth='foliose-'+type;
+  const color=type?[.53,.56,.46]:[.60,.51,.37],nw=lod==='high'?48:lod==='middle'?24:12,nt=lod==='high'?5:lod==='middle'?3:2;
+  const vertices=[],faces=[],vertex=(p,c)=>{vertices.push({p,c,n:[0,0,0]});return vertices.length-1;};
+  const tri=(a,b,c)=>{const n=V.cross(V.sub(vertices[b].p,vertices[a].p),V.sub(vertices[c].p,vertices[a].p));if(V.len(n)<1e-12)return;faces.push([a,b,c]);for(const i of [a,b,c])vertices[i].n=V.add(vertices[i].n,n);};
+  const tone=(t,under,u=0)=>color.map(c=>mix(c*(under?.96:.93+.03*t),.76,Math.max(Math.pow(t,18),Math.abs(u)**22)*(under?.09:.13)));
+  // The basal section stays byte-for-byte in the same position at every LOD.
+  // Above it a low, broad common growth region has actual openings sewn to
+  // the laminae. Small folded leaves cover its crown instead of exposing a pole.
+  const rootColor=tone(0,true),bottom=vertex([0,-.06,0],rootColor),root=[[-.04,.065],[0,.10],[.08,.12]].map(([y,r])=>Array.from({length:12},(_,i)=>vertex([Math.cos(i/12*TAU)*r,y,Math.sin(i/12*TAU)*r],rootColor)));
+  for(let i=0;i<12;i++){const next=(i+1)%12;tri(bottom,root[0][i],root[0][next]);for(let j=0;j<root.length-1;j++){tri(root[j][i],root[j+1][next],root[j][next]);tri(root[j][i],root[j+1][i],root[j+1][next]);}}
+  const levels=[.095,...leaves[type].flatMap(l=>[l[1]-.016,l[1]+.016])],core=levels.map(y=>Array.from({length:12},(_,i)=>{const c=center(y),r=.235-.12*(y/.43);return vertex([c[0]+Math.cos(i/12*TAU)*r,y,c[2]+Math.sin(i/12*TAU)*r],rootColor);}));
+  const base=root[root.length-1];for(let j=0;j<12;j++){const n=(j+1)%12;tri(base[j],core[0][n],base[n]);tri(base[j],core[0][j],core[0][n]);}
+  for(let k=0;k<core.length-1;k++)for(let j=0;j<12;j++){if(k%2===1&&Math.floor(j/3)===leaves[type][(k-1)/2][0])continue;const next=(j+1)%12;tri(core[k][j],core[k+1][next],core[k][next]);tri(core[k][j],core[k+1][j],core[k+1][next]);}
+  const cap=vertex(center(levels[levels.length-1]+.012),tone(0,false));for(let j=0;j<12;j++)tri(cap,core[core.length-1][(j+1)%12],core[core.length-1][j]);
+  for(let k=0;k<leaves[type].length;k++){
+   const leaf=leaves[type][k],nv=leaf[2]<.45?Math.max(nt,5):nt,s=leaf[0]*3,next=(s+3)%12,ll=core[k*2+1][s],lr=core[k*2+1][next],ul=core[k*2+2][s],ur=core[k*2+2][next];
+   // Keeping matching X/Z samples on the two sides preserves a thin closed
+   // edge even at coarse LOD; independently offset smooth normals can invert
+   // a concave edge when its triangulation becomes much coarser.
+   const sheet=[-1,1].map(side=>Array.from({length:nv+1},(_,j)=>Array.from({length:nw+1},(_,i)=>{const t=j/nv,u=i/nw*2-1,p=mid(type,leaf,t,u),halfThickness=.0045-.0017*t;return vertex([p[0],p[1]+side*halfThickness,p[2]],tone(t,side<0,u));})));
+   for(let side=0;side<2;side++)for(let j=0;j<nv;j++)for(let i=0;i<nw;i++){const a=sheet[side][j][i],b=sheet[side][j][i+1],c=sheet[side][j+1][i+1],d=sheet[side][j+1][i];if(side){tri(a,b,c);tri(a,c,d);}else{tri(a,c,b);tri(a,d,c);}}
+   const lo=sheet[0][0],hi=sheet[1][0];for(let part=0;part<3;part++){const a=core[k*2+2][(s+part)%12],b=core[k*2+2][(s+part+1)%12],c=core[k*2+1][(s+part)%12],d=core[k*2+1][(s+part+1)%12],start=part*nw/3,end=(part+1)*nw/3;tri(a,b,hi[end]);tri(c,lo[end],d);for(let i=start;i<end;i++){tri(a,hi[i+1],hi[i]);tri(c,lo[i],lo[i+1]);}}
+   tri(ll,ul,hi[0]);tri(ll,hi[0],lo[0]);tri(lr,lo[nw],hi[nw]);tri(lr,hi[nw],ur);
+   for(let j=0;j<nv;j++){const a=sheet[0][j],b=sheet[1][j],c=sheet[0][j+1],d=sheet[1][j+1];tri(a[0],b[0],d[0]);tri(a[0],d[0],c[0]);tri(a[nw],c[nw],d[nw]);tri(a[nw],d[nw],b[nw]);}
+   for(let i=0;i<nw;i++){const lo=sheet[0][nv],hi=sheet[1][nv];tri(hi[i],hi[i+1],lo[i+1]);tri(hi[i],lo[i+1],lo[i]);}
+  }
+  for(const v of vertices)v.n=V.norm(v.n);
+  for(const face of faces){const v=face.map(i=>vertices[i]),n=faceNormal(...v.map(p=>p.p)),average=v.reduce((s,p)=>V.add(s,p.n),[0,0,0]);g.tri(...v.map(p=>p.p),color,V.dot(n,average)>1e-8?v.map(p=>p.n):[n,n,n],v.map(p=>p.c));}
+  return g;
+ }
+ return {build};
+})();
+function tableCoral(type=0,lod=null){return FolioseArt.build(type,lod||(reefDetailLevel?'high':'middle'));}
 // Runtime observation interface: inspect another real instance, no representative clone.
 function initIndividualUI(){
  const panel=document.createElement('div');panel.id='individualCard';panel.className='hidden';panel.innerHTML='<div><small>THIS ENCOUNTER</small><b id="individualLabel"></b><span id="individualTraits"></span></div><button id="nextIndividual" title="觀察同種下一隻">下一隻 ↗</button>';$('hud').appendChild(panel);
@@ -554,8 +595,8 @@ buildReef=function(r){
  const types=[[],[],[]];const bases=placedReefRocks.slice();
  for(let k=0;k<bases.length;k++){const {item,variant}=bases[k];for(let j=0;j<8;j++){
   const id=bioHash(k*113+j*37+812),a=bioValue(id,0)*TAU,rad=.15+.69*bioValue(id,1),x=item.p[0]+Math.cos(a)*item.s[0]*rad,z=item.p[2]+Math.sin(a)*item.s[2]*rad;
-  const y=rockTop(item,variant,x,z);if(!Number.isFinite(y))continue;
-  const actual=rootHeight(x,z);if(actual-y>.14)continue;const sc=.13+.25*bioValue(id,2);
+  const layoutY=rockLayoutTop(item,variant,x,z);if(!Number.isFinite(layoutY))continue;
+  if(rootLayoutHeight(x,z)-layoutY>.14)continue;const y=layoutY,sc=.13+.25*bioValue(id,2);
   types[j%3].push({p:[x,y+.008,z],s:[sc,.20+bioValue(id,3)*.18,sc*(.75+bioValue(id,4)*.6)],yaw:a,phase:a});
  }}
  for(let type=0;type<3;type++){

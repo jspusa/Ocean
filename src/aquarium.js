@@ -107,7 +107,7 @@ const oceanAquarium=(()=>{
   // Detailed reef colonies retain their original meshes and colours. Save/restore the
   // procedural seed so visiting the gallery cannot change any later world generation.
   const previousSeed=seed;
-  try{const tables=tableCoral(0),fans=fanCoral();own(tables,[-1,1].flatMap(side=>[0,1,2].map(row=>({p:[ORIGIN[0]+side*(11+row%2*3),-14.7,ORIGIN[2]-9+row*8],s:[2.2,2.0,2.2],yaw:side*.6+row*.7}))));own(fans,[-1,1].flatMap(side=>[0,1,2].map(row=>({p:[ORIGIN[0]+side*(17-row),-15.3,ORIGIN[2]-10+row*9],s:[2.4,2.9,2.4],yaw:side*.65,phase:row}))),3);}finally{seed=previousSeed;}
+  try{const tables=tableCoral(0),fans=fanCoral();own(tables,[-1,1].flatMap(side=>[0,1,2].map(row=>({p:[ORIGIN[0]+side*(11+row%2*3),-14.7,ORIGIN[2]-9+row*8],s:[2.2,2.0,2.2],yaw:side*.6+row*.7}))));own(fans,[-1,1].flatMap(side=>[0,1,2].map(row=>({p:[ORIGIN[0]+side*(17-row),-15.3,ORIGIN[2]-10+row*9],s:[2.4,2.9,2.4],yaw:side*.65,phase:row}))),3);}finally{seed=previousSeed;seaFanGeometryCache.clear();}
  }
  function syncExhibits(){
   if(!runtime.pools.size)return;

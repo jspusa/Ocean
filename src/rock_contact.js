@@ -52,8 +52,8 @@ const OceanRockContact=(()=>{
   const va=d3*d6-d5*d4;if(va<=0&&d4-d3>=0&&d5-d6>=0)return add(b,mul(sub(c,b),(d4-d3)/(d4-d3+d5-d6)));const den=1/(va+vb+vc);return add(a,add(mul(ab,vb*den),mul(ac,vc*den)));
  }
  function worldTriangle(i,t){return triangle(i.m,t).map(p=>forward(p,i));}
- function nearest(i,p,limit=Infinity){let best=limit*limit,result=null;const local=inverse(p,i),distance=n=>n.lo.reduce((sum,v,k)=>sum+Math.max(v-local[k],0,local[k]-n.hi[k])**2,0)*i.minScale*i.minScale,stack=[0];
-  while(stack.length){const n=i.m.nodes[stack.pop()];stats.nodes++;if(distance(n)>best+EPS)continue;if(n.triangles){for(const t of n.triangles){stats.triangles++;const v=worldTriangle(i,t),q=closest(p,v),d=dot(sub(p,q),sub(p,q));if(d<best){best=d;result={point:q,distance:Math.sqrt(d),normal:unit(cross(sub(v[1],v[0]),sub(v[2],v[0])))};}}}else{const a=i.m.nodes[n.left],b=i.m.nodes[n.right];if(distance(a)<distance(b))stack.push(n.right,n.left);else stack.push(n.left,n.right);}}
+ function nearest(i,p,limit=Infinity,withTriangle=false){let best=limit*limit,result=null;const local=inverse(p,i),distance=n=>n.lo.reduce((sum,v,k)=>sum+Math.max(v-local[k],0,local[k]-n.hi[k])**2,0)*i.minScale*i.minScale,stack=[0];
+  while(stack.length){const n=i.m.nodes[stack.pop()];stats.nodes++;if(distance(n)>best+EPS)continue;if(n.triangles){for(const t of n.triangles){stats.triangles++;const v=worldTriangle(i,t),q=closest(p,v),d=dot(sub(p,q),sub(p,q));if(d<best){best=d;result={point:q,distance:Math.sqrt(d),normal:unit(cross(sub(v[1],v[0]),sub(v[2],v[0])))};if(withTriangle)result.triangle=v;}}}else{const a=i.m.nodes[n.left],b=i.m.nodes[n.right];if(distance(a)<distance(b))stack.push(n.right,n.left);else stack.push(n.left,n.right);}}
   return result;
  }
  function candidates(a,b=a,r=0){stats.queries++;const lo=a.map((v,k)=>Math.min(v,b[k])-r-EPS),hi=a.map((v,k)=>Math.max(v,b[k])+r+EPS),from=lo.map(v=>Math.floor(v/CELL)),to=hi.map(v=>Math.floor(v/CELL)),count=to.reduce((n,v,k)=>n*(v-from[k]+1),1);let found;
@@ -85,6 +85,13 @@ const OceanRockContact=(()=>{
  }
  function topAt(x,z,ceiling=Infinity){if(!Number.isFinite(x)||!Number.isFinite(z)||Number.isNaN(ceiling))return -Infinity;let y=-Infinity;for(const id of candidates([x,worldMin-1,z],[x,Math.min(worldMax+1,ceiling),z]))y=Math.max(y,surface(instances[id],x,z,ceiling));return y;}
  function heightOn(geometry,pose,x,z,ceiling=Infinity){return surface(makeInstance(pose,meshFor(geometry)),x,z,ceiling);}
+ // Construction-only immutable probe. Reuse one mesh BVH and full pose while
+ // fitting a colony; this never installs or mutates the interaction catalogue.
+ function surfaceProbe(geometry,pose){const i=makeInstance(pose,meshFor(geometry));return {
+  lo:i.lo.slice(),hi:i.hi.slice(),height:(x,z)=>surface(i,x,z),contains:p=>inside(i,p),nearest:p=>nearest(i,p,Infinity,true),
+  intersectsTriangle:world=>{const v=world.map(p=>inverse(p,i)),lo=[0,1,2].map(k=>Math.min(...v.map(p=>p[k]))),hi=[0,1,2].map(k=>Math.max(...v.map(p=>p[k])));let hit=false;
+   walkBox(i.m,lo,hi,t=>{const w=triangle(i.m,t);for(let k=0;k<3;k++){if(rayTriangle(v[k],sub(v[(k+1)%3],v[k]),w,0)<=1||rayTriangle(w[k],sub(w[(k+1)%3],w[k]),v,0)<=1){hit=true;return false;}}});return hit;}
+ };}
  function surfaceAt(geometry,x,z,ceiling=Infinity){return heightOn(geometry,{p:[0,0,0],s:[1,1,1]},x,z,ceiling);}
  function resolve(p,r=.4,from=null,report=null){if(report){report.normal=null;report.valid=false;}if(!finite3(p)||!Number.isFinite(r)||r<0)return p;let q=p.slice(),lastNormal=null;
   if(from&&finite3(from)&&len(sub(p,from))>EPS&&!overlaps(from,r)){
@@ -117,7 +124,7 @@ const OceanRockContact=(()=>{
   }return catalogue;
  }
  function captureBuild(build,renderer){const original=renderer.batch,entries=[];renderer.batch=function(geometry,items,kind=0,dynamic=false){const batch=original.call(this,geometry,items,kind,dynamic);if(geometry.rockContact)entries.push({geometry,instances:items,batch});return batch;};let result;try{result=build(renderer);}finally{renderer.batch=original;}install(createCatalogue(entries));return result;}
- return {sweep,resolve,segmentBlocked,overlaps,topAt,heightOn,surfaceAt,install,reset,createCatalogue,captureBuild,catalogue:()=>current,replacesLegacy:ob=>!!current&&(legacy.has(key(ob.p))||hasArch&&ob.rockContactLegacy===true),status:()=>({loaded:!!current,meshes:meshes.length,instances:instances.length,cells:tiles.size,large:large.length,...stats}),resetQueryStats:()=>{stats.queries=stats.candidates=stats.nodes=stats.triangles=0;}};
+ return {sweep,resolve,segmentBlocked,overlaps,topAt,heightOn,surfaceAt,surfaceProbe,install,reset,createCatalogue,captureBuild,catalogue:()=>current,replacesLegacy:ob=>!!current&&(legacy.has(key(ob.p))||hasArch&&ob.rockContactLegacy===true),status:()=>({loaded:!!current,meshes:meshes.length,instances:instances.length,cells:tiles.size,large:large.length,...stats}),resetQueryStats:()=>{stats.queries=stats.candidates=stats.nodes=stats.triangles=0;}};
 })();
 // Installed after every world extension; capture works with the offline recorder
 // and the normal renderer without retaining renderer/GPU-owned mesh buffers.

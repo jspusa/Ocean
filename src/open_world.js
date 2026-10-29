@@ -93,6 +93,12 @@ function wreckVessel(){
  for(let i=0;i<12;i++){let z=-11+i*2;g.tube([-2,.15,z],[2,.15,z+.55],.11,.12,rusty,6);}
  return g;
 }
+// Two original deck colonies intersect the forward posts with the wider leaf
+// form. Their reviewed moves stay on the same actual deck with unchanged
+// height, scale and yaw; the full source identities make the exception local.
+// BEGIN WRECK_PLATE_CLEARANCE_RELOCATIONS
+const WRECK_PLATE_CLEARANCE_RELOCATIONS=Object.freeze([{"id":"wreck-port-forward-plate-clearance","original":{"p":[96.5679588916619,-33.94441215240233,-163.63429671189442],"s":[0.40876262421719733,0.5342414341625346,0.40876262421719733],"yaw":0.45999999999999996,"phase":0.84},"to":{"p":[96.60554865100615,-33.94441215240233,-163.28632112368103],"s":[0.40876262421719733,0.5342414341625346,0.40876262421719733],"yaw":0.45999999999999996,"pitch":0}},{"id":"wreck-starboard-forward-plate-clearance","original":{"p":[100.06477560112921,-33.94441215240233,-162.77856725675673],"s":[0.5091726643312723,0.6338445240675619,0.5091726643312723],"yaw":-0.94,"phase":6.72},"to":{"p":[99.84302725150567,-33.94441215240233,-162.44565935742233],"s":[0.5091726643312723,0.6338445240675619,0.5091726643312723],"yaw":-0.94,"pitch":0}}]);
+// END WRECK_PLATE_CLEARANCE_RELOCATIONS
 function buildWreckHabitat(r,wy){
  const geometry=wreckVessel(),pose={p:[99,wy+.10,-166],yaw:-.24},wreck=r.batch(geometry,[pose]);wreck.maxDistance=230;wreck.sceneRole='wreck-hull';
  const wreckFans=[],wreckSponges=[],wreckPlates=[],{panels,decks}=geometry.growthSurfaces;let fan=0,deckPlant=0;
@@ -108,6 +114,10 @@ function buildWreckHabitat(r,wy){
   const inst={p:toWreck(x,y-.012,z),s:[scale,scale*(1.1+random()*.30),scale],yaw:pose.yaw+side*.70,phase:k*.84};
   (isFan?wreckFans:k%3===0?wreckSponges:wreckPlates).push(inst);
  }
+ // Match every original field. The same 1e-10 construction arithmetic allowance
+ // used by reef replay accommodates JS engines without rounding stored poses.
+ const same=(a,b)=>typeof a==='number'||typeof b==='number'?Number.isFinite(a)&&Number.isFinite(b)&&Math.abs(a-b)<=1e-10:a===null||b===null||typeof a!=='object'||typeof b!=='object'?a===b:Array.isArray(a)!==Array.isArray(b)?false:Object.keys(a).length===Object.keys(b).length&&Object.keys(a).every(k=>Object.hasOwn(b,k)&&same(a[k],b[k]));
+ for(const entry of WRECK_PLATE_CLEARANCE_RELOCATIONS){const matches=wreckPlates.filter(n=>same(entry.original,n));if(matches.length!==1)throw Error('Wreck plate clearance source identity differs: '+entry.id);const n=matches[0];if(!same([entry.to.s,entry.to.yaw,entry.to.pitch,entry.to.p[1]],[n.s,n.yaw,n.pitch||0,n.p[1]]))throw Error('Wreck plate clearance changes its deck attachment');n.p=entry.to.p.slice();}
  const wf=r.batch(fanCoral(),wreckFans,3);wf.maxDistance=65;wf.sceneRole='wreck-fans';
  const ws=r.batch(spongeGeometry(true),wreckSponges);ws.maxDistance=48;ws.sceneRole='wreck-sponges';
  reefDetailLevel=0;const wp=r.batch(tableCoral(1),wreckPlates);wp.maxDistance=50;wp.sceneRole='wreck-plates';reefDetailLevel=1;
@@ -132,14 +142,18 @@ function dolphinGeometry(low=false){
 const dolphinSpec={id:'dolphin',name:'瓶鼻海豚',latin:'Tursiops spp. · 原創類群模型',en:'BOTTLENOSE DOLPHIN',color:0x698a99,zone:5,height:.22,width:.11,size:1,hint:'流線身形、短吻與弧形背鰭。',detail:'本版的原創伴游海豚。動物行為為遊戲編排，不可用作接近真實野生動物的指引。'};
 SPECIES.push(dolphinSpec);SPECIES[9].zone=5;SPECIES[10].zone=7;
 const constructCore=buildReef;
+let reefGrowthFitReport=null;
 buildReef=function(r){
+ reefGrowthFitReport=null;
+ const rootBatch=r.batch,rootEntries=[];r.batch=function(geometry,instances,kind=0,dynamic=false){const batch=rootBatch.call(this,geometry,instances,kind,dynamic);if(geometry.reefGrowth||geometry.rockContact||geometry.material===1||geometry.material===13)rootEntries.push({geometry,instances,batch,batchIndex:r.batches?.indexOf(batch)??-1});return batch;};
+ try{
  constructCore(r);
  const reefs=[[],[],[],[]],plates=[],branches=[],fans=[];
  const patches=[[-82,-63,12],[-112,-93,18],[-125,-52,14],[85,-73,13],[117,-96,15],[130,-127,15],[71,-136,11],[113,-186,10],[-67,-171,15],[38,-200,13],[-109,-234,19],[90,-257,16],[-140,2,19],[128,15,19],[-179,-120,20],[183,-160,19]];
  patches.forEach(([cx,cz,sz],idx)=>{
   for(let k=0;k<4;k++){const a=k*2.39996+idx,x=cx+Math.cos(a)*k*sz*.45,z=cz+Math.sin(a)*k*sz*.4;const sx=sz*rr(.43,.74),sy=sx*rr(.18,.31),sy0=groundHeight(x,z)-sy*.16;
    const ob={p:[x,sy0,z],s:[sx,sy,sx*rr(.75,1.15)],yaw:rr(0,6.28)};reefs[idx%4].push(ob);obstacles.push({p:ob.p.slice(),s:ob.s.map(n=>n*.86)});
-   for(let j=0;j<9;j++){const a=j*2.39996,d=rr(.14,.64),px=x+Math.cos(a)*sx*d,pz=z+Math.sin(a)*sx*d;const py=rockTop(ob,idx%4,px,pz);if(!Number.isFinite(py))continue;const sc=rr(.55,1.65);const inst={p:[px,py-.04,pz],s:[sc,sc*.74,sc],yaw:a,phase:a};(j%4===0?fans:j%3===0?branches:plates).push(inst);}
+   for(let j=0;j<9;j++){const a=j*2.39996,d=rr(.14,.64),px=x+Math.cos(a)*sx*d,pz=z+Math.sin(a)*sx*d;const py=rockLayoutTop(ob,idx%4,px,pz);if(!Number.isFinite(py))continue;const sc=rr(.55,1.65);const inst={p:[px,py-.04,pz],s:[sc,sc*.74,sc],yaw:a,phase:a};(j%4===0?fans:j%3===0?branches:plates).push(inst);}
   }
  });
  for(let k=0;k<4;k++){let hi=r.batch(rockGeometry(k),reefs[k]);hi.maxDistance=65;let lo=r.batch(rockGeometry(k,true),reefs[k]);lo.minDistance=65;lo.maxDistance=430;lo.shadowProxy=true;}
@@ -156,6 +170,10 @@ buildReef=function(r){
  // Above-water home base and distant islands are real meshes, not a wallpaper.
  const boat=r.batch(researchVessel(),[{p:OPEN_WORLD.boat.slice(),yaw:-.14}]);boat.maxDistance=600;boat.sceneRole='research-vessel';
  for(let k=0;k<3;k++){const isles=[{p:[-235,-13,120],s:[76,63,61],yaw:.7},{p:[168,-10,168],s:[89,48,70],yaw:.2},{p:[225,-6,-10],s:[52,41,76],yaw:.5}];const g=rockGeometry(k,true);g.material=15;const b=r.batch(g,[isles[k]]);b.maxDistance=1000;b.shadow=false;}
+ reefGrowthFitReport=fitReefGrowth(rootEntries,!!r.gl);
+ // Attachment work is construction-only; no full source terrain/rock arrays
+ // or query cache are retained for gameplay after their GPU/archive upload.
+ }finally{r.batch=rootBatch;reefGroundSurfaces.length=0;rockHeightCache.clear();}
 };
 const spawnCoreLife=addLife;
 addLife=function(r){

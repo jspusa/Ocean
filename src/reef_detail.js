@@ -68,23 +68,23 @@ function diverGeometry(){const g=new Geometry();g.material=11;const suit=[.15,.1
  }
  return g;}
 // Layered, irregular ridges, not a grid of identical stones and evenly scattered animals.
-function buildReef(r){seed=441072;obstacles.length=0;reefPatches.length=0;addGroundTiles(r);
+function buildReef(r){seed=441072;obstacles.length=0;reefPatches.length=0;addRootGround(r);
  let lastRock=null,lastRockVariant=0;const rocks=[[],[],[],[]],corals=Array.from({length:11},()=>[]),rubble=[],grassItems=[];
  const centers=[[-7,6,2.65],[-10,-1,3.0],[-11,-8,3.1],[-14,-17,3.2],[8,0,2.8],[11,-8,3.0],[12,-19,3.2],[21,-23,4.0],[-21,-24,3.1],[-22,9,3.2],[20,4,3.4],[-30,-13,4.5],[29,-8,4.3]];
  function putRock(x,z,sx,sy,sz,variant,dy=0){let y=groundHeight(x,z)+dy;let item={p:[x,y,z],s:[sx,sy,sz],yaw:rr(0,TAU),tint:[rr(.92,1.06),rr(.93,1.04),rr(.91,1.06)]};rocks[variant%4].push(item);lastRock=item;lastRockVariant=variant%4;placedReefRocks.push({item,variant:variant%4});obstacles.push({p:item.p.slice(),s:[sx*.89,sy*.90,sz*.90]});return y;}
  centers.forEach(([cx,cz,scale],ci)=>{for(let k=0;k<7;k++){let a=k*2.39996+ci,rad=k?Math.sqrt(k)*1.56:0,x=cx+Math.cos(a)*rad,z=cz+Math.sin(a)*rad*.83,sx=scale*rr(.53,1.05),sy=sx*rr(.45,.91),sz=sx*rr(.68,1.1),y=putRock(x,z,sx,sy,sz,(k+ci)%4,.06);
  reefPatches.push({x,z,y:y+sy*.90,rx:sx*.76,rz:sz*.76});
  // Colonies grow in patches of similar form with occasional contrasting forms.
- for(let j=0;j<6;j++){let a=j*2.39996+rr(-.18,.18),d=rr(.18,.74),px=x+Math.cos(a)*sx*d,pz=z+Math.sin(a)*sz*d,py=rockTop(lastRock,lastRockVariant,px,pz)+.025;if(!Number.isFinite(py))py=y+sy*.95;let type=j<3?[0,3,9,2,10][ci%5]:Math.floor(rr(0,11));let sc=rr(.40,.88);if(type===6)sc*=1.2;if(type===3||type===4)sc*=1.18;corals[type].push({p:[px,py,pz],s:[sc,sc*rr(.83,1.18),sc],yaw:rr(0,TAU),phase:rr(0,TAU),tint:[rr(.90,1.05),rr(.90,1.07),rr(.93,1.05)]});}
+ for(let j=0;j<6;j++){let a=j*2.39996+rr(-.18,.18),d=rr(.18,.74),px=x+Math.cos(a)*sx*d,pz=z+Math.sin(a)*sz*d,py=rockLayoutTop(lastRock,lastRockVariant,px,pz)+.025;if(!Number.isFinite(py))py=y+sy*.95;let type=j<3?[0,3,9,2,10][ci%5]:Math.floor(rr(0,11));let sc=rr(.40,.88);if(type===6)sc*=1.2;if(type===3||type===4)sc*=1.18;corals[type].push({p:[px,py,pz],s:[sc,sc*rr(.83,1.18),sc],yaw:rr(0,TAU),phase:rr(0,TAU),tint:[rr(.90,1.05),rr(.90,1.07),rr(.93,1.05)]});}
  }});
  // Low coral carpets bridge the bare boulders; carbonate fragments collect at the edges.
  for(let i=0;i<650;i++){const c=centers[i%centers.length],a=rr(0,TAU),rad=rr(1,8),x=c[0]+Math.cos(a)*rad,z=c[1]+Math.sin(a)*rad,sz=rr(.035,.21);rubble.push({p:[x,groundHeight(x,z)+.016,z],s:[sz,sz*rr(.36,.72),sz*rr(.6,1.7)],yaw:rr(0,TAU),tint:[rr(.83,1.08),rr(.87,1.02),rr(.86,1.03)]});}
- for(const group of corals)for(const colony of group)colony.p[1]=rootHeight(colony.p[0],colony.p[2]);
+ for(const group of corals)for(const colony of group)colony.p[1]=rootLayoutHeight(colony.p[0],colony.p[2]);
  // Keep massive plates and branches from growing through one another. Resolve before compilation.
- const occupied=[{p:[-4.3,rootHeight(-4.3,5.5),5.5],radius:1.55},{p:[6.1,rootHeight(6.1,-2.5),-2.5],radius:1.40}];
+ const occupied=[{p:[-4.3,rootLayoutHeight(-4.3,5.5),5.5],radius:1.55},{p:[6.1,rootLayoutHeight(6.1,-2.5),-2.5],radius:1.40}];
  for(const type of [3,4,5,9,10,0,1,2,8,7,6]){const kept=[];
   for(const c of corals[type]){const rad=([3,4].includes(type)?.90:type===6?.46:.56)*c.s[0];const initial=c.p.slice();let accepted=false;
-   for(let attempt=0;attempt<6;attempt++){if(attempt){const a=c.yaw+attempt*2.39996,r=.40+attempt*.21;c.p[0]=initial[0]+Math.cos(a)*r;c.p[2]=initial[2]+Math.sin(a)*r;c.p[1]=rootHeight(c.p[0],c.p[2]);}
+   for(let attempt=0;attempt<6;attempt++){if(attempt){const a=c.yaw+attempt*2.39996,r=.40+attempt*.21;c.p[0]=initial[0]+Math.cos(a)*r;c.p[2]=initial[2]+Math.sin(a)*r;c.p[1]=rootLayoutHeight(c.p[0],c.p[2]);}
     if(c.p[1]<groundHeight(c.p[0],c.p[2])+.20)continue;
     // Keep this attached anemone's tentacles clear of neighbouring colonies.
     if(Math.hypot(c.p[0]+5.6,c.p[2]-1)<.84+rad*1.3)continue;
@@ -93,6 +93,8 @@ function buildReef(r){seed=441072;obstacles.length=0;reefPatches.length=0;addGro
    if(accepted){kept.push(c);occupied.push({p:c.p.slice(),radius:rad});}
   }corals[type]=kept;
  }
+ // Keep original construction poses. The offline fitter records every later
+ // root/crown correction against these exact identities in one replay receipt.
 
  const rockSurfaces=[];
  for(let i=0;i<4;i++){const geometry=rockGeometry(i);let b=r.batch(geometry,rocks[i]);b.maxDistance=30;for(const instance of rocks[i])rockSurfaces.push({geometry,instance});let low=r.batch(rockGeometry(i,true),rocks[i]);low.minDistance=30;low.maxDistance=170;}
@@ -106,12 +108,12 @@ function buildReef(r){seed=441072;obstacles.length=0;reefPatches.length=0;addGro
  const meadows=[[-3.6,15,2.5],[4.4,9.5,2.1],[-2.5,2.5,1.6],[15,12,2.9],[-17,16,2.5],[3,-16,2.0]];
  for(let i=0;i<156;i++){
   const meadow=meadows[i%meadows.length],a=rr(0,TAU),rad=Math.sqrt(random())*meadow[2],x=meadow[0]+Math.cos(a)*rad,z=meadow[1]+Math.sin(a)*rad*.65;
-  const floor=groundHeight(x,z);if(rootHeight(x,z)>floor+.22)continue;
+  const floor=groundHeight(x,z);if(rootLayoutHeight(x,z)>floor+.22)continue;
   const sc=rr(.60,1.22);grassItems.push({p:[x,floor+.018,z],s:[sc,sc*rr(.78,1.14),sc],yaw:rr(0,TAU),phase:rr(0,TAU)});
  }r.batch(grass(),grassItems,3).maxDistance=35;
  // Close, carefully composed flora along the route instead of only background detail.
- r.batch(tableCoral(),[{p:[-4.3,rootHeight(-4.3,5.5),5.5],s:[1.42,1.12,1.3],yaw:1.1},{p:[6.1,rootHeight(6.1,-2.5),-2.5],s:[1.15,1.5,1.3],yaw:.4}]);
- r.batch(fanCoral(),[{p:[-5.6,rootHeight(-5.6,6.4),6.4],s:[1.25,1.6,1.25],yaw:1.0,phase:1},{p:[6.3,rootHeight(6.3,1),1],s:[1.4,1.8,1.4],yaw:.4,phase:2}]);
+ r.batch(tableCoral(),[{p:[-4.3,rootLayoutHeight(-4.3,5.5),5.5],s:[1.42,1.12,1.3],yaw:1.1},{p:[6.1,rootLayoutHeight(6.1,-2.5),-2.5],s:[1.15,1.5,1.3],yaw:.4}]);
+ fanColonyLods(r,[{p:[-5.6,rootLayoutHeight(-5.6,6.4),6.4],s:[1.25,1.6,1.25],yaw:1.0,phase:1},{p:[6.3,rootLayoutHeight(6.3,1),1],s:[1.4,1.8,1.4],yaw:.4,phase:2}],'hero-fans');
  const anemone=reefAnemoneHabitat(rockSurfaces);reefAnemoneHome=anemone.home;
  const anemoneBatch=r.batch(anemone.geometry,[anemone.instance],3);anemoneBatch.maxDistance=12;anemoneBatch.sceneRole='reef-anemone';
  // Eroded passage; thick geometry supplies genuine shadow, parallax and overhead enclosure.
@@ -121,7 +123,7 @@ function buildReef(r){seed=441072;obstacles.length=0;reefPatches.length=0;addGro
  const walls=[{p:[-14,-29,-39],s:[7,16,11],yaw:.1},{p:[-20,-43,-60],s:[8.7,22,14],yaw:.4},{p:[20,-40,-54],s:[9,19,12],yaw:-.4},{p:[30,-52,-80],s:[12,22,16],yaw:.7},{p:[-31,-54,-89],s:[13,24,17],yaw:-.6},{p:[-20,-64,-116],s:[12,22,18],yaw:.4},{p:[20,-65,-121],s:[13,26,18],yaw:-.1}];
  r.batch(rockGeometry(3),walls);walls.forEach(ob=>obstacles.push({p:ob.p.slice(),s:ob.s.map(v=>v*.87)}));
  const shelves=[],plates=[],fans=[];for(const wall of walls.slice(0,4)){for(let j=0;j<4;j++){let x=wall.p[0]+(wall.p[0]<0?1:-1)*wall.s[0]*.73,y=wall.p[1]+wall.s[1]*(.8-j*.34),z=wall.p[2]+(j%2)*2.1;let item={p:[x,y,z],s:[2.25,.74,3.5],yaw:wall.yaw};shelves.push(item);if(y>-35){plates.push({p:[x,y+.74,z],s:[1.6,1.1,1.3],yaw:rr(0,TAU)});fans.push({p:[x+1,y+.64,z+.6],s:[1.3,1.7,1.3],yaw:.3,phase:rr(0,6)});}}}
- r.batch(rockGeometry(0),shelves);r.batch(tableCoral(),plates);r.batch(fanCoral(),fans,3);
+ r.batch(rockGeometry(0),shelves);r.batch(tableCoral(),plates);fanColonyLods(r,fans,'cliff-fans');
  const post=new Geometry();post.material=11;post.tag=3;let cream=[.55,.64,.56],green=[.16,.30,.26];post.tube([0,0,0],[0,.14,0],.71,.69,cream,36);post.tube([0,.14,0],[0,.55,0],.11,.11,green,20);post.tube([0,.55,0],[0,1.65,0],.36,.36,cream,42);post.tube([0,1.65,0],[0,1.8,0],.41,.38,green,36);post.sphere([0,1.8,0],[.38,.12,.38],green,32,16);post.box([0,1.39,.355],[.29,.06,.03],[.02,.05,.04]);post.box([0,.90,.36],[.29,.18,.018],green);r.batch(post,[{p:[12,groundHeight(12,-17),-17],yaw:.22}]);
  obstacles.push({p:[12,groundHeight(12,-17)+1,-17],s:[.5,1.1,.5]});
 }

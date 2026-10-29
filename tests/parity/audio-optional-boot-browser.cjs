@@ -6,7 +6,8 @@
 const fs=require('node:fs'),path=require('node:path'),assert=require('node:assert/strict');
 const root=path.resolve(__dirname,'../..'),arg=(k,d)=>process.argv.find(x=>x.startsWith('--'+k+'='))?.slice(k.length+3)||d;
 const url=arg('url','http://127.0.0.1:8766/'),out=path.resolve(root,arg('out','qa/parity/v01836-audio/optional-boot.json'));
-const report={url,status:'running',method:'Headless native Chrome, strict autoplay, CDP userGesture:false; default auto quality. Controlled Web Audio boundary faults only.',cases:[]};
+const scene=arg('scene','compiled'),procedural=scene==='procedural';assert(['compiled','archive','procedural'].includes(scene));
+const report={url,status:'running',scene,method:'Headless native Chrome, strict autoplay, CDP userGesture:false; default auto quality. Controlled Web Audio boundary faults. Archive mode aborts only the scene index; procedural mode aborts scene index and archive requests to exercise the real source fallback.',cases:[]};
 const save=()=>{fs.mkdirSync(path.dirname(out),{recursive:true});fs.writeFileSync(out,JSON.stringify(report,null,2)+'\n');};
 function boundary(fault){
  const trace=window.__optionalAudio={constructors:[],resumes:[],fetches:[],fault};let attempts=0;
@@ -31,13 +32,17 @@ function boundary(fault){
    try{
     await context.addInitScript(boundary,fault);const page=await context.newPage(),cdp=await context.newCDPSession(page);page.on('pageerror',e=>row.errors.push(e.message));
     const read=async expression=>{const r=await cdp.send('Runtime.evaluate',{expression,returnByValue:true,userGesture:false});if(r.exceptionDetails)throw Error(r.exceptionDetails.text);return r.result.value;};
-    const wait=async(expression,timeout=30000)=>{const end=Date.now()+timeout;while(Date.now()<end){if(await read(expression))return;await new Promise(r=>setTimeout(r,100));}throw Error('Timeout: '+expression);};
+    const wait=async(expression,timeout=30000)=>{const end=Date.now()+timeout;while(Date.now()<end){if(await read(expression))return;const failure=await read('document.getElementById("errorBox") && !document.getElementById("errorBox").classList.contains("hidden") ? document.getElementById("errorMessage")?.textContent : null');if(failure)throw Error('Actual boot failure: '+failure);await new Promise(r=>setTimeout(r,100));}throw Error('Timeout: '+expression);};
     const check=(name,ok)=>{row.checks.push({name,passed:!!ok});save();assert(ok,name);};
     const press=s=>touch?page.locator(s).tap():page.locator(s).click();
-    await page.goto(url);await wait('!!window.__ocean?.ready',120000);await wait('$("loading").classList.contains("hidden")');
+    if(procedural)await page.route(/\/assets\/(?:scene\/index\.json|reef\.mesh\.gz)(?:\?|$)/,route=>route.abort('failed'));
+    else if(scene==='archive')await page.route(/\/assets\/scene\/index\.json(?:\?|$)/,route=>route.abort('failed'));
+    const bootStart=Date.now();await page.goto(url);await wait('!!window.__ocean?.ready',120000);await wait('$("loading").classList.contains("hidden")');row.bootElapsedMs=Date.now()-bootStart;
     row.home=await read('({trace:__optionalAudio,active:navigator.userActivation.hasBeenActive,context:oceanAudio.ctx?.state||null,adaptive:settings.adaptive,detail:$("loadDetail").textContent})');
     check('ready with no Web Audio work or music request before entry',!row.home.active&&row.home.context===null&&row.home.trace.constructors.length===0&&row.home.trace.fetches.length===0);
     check('automatic quality remains enabled',row.home.adaptive);
+    if(procedural){row.scene=await read('({compiled:renderer.sceneLoad.compiled,growth:reefGrowthFitReport,fanConstructionMeshes:seaFanGeometryCache.size,authoredFormsRetained:SCULPTED_CORAL!==undefined})');check('real procedural fallback uses verified precomputed growth replay',row.scene.compiled===false&&row.scene.growth?.mode==='verified-replay'&&row.scene.growth.failed.length===0);check('temporary source geometry is released after upload',row.scene.fanConstructionMeshes===0&&!row.scene.authoredFormsRetained);}
+    else if(scene==='archive'){row.scene=await read('({compiled:renderer.sceneLoad.compiled,streamed:!!renderer.sceneStream,decodedBytes:renderer.sceneLoad.decodedBytes})');check('actual compressed archive fallback loaded the complete scene',row.scene.compiled===true&&!row.scene.streamed&&row.scene.decodedBytes>0);}
     await press('#startBtn');await wait('active&&$("welcome").classList.contains("hidden")');
     row.before=await read('player.p.slice()');
     if(touch){const r=await page.locator('#joystick').boundingBox();await cdp.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{x:r.x+r.width/2,y:r.y+r.height*.17}]});await new Promise(r=>setTimeout(r,800));await cdp.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});}
@@ -51,7 +56,7 @@ function boundary(fault){
     }
     check('no page or WebGL errors',row.errors.length===0&&row.after.gl===0&&!row.after.lost);
     row.status='passed';console.log('PASS '+row.profile+' '+fault);
-   }catch(e){row.status='failed';row.failure=e.stack;throw e;}finally{save();await context.close();}
+   }catch(e){row.status='failed';row.failure=e.stack;try{row.visibleFailure=await context.pages()[0]?.locator('body').innerText({timeout:1500});}catch(_){}throw e;}finally{save();await context.close();}
   }
   assert(report.cases.length);report.status='passed';
  }catch(e){report.status='failed';report.failure=e.stack;console.error(e);process.exitCode=1;}finally{save();await browser?.close();}
