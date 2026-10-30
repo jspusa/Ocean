@@ -11,7 +11,7 @@ const rows=[],errors=[],digest=s=>crypto.createHash('sha256').update(Buffer.from
   const context=await browser.newContext({viewport:{width:320,height:240},deviceScaleFactor:1,isMobile:mobile,hasTouch:mobile}),page=await context.newPage();
   page.on('pageerror',e=>errors.push(e.message));let phase='boot';const requests=[],releases=[];
   await page.route('**/assets/*.jpg*',async route=>{
-   const request=new URL(route.request().url()),target=request.pathname.endsWith('/shell_nor_gl.jpg');
+   const request=new URL(route.request().url()),target=request.pathname.endsWith('/turtle_skin_v45.jpg');
    if(target){requests.push({phase,url:request.href});if(phase==='upgrade'||requests.filter(r=>r.phase==='boot').length===1){await route.fulfill({status:503,contentType:'text/plain',body:'injected temporary texture failure'});return;}}
    if(phase==='upgrade'){
     await new Promise(resolve=>releases.push(resolve));
@@ -30,7 +30,7 @@ const rows=[],errors=[],digest=s=>crypto.createHash('sha256').update(Buffer.from
   await page.evaluate(()=>{
    // Decoded Image memory caches can bypass a second network request. Give
    // this upgrade fresh fixture URLs so the delayed responses are real.
-   window.__oldTextureURLs={};for(const n of ['sand_diff','sand_nor_gl','rock_diff','rock_nor_gl','shell_diff','shell_nor_gl','coral_diff','coral_nor_gl','caustics']){__oldTextureURLs[n]=ASSETS[n];ASSETS[n]+='&_texture_upgrade_fixture=1';}
+   window.__oldTextureURLs={};for(const n of ['sand_diff','sand_nor_gl','rock_diff','rock_nor_gl','shell_diff','turtle_skin_v45','coral_diff','coral_nor_gl','caustics']){__oldTextureURLs[n]=ASSETS[n];ASSETS[n]+='&_texture_upgrade_fixture=1';}
    window.__oldTextureSet=renderer.textures;window.__oldTextureFull=renderer.textureFull;window.__textureFailure=null;renderer.loadTextures(true).then(()=>{__textureFailure={failed:false};},error=>{__textureFailure={failed:true,message:error.message};});
   });
   await page.waitForFunction(()=>window.__textureFailure!==null,null,{timeout:10000});

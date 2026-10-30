@@ -1,5 +1,5 @@
 {
-  "version": "0.18.44",
+  "version": "0.18.45",
   "scope": "served game and build sources",
   "files": [
     {
@@ -9,8 +9,8 @@
     },
     {
       "path": "CREDITS.md",
-      "bytes": 14959,
-      "sha256": "b5dac906fc2ed0b72a4b68d23422d56e0fb608498836714c2bddbf98a625261b"
+      "bytes": 15372,
+      "sha256": "79dcabfd764092561262df9e59f4e1e67e4629464744cd261516a5471a13b060"
     },
     {
       "path": "LICENSE",
@@ -25,7 +25,7 @@
     {
       "path": "VERSION",
       "bytes": 8,
-      "sha256": "73b4169135a1e7b01f61fd01fa3376b50a5ed637f3bd8c8c04cb2c5309e24f43"
+      "sha256": "756c276cb112ad0cdc230f3789d5b39868bbc85a0792972e798fc23f84c8d850"
     },
     {
       "path": "assets/barramundi/CC0-1.0.txt",
@@ -274,8 +274,8 @@
     },
     {
       "path": "assets/guide_turtle.jpg",
-      "bytes": 13622,
-      "sha256": "9a508d1a69ce637945f7b6018265c39d4852db298b29cb2267c296b84b831fca"
+      "bytes": 15546,
+      "sha256": "89b2a932bb630edbd98b119e4ac1240618bfcc31ae115dfa365ac8af8b497828"
     },
     {
       "path": "assets/guide_vampire_squid.jpg",
@@ -300,12 +300,12 @@
     {
       "path": "assets/reef-growth.json",
       "bytes": 462778,
-      "sha256": "de83efda79a8676bddea66a119a37736906df9fa0579b1f745fae361bd421f37"
+      "sha256": "e9c38e3c98250d1b688f70bdb0af19677be7251121ab1b5d505980b44d30feab"
     },
     {
       "path": "assets/reef.mesh.gz",
-      "bytes": 25287510,
-      "sha256": "38cdd35e63955d01b4d7b86916c7736a6fee28afe4b5ed3046c3c69d073b8d10"
+      "bytes": 25267796,
+      "sha256": "58e4ece5ba9755bad441d887f6786cbf1a8d00091c42393e595df0a4e81ae12c"
     },
     {
       "path": "assets/rock_diff.jpg",
@@ -356,6 +356,11 @@
       "path": "assets/scene/chunk-03fee170e1c003a0860a.bin.gz",
       "bytes": 213532,
       "sha256": "03fee170e1c003a0860aa0a483905fa9fb6e25bf64574119757a4f00c994d292"
+    },
+    {
+      "path": "assets/scene/chunk-05cc4bc5ec0b6a48284d.bin.gz",
+      "bytes": 308799,
+      "sha256": "05cc4bc5ec0b6a48284deb50b0b39cb49615fcd5b988a47648bf815936ab0fea"
     },
     {
       "path": "assets/scene/chunk-07617a9ee6631c66a70f.bin.gz",
@@ -781,11 +786,6 @@
       "path": "assets/scene/chunk-6cddbf1d7dfa6b256c93.bin.gz",
       "bytes": 243970,
       "sha256": "6cddbf1d7dfa6b256c93ede6a9d03f439de6801dad1d4704b9aee03c66510cb9"
-    },
-    {
-      "path": "assets/scene/chunk-6ce90f47332e0b3e3f25.bin.gz",
-      "bytes": 321784,
-      "sha256": "6ce90f47332e0b3e3f25620b16692b2d04a89f7fd74b5aa386fc9f06257260e2"
     },
     {
       "path": "assets/scene/chunk-6e9230cd755c14bb12c3.bin.gz",
@@ -1255,7 +1255,7 @@
     {
       "path": "assets/scene/index.json",
       "bytes": 3112528,
-      "sha256": "48829c9cbb9e05c544285f86f07d137be741b3be9b1336f21b75247e26a2d498"
+      "sha256": "0b2984e1f187ecc42f397b1d4d1a193f26519372d4a92bf23049672376b88ea0"
     },
     {
       "path": "assets/shell_diff.jpg",
@@ -1266,6 +1266,11 @@
       "path": "assets/shell_nor_gl.jpg",
       "bytes": 59277,
       "sha256": "3015c96d1280251bc210114fc3e85ffda39051f524fbc078d2559048569371ed"
+    },
+    {
+      "path": "assets/turtle_skin_v45.jpg",
+      "bytes": 649123,
+      "sha256": "b865d967b09c54d16c0797a68db8821fe9069b504dd3662f9063da2c609b9c85"
     },
     {
       "path": "bake_scene.cjs",
@@ -1280,7 +1285,7 @@
     {
       "path": "index.html",
       "bytes": 16778,
-      "sha256": "3cfc8b17865071bea184d07b549255363d6949e15ec1878f2a4d21a4e6e5c15f"
+      "sha256": "1b5d7e948464f000f3bf713e43147b8e2339072fa781e11c056c9b7c7b3457d8"
     },
     {
       "path": "music/blue_silence.mp3",
@@ -1379,13 +1384,13 @@
     },
     {
       "path": "src/config.js",
-      "bytes": 466508,
-      "sha256": "7c5d4fb4df4e9deb0d7cf53d4c174937da31fb1cdf799fd7e9b9d25f724cad90"
+      "bytes": 466565,
+      "sha256": "025e6158ff9ad8e5400522ef44b83f8ebfbc2560025de9d7d4059ec3d0a9a0e7"
     },
     {
       "path": "src/deepsea.js",
-      "bytes": 19238,
-      "sha256": "e9c30f4c2de67a5b07eab7e0f8eee7aa01ffdb82c3f59d0e6ad73fc9550f84a7"
+      "bytes": 21307,
+      "sha256": "a278e64a339ee7991678d5830154033536ba976481be58df41e91a1ef5c703e3"
     },
     {
       "path": "src/dumbo_octopus.js",
@@ -1399,13 +1404,13 @@
     },
     {
       "path": "src/encounters.js",
-      "bytes": 8769,
-      "sha256": "c499ae03935c04e2675289acba1d2d68864ca507a4c2497b5a373b0a8bcefbe4"
+      "bytes": 12362,
+      "sha256": "17a876620a8bf8d3c6ef0ad2618eea11d6bc45de2bee5afa06839b3492064c58"
     },
     {
       "path": "src/engine.js",
-      "bytes": 147158,
-      "sha256": "286b79b251760695fa025ca3543f0f19fb77c70b4eb3761e1d01469d323674dd"
+      "bytes": 148145,
+      "sha256": "a87f040ff2ec756173dfde595bd9147559870c6f0a1910c36783fc7cd8346304"
     },
     {
       "path": "src/expedition.js",
@@ -1575,7 +1580,7 @@
     {
       "path": "src/shell.html",
       "bytes": 12391,
-      "sha256": "eb5c0b4ae28183207d39e74ee422d57e00aaf1342484fb75121ee3528631f84f"
+      "sha256": "33e8f326f42d93cab3de31e768a1ca475be1a6b1acea76635ba63865815c17ba"
     },
     {
       "path": "src/ship.js",
@@ -1594,8 +1599,8 @@
     },
     {
       "path": "src/trench.js",
-      "bytes": 24963,
-      "sha256": "66120617e184ca5a75fe36a6e97cfdd44d2d96001aeb2ec835727654c023e419"
+      "bytes": 26486,
+      "sha256": "5eef6fe70507432c53745410359fc4a4940c59c2609fe5701c6bfde803a03f8c"
     },
     {
       "path": "src/trench_fauna.js",
@@ -1619,8 +1624,8 @@
     },
     {
       "path": "src/world.js",
-      "bytes": 35951,
-      "sha256": "cbc487ed20b05722172b1ca484c0c7254ab4af125a65eabefc057b4adaf0e2c9"
+      "bytes": 37476,
+      "sha256": "b63ea0a9f132567f6303a8a6a14584495e145f991010a48e0e06c566ddb10167"
     }
   ]
 }

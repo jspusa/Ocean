@@ -221,9 +221,35 @@ const OceanTrench=(()=>{
 
  // A bounded visibility graph handles the finite terrace edge at the current
  // depth. Replanning must never first visit the last completed station.
- function clearRouteSegment(a,b){
-  if(typeof OceanRegions!=='undefined'&&!OceanRegions.pathClear(a,b,.4))return false;
-  const steps=Math.max(1,Math.ceil(V.dist(a,b)/4));for(let i=0;i<=steps;i++){const p=V.lerp(a,b,i/steps),floor=groundHeight(p[0],p[2])??coastalGround(p[0],p[2]);if(p[1]<floor+.81)return false;}return true;
+ function routeEnvelope(){
+  const scale=typeof diverBatch!=='undefined'?diverBatch?.instances?.[0]?.s?.[0]||.85:.85;
+  return typeof OceanDiverContact==='undefined'?2.37:Math.max(...OceanDiverContact.profile.map(s=>(Math.abs(s.z)+s.r)*scale))+.035;
+ }
+ function clearRouteSegment(a,b,wide=false){
+  // A route is planned once, never in the 120 Hz movement loop. Near the reef
+  // reserve the complete rotating body, using the same rendered-rock owner.
+  const radius=wide?routeEnvelope():.81;
+  if(typeof OceanRegions!=='undefined'&&!OceanRegions.pathClear(a,b,radius))return false;
+  if(groundSweep(a,b,radius))return false;
+  if(typeof OceanRockContact!=='undefined'&&OceanRockContact.catalogue()){
+   const r=routeEnvelope();if(OceanRockContact.overlaps(a,r)||OceanRockContact.overlaps(b,r)||OceanRockContact.sweep(a,b,r))return false;
+  }
+  const steps=Math.max(1,Math.ceil(V.dist(a,b)/.6));for(let i=0;i<=steps;i++){const p=V.lerp(a,b,i/steps),floor=groundHeight(p[0],p[2])??coastalGround(p[0],p[2]);if(p[1]<floor+radius)return false;}return true;
+ }
+ function reefDeparture(start,x){
+  const level=[start[0],-3,start[2]],goal=[x,-3,-90];
+  if(!clearRouteSegment(start,level,true))return [];
+  if(clearRouteSegment(level,goal,true))return [start,level,goal];
+  // A finite set of open-water lanes avoids the coastal rock belt. Every leg
+  // is checked against the real catalogue and whole-body turning envelope;
+  // no collision shape, map geometry or movement budget is changed.
+  let best=null,length=Infinity;
+  for(const z of [-100,-160,-240,-320,100,180]){
+   const path=[level,[level[0],-3,z],[x,-3,z],goal];let cost=0,clear=true;
+   for(let i=1;i<path.length;i++){if(!clearRouteSegment(path[i-1],path[i],true)){clear=false;break;}cost+=V.dist(path[i-1],path[i]);}
+   if(clear&&cost<length){best=path;length=cost;}
+  }
+  return best?[start,...best]:[];
  }
  function departure(start,x){
   const goal=[x,start[1],-90];if(clearRouteSegment(start,goal))return [start.slice(),goal];
@@ -238,7 +264,7 @@ const OceanTrench=(()=>{
   const start=(currentPosition||a.p).slice();let out=[];
   // From the reef, swim through open water and descend the same unbroken
   // column that manual swimming uses. No deployment or scene transition.
-  if(start[0]<720||start[0]>800){out=[start,[start[0],-3,start[2]],[b.p[0],-3,-90]];}
+  if(start[0]<720||start[0]>800){out=reefDeparture(start,b.p[0]);}
   else for(const rise of [0,2,-2,8,-8,32]){const lifted=[start[0],Math.min(-.65,start[1]+rise),start[2]];if(rise&&!clearRouteSegment(start,lifted))continue;const path=departure(lifted,b.p[0]);if(path.length){out=rise?[start,...path]:path;break;}}
   if(!out.length)return [];
   const exit=out.at(-1),entry=[b.p[0],b.p[1],-90],count=Math.max(4,Math.ceil(Math.abs(exit[1]-entry[1])/96));

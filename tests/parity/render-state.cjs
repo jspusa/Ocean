@@ -14,8 +14,28 @@ function fixture(){
  return {renderer,batches,calls,draws,render};
 }
 const results=[];function check(name,fn){try{fn();results.push(true);console.log('PASS '+name);}catch(e){results.push(false);console.error('FAIL '+name+': '+e.message);}}
-check('every submitted mesh retains all original v0.17 shader uniforms and draw order',()=>{
- const original=JSON.parse(fs.readFileSync(path.join(__dirname,'fixtures/render-state-v017.json'),'utf8')),f=fixture();f.render();assert.deepEqual(f.draws,original.draws);
+// v45 reuses the formerly unused normal-map slot for turtle skin. Preserve the
+// v0.17 recording; permit exactly this name change, only at the same unit 5.
+function normalizeSlotFive(draws){
+ const result=structuredClone(draws);
+ for(const draw of result)if(Object.hasOwn(draw.uniforms,'uTurtleSkin')){
+  assert.equal(draw.pass,'colour');assert(!Object.hasOwn(draw.uniforms,'uShellN'));assert.deepEqual(draw.uniforms.uTurtleSkin,[5]);
+  draw.uniforms.uShellN=draw.uniforms.uTurtleSkin;delete draw.uniforms.uTurtleSkin;
+ }return result;
+}
+check('every submitted mesh retains v0.17 state except the explicit same-unit turtle sampler rename',()=>{
+ const original=JSON.parse(fs.readFileSync(path.join(__dirname,'fixtures/render-state-v017.json'),'utf8')),f=fixture();f.render();
+ const oldSlots=original.draws.filter(d=>Object.hasOwn(d.uniforms,'uShellN'));assert.equal(oldSlots.length,5);assert(oldSlots.every(d=>d.pass==='colour'&&d.uniforms.uShellN.length===1&&d.uniforms.uShellN[0]===5));
+ if(vm.runInContext('FS.includes("uniform sampler2D uTurtleSkin;")',context))assert.equal(f.draws.filter(d=>Object.hasOwn(d.uniforms,'uTurtleSkin')).length,oldSlots.length,'every historical slot-5 write must remain present');
+ assert.deepEqual(normalizeSlotFive(f.draws),original.draws);
+});
+check('slot normalization rejects unit changes, duplicate aliases and unrelated render-state drift',()=>{
+ const original=JSON.parse(fs.readFileSync(path.join(__dirname,'fixtures/render-state-v017.json'),'utf8')),f=fixture();f.render();
+ const candidate=structuredClone(f.draws),draw=candidate.find(d=>d.pass==='colour');if(Object.hasOwn(draw.uniforms,'uShellN')){draw.uniforms.uTurtleSkin=draw.uniforms.uShellN;delete draw.uniforms.uShellN;}
+ const wrongUnit=structuredClone(candidate);wrongUnit.find(d=>d.pass==='colour').uniforms.uTurtleSkin=[4];assert.throws(()=>normalizeSlotFive(wrongUnit));
+ const duplicate=structuredClone(candidate);duplicate.find(d=>d.pass==='colour').uniforms.uShellN=[5];assert.throws(()=>normalizeSlotFive(duplicate));
+ const wrongMaterial=structuredClone(candidate);wrongMaterial.find(d=>d.pass==='colour').uniforms.uMat=[99];assert.throws(()=>assert.deepEqual(normalizeSlotFive(wrongMaterial),original.draws));
+ const wrongOrder=structuredClone(candidate);[wrongOrder[0],wrongOrder[1]]=[wrongOrder[1],wrongOrder[0]];assert.throws(()=>assert.deepEqual(normalizeSlotFive(wrongOrder),original.draws));
 });
 check('one pass updates each consecutive repeated material/species state only when needed',()=>{
  const f=fixture();f.render();const main=f.calls.filter(c=>c.pass==='colour');

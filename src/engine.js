@@ -342,7 +342,7 @@ const FS=`#version 300 es
 precision highp float;precision highp int;
 in vec3 vWorld;in vec3 vRelative;in vec3 vNormal;in vec3 vColor;in vec3 vLocal;in vec2 vUV;in float vTag;in float vSeed;in vec4 vShadow;in float vLodDistance;uniform vec3 uLODBounds;flat in vec4 vGenes;flat in vec3 vTint;in vec4 vDynamicShadow;uniform int uSamples;uniform int uQuality;uniform vec3 uRenderOrigin;uniform vec4 uTorchParams;uniform vec4 uSurfaceProfile;
 uniform vec3 uCamera;uniform float uTime;uniform float uTorch;uniform vec3 uViewForward;uniform vec3 uFog;uniform float uFogDensity;uniform float uSun;uniform int uKind;uniform int uMat;uniform int uSpecies;uniform int uSunless;
-uniform sampler2D uSand;uniform sampler2D uSandN;uniform sampler2D uRock;uniform sampler2D uRockN;uniform sampler2D uShell;uniform sampler2D uShellN;uniform sampler2D uCoral;uniform sampler2D uCoralN;uniform highp sampler2DShadow uShadow;uniform highp sampler2DShadow uDynamicShadow;
+uniform sampler2D uSand;uniform sampler2D uSandN;uniform sampler2D uRock;uniform sampler2D uRockN;uniform sampler2D uShell;uniform sampler2D uTurtleSkin;uniform sampler2D uCoral;uniform sampler2D uCoralN;uniform highp sampler2DShadow uShadow;uniform highp sampler2DShadow uDynamicShadow;
 uniform float uShadowTexel;uniform float uShadows;uniform vec3 uLightDir;uniform vec3 uAirLightDir;uniform vec3 uLightColor;
 out vec4 frag;
 ${NOISE_GLSL}
@@ -637,8 +637,14 @@ void main(){
    base*=1.+(fine-.5)*.035*detail;
    rough=.64+.12*mottle-.10*wear;
    height=-.00065*rawSeam+.00025*(fine-.5);
-  }else if(vTag<2.5){
-   base=mix(vec3(.21,.23,.16),vec3(.345,.33,.215),smoothstep(.20,.80,mottle));
+  }else if(vTag<2.5||(vTag<3.5&&p.x>.95)){
+   // Pigment follows undeformed anatomy. Mirror wrapping gives continuous
+   // borders without relying on generated-image edges being exactly tileable.
+   // Fold the angle before implicit mip gradients; keep the axial sample finite.
+   vec2 finUV=p.xz*vec2(2.4,1.9)+vGenes.xy*vec2(5.,7.);
+   vec2 headUV=vec2((p.x-.78)*4.2+vGenes.x*5.,atan(max(abs(p.z),.000001),p.y+.02)*.31830988618);
+   vec3 skin=mix(texture(uTurtleSkin,finUV).rgb,texture(uTurtleSkin,headUV).rgb,head);
+   base=skin*vec3(.96,1.035,.96)*(.94+.12*mottle);
    float grainDistance=abs(fine-.48),grainWidth=max(fwidth(fine),.006);
    float grain=1.-smoothstep(max(0.,.035-grainWidth),.035+grainWidth,grainDistance);
    float rawGrain=1.-smoothstep(.022,.055,grainDistance),grainArea=1.-head*.65;
@@ -652,11 +658,17 @@ void main(){
    float crown=smoothstep(.015,.065,p.y),plateArea=(1.-smoothstep(.90,1.08,plate))*crown;
    float plateDistance=min(abs(p.z),abs(plate-1.)*.085),plateMask=crown*(1.-smoothstep(1.04,1.16,plate));
    float plateEdge=skinLine(plateDistance,.0013)*plateMask,rawPlateEdge=(1.-smoothstep(.0007,.0026,plateDistance))*plateMask;
+   base=mix(base,vec3(.30,.305,.205)*(.92+.14*mottle),plateArea*.68);
    base*=1.-plateArea*.08-plateEdge*.13;
    float neck=smoothstep(.59,.65,p.x)*(1.-smoothstep(.76,.88,p.x))*(1.-smoothstep(.12,.20,abs(p.z)));
    float creaseDistance=abs(sin((p.x-.62)*44.+rawMottle*.6))*.012;
    float crease=skinLine(creaseDistance,.0014)*neck,rawCrease=(1.-smoothstep(.0007,.0028,creaseDistance))*neck;
    base*=1.-crease*.045;rough=mix(.84,.75,head)+.025*(mottle-.5);
+   // The pale lower jaw is part of the same skin. Use its anatomical contour
+   // instead of flat triangle tags, so colour does not form a jagged patch.
+   float mouthY=-.05+.012*smoothstep(1.08,1.31,p.x);
+   float jaw=smoothstep(1.145,1.205,p.x)*(1.-smoothstep(mouthY-.009,mouthY+.005,p.y));
+   base=mix(base,vec3(.57,.55,.41)*(.94+.10*mottle),jaw*.78);rough=mix(rough,.65,jaw);
    height=.00022*(fine-.5)-.00020*rawGrain*grainArea-.00025*rawCrease-.00028*rawPlateEdge;
   }else if(vTag<3.5){
    if(p.x<.95){
@@ -1356,7 +1368,7 @@ class Renderer{
  setMatrix4fv(p,n,transpose,v){const u=this.uniform(p,n);if(u!==null)this.gl.uniformMatrix4fv(u,transpose,v);}
  attr(index,size,stride,offset,divisor=0){let g=this.gl;g.enableVertexAttribArray(index);g.vertexAttribPointer(index,size,g.FLOAT,false,stride,offset);g.vertexAttribDivisor(index,divisor);}
  async loadTextures(forceFull=false){
-  const g=this.gl,pending=[],images=new Map(),timers=new Set(),names=['sand_diff','sand_nor_gl','rock_diff','rock_nor_gl','shell_diff','shell_nor_gl','coral_diff','coral_nor_gl','caustics'];const full=forceFull||!this.mobile||this.quality===2;
+  const g=this.gl,pending=[],images=new Map(),timers=new Set(),names=['sand_diff','sand_nor_gl','rock_diff','rock_nor_gl','shell_diff','turtle_skin_v45','coral_diff','coral_nor_gl','caustics'];const full=forceFull||!this.mobile||this.quality===2;
   const retryToken=Date.now().toString(36)+'-'+(this._textureRequestSequence=(this._textureRequestSequence||0)+1),retryDelays=[150,400];let aborted=false;
   const cancel=()=>{aborted=true;for(const timer of timers)clearTimeout(timer);timers.clear();for(const image of images.keys()){image.onload=null;image.onerror=null;image.removeAttribute('src');}images.clear();};
   try{await Promise.all(names.map((name,i)=>new Promise((resolve,reject)=>{
@@ -1371,7 +1383,7 @@ class Renderer{
       if(performance.now()>=expiresAt){img.onerror();return;}
       try{g.bindTexture(g.TEXTURE_2D,tex);g.pixelStorei(g.UNPACK_FLIP_Y_WEBGL,false);let source=img;
        if(!full&&name!=='caustics'&&img.width>1024){const c=document.createElement('canvas');c.width=c.height=1024;c.getContext('2d').drawImage(img,0,0,1024,1024);source=c;}
-       g.texImage2D(g.TEXTURE_2D,0,g.RGBA8,g.RGBA,g.UNSIGNED_BYTE,source);g.generateMipmap(g.TEXTURE_2D);g.texParameteri(g.TEXTURE_2D,g.TEXTURE_MIN_FILTER,g.LINEAR_MIPMAP_LINEAR);g.texParameteri(g.TEXTURE_2D,g.TEXTURE_MAG_FILTER,g.LINEAR);g.texParameteri(g.TEXTURE_2D,g.TEXTURE_WRAP_S,g.REPEAT);g.texParameteri(g.TEXTURE_2D,g.TEXTURE_WRAP_T,g.REPEAT);
+       g.texImage2D(g.TEXTURE_2D,0,g.RGBA8,g.RGBA,g.UNSIGNED_BYTE,source);g.generateMipmap(g.TEXTURE_2D);g.texParameteri(g.TEXTURE_2D,g.TEXTURE_MIN_FILTER,g.LINEAR_MIPMAP_LINEAR);g.texParameteri(g.TEXTURE_2D,g.TEXTURE_MAG_FILTER,g.LINEAR);const wrap=name==='turtle_skin_v45'?g.MIRRORED_REPEAT:g.REPEAT;g.texParameteri(g.TEXTURE_2D,g.TEXTURE_WRAP_S,wrap);g.texParameteri(g.TEXTURE_2D,g.TEXTURE_WRAP_T,wrap);
        if(this.aniso)g.texParameterf(g.TEXTURE_2D,this.aniso.TEXTURE_MAX_ANISOTROPY_EXT,Math.min(8,g.getParameter(this.aniso.MAX_TEXTURE_MAX_ANISOTROPY_EXT)));settled=true;detach(img);resolve();
       }catch(error){detach(img,true);fail(error);}
      };
@@ -1808,7 +1820,7 @@ class Renderer{
   g.bindFramebuffer(g.FRAMEBUFFER,this.msaaFBO||this.sceneFBO);if(this.msaaSamples)g.enable(g.SAMPLE_ALPHA_TO_COVERAGE);g.viewport(0,0,this.canvas.width,this.canvas.height);g.clearColor(.002,.025,.045,1);g.clear(g.COLOR_BUFFER_BIT|g.DEPTH_BUFFER_BIT);
   g.depthFunc(g.LEQUAL);this.common(this.skyProgram,eye,this.vp,t);this.setMatrix4fv(this.skyProgram,'uInvVP',false,inv);g.bindVertexArray(this.postVAO);g.drawArrays(g.TRIANGLES,0,3);g.depthFunc(g.LESS);this.drawCalls++;
   const surfaceStates=new Map();let activeSurface=null;
-  const names=['uSand','uSandN','uRock','uRockN','uShell','uShellN','uCoral','uCoralN'];for(let i=0;i<8;i++)this.bindTex(i,this.textures[i]);this.bindTex(8,this.shadowTexture);g.bindSampler(8,this.shadowSampler);this.bindTex(10,this.dynamicShadowTexture);g.bindSampler(10,this.shadowSampler);
+  const names=['uSand','uSandN','uRock','uRockN','uShell','uTurtleSkin','uCoral','uCoralN'];for(let i=0;i<8;i++)this.bindTex(i,this.textures[i]);this.bindTex(8,this.shadowTexture);g.bindSampler(8,this.shadowSampler);this.bindTex(10,this.dynamicShadowTexture);g.bindSampler(10,this.shadowSampler);
   this.submittedTriangles=0;this.submittedVertices=0;const planes=this.frustum(this.vp),ls=this.mobile?(this.quality===0?.64:.82):(this.quality===0?.75:1);
   for(const b of this.batches){if(!b.visible||(b.kind===13&&!this.importedBatchReady(b)))continue;this.updateBatch(b,eye,planes);if(!b.drawCount)continue;
    this.submittedTriangles+=(b.transparentShell?.first??b.count)/3*b.drawCount;this.submittedVertices+=b.vertexCount*b.drawCount;

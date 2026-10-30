@@ -29,9 +29,13 @@ const DeepseaRules=(()=>{
  function swimScale(p){
   const depth=Math.max(0,-p[1]),floor=groundHeight(p[0],p[2]),clearance=Math.max(0,p[1]-floor);
   let nearest=clearance;
-  for(const habitat of Object.values(OceanTrench.habitats))for(const home of habitat.homes)nearest=Math.min(nearest,V.dist(p,home));
-  for(const encounter of deepseaEncounters)nearest=Math.min(nearest,V.dist(p,encounter.home));
-  if(typeof AbyssWorldRules!=='undefined')for(const habitat of Object.values(AbyssWorldRules.sites))for(const home of habitat.homes)nearest=Math.min(nearest,V.dist(p,home));
+  const liveHomes=typeof oceanEncounters!=='undefined'?oceanEncounters.deepHomes?.():null;
+  if(liveHomes?.length){for(const home of liveHomes)nearest=Math.min(nearest,V.dist(p,home));}
+  else{
+   for(const habitat of Object.values(OceanTrench.habitats))for(const home of habitat.homes)nearest=Math.min(nearest,V.dist(p,home));
+   for(const encounter of deepseaEncounters)nearest=Math.min(nearest,V.dist(p,encounter.home));
+   if(typeof AbyssWorldRules!=='undefined')for(const habitat of Object.values(AbyssWorldRules.sites))for(const home of habitat.homes)nearest=Math.min(nearest,V.dist(p,home));
+  }
   const open=smooth01((nearest-12)/145),deep=smooth01((depth-80)/500);
   return mix(2.2,72,open*deep);
  }
@@ -54,13 +58,33 @@ const DeepseaRules=(()=>{
  return {initial,sanitize,station,areaName,canResume,advance,swimScale,itinerary};
 })();
 const oceanDeepsea=(()=>{
- const R=DeepseaRules,state=()=>oceanFeatures.state('deepsea');let transit=null,patrol=null,journey=null,pausedEncounter=null,lastHUD=0;
+ const R=DeepseaRules,state=()=>oceanFeatures.state('deepsea');let transit=null,patrol=null,journey=null,pausedEncounter=null,pendingMotion=null,lastHUD=0;
  const isActive=()=>active&&OceanTrench.containsXZ(player.p[0],player.p[2])&&player.p[1]<-160;
  const current=()=>R.station(state().station)||OceanTrench.stations[0];
- function clearMotion(keepGuide=false){transit=null;patrol=null;journey=null;pausedEncounter=null;if(!keepGuide)state().guide=null;stopAuto();resetInput();}
+ function clearMotion(keepGuide=false){pendingMotion=null;transit=null;patrol=null;journey=null;pausedEncounter=null;if(!keepGuide)state().guide=null;stopAuto();resetInput();}
  function pauseTravel(){
   if(!transit)return;
-  transit=null;patrol=null;journey=null;player.velocity=[0,0,0];stopAuto();paintHUD();saveVoyage();
+  pendingMotion=null;transit=null;patrol=null;journey=null;player.velocity=[0,0,0];stopAuto();paintHUD();saveVoyage();
+ }
+ // updateCamera owns the full eight-volume body solve once per rendered frame.
+ // Physics steps only propose motion; progress/arrival use its accepted pose.
+ function afterCamera(){
+  const motion=pendingMotion;pendingMotion=null;if(!motion||motion.trip!==(transit||patrol))return;
+  const accepted=player.p.slice(),delta=V.sub(accepted,motion.before);
+  player.velocity=V.mul(delta,1/Math.max(.0001,motion.seconds));
+  const wanted=V.sub(motion.requested,motion.before),distance=V.len(wanted),correction=V.dist(accepted,motion.requested),progress=distance?V.dot(delta,wanted)/distance:0;
+  // At observation speed an entirely rejected frame is only millimetres.
+  // Count accepted directional progress over time, not just a large one-frame
+  // correction. Fully accepted slow swimming never enters this stall meter.
+  motion.trip.stalledSeconds=correction>.0001&&progress<distance*.1?(motion.trip.stalledSeconds||0)+motion.seconds:0;
+  if(motion.blocked||correction>.25||motion.trip.stalledSeconds>=.5-1e-8){
+   if(transit)pauseTravel();else clearMotion(true);
+   player.velocity=[0,0,0];toast('前方有岩壁，請自行游過，再按「繼續前往」。');return;
+  }
+  // Do not consume a corner/observation gate that the body did not reach.
+  if(!motion.ready||correction>.0001)return;
+  const trip=motion.trip;trip.index=motion.index;
+  if(motion.done){if(transit)completeLeg(trip);else{patrol.index=1;patrol.route=[accepted,...(current().route||[current().p,current().look,current().p]).map(p=>p.slice())];}}
  }
  function aimAt(p){const d=V.sub(p,player.p);player.yaw=Math.atan2(d[0],-d[2]);player.pitch=clamp(Math.atan2(d[1],Math.hypot(d[0],d[2])),-1.2,1.2);cameraCut=true;}
  function deploy(id){
@@ -191,16 +215,22 @@ const oceanDeepsea=(()=>{
    if(auto&&!follow&&!oceanFeatures.pointerCaptured()&&(transit||isActive())){
     if(!transit&&!patrol){const route=current().route||[current().p,current().look,current().p];patrol={route:[player.p.slice(),...route.map(p=>p.slice())],index:1};}
     const trip=transit||patrol,before=player.p.slice(),remaining=V.dist(before,trip.route.at(-1));
-    const speed=transit?.approaching?approachSpeed(remaining):transit?mix(8,260,smooth01((remaining-12)/180)):2.2,next=R.advance(before,trip.route,trip.index,dt*speed);
-    player.p=collide(next.p,before);const d=V.sub(player.p,before);player.velocity=V.mul(d,1/Math.max(.0001,dt));
+    const motion=pendingMotion||(pendingMotion={trip,before:before.slice(),seconds:0,requested:before.slice(),index:trip.index,ready:false,done:false,blocked:false});motion.seconds+=dt;
+    if(motion.ready||motion.blocked)return;
+    const speed=transit?.approaching?approachSpeed(remaining):transit?mix(8,260,smooth01((remaining-12)/180)):2.2;
+    // End this frame at the next corner. Its body acceptance must precede
+    // another leg, even when a display frame contains several physics steps.
+    const budget=Math.min(dt*speed,V.dist(before,trip.route[trip.index])),next=R.advance(before,trip.route,trip.index,budget);
+    motion.requested=next.p.slice();player.p=collide(next.p.slice(),before);
+    motion.blocked=V.dist(player.p,motion.requested)>.25;motion.index=next.index;motion.ready=next.index!==trip.index;motion.done=next.done;
+    const d=V.sub(player.p,before);player.velocity=V.mul(d,1/Math.max(.0001,dt));
     if(V.len(d)>.001){player.yaw=lerpAngle(player.yaw,Math.atan2(d[0],-d[2]),1-Math.exp(-dt*3));player.pitch=mix(player.pitch,clamp(Math.atan2(d[1],Math.hypot(d[0],d[2])),-1.2,1.2),1-Math.exp(-dt*3));}
-    if(V.dist(player.p,next.p)>.25){if(transit)pauseTravel();else clearMotion(true);toast('前方有岩壁，請自行游過，再按「繼續前往」。');return;}
-    trip.index=next.index;if(next.done){if(transit)completeLeg(transit);else{patrol.index=1;patrol.route=[player.p.slice(),...(current().route||[current().p,current().look,current().p]).map(p=>p.slice())];}}return;
+    return;
    }
    const speed=settings.speed;settings.speed=speed*R.swimScale(player.p);try{oldPlayer(dt);}finally{settings.speed=speed;}
   };
   renderer.submersible=false;
  }
- const feature={id:'deepsea',initial:R.initial,sanitize:R.sanitize,init,prepareDive,startDive:start,endDive:end,tick,paintHUD,panelChanged:pauseTravel,photoOpened:pauseTravel,beforePhoto:pauseTravel,cameraModeChanged(enabled){if(enabled)pauseTravel();},photoMetadata(photo){const area=R.areaName(player.p);if(area)photo.area=area+' · '+Math.round(-player.p[1]).toLocaleString()+' m';},shipRender(){if(voyage.state.resume&&R.canResume(state(),voyage.state.resume.p)&&voyage.state.resume.p[1]<-160)$('shipContinue').textContent='繼續深海探索';},reset(){clearMotion(true);renderer.submersible=false;},renderPanel(type){if(type!=='deepsea')return false;render();return true;}};
+ const feature={id:'deepsea',initial:R.initial,sanitize:R.sanitize,init,prepareDive,afterCamera,startDive:start,endDive:end,tick,paintHUD,panelChanged:pauseTravel,photoOpened:pauseTravel,beforePhoto:pauseTravel,cameraModeChanged(enabled){if(enabled)pauseTravel();},photoMetadata(photo){const area=R.areaName(player.p);if(area)photo.area=area+' · '+Math.round(-player.p[1]).toLocaleString()+' m';},shipRender(){if(voyage.state.resume&&R.canResume(state(),voyage.state.resume.p)&&voyage.state.resume.p[1]<-160)$('shipContinue').textContent='繼續深海探索';},reset(){clearMotion(true);renderer.submersible=false;},renderPanel(type){if(type!=='deepsea')return false;render();return true;}};
  oceanFeatures.register(feature);return {isActive,deploy,travel,resumeTravel,cancelTravel,current,feature,snapshot:()=>({deployed:false,freeSwimming:true,deep:isActive(),station:state().station,travelTarget:state().guide?.target||null,guideMode:transit?'traveling':state().guide?(pausedEncounter?'observing':'paused'):null,approaching:transit?.approaching===true,encounter:transit?.encounter?.id||pausedEncounter,holding:!!pausedEncounter,vehicle:false,position:player.p.slice()})};
 })();

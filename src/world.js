@@ -123,11 +123,20 @@ function turtleGeometry(low=false){let g=new Geometry();g.material=5;g.tag=1;
   const start=g.v.length;marineSurface(g,(u,v)=>{const a=u*Math.PI,b=v*TAU;return [center[0]+Math.cos(a)*scale[0],center[1]+Math.sin(a)*Math.cos(b)*scale[1],center[2]+Math.sin(a)*Math.sin(b)*scale[2]];},rings,segments,color);
   for(let k=start;k<g.v.length;k+=12){const n=V.norm(scale.map((s,i)=>(g.v[k+i]-center[i])/(s*s)));for(let i=0;i<3;i++)g.v[k+3+i]=n[i];}
  };
- const skinSurface=(point,nu,nv,color,axis,sign,closeRoot=false)=>{
-  const start=g.v.length,tip=point(1,0)[axis],root=point(0,0)[axis];marineSurface(g,point,nu,nv,color);
-  // At a collapsed cap the angular finite difference is zero. Use the one
-  // axial limit for every copy of that pole instead of a radial star of normals.
-  for(let k=start;k<g.v.length;k+=12){const pole=Math.abs(g.v[k+axis]-tip)<1e-9?sign:closeRoot&&Math.abs(g.v[k+axis]-root)<1e-9?-sign:0;if(pole){g.v[k+3]=g.v[k+4]=g.v[k+5]=0;g.v[k+3+axis]=pole;}}
+ const skinSurface=(point,nu,nv,color,closeRoot=false)=>{
+  const start=g.v.length,normals=new Map(),key=p=>p.map(v=>Math.round(v*1e10)).join(',');marineSurface(g,point,nu,nv,color);
+  const cap=end=>{const tip=point(end,0),ring=Array.from({length:nv},(_,j)=>point(end?1-1/nu:1/nu,j/nv)),center=ring.reduce((sum,p)=>V.add(sum,V.mul(p,1/nv)),[0,0,0]);return V.norm(V.sub(tip,center));};
+  const tipNormal=cap(1),rootNormal=closeRoot?cap(0):null;
+  for(let i=0;i<=nu;i++)for(let j=0;j<=nv;j++){
+   const u=i/nu,v=j/nv,p=point(u,v);let n;
+   if(i===nu)n=tipNormal;else if(i===0&&closeRoot)n=rootNormal;
+   else{const du=V.norm(V.sub(point(Math.min(1,u+.00001),v),point(Math.max(0,u-.00001),v))),dv=V.norm(V.sub(point(u,v+.00001),point(u,v-.00001)));n=V.norm(V.cross(dv,du));if(V.dot(n,V.sub(p,point(u,v+.5)))<0)n=V.mul(n,-1);}
+   normals.set(key(p),n);
+  }
+  // Normalize derivatives before crossing: the tiny buried neck ring must not
+  // fall into a tangent fallback. A swept foil's discrete cap points along its
+  // last-ring-to-tip axis, which is not generally a world coordinate axis.
+  for(let k=start;k<g.v.length;k+=12){const n=normals.get(key(g.v.slice(k,k+3)));for(let j=0;j<3;j++)g.v[k+3+j]=n[j];}
  };
  // Dorsal and ventral shell skins share one rim. A full carapace ellipsoid
  // would hide the pale plastron underneath it and leave two stacked shells.
@@ -144,16 +153,26 @@ function turtleGeometry(low=false){let g=new Geometry();g.material=5;g.tag=1;
  // A single soft neck-to-head loft seats inside the shell; the crown grows
  // continuously from the neck instead of intersecting a cylindrical collar.
  g.tag=2;const headRows=[[.58,-.04,0,0],[.64,-.04,.12,.12],[.79,-.03,.118,.118],[.95,-.018,.126,.139],[1.08,-.015,.14,.155],[1.20,-.025,.115,.138],[1.275,-.04,.066,.105],[1.31,-.04,0,0]];
- skinSurface((u,v)=>{const x=.58+.73*(1-Math.cos(u*Math.PI))*.5,p=marineProfile(headRows,x),a=v*TAU;return [x,p[1]+Math.cos(a)*p[2],Math.sin(a)*p[3]];},low?12:44,low?8:24,[.62,.63,.43],0,1,true);
- g.tag=3;ellipsoid([1.236,-.040,0],[.07,.060,.116],[.72,.70,.53],low?8:26,low?4:16);
+ const headStart=g.v.length,headPoint=(u,v)=>{
+  const x=.58+.73*(1-Math.cos(u*Math.PI))*.5,p=marineProfile(headRows,x),a=v*TAU;
+  if(x<=.95)return [x,p[1]+Math.cos(a)*p[2],Math.sin(a)*p[3]];
+  const front=smooth01((x-1.08)/.23),taper=smooth01((1.31-x)/.04),mouth=smooth01((x-1.165)/.05)*(1-smooth01((x-1.295)/.015));
+  const mouthY=-.05+.012*front,mouthAngle=Math.acos(clamp((mouthY-p[1])/Math.max(.00001,p[2]),-.98,.98)),angle=a+mouth*(mouthAngle-Math.PI*.5)*Math.sin(a),c=Math.cos(angle),s=Math.sin(angle);
+  const groove=.008*mouth*Math.pow(Math.abs(Math.sin(a)),64),radial=Math.hypot(c*p[2],s*p[3]),shrink=1-groove/Math.max(.01,radial),orbit=.024*Math.exp(-(((x-1.14)/.065)**2+((c-.4)/.6)**2))*smooth01((x-.95)/.10)*(1-smooth01((x-1.21)/.07));
+  // One softly flattened snout grows out of the skull. The lower jaw shares
+  // its skin and the oral crease is an inward displacement of that surface.
+  return [x,p[1]+c*p[2]*shrink+front*taper*(.018*Math.max(0,-c)**2-.026*Math.max(0,c)**2),s*(p[3]*shrink+orbit)];
+ };
+ skinSurface(headPoint,low?12:44,low?8:24,[.62,.63,.43],true);
+ for(let k=headStart;k<g.v.length;k+=36){const x=(g.v[k]+g.v[k+12]+g.v[k+24])/3,y=(g.v[k+1]+g.v[k+13]+g.v[k+25])/3;if(x>1.165&&y<-.05+.012*smooth01((x-1.08)/.23))for(const j of [11,23,35])g.v[k+j]=3;}
  g.tag=2;for(let side of [-1,1]){
  // Each front flipper is a tapered, cambered three-dimensional foil, not a quad.
- const fin=(u,v)=>{const a=v*TAU,cap=Math.sqrt(Math.max(0,1-u*u)),width=(.10+.24*Math.sin(u*Math.PI))*cap*(1-u*.65);return [.35-u*.37-u*u*.22+Math.cos(a)*width,-.045-u*.045+Math.sin(a)*.026*cap*(1-u*.65),side*(.51+u*1.19)];};skinSurface(fin,low?10:34,low?6:18,[.6,.62,.42],2,side);
- const back=(u,v)=>{const a=v*TAU,cap=Math.sqrt(Math.max(0,1-u*u)),width=(.08+.10*Math.sin(u*Math.PI))*cap*(1-u*.56);return [-.70-u*.58+Math.cos(a)*width,-.09+Math.sin(a)*.020*cap*(1-u*.4),side*(.48+u*.38)];};skinSurface(back,low?6:20,low?6:14,[.6,.62,.42],2,side);
+ const fin=(u,v)=>{const a=v*TAU,cap=Math.sqrt(Math.max(0,1-u*u)),width=(.10+.24*Math.sin(u*Math.PI))*cap*(1-u*.65);return [.35-u*.37-u*u*.22+Math.cos(a)*width,-.045-u*.045+Math.sin(a)*.026*cap*(1-u*.65),side*(.51+u*1.19)];};skinSurface(fin,low?10:34,low?6:18,[.6,.62,.42]);
+ const back=(u,v)=>{const a=v*TAU,cap=Math.sqrt(Math.max(0,1-u*u)),width=(.08+.10*Math.sin(u*Math.PI))*cap*(1-u*.56);return [-.70-u*.58+Math.cos(a)*width,-.09+Math.sin(a)*.020*cap*(1-u*.4),side*(.48+u*.38)];};skinSurface(back,low?6:20,low?6:14,[.6,.62,.42]);
  g.tag=4;if(low)ellipsoid([1.143,.041,side*.147],[.022,.024,.012],[.012,.02,.022],6,4);else{
  ellipsoid([1.14,.039,side*.137],[.022,.024,.012],[.052,.064,.045],18,12);ellipsoid([1.143,.041,side*.147],[.014,.017,.005],[.012,.02,.022],16,10);ellipsoid([1.151,.047,side*.152],[.004,.004,.003],[.80,.89,.78],10,6);
- // Small recessed nostrils and a curved beak line.
- ellipsoid([1.255,.007,side*.043],[.007,.005,.005],[.06,.08,.05],9,6);let prev=null;for(let i=0;i<15;i++){let a=i/14*Math.PI,p=[1.225+.052*Math.sin(a),-.055,side*.108*Math.cos(a)];if(prev)g.tube(prev,p,.0025,.0025,[.16,.18,.12],5);prev=p;}}g.tag=2;
+ // Fixed nostril anchors remain seated in the continuous snout surface.
+ ellipsoid([1.255,.007,side*.043],[.007,.005,.005],[.06,.08,.05],9,6);}g.tag=2;
  }
  g.tube([-1.07,-.12,0],[-1.32,-.15,0],.060,.010,[.58,.61,.43],low?6:18);return g;}
 // A closed, cambered eagle-ray body: ventral belly, swept wings and whip tail.

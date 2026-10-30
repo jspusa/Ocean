@@ -3,8 +3,25 @@
 'use strict';
 const fs=require('node:fs'),path=require('node:path'),vm=require('node:vm'),cp=require('node:child_process'),crypto=require('node:crypto'),assert=require('node:assert/strict');
 const root=path.resolve(__dirname,'../..'),sha=x=>crypto.createHash('sha256').update(x).digest('hex');
-const source=fs.readFileSync(path.join(root,'src/engine.js'),'utf8'),baseline=cp.execFileSync('git',['show','1d6738d3fc0a67fd93696cd13cca7537eec76694:src/engine.js'],{cwd:root,encoding:'utf8'});
-const context=text=>{const c=vm.createContext({console,Float32Array,Uint16Array,Uint32Array,BIO_NEUTRAL:[1,1,1,1],BIO_DEFAULT:[.5,.5,.5,.5]});vm.runInContext(text,c);return c;},cx=context(source),old=context(baseline),Renderer=vm.runInContext('Renderer',cx);
+const source=fs.readFileSync(path.join(root,'src/engine.js'),'utf8'),baseline=cp.execFileSync('git',['show','1d6738d3fc0a67fd93696cd13cca7537eec76694:src/engine.js'],{cwd:root,encoding:'utf8'}),published=cp.execFileSync('git',['show','dbd54ec34adcdad177014d01d3536197ea21fb59:src/engine.js'],{cwd:root,encoding:'utf8'});
+const context=text=>{const c=vm.createContext({console,Float32Array,Uint16Array,Uint32Array,BIO_NEUTRAL:[1,1,1,1],BIO_DEFAULT:[.5,.5,.5,.5]});vm.runInContext(text,c);return c;},cx=context(source),old=context(baseline),previous=context(published),Renderer=vm.runInContext('Renderer',cx);
+function replaceOnce(text,from,to){assert.equal(text.split(from).length,2,'Expected exactly one explicit allowed seam: '+from);return text.replace(from,to);}
+function turtleBlock(text){
+ const anchor=' if(uMat==5){',start=text.indexOf(anchor);assert(start>=0&&text.indexOf(anchor,start+anchor.length)<0,'Unique turtle material branch required');
+ let depth=0;for(let i=start+anchor.indexOf('{');i<text.length;i++){if(text[i]==='{')depth++;else if(text[i]==='}'&&!--depth)return {start,end:i+1,text:text.slice(start,i+1)};}throw Error('Unclosed turtle material branch');
+}
+// v45 changes only the material-5 body and repurposes its old unused slot.
+// Restore that explicit branch for comparison; every byte outside it, every
+// other shader and every vertex rig still has to match the frozen baseline.
+function normalizeTurtleFragment(actual,reference){
+ let text=actual;if(text.includes('uniform sampler2D uTurtleSkin;'))text=replaceOnce(text,'uniform sampler2D uTurtleSkin;','uniform sampler2D uShellN;');
+ const a=turtleBlock(text),b=turtleBlock(reference);return text.slice(0,a.start)+b.text+text.slice(a.end);
+}
+function normalizeEntryTextures(text){
+ if(!text.includes("'turtle_skin_v45'"))return text;
+ text=replaceOnce(text,"const wrap=name==='turtle_skin_v45'?g.MIRRORED_REPEAT:g.REPEAT;g.texParameteri(g.TEXTURE_2D,g.TEXTURE_WRAP_S,wrap);g.texParameteri(g.TEXTURE_2D,g.TEXTURE_WRAP_T,wrap);","g.texParameteri(g.TEXTURE_2D,g.TEXTURE_WRAP_S,g.REPEAT);g.texParameteri(g.TEXTURE_2D,g.TEXTURE_WRAP_T,g.REPEAT);");
+ return replaceOnce(text,"'turtle_skin_v45'","'shell_nor_gl'");
+}
 const {binaryModel,allPhaseBound}=require('./barramundi-asset-contract.cjs'),raw=fs.readFileSync(path.join(root,'assets/barramundi/geometry.bin')),asset=binaryModel(raw),bounds=allPhaseBound(asset);
 const vertices=new Float32Array(asset.positions.length/3*12);for(let i=0;i<asset.positions.length/3;i++){vertices.set(asset.positions.subarray(i*3,i*3+3),i*12);vertices.set(asset.normals.subarray(i*3,i*3+3),i*12+3);vertices.set([1,1,1],i*12+6);vertices.set(asset.uv.subarray(i*2,i*2+2),i*12+9);vertices[i*12+11]=1;}
 const mesh={vertices,indices:asset.indices,tangents:asset.tangents,radius:bounds.restRadius},material=()=>({textures:[{tex:'base'},{tex:'orm'},{tex:'normal'}],ready:true,motionAmplitude:.025,normalStrength:1}),actor=()=>({p:[3,-7,-12],s:[1.2,.9,1.1],yaw:.4,pitch:-.2,phase:1});
@@ -23,10 +40,19 @@ function renderer(options={}){
 }
 const geo=m=>({indexed:mesh,material:18,species:100,shadow:true,importedMaterial:m}),report={scope:'CPU source and mocked GPU ownership only; native shader compilation, visual fidelity, performance and real-device acceptance pending',engineSHA256:sha(source),validatorSHA256:sha(fs.readFileSync(__filename)),assetSHA256:sha(raw),checks:[]};
 function check(name,fn){try{report.checks.push({name,passed:true,detail:fn()});}catch(e){report.checks.push({name,passed:false,error:e.stack});}}
-check('all existing shader strings and specialization outputs remain byte exact',()=>{
- const names=[...baseline.matchAll(/const ([A-Z_]*(?:VS|FS|GLSL))=/g)].map(x=>x[1]);for(const name of names)assert.equal(vm.runInContext(name,cx),vm.runInContext(name,old),name);
- for(const [k,m]of [[0,1],[0,2],[0,3],[1,6],[0,12],[0,16],[0,17],[11,0],[3,3],[2,5]])for(const shader of ['VS','FS'])assert.equal(vm.runInContext(`surfaceShaderSource(${shader},${k},${m})`,cx),vm.runInContext(`surfaceShaderSource(${shader},${k},${m})`,old));
- assert.equal(Renderer.prototype.loadTextures.toString(),vm.runInContext('Renderer.prototype.loadTextures.toString()',old));assert.equal(Renderer.prototype.setupSurfacePrograms.toString(),vm.runInContext('Renderer.prototype.setupSurfacePrograms.toString()',old));return {shaderStrings:names.length,specializedSources:20,entryTexturePromiseUnchanged:true};
+check('all non-turtle shader bytes, rigs and texture transaction remain exact outside named v45 seams',()=>{
+ const names=[...baseline.matchAll(/const ([A-Z_]*(?:VS|FS|GLSL))=/g)].map(x=>x[1]);for(const name of names){const actual=vm.runInContext(name,cx),reference=vm.runInContext(name,old);assert.equal(name==='FS'?normalizeTurtleFragment(actual,reference):actual,reference,name);}
+ for(const [k,m]of [[0,1],[0,2],[0,3],[1,6],[0,12],[0,16],[0,17],[11,0],[3,3],[2,5]])for(const shader of ['VS','FS']){const actual=vm.runInContext(`surfaceShaderSource(${shader},${k},${m})`,cx),reference=vm.runInContext(`surfaceShaderSource(${shader},${k},${m})`,old);assert.equal(shader==='FS'?normalizeTurtleFragment(actual,reference):actual,reference);}
+ assert.equal(normalizeEntryTextures(Renderer.prototype.loadTextures.toString()),vm.runInContext('Renderer.prototype.loadTextures.toString()',old));assert.equal(Renderer.prototype.setupSurfacePrograms.toString(),vm.runInContext('Renderer.prototype.setupSurfacePrograms.toString()',old));
+ const currentImport=vm.runInContext('importedFishShaderSources()',cx),publishedImport=vm.runInContext('importedFishShaderSources()',previous);assert.equal(currentImport.vertex,publishedImport.vertex);assert.equal(normalizeTurtleFragment(currentImport.fragment,publishedImport.fragment),publishedImport.fragment);assert.equal(vm.runInContext('importedFishShaderSources.toString()',cx),vm.runInContext('importedFishShaderSources.toString()',previous));
+ return {shaderStrings:names.length,specializedSources:20,entryTexturePromiseUnchanged:true,allowedChanges:['material-5 body','unused slot-5 name and mirrored wrapping'],importedVertexExact:true,importedFragmentOutsideDeadTurtleBranchExact:true};
+});
+check('narrow turtle normalization cannot hide fish, lighting, imported motion or loader changes',()=>{
+ const fragment=vm.runInContext('FS',cx),reference=vm.runInContext('FS',old);
+ for(const [from,to]of [['if(uMat==6)','if(uMat==66)'],['vec3 L=normalize(vWorld.y<0.?uLightDir:uAirLightDir);','vec3 L=vec3(1.);'],['uniform sampler2D uRock;','uniform sampler2D uChangedRock;']]){const changed=replaceOnce(fragment,from,to);assert.notEqual(normalizeTurtleFragment(changed,reference),reference);}
+ const loader=Renderer.prototype.loadTextures.toString(),oldLoader=vm.runInContext('Renderer.prototype.loadTextures.toString()',old);assert.notEqual(normalizeEntryTextures(replaceOnce(loader,'expiresAt=performance.now()+12000','expiresAt=performance.now()+99999')),oldLoader);
+ const imported=vm.runInContext('importedFishShaderSources()',cx),prior=vm.runInContext('importedFishShaderSources()',previous);assert.notEqual(normalizeTurtleFragment(replaceOnce(imported.fragment,'vec3 albedo=importedAlbedo*(1.-metallic);','vec3 albedo=vec3(1.);'),prior.fragment),prior.fragment);assert.notEqual(replaceOnce(imported.vertex,'tangent.z+=slope*tangent.x;','tangent.z+=0.;'),prior.vertex);
+ return {unrelatedFragmentMutations:3,loaderDeadlineMutation:1,importedAlbedoAndRigMutations:2};
 });
 check('frozen motion exact; derived source keeps one sRGB decode, source ORM and transported frame',()=>{
  assert.equal(sha(vm.runInContext('IMPORTED_FISH_MOTION_GLSL',cx)),'70973c8e2ef159b482920df6d7ac03eb3d0a8c5d3272f62c7e65342f8505fab1');

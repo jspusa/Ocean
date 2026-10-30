@@ -54,13 +54,21 @@ async function run(browser,mode){
   await page.waitForFunction(b=>t>b.t+.5&&V.dist(b.p,player.p)>2,before,{timeout:30000});await page.waitForTimeout(700);
   const actual=await page.evaluate(b=>({distance:V.dist(b.p,player.p),seconds:t-b.t,travel:oceanDeepsea.snapshot().travelTarget,compiled:renderer.sceneLoad.compiled,streamed:renderer.sceneLoad.streamed,gl:renderer.gl.getError(),focus:document.hasFocus()}),before);
   check(mode,'actual RAF drives a continuous guided swim with streamed native rendering',actual.distance>2&&actual.seconds>.5&&actual.travel==='midwater'&&actual.compiled&&actual.streamed&&actual.gl===0&&actual.focus,actual);
-  if(mode.touch)await press(page,mode,'#upBtn');else{await page.keyboard.down('KeyW');await page.waitForTimeout(120);await page.keyboard.up('KeyW');}
-  await page.waitForFunction(()=>!auto&&oceanDeepsea.snapshot().travelTarget==='midwater'&&oceanDeepsea.snapshot().guideMode==='paused');
   await page.evaluate(()=>{window.__freeze=true;});
-  check(mode,'real manual movement pauses guidance and retains its destination',await page.evaluate(()=>!auto&&oceanDeepsea.snapshot().travelTarget==='midwater'&&oceanDeepsea.snapshot().guideMode==='paused'&&!follow));
   const encountered=new Set();
   for(const id of ['midwater','slope','hadal']){
-   await travel(page,mode,id);await page.evaluate(()=>{__deepLastHold=null;__deepMetrics={seconds:0,distance:0,maxStep:0,maxApproachSpeed:0,holds:[]};});
+   // Continue the original boat departure without cancelling/replanning past
+   // a shallow obstacle. Manual cancellation is still exercised on trip two.
+   if(id!=='midwater')await travel(page,mode,id);
+   if(id==='slope'){
+    await page.evaluate(()=>{lastTime=performance.now();window.__freeze=false;});
+    if(mode.touch)await press(page,mode,'#upBtn');else{await page.keyboard.down('KeyW');await page.waitForTimeout(120);await page.keyboard.up('KeyW');}
+    await page.waitForFunction(()=>!auto&&oceanDeepsea.snapshot().travelTarget==='slope'&&oceanDeepsea.snapshot().guideMode==='paused');
+    await page.evaluate(()=>{window.__freeze=true;});
+    check(mode,'real manual movement pauses guidance and retains its destination',await page.evaluate(()=>!auto&&oceanDeepsea.snapshot().travelTarget==='slope'&&oceanDeepsea.snapshot().guideMode==='paused'&&!follow));
+    await travel(page,mode,id);
+   }
+   await page.evaluate(()=>{__deepLastHold=null;__deepMetrics={seconds:0,distance:0,maxStep:0,maxApproachSpeed:0,holds:[]};});
    let sim=0;
    for(;sim<420;sim+=5){
     const s=await page.evaluate(()=>__deepAdvance(5));

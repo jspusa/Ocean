@@ -97,11 +97,17 @@ check('ten programs compile once; turtle, vessel, deep terrain, trench fauna and
    assert.equal(actual.replace('const int uKind='+kind+';','uniform int uKind;').replace('const int uMat='+material+';','uniform int uMat;'),original,'all remaining shader source, including LOD discard, must be unchanged');
   }
  }
- for(let kind=-1;kind<15;kind++)for(let material=0;material<20;material++){const b={kind,material},program=f.renderer.surfaceProgram(b);if(!keys.includes(kind+':'+material))assert.equal(program,f.renderer.program);}
+ for(let kind=-1;kind<15;kind++)for(let material=0;material<20;material++){const b={kind,material},program=f.renderer.surfaceProgram(b);if(!keys.includes(kind+':'+material))assert.equal(program,kind===13?null:f.renderer.program,'unready imported geometry stays hidden; other unknown pairs retain generic fallback');}
  f.renderer.surfacePrograms.set('3:2',f.compiled[0]);assert.equal(f.renderer.surfaceProgram({kind:3,material:2}),f.renderer.program,'unknown pairs cannot opt into cached variants');
  for(const b of [{kind:0,material:2.5},{kind:'0',material:2},{kind:NaN,material:2},{}])assert.equal(f.renderer.surfaceProgram(b),f.renderer.program);
  assert.equal(f.compiled.length,10,'selection may not compile unbounded variants');
  const source=vm.runInContext('surfaceShaderSource',context);assert.throws(()=>source(VS,3,2),/Unsupported surface/);assert.throws(()=>source(VS.replace('uniform int uMat;',''),0,2),/Missing surface shader uniform/);
+});
+check('imported kind 13 routes only complete assets to its owned program and never generic fallback',()=>{
+ const f=fixture(),r=f.renderer,program=shaderProgram(VS,FS,'optional-imported'),geometry={released:false},material={ready:true,textures:[{},{},{}]},b={kind:13,material:18,importedGeometry:geometry,importedMaterial:material};
+ assert.equal(r.surfaceProgram(b),null);r.surfacePrograms.set('13:18',program);assert.equal(r.surfaceProgram(b),null);r.importedShadowProgram={};assert.equal(r.surfaceProgram(b),program);
+ for(const change of [()=>{geometry.released=true;},()=>{material.ready=false;},()=>{material.textures[1]=null;},()=>{b.material=6;}]){change();assert.equal(r.surfaceProgram(b),null);geometry.released=false;material.ready=true;material.textures=[{},{},{}];b.material=18;}
+ assert.equal(f.compiled.length,10,'selection must not compile optional programs');
 });
 check('interleaved variants preserve every pass, draw order, uniform, sampler and current instance prefix',()=>{
  const original=fixture(false),candidate=fixture();assert.deepEqual(candidate.capture(),original.capture());

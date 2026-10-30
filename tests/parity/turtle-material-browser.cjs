@@ -74,9 +74,12 @@ async function main(){
    const quantile=(values,q)=>values.slice().sort((a,b)=>a-b)[Math.min(values.length-1,Math.floor(q*values.length))];
    const originalOrigin=renderer.renderOrigin,originalQuality=renderer.quality,created=[],rows=[],geometry=[];
    renderer.renderOrigin=[0,0,0];g.disable(g.BLEND);g.disable(g.DEPTH_TEST);g.disable(g.CULL_FACE);g.disable(g.DITHER);g.disable(g.SCISSOR_TEST);g.disable(g.SAMPLE_ALPHA_TO_COVERAGE);g.colorMask(true,true,true,true);
+   const skinSampler={textures:renderer.textures.length};
+   renderer.bindTex(5,renderer.textures[5]);skinSampler.wrapS=g.getTexParameter(g.TEXTURE_2D,g.TEXTURE_WRAP_S);skinSampler.wrapT=g.getTexParameter(g.TEXTURE_2D,g.TEXTURE_WRAP_T);skinSampler.minFilter=g.getTexParameter(g.TEXTURE_2D,g.TEXTURE_MIN_FILTER);
+   if(skinSampler.textures!==9||skinSampler.wrapS!==g.MIRRORED_REPEAT||skinSampler.wrapT!==g.MIRRORED_REPEAT||skinSampler.minFilter!==g.LINEAR_MIPMAP_LINEAR)throw Error('Skin sampler must reuse one of the nine mipmapped slots with continuous mirror boundaries');
    const setup=(batch,time,eye,vp,quality,mode)=>{
     renderer.quality=quality;renderer.common(program,eye,vp,time);renderer.batchUniforms(program,batch,{});renderer.set1i(program,'uSamples',0);renderer.set1i(program,'uMaterialDiagnostic',mode);renderer.set3f(program,'uLODBounds',0,10000,0);
-    for(const [i,name]of ['uSand','uSandN','uRock','uRockN','uShell','uShellN','uCoral','uCoralN'].entries()){renderer.bindTex(i,renderer.textures[i]);renderer.set1i(program,name,i);}
+    for(const [i,name]of ['uSand','uSandN','uRock','uRockN','uShell','uTurtleSkin','uCoral','uCoralN'].entries()){renderer.bindTex(i,renderer.textures[i]);renderer.set1i(program,name,i);}
     renderer.updateBatch(batch);g.bindVertexArray(batch.vao);
    };
    try{
@@ -130,7 +133,7 @@ async function main(){
       }
      }
     }
-    return {hardware,compiled:renderer.sceneLoad.compiled,streamed:renderer.sceneLoad.streamed,worldVersion:OPEN_WORLD.version,uid:actor.uid,actorScale:actor.s.slice(),sourceSHA256:{VS:await digest(VS),FS:await digest(FS)},diagnostic:'base, world normal, geometry normal, model position before lighting; RGBA32F; no multisampling',geometry,rows};
+    return {hardware,compiled:renderer.sceneLoad.compiled,streamed:renderer.sceneLoad.streamed,worldVersion:OPEN_WORLD.version,uid:actor.uid,actorScale:actor.s.slice(),sourceSHA256:{VS:await digest(VS),FS:await digest(FS)},diagnostic:'base, world normal, geometry normal, model position before lighting; RGBA32F; no multisampling',geometry,skinSampler,rows};
    }finally{
     for(const batch of created){renderer.batches.splice(renderer.batches.indexOf(batch),1);g.deleteVertexArray(batch.vao);g.deleteBuffer(batch.vb);g.deleteBuffer(batch.eb);g.deleteBuffer(batch.ib);}
     renderer.renderOrigin=originalOrigin;renderer.quality=originalQuality;g.bindFramebuffer(g.FRAMEBUFFER,null);g.bindVertexArray(null);g.deleteProgram(program.p);g.deleteBuffer(feedbackBuffer);g.deleteTransformFeedback(feedback);g.deleteFramebuffer(framebuffer);g.deleteTexture(color);

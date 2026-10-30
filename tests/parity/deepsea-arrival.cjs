@@ -8,15 +8,19 @@ let viewport={width:1440,height:900,touch:false};const node=()=>({classList:clas
 const $=id=>{if(!elements.has(id))elements.set(id,node());return elements.get(id)};
 const c=vm.createContext({console,performance:{now:()=>1000},document:{createElement:node,getElementById:$,body:node(),hidden:false},$: $,matchMedia:()=>({matches:viewport.touch}),active:true,modal:null,photoOpen:false,auto:false,follow:null,focusFish:null,focusId:null,focusSeconds:0,t:0,eye:[0,0,0],target:[0,0,-1],player:{p:[-24,-2,43],velocity:[0,0,0],yaw:0,pitch:0},settings:{speed:1.15,third:false,sensitivity:.85,hints:true},lookStick:[0,0],stick:[0,0],verticalInput:0,keys:new Set(),cameraCut:false,cameraFollowLength:6.3,lastCameraThird:null,collisionNotice:0,renderer:{fov:69,batches:[{sceneRole:'research-vessel',instances:[{p:[-24,0,43]}]}]},voyage:{state:{mode:'free',completed:[],visited:[],features:{expedition:{guest:null}},resume:null},awaitingResume:false},safe:s=>s,toast:s=>notes.push(s),radio(){},setAutoUI(){},resetInput(){c.player.velocity=[0,0,0]},closePanel(){c.modal=null},saveVoyage(){},currentOrder:()=>null});
 const notes=[];c.stopAuto=()=>{c.auto=false;c.follow=null};c.startDive=()=>{c.active=true};c.jumpTo=()=>{};c.renderMap=()=>{};
-for(const name of ['engine','world','reef_detail','next_reef','individuals','open_world','trench','fauna','cetaceans','abyss_fauna','trench_fauna','fauna_world','cetacean_world','regions','abyss_world','trench_world','pelagic_life','reef_fauna','oarfish','frilled_shark','frilled_shark_world','barreleye','barreleye_world','tripod_fish','dumbo_octopus','abyss_community'])vm.runInContext(read(name),c,{filename:name+'.js'});
+for(const name of ['engine','world','reef_detail','next_reef','individuals','open_world','trench','fauna','cetaceans','abyss_fauna','trench_fauna','fauna_world','cetacean_world','regions','abyss_world','trench_world','pelagic_life','reef_fauna','oarfish','frilled_shark','frilled_shark_world','barreleye','barreleye_world','tripod_fish','dumbo_octopus','abyss_community','rock_contact','player_contact'])vm.runInContext(read(name),c,{filename:name+'.js'});
 const get=s=>vm.runInContext(s,c);const bytes=zlib.gunzipSync(fs.readFileSync(root+'/assets/reef.mesh.gz'));const header=JSON.parse(bytes.subarray(8,8+bytes.readUInt32LE(4)));c.header=header;
 get('life.push(...header.life.map(i=>header.nodes[i])); obstacles.push(...header.obstacles);diverBatch={visible:false,instances:[{p:[0,0,0]}]};');
+get('OceanRockContact.install(header.rockContact);');
 c.renderer.batch=function(g,instances,kind,dynamic){const batch={g,instances,kind,dynamic};this.batches.push(batch);return batch;};
 get('ensureOarfish(renderer);ensureFrilledShark(renderer);allLife=life.concat(decorLife);initializeIndividuals(renderer);');
 const app=read('app');for(const [start,end]of [['function collide(','function startDive('],['const path=','function updateCamera('],['function updateCamera(','function observe(dt)']])vm.runInContext(app.slice(app.indexOf(start),app.indexOf(end)),c);
 const features={},states={};c.oceanFeatures={register:f=>{features[f.id]=f;states[f.id]=f.initial()},state:id=>states[id],addMenu(){},pointerCaptured:()=>false};
 for(const name of ['selection','navigation','deepsea'])vm.runInContext(read(name),c,{filename:name+'.js'});
 features.navigation.init();features.deepsea.init();const T=get('OceanTrench'),deep=get('oceanDeepsea'),selection=get('oceanSelection'),V=get('V'),species=get('SPECIES'),actors=get('life'),trench=actors.filter(f=>species[f.species].trench),moving=actors.filter(f=>species[f.species].trench||f.encounterId),pose=get('faunaMotionPose');
+const frameHz=Number(process.env.OCEAN_GUIDE_FRAME_HZ||60);assert([30,60].includes(frameHz),'guide frame cadence must be 30 or 60 Hz');
+const frameSeconds=1/frameHz,physicsSteps=120/frameHz;
+function gameFrame(){for(let step=0;step<physicsSteps;step++)c.updatePlayer(1/120);c.updateCamera(frameSeconds);features.deepsea.afterCamera(frameSeconds);c.t+=frameSeconds;}
 const results=[],viewports=[{width:1440,height:900,touch:false},{width:390,height:844,touch:true},{width:844,height:390,touch:true}];
 function viewSample(f,vp){
  viewport=vp;c.updateCamera(1/60);get(`renderer.vp=mm(perspective(69*Math.PI/180,${vp.width}/${vp.height},.16,1200),lookAt(eye,target));`);
@@ -32,9 +36,12 @@ for(const station of T.stations){
  c.auto=false;features.navigation.prepareDive({resume:false});features.deepsea.prepareDive({resume:false});features.deepsea.startDive();const departure=c.player.p.slice();assert(deep.travel(station.id));let frames=0,approachFrames=0,maxApproachSpeed=0,maxStep=0,approachSamples=[],holds=[],currentHold=null;const expected=get('DeepseaRules').itinerary(T.route('midwater',station.id,departure),get('deepseaEncounters'),(a,b)=>get('OceanRegions').pathClear(a,b,.4)).filter(l=>l.encounter).map(l=>l.encounter.id);
  // Preserve the existing travel-time budget and add only the time deliberately
  // spent at the now player-controlled stops. No timer may resume the guide.
- const frameBudget=18000+expected.length*900;
+ const frameBudget=(300+expected.length*15)*frameHz;
  for(;frames<frameBudget&&deep.snapshot().travelTarget;frames++){
-  const before=c.player.p.slice(),approaching=deep.snapshot().approaching;c.updatePlayer(1/60);c.t+=1/60;if(frames%6===0)for(const f of moving)pose(f,c.t,f.p);const snapshot=deep.snapshot();
+  // A real game frame runs the body-contact owner from updateCamera after
+  // navigation. Sampling the camera only at stops leaves its accepted pose
+  // at the previous station and is no longer a valid simulation of a trip.
+  const before=c.player.p.slice(),approaching=deep.snapshot().approaching;gameFrame();if(frames%(frameHz/10)===0)for(const f of moving)pose(f,c.t,f.p);const snapshot=deep.snapshot();
   if(snapshot.holding){
    assert.equal(snapshot.guideMode,'observing');assert.equal(snapshot.travelTarget,station.id);assert.equal(c.auto,false);
    if(!currentHold){
@@ -50,7 +57,7 @@ for(const station of T.stations){
   maxStep=Math.max(maxStep,V.dist(before,c.player.p));if(approaching){approachFrames++;maxApproachSpeed=Math.max(maxApproachSpeed,V.len(c.player.velocity));approachSamples.push({p:c.player.p.slice(),speed:V.len(c.player.velocity)});}
  }
  assert.equal(deep.snapshot().travelTarget,null);assert.equal(c.auto,false);
- const arrival={expected,holds,approachFrames,maxApproachSpeed,finalApproachSpeed:Math.max(0,...approachSamples.filter(x=>V.dist(x.p,c.player.p)<=4).map(x=>x.speed)),maxStep,footClearance:c.player.p[1]-T.floorAt(c.player.p[0],c.player.p[2],c.player.p[1]+.1),id:station.id,departure,p:c.player.p.slice(),yaw:c.player.yaw,pitch:c.player.pitch,seconds:frames/60,notes:notes.splice(0),samples:[]};
+ const arrival={expected,holds,approachFrames,maxApproachSpeed,finalApproachSpeed:Math.max(0,...approachSamples.filter(x=>V.dist(x.p,c.player.p)<=4).map(x=>x.speed)),maxStep,footClearance:c.player.p[1]-T.floorAt(c.player.p[0],c.player.p[2],c.player.p[1]+.1),id:station.id,departure,p:c.player.p.slice(),yaw:c.player.yaw,pitch:c.player.pitch,seconds:frames/frameHz,notes:notes.splice(0),samples:[]};
  for(const seconds of [0,30,60])for(const vp of viewports){
   viewport=vp;c.updateCamera(1/60);get(`renderer.vp=mm(perspective(69*Math.PI/180,${vp.width}/${vp.height},.16,1200),lookAt(eye,target));`);
   const sample={seconds,viewport:[vp.width,vp.height],actors:[]};
@@ -70,7 +77,7 @@ for(const sp of species.filter(s=>s.abyss||s.trench)){const before=c.player.p.sl
 // true pointer events are deliberately left to the browser integration gate.
 let passed=0,failed=0;function check(name,fn){try{fn();passed++;console.log('PASS '+name)}catch(error){failed++;console.error('FAIL '+name+': '+error.message)}}
 for(const r of results){
- check(r.id+' route remains continuous and adds a slow final observation approach',()=>{assert(r.maxStep<=260/60+.001);assert(r.approachFrames>0,'missing observation approach');assert(r.maxApproachSpeed<=2.2+.0001);assert(r.finalApproachSpeed<=.85+.0001);assert(r.footClearance>=.82-.002);});
+ check(r.id+' route remains continuous and adds a slow final observation approach',()=>{assert(r.maxStep<=260/frameHz+.001);assert(r.approachFrames>0,'missing observation approach');assert(r.maxApproachSpeed<=2.2+.0001);assert(r.finalApproachSpeed<=.85+.0001);assert(r.footClearance>=.82-.002);});
  check(r.id+' real arrival leaves an in-frame selectable individual in all three viewports',()=>{for(const s of r.samples){const valid=s.actors.filter(a=>a.valid&&a.picked===a.uid);assert(valid.length>0,JSON.stringify({viewport:s.viewport,seconds:s.seconds,actors:s.actors.map(a=>({uid:a.uid,d:a.distance,max:a.observeDistance,blocked:a.blocked}))}));assert(valid.some(a=>a.bodyLengthPixels>=12),'animal remains too small at the actual approach endpoint');}});
 }
 check('actual compiled corridor actors are approached and held in every planned trip',()=>{assert.equal(T.encounters.length,9);for(const r of results){assert.deepEqual(r.holds.map(h=>h.id),Array.from(r.expected),r.id+' missed a real observation stop');for(const hold of r.holds)for(const s of hold.samples){assert(s.valid&&s.picked===s.uid,JSON.stringify({station:r.id,hold:hold.id,position:hold.p,sample:s}));assert(s.bodyLengthPixels>=12);}}});
@@ -82,7 +89,7 @@ check('900 m frilled shark has a readable full-body side view in the first four 
 check('guided giant squid observation remains within 12–18 metres across actual motion and all aspects',()=>{for(const r of results)for(const h of r.holds.filter(h=>h.id==='giant-squid-pass'))for(const s of h.samples){assert(s.distance>=12&&s.distance<=18,JSON.stringify({trip:r.id,seconds:s.seconds,viewport:s.viewport,distance:s.distance}));assert(s.valid&&s.picked===s.uid);}});
 check('eight distant deep-guide entries retain true habitat coordinates without teleport',()=>{assert.equal(guide.length,8);assert(guide.every(g=>!g.startsTravel));});
 check('guided arrival never automatically selects or identifies an animal',()=>{assert.equal(selection.snapshot().uid,null);assert.equal(c.focusFish,null);});
-features.navigation.prepareDive({resume:false});deep.travel('slope');for(let i=0;i<12000&&deep.snapshot().travelTarget&&!deep.snapshot().approaching;i++)c.updatePlayer(1/60);
+features.navigation.prepareDive({resume:false});deep.travel('slope');for(let i=0;i<200*frameHz&&deep.snapshot().travelTarget&&!deep.snapshot().approaching;i++)gameFrame();
 check('the slow approach remains cancellable through the public travel action',()=>{assert(deep.snapshot().approaching);deep.cancelTravel();const before=c.player.p.slice();for(let i=0;i<60;i++)c.updatePlayer(1/60);assert.equal(deep.snapshot().travelTarget,null);assert.equal(c.auto,false);assert(V.dist(c.player.p,before)<.000001);});
 check('guided itinerary visits actual corridor gates in travel order without omitting route corners',()=>{
  const rules=get('DeepseaRules'),route=T.route('midwater','hadal',[-22.6,-2.2,52.5]),encounters=[
@@ -96,6 +103,6 @@ check('guided itinerary visits actual corridor gates in travel order without omi
  assert(V.dist(legs.at(-1).route.at(-1),T.stations.find(s=>s.id==='hadal').p)<1e-9);
  const ignored=rules.itinerary(route,[{...encounters[0],guide:false},{...encounters[1],gate:[NaN,-680,-90]},{...encounters[2],gate:[10000,-2300,-90]}]);assert.equal(ignored.length,1);
 });
-fs.mkdirSync(root+'/qa/parity',{recursive:true});fs.writeFileSync(root+'/qa/parity/deepsea-arrival.json',JSON.stringify({method:'CPU actual compiled actors, production navigation and motion; no GPU or raster visibility claim',results,guide,passed,failed},null,2));
+fs.mkdirSync(root+'/qa/parity',{recursive:true});fs.writeFileSync(root+'/qa/parity/deepsea-arrival.json',JSON.stringify({method:'CPU actual compiled actors, 120 Hz production navigation and full body acceptance at the chosen frame cadence; no GPU or raster visibility claim',frameHz,physicsHz:120,results,guide,passed,failed},null,2));
 for(const r of results)console.log(r.id+': '+r.seconds.toFixed(1)+' simulated seconds, '+r.holds.length+' actual encounter stops');
 console.log(`${passed}/${passed+failed} guided deep observation checks passed (CPU production navigation/projection/selection; no GPU)`);if(failed)process.exitCode=1;

@@ -21,6 +21,9 @@ let feature,state;ctx.oceanFeatures={register:f=>feature=f,state:()=>state,addMe
 vm.runInContext(read('deepsea'),ctx,{filename:'deepsea.js'});state=feature.sanitize({deployed:true,station:'slope',visited:['midwater']});
 ctx.goHome=()=>{homes++;feature.endDive();ctx.active=false;};feature.init();
 const get=s=>vm.runInContext(s,ctx),deep=get('oceanDeepsea'),plain=x=>JSON.parse(JSON.stringify(x));let count=0;
+// Match the production frame-end protocol; compiled physical acceptance has
+// its own real-owner arrival/contact regressions.
+function frame(dt=1/60){ctx.updatePlayer(dt);feature.afterCamera(dt);}
 function check(name,fn){fn();count++;console.log('PASS '+name);}
 const distance=(a,b)=>Math.hypot(...a.map((n,i)=>n-b[i])),station=id=>get('OceanTrench').stations.find(s=>s.id===id);
 check('old saves have no guide; only known destinations and unique authored stops survive round-trip',()=>{
@@ -36,14 +39,14 @@ check('old saves have no guide; only known destinations and unique authored stop
 });
 check('manual takeover keeps the destination and current input; resume replans from the real position',()=>{
  ctx.active=true;ctx.player.p=[760,-3000,-90];state=feature.initial();state.station='slope';
- assert(deep.travel('hadal'));for(let i=0;i<60;i++)ctx.updatePlayer(1/60);
- const before=plain(ctx.player.p);ctx.stopAuto();ctx.manualAxis=1;ctx.updatePlayer(.5);
+ assert(deep.travel('hadal'));for(let i=0;i<60;i++)frame();
+ const before=plain(ctx.player.p);ctx.stopAuto();ctx.manualAxis=1;frame(.5);
  assert.equal(deep.snapshot().travelTarget,'hadal');assert.equal(deep.snapshot().guideMode,'paused');
  assert.equal(ctx.player.p[0],before[0]+.5,'takeover consumed the movement input');
  assert.deepEqual(plain(state.guide),{target:'hadal',passed:[]});
  const resumeFrom=plain(ctx.player.p);assert(deep.resumeTravel());
  assert.deepEqual(plain(ctx.player.p),resumeFrom,'resume teleported');assert.equal(ctx.manualAxis,0);
- ctx.updatePlayer(1/60);assert(distance(resumeFrom,ctx.player.p)>0);assert(distance(resumeFrom,ctx.player.p)<=260/60+.001);
+ frame();assert(distance(resumeFrom,ctx.player.p)>0);assert(distance(resumeFrom,ctx.player.p)<=260/60+.001);
  assert.equal(deep.snapshot().guideMode,'traveling');deep.cancelTravel();
  assert.equal(state.guide,null);assert.equal(deep.snapshot().travelTarget,null);assert.equal(ctx.auto,false);
 });
@@ -55,25 +58,25 @@ function speciesTraits(i){return SPECIES[i].traits;}
 `);
 check('an encountered animal remains a voluntary stop beyond fifteen seconds and is skipped only after explicit continuation',()=>{
  state=feature.initial();ctx.player.p=[766,-650,-90];assert(deep.travel('midwater'));
- for(let i=0;i<9000&&!deep.snapshot().holding;i++){ctx.t+=1/60;ctx.updatePlayer(1/60);}
+ for(let i=0;i<9000&&!deep.snapshot().holding;i++){ctx.t+=1/60;frame();}
  assert(deep.snapshot().holding);const at=plain(ctx.player.p),visited=plain(state.visited);
- for(let i=0;i<1200;i++){ctx.t+=1/60;ctx.updatePlayer(1/60);}
+ for(let i=0;i<1200;i++){ctx.t+=1/60;frame();}
  assert.deepEqual(plain(ctx.player.p),at,'left the animal without player consent');
  assert.equal(deep.snapshot().guideMode,'observing');assert.equal(ctx.auto,false);
  assert.deepEqual(plain(state.guide),{target:'midwater',passed:['giant-squid-pass']});
  assert.deepEqual(plain(state.visited),visited);assert.deepEqual(ctx.persistent.seen,[]);
  assert(deep.resumeTravel());assert.deepEqual(plain(ctx.player.p),at);
- for(let i=0;i<9000&&deep.snapshot().travelTarget;i++){ctx.t+=1/60;ctx.updatePlayer(1/60);assert(!deep.snapshot().holding,'revisited the completed stop');}
+ for(let i=0;i<9000&&deep.snapshot().travelTarget;i++){ctx.t+=1/60;frame();assert(!deep.snapshot().holding,'revisited the completed stop');}
  assert.equal(deep.snapshot().travelTarget,null);assert.equal(state.guide,null);assert(distance(ctx.player.p,station('midwater').p)<.001);
 });
 check('home, sanitized reload and resume retain the destination without moving until requested; new dive and cancel clear it',()=>{
  ctx.active=true;ctx.player.p=[760,-3000,-90];state=feature.sanitize({station:'slope',guide:{target:'hadal',passed:['pelican-pass']}});
- assert(deep.resumeTravel());ctx.updatePlayer(1/60);const at=plain(ctx.player.p),saved=plain(state.guide);
+ assert(deep.resumeTravel());frame();const at=plain(ctx.player.p),saved=plain(state.guide);
  feature.endDive();ctx.active=false;assert.deepEqual(plain(state.guide),saved);assert.equal(ctx.auto,false);
  state=feature.sanitize(plain(state));feature.reset();feature.prepareDive({resume:true});ctx.active=true;feature.startDive();
- assert.equal(deep.snapshot().guideMode,'paused');for(let i=0;i<1200;i++)ctx.updatePlayer(1/60);
+ assert.equal(deep.snapshot().guideMode,'paused');for(let i=0;i<1200;i++)frame();
  assert.deepEqual(plain(ctx.player.p),at);assert.deepEqual(plain(state.guide),saved);assert.equal(ctx.auto,false);
- assert(deep.resumeTravel());ctx.updatePlayer(1/60);assert(distance(at,ctx.player.p)>0);
+ assert(deep.resumeTravel());frame();assert(distance(at,ctx.player.p)>0);
  feature.endDive();feature.prepareDive({resume:false});assert.equal(state.guide,null);assert.equal(deep.snapshot().travelTarget,null);
 });
 check('opening a panel or camera pauses; only the explicit guide control resumes and camera mode is exited',()=>{

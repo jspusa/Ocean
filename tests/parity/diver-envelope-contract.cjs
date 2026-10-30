@@ -16,7 +16,37 @@ function meshAt(a,b){
 }
 function meshSHA(m){return sha(Buffer.concat([bytes(m.vertices),bytes(m.indices)]));}
 function meshEqual(a,b){assert(bytes(a.vertices).equals(bytes(b.vertices)),'Actual vertex words changed');assert(bytes(a.indices).equals(bytes(b.indices)),'Actual triangle indices changed');assert.equal(a.radius,b.radius,'Actual mesh radius changed');}
-function exactWorld(a,b){assert.deepEqual(b.header,a.header,'World metadata/nodes/species/contacts/instanceIDs changed');assert(a.raw.subarray(a.start).equals(b.raw.subarray(b.start)),'A scene mesh changed');}
+const TURTLE_UIDS=Array.from({length:6},(_,i)=>'turtle-'+String(i+1).padStart(3,'0'));
+function turtleBatchIDs(a){
+ const ids=a.header.batches.flatMap((b,i)=>b.kind===2&&b.material===5&&JSON.stringify(b.instanceIDs.map(id=>a.header.nodes[id]?.uid))===JSON.stringify(TURTLE_UIDS)?[i]:[]);
+ assert.deepEqual(ids,[420,421],'Exactly the two frozen six-turtle LOD owners are allowed');return ids;
+}
+function packedLayout(a){
+ let cursor=0;for(const [i,b]of a.header.batches.entries()){assert.equal(b.vertexOffset,cursor,'Unexpected vertex packing at batch '+i);cursor+=b.vertexFloats*4;assert.equal(b.indexOffset,cursor,'Unexpected index packing at batch '+i);cursor+=b.indexCount*4;meshAt(a,b);}
+ assert.equal(a.start+cursor,a.raw.length,'Every payload byte must belong to an existing batch');return cursor;
+}
+function exactWorld(a,b){
+ // v45 removes redundant turtle triangles. Offsets after those two LODs move,
+ // but that is not permission to change any other mesh or scene semantics.
+ const {batches:priorBatches,...priorHeader}=a.header,{batches:currentBatches,...currentHeader}=b.header;
+ assert.deepEqual(currentHeader,priorHeader,'World metadata/nodes/species/contacts changed');assert.equal(currentBatches.length,priorBatches.length,'World batch count changed');
+ const turtles=turtleBatchIDs(a);assert.deepEqual(turtleBatchIDs(b),turtles);const oldBytes=packedLayout(a),newBytes=packedLayout(b),allowed=[];
+ for(let i=0;i<priorBatches.length;i++){
+  const turtle=turtles.includes(i),metadata=batch=>{const {vertexOffset,indexOffset,...rest}=batch;if(turtle){delete rest.vertexFloats;delete rest.indexCount;}return rest;};
+  assert.deepEqual(metadata(currentBatches[i]),metadata(priorBatches[i]),'Batch '+i+' semantic metadata/radius/LOD/instances changed');
+  const before=meshAt(a,priorBatches[i]),current=meshAt(b,currentBatches[i]);
+  if(!turtle){try{meshEqual(before,current);}catch(error){throw Error('Non-turtle batch '+i+': '+error.message);}}
+  else{assert(current.vertices.length<=before.vertices.length&&current.indices.length<=before.indices.length,'Allowed turtle rewrite must not increase either geometry buffer');allowed.push({batch:i,baselineMeshSHA256:meshSHA(before),currentMeshSHA256:meshSHA(current),baselineVertices:before.vertices.length/12,currentVertices:current.vertices.length/12,baselineTriangles:before.indices.length/3,currentTriangles:current.indices.length/3});}
+ }
+ return {exactNonTurtleBatches:priorBatches.length-turtles.length,exactNodes:currentHeader.nodes.length,allowedTurtleLODs:allowed,payloadByteDelta:newBytes-oldBytes};
+}
+function turtleConstructor(source){
+ const text=vm.runInNewContext(source+'\nturtleGeometry.toString()',{}, {timeout:10000}),start=source.indexOf(text);assert(start>=0&&source.indexOf(text,start+1)<0,'Unique exact turtle constructor seam required');return {start,end:start+text.length,text};
+}
+function normalizeTurtleConstructor(source,reference){const a=turtleConstructor(source),b=turtleConstructor(reference);return source.slice(0,a.start)+b.text+source.slice(a.end);}
+function ownedTurtleMeshes(a,context){
+ const before=vm.runInContext('seed',context),rows=turtleBatchIDs(a).map((id,i)=>{const made=vm.runInContext('indexGeometry(turtleGeometry('+Boolean(i)+').v)',context),stored=meshAt(a,a.header.batches[id]);meshEqual(stored,made);return {batch:id,low:!!i,meshSHA256:meshSHA(made),vertices:made.vertices.length/12,triangles:made.indices.length/3};});assert.equal(vm.runInContext('seed',context),before,'Turtle constructor changed procedural seed consumption');return rows;
+}
 function vertex(m,id){assert(Number.isInteger(id)&&id>=0&&id*12+11<m.vertices.length);const k=id*12,p=[m.vertices[k],m.vertices[k+1],m.vertices[k+2]],tag=m.vertices[k+11];assert([...p,tag].every(Number.isFinite));return {id,p,tag};}
 // Different from the shader evaluation below: this encloses ALL real times and
 // swim in [0,1], without assuming that the hip and knee extrema coincide.
@@ -111,10 +141,11 @@ function speciesEvidence(){
 try{
  const baseline=archive(historical('assets/reef.mesh.gz')),current=archive(fs.readFileSync(path.resolve(root,option('archive','assets/reef.mesh.gz'))));assert.equal(baseline.sha256,BASELINE_ARCHIVE,'Wrong immutable baseline');
  const h=current.header,id=h.diverBatch,b=h.batches[id];assert(b&&b.kind===5&&b.material===11&&b.species===-1);const m=meshAt(current,b),prior=meshAt(baseline,baseline.header.batches[baseline.header.diverBatch]);
- report.archives={baseline:{sha256:baseline.sha256,bytes:baseline.bytes},current:{sha256:current.sha256,bytes:current.bytes},identityScope:'Archive header contains scene semantics, not generator fingerprints. All header fields and decoded geometry remain exact; legal source-input provenance updates in external reef-growth/index files are not treated as geometry changes.'};
+ report.archives={baseline:{sha256:baseline.sha256,bytes:baseline.bytes},current:{sha256:current.sha256,bytes:current.bytes},identityScope:'Immutable v43 baseline retained. All non-turtle VB/IB/radii, all nodes/contacts/species and batch semantics remain exact. Only the two existing six-turtle LOD owners may shrink/change VB/IB, validated against their actual current constructors; sequential buffer offsets may shift. External reef-growth/index provenance is not scene geometry.'};
  report.mesh={batch:id,nodeIDs:b.instanceIDs,vertices:m.vertices.length/12,triangles:m.indices.length/3,sha256:meshSHA(m),instance:b.instanceIDs.map(id=>h.nodes[id])};
- check('actual prior/current diver VB IB and complete world/node/species identity',()=>{meshEqual(prior,m);exactWorld(baseline,current);return {nodes:h.nodes.length,batches:h.batches.length,kind5Batches:h.batches.filter(b=>b.kind===5).length};});
- const context=vm.createContext({console});for(const name of ['engine.js','world.js','reef_detail.js'])vm.runInContext(fs.readFileSync(path.join(root,'src',name),'utf8'),context,{filename:name});
+ check('actual diver and every non-turtle world mesh node species and contact remain exact',()=>{meshEqual(prior,m);return {...exactWorld(baseline,current),nodes:h.nodes.length,batches:h.batches.length,kind5Batches:h.batches.filter(b=>b.kind===5).length};});
+ const context=vm.createContext({console});for(const name of ['engine.js','world.js','reef_detail.js','next_reef.js'])vm.runInContext(fs.readFileSync(path.join(root,'src',name),'utf8'),context,{filename:name});
+ check('world source changes only its exact turtle constructor and both archived LODs match that owner',()=>{const world=fs.readFileSync(path.join(root,'src/world.js'),'utf8'),oldWorld=historical('src/world.js').toString();assert.equal(normalizeTurtleConstructor(world,oldWorld),oldWorld,'World source changed outside turtleGeometry');return {sourceSeam:'turtleGeometry only',worldSHA256:sha(world),turtleConstructorSHA256:sha(turtleConstructor(world).text),exactSourceOwnedLODs:ownedTurtleMeshes(current,context)};});
  check('single current diver constructor exactly matches real archived mesh without building world',()=>{const before=vm.runInContext('seed',context),made=vm.runInContext('indexGeometry(diverGeometry().v)',context);meshEqual(m,made);assert.equal(vm.runInContext('seed',context),before);return {meshSHA256:meshSHA(made),sceneBuild:false};});
  const engine=fs.readFileSync(path.join(root,'src/engine.js'),'utf8'),section=shaderSection(engine);
  check('actual kind5 deformation transforms and bounded swim uniform unchanged from fixed v43 shader',()=>{const priorEngine=historical('src/engine.js').toString();assert.equal(section,shaderSection(priorEngine));const uniform=swimUniform(engine);assert.equal(uniform,swimUniform(priorEngine));assert.equal(uniform,"this.set1f(p,'uSwim',typeof player==='undefined'?.4:Math.min(1,Math.hypot(...player.velocity)/1.6));");return {shaderSectionSHA256:sha(section),engineSHA256:sha(engine),swimUniform:uniform,swimRange:[0,1],assumption:'Finite player velocity; the actual hypot/min uniform owner clamps every finite velocity magnitude into [0,1].'};});
@@ -146,6 +177,18 @@ try{
   const pose={p:[4,-10,9],yaw:.75,pitch:.42,scale:.85},actual=plain(volumes(pose));let bad=0;
   for(let i=0;i<8;i++){const expected=shaderPoint({p:[0,0,profile[i].z],tag:0},0,0,1.2,pose);assert(Math.hypot(...expected.map((v,j)=>v-actual[i].p[j]))<1e-10);const flipped=shaderPoint({p:[0,0,profile[i].z],tag:0},0,0,0,{...pose,yaw:-pose.yaw,pitch:-pose.pitch});if(Math.hypot(...flipped.map((v,j)=>v-actual[i].p[j]))>.1)bad++;}assert(bad>=6);controls++;
   return {controls,radiusShrink:8,normalMutation:true,indexMutation:true,speciesMutation:true,signReversalWitnesses:bad};
+ });
+ check('narrow turtle exception rejects unrelated geometry metadata nodes packing and unowned turtle changes',()=>{
+  const altered={...current,raw:Buffer.from(current.raw)},first=h.batches[0];
+  const corruptWord=(offset,run,expected)=>{const at=current.start+offset,word=altered.raw.readUInt32LE(at);altered.raw.writeUInt32LE((word^1)>>>0,at);try{assert.throws(run,expected);}finally{altered.raw.writeUInt32LE(word,at);}};
+  corruptWord(first.vertexOffset+12,()=>exactWorld(current,altered),/Non-turtle batch 0: Actual vertex words changed/);corruptWord(first.indexOffset,()=>exactWorld(current,altered),/Non-turtle batch 0: Actual triangle indices changed/);
+  const corruptHeader=change=>{const header=plain(h);change(header);assert.throws(()=>exactWorld(current,{...current,header}));};
+  corruptHeader(x=>{x.batches[h.diverBatch].radius+=.001;});corruptHeader(x=>{x.batches[420].radius+=.001;});corruptHeader(x=>{x.batches[420].maxDistance++;});corruptHeader(x=>{x.batches[420].instanceIDs[0]=x.batches[420].instanceIDs[1];});corruptHeader(x=>{x.nodes[x.batches[420].instanceIDs[0]].p[0]+=.01;});corruptHeader(x=>{x.batches[422].vertexOffset+=4;});
+  assert.throws(()=>exactWorld(current,{...current,raw:Buffer.concat([current.raw,Buffer.alloc(4)])}));
+  // The allowed VB/IB seam is still tied to the production turtle owner.
+  corruptWord(h.batches[420].vertexOffset,()=>ownedTurtleMeshes(altered,context),/Actual vertex words changed/);corruptWord(h.batches[421].indexOffset,()=>ownedTurtleMeshes(altered,context),/Actual triangle indices changed/);
+  const world=fs.readFileSync(path.join(root,'src/world.js'),'utf8'),oldWorld=historical('src/world.js').toString(),marker='function diverGeometry(){';assert.equal(world.split(marker).length,2);assert.notEqual(normalizeTurtleConstructor(world.replace(marker,marker+'throw Error("injected unrelated diver change");'),oldWorld),oldWorld);
+  return {controls:12,nonTurtleVBAndIB:2,diverRadius:1,turtleRadiusLODInstancesAndNode:4,packingOffsetAndUnownedTail:2,turtleSourceArchiveVBAndIB:2,unrelatedDiverConstructor:1};
  });
  report.status=report.checks.every(c=>c.passed)?flag('derive')?'passed-derived-envelope-production-pending':'passed-actual-diver-envelope-cpu':'failed';
 }catch(error){report.status='error';report.error=error.stack;}

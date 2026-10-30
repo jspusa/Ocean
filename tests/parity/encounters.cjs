@@ -16,13 +16,14 @@ else{
  const entries=[];for(const b of header.batches){const actual=mesh(b),meta=known.get(hash(actual));if(meta)entries.push({...b,geometry:{indexed:actual,rockContact:meta},instances:b.instanceIDs.map(id=>header.nodes[id])});}api.install(api.createCatalogue(entries));
 }
 get('obstacles.push(...header.obstacles);life.push(...header.life.map(i=>header.nodes[i]));decorLife.push(...header.decorLife.map(i=>header.nodes[i]));shoal.push(...header.shoal.map(i=>header.nodes[i]));allLife=life.concat(decorLife);initializeIndividuals({batches:[]});');
-for(const name of ['seasons','features'])vm.runInContext(source(name),c,{filename:name});
+for(const name of ['player_contact','seasons','features'])vm.runInContext(source(name),c,{filename:name});
 get('const registered=[];const registration=oceanFeatures.register;oceanFeatures.register=function(module){registered.push(module);return registration(module)};');
 for(const name of ['encounters','ecology','expedition','navigation','deepsea'])vm.runInContext(source(name),c,{filename:name});
 // The real state readers/sanitizers and prepareDive hooks are retained. These
 // other init/reset functions only build UI or reset UI-only runtime objects.
 get('for(const module of registered)if(module.id!=="encounters"){module.init=undefined;module.reset=undefined;}voyage.state.features=oceanFeatures.read(voyage.state.features);oceanEncounters.feature.init();');
-const plain=x=>JSON.parse(JSON.stringify(x)),arrangement=()=>get('JSON.stringify({life:life.map(f=>[f.uid,f.home,f.center,f.phase,f.orbit,f.encounterPresent]),shoal:shoal.map(f=>[f.uid,f.phase,f.schoolHome,f.schoolGroup,f.schoolSpan])})'),identities=()=>get('JSON.stringify([...life,...decorLife,...shoal].map(f=>[f.uid,f.species,f.s,f.bioSeed,f.bioMorph,f.bioGenes,f.home,f.center]))'),initialIdentities=identities(),initialPhotos=JSON.stringify(c.persistent.photos);
+get('const variableDeepUIDs=new Set(["coelacanth-002","pelican_eel-001","pelican_eel-002","pelican_eel-003","humpback_anglerfish-001","humpback_anglerfish-002"]);');
+const plain=x=>JSON.parse(JSON.stringify(x)),arrangement=()=>get('JSON.stringify({life:life.map(f=>[f.uid,f.home,f.center,f.phase,f.orbit,f.encounterPresent]),shoal:shoal.map(f=>[f.uid,f.phase,f.schoolHome,f.schoolGroup,f.schoolSpan])})'),identities=()=>get('JSON.stringify([...life,...decorLife,...shoal].map(f=>[f.uid,f.species,f.s,f.bioSeed,f.bioMorph,f.bioGenes,...(variableDeepUIDs.has(f.uid)?[]:[f.home,f.center])]))'),initialIdentities=identities(),initialPhotos=JSON.stringify(c.persistent.photos);
 let checks=0;function check(name,fn){fn();checks++;console.log('PASS '+name);}
 const dive=resume=>get('oceanFeatures.call("prepareDive",{resume:'+resume+',tour:false})');
 // Use production waypoint, storage writer/reader and voyage sanitization. Only
@@ -105,5 +106,5 @@ check('64 independent saved seeds retain every school corridor without sampling 
  c.nextSeed=seed;get('voyage.state.features.encounters.seed=nextSeed;oceanEncounters.feature.reset()');assert.equal(entropyCalls,before);
 });
 check('an unavailable entropy provider still gives a new bounded seed without blocking entry',()=>{const previous=get('oceanEncounters.snapshot().seed'),provider=c.crypto.getRandomValues;c.crypto.getRandomValues=()=>{throw Error('Unavailable entropy provider');};try{dive(false);const next=get('oceanEncounters.snapshot().seed');assert(Number.isInteger(next)&&next>0&&next<=0xffffffff);assert.notEqual(next,previous);}finally{c.crypto.getRandomValues=provider;}});
-check('all identity, scale, homes and saved photo references survive every variation',()=>{assert.equal(identities(),initialIdentities);assert.equal(JSON.stringify(c.persistent.photos),initialPhotos);});
+check('identity, scales, nonvariable homes and saved photo references survive every variation',()=>{assert.equal(identities(),initialIdentities);assert.equal(JSON.stringify(c.persistent.photos),initialPhotos);for(const d of get('oceanEncounters.rules.deepHabitats')){const f=get('life').find(f=>f.uid===d.uid),old=originalActors.get(d.uid);assert([old.home,...d.homes].some(home=>home.every((v,i)=>v===f.home[i])),'Only certified deep homes may change: '+d.uid);}});
 console.log(checks+' encounter checks passed');
