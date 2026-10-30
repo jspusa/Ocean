@@ -9,7 +9,7 @@ const SPECIES=[
  {id:'chromis',name:'青雀鯛',latin:'Chromis spp. · 類群示意',en:'REEF CHROMIS',color:0x73cfbd,height:.19,width:.08,zone:0,hint:'青綠色的小型身影，成群穿梭。',detail:'本版讓小魚在珊瑚上方集體轉向。魚群數量、密度與游動路徑是遊戲設定，不是生態調查數據。',size:.33},
  {id:'parrot',name:'鸚哥魚',latin:'Scaridae · 類群示意',en:'PARROTFISH',color:0x60ae9a,height:.31,width:.16,zone:2,hint:'厚實的身形、青綠色側身與粉色花紋。',detail:'本版使用青綠色的合成鸚哥魚造型。真實物種與不同生命階段可能有不同外觀，本模型不提供種級判定。',size:.85},
  {id:'wrasse',name:'隆頭魚',latin:'Labridae · 類群示意',en:'REEF WRASSE',color:0x78b68e,height:.20,width:.10,zone:2,hint:'修長輪廓，身體帶有彩色橫向紋路。',detail:'這是隆頭魚類的合成視覺造型。沿著遊戲中的礁緣游動，可以留意這種細長輪廓。',size:.68},
- {id:'turtle',name:'綠蠵龜',latin:'Chelonia mydas · 簡化模型',en:'GREEN SEA TURTLE',color:0x88946c,zone:0,hint:'褐綠色龜殼，四肢像槳一樣划動。',detail:'綠蠵龜資料可參考 NOAA Fisheries。本版的龜殼、體型與游動已簡化；牠在遊戲中的路線不代表現地海龜位置。觀察時不追逐、不碰觸。',size:1,source:'https://www.fisheries.noaa.gov/species/green-turtle'},
+ {id:'turtle',contactRadius:1.719214937115194,name:'綠蠵龜',latin:'Chelonia mydas · 簡化模型',en:'GREEN SEA TURTLE',color:0x88946c,zone:0,hint:'褐綠色龜殼，四肢像槳一樣划動。',detail:'綠蠵龜資料可參考 NOAA Fisheries。本版的龜殼、體型與游動已簡化；牠在遊戲中的路線不代表現地海龜位置。觀察時不追逐、不碰觸。',size:1,source:'https://www.fisheries.noaa.gov/species/green-turtle'},
  {id:'ray',name:'鷹魟',latin:'Aetobatus spp. · 類群示意',en:'EAGLE RAY',color:0x718b85,zone:2,hint:'展開的菱形胸鰭，細長的尾巴。',detail:'本版以斑點鷹魟類群的輪廓表現安靜滑翔。出現在藍色斷崖是遊戲編排，不表示石朗有固定觀察點或保證能遇見。',size:1},
  {id:'whale',name:'大翅鯨',latin:'Megaptera novaeangliae · 景觀模型',en:'HUMPBACK WHALE',color:0x536978,zone:3,height:.4,width:.18,hint:'長胸鰭、寬尾鰭與喉腹部的縱向褶溝。',detail:'為營造大洋尺度而加入的原創大翅鯨景觀模型。這是幻想深水延伸場景，不是石朗鯨類目擊、活動水深或出現季節的資料。',size:1.25}
 ];
@@ -119,12 +119,30 @@ function fishGeometry(s,lod=false){if(lod)return distantFishGeometry(s);let g=ne
  if(s.id==='idol'){let pts=[[.14,.34,0],[.09,.55,0],[-.08,.78,0],[-.35,.84,0],[-.62,.82,0],[-.83,.88,0]];for(let i=0;i<pts.length-1;i++)g.tube(pts[i],pts[i+1],.018-i*.0027,.014-i*.0025,[.95,.93,.79],7);}
  return g;}
 function turtleGeometry(low=false){let g=new Geometry();g.material=5;g.tag=1;
+ // Full-body atlas: image top is UV v=0 with UNPACK_FLIP_Y_WEBGL=false.
+ // Rects and insets are pixels in the fixed 1024-square atlas contract.
+ const atlasRects={carapace:[0,0,512,588,16],plastron:[512,0,512,588,16],head:[0,588,512,436,16],front:[512,588,512,171,16],rear:[512,759,512,126,16],tail:[512,885,512,139,16]};
+ const atlasUV=(chart,u,v)=>{const [x,y,w,h,inset]=atlasRects[chart];return [(x+inset+u*(w-2*inset))/1024,(y+inset+v*(h-2*inset))/1024];};
+ // Same samples, triangles and initial normals as marineSurface; only the local
+ // emitter carries chart parameters. Other animals keep the shared builder.
+ const atlasSurface=(point,nu,nv,color,chart)=>{
+  const sample=(u,v)=>{const p=point(u,v),du=V.sub(point(Math.min(1,u+.00001),v),point(Math.max(0,u-.00001),v)),dv=V.sub(point(u,v+.00001),point(u,v-.00001)),radial=V.sub(p,point(u,v+.5));let n=V.cross(dv,du);if(V.len(n)<1e-12)n=V.mul(du,u<.5?-1:1);else if(V.dot(n,radial)<0)n=V.mul(n,-1);return {p,n:V.norm(n),c:typeof color==='function'?color(p):color,u,v};};
+  const rows=Array.from({length:nu+1},(_,i)=>Array.from({length:nv+1},(_,j)=>sample(i/nu,j/nv)));
+  const tri=(a,b,c)=>{const face=V.cross(V.sub(b.p,a.p),V.sub(c.p,a.p));if(V.len(face)<1e-12)return;if(V.dot(face,V.add(V.add(a.n,b.n),c.n))<0)[b,c]=[c,b];
+   const vertices=[a,b,c],lo=Math.min(a.v,b.v,c.v),hi=Math.max(a.v,b.v,c.v);
+   // Existing even angular grids contain the ventral v=.5 seam exactly. Emit
+   // its two sides as chart V=1 / V=0; do not interpolate across the atlas.
+   if(chart==='head'&&lo<.5&&hi>.5)throw Error('Head angular grid must contain the ventral atlas seam');
+   for(const q of vertices){const u=chart==='head'?(q.p[0]-.58)/.73:q.u,v=chart==='head'?(hi<=.5?q.v+.5:q.v-.5):q.v;g.vertex(q.p,q.n,q.c,atlasUV(chart,u,v));}
+  };
+  for(let i=0;i<nu;i++)for(let j=0;j<nv;j++){const a=rows[i][j],b=rows[i+1][j],c=rows[i+1][j+1],d=rows[i][j+1];tri(a,b,c);tri(a,c,d);}
+ };
  const ellipsoid=(center,scale,color,segments,rings)=>{
   const start=g.v.length;marineSurface(g,(u,v)=>{const a=u*Math.PI,b=v*TAU;return [center[0]+Math.cos(a)*scale[0],center[1]+Math.sin(a)*Math.cos(b)*scale[1],center[2]+Math.sin(a)*Math.sin(b)*scale[2]];},rings,segments,color);
   for(let k=start;k<g.v.length;k+=12){const n=V.norm(scale.map((s,i)=>(g.v[k+i]-center[i])/(s*s)));for(let i=0;i<3;i++)g.v[k+3+i]=n[i];}
  };
- const skinSurface=(point,nu,nv,color,closeRoot=false)=>{
-  const start=g.v.length,normals=new Map(),key=p=>p.map(v=>Math.round(v*1e10)).join(',');marineSurface(g,point,nu,nv,color);
+ const skinSurface=(point,nu,nv,color,closeRoot=false,chart)=>{
+  const start=g.v.length,normals=new Map(),key=p=>p.map(v=>Math.round(v*1e10)).join(',');atlasSurface(point,nu,nv,color,chart);
   const cap=end=>{const tip=point(end,0),ring=Array.from({length:nv},(_,j)=>point(end?1-1/nu:1/nu,j/nv)),center=ring.reduce((sum,p)=>V.add(sum,V.mul(p,1/nv)),[0,0,0]);return V.norm(V.sub(tip,center));};
   const tipNormal=cap(1),rootNormal=closeRoot?cap(0):null;
   for(let i=0;i<=nu;i++)for(let j=0;j<=nv;j++){
@@ -140,20 +158,46 @@ function turtleGeometry(low=false){let g=new Geometry();g.material=5;g.tag=1;
  };
  // Dorsal and ventral shell skins share one rim. A full carapace ellipsoid
  // would hide the pale plastron underneath it and leave two stacked shells.
+ // QA v01850 original shape option. Controls are artistic, not measured.
+ // Shape-preserving cubic Hermite interpolation keeps positive section widths
+ // and thicknesses within the authored rows; geometry sample counts stay fixed.
+ const shapeProfile=rows=>{
+  const slopes=rows.map((r,i)=>r.map((_,k)=>{
+   if(k===0)return 0;
+   if(i===0)return (rows[1][k]-r[k])/(rows[1][0]-r[0]);
+   if(i===rows.length-1)return (r[k]-rows[i-1][k])/(r[0]-rows[i-1][0]);
+   const h0=r[0]-rows[i-1][0],h1=rows[i+1][0]-r[0],d0=(r[k]-rows[i-1][k])/h0,d1=(rows[i+1][k]-r[k])/h1;
+   if(d0*d1<=0)return 0;const w0=2*h1+h0,w1=h1+2*h0;return (w0+w1)/(w0/d0+w1/d1);
+  }));
+  return {rows,slopes,at(t){t=clamp(t,rows[0][0],rows.at(-1)[0]);let i=0;while(i<rows.length-2&&t>rows[i+1][0])i++;
+   const a=rows[i],b=rows[i+1],h=b[0]-a[0],f=(t-a[0])/h,f2=f*f,f3=f2*f;
+   return a.map((v,k)=>k===0?t:(2*f3-3*f2+1)*v+(f3-2*f2+f)*h*slopes[i][k]+(-2*f3+3*f2)*b[k]+(f3-f2)*h*slopes[i+1][k]);
+  }};
+ };
+ const rimProfile=shapeProfile([[0,.82,0],[15,.79,.22],[30,.68,.405],[45,.49,.565],[60,.25,.66],[90,-.20,.70],[120,-.65,.60],[135,-.89,.45],[150,-1.05,.285],[165,-1.14,.13],[180,-1.17,0]]);
+ // Reflection gives an even X and odd Z continuation at the anterior/posterior
+ // endpoints; zero endpoint X slopes preserve their smooth lateral tangent.
+ rimProfile.slopes[0][1]=0;rimProfile.slopes.at(-1)[1]=0;
+ const rim=a=>{const t=((a%TAU)+TAU)%TAU,side=t<=Math.PI?1:-1,p=rimProfile.at((t<=Math.PI?t:TAU-t)*180/Math.PI);return [p[1],p[2]*side];};
  const bodyHalf=under=>{
   const segments=low?32:80,rings=under?(low?3:12):(low?5:24),color=under?[.72,.70,.53]:[.55,.52,.32];
-  const point=(a,b)=>{const s=Math.sin(b),f=1+.025*Math.sin(a*14)*Math.pow(s,12);return [-.16+Math.cos(a)*s*f,-.075+(under?-.16:.373)*Math.cos(b),Math.sin(a)*s*.70*f];};
+  const point=(a,b)=>{const s=Math.sin(b),r=rim(a);return [-.20+(r[0]+.20)*s,-.075+.012*Math.cos(a)*s*s+(under?-.15:.35)*Math.cos(b),r[1]*s];};
   const sample=(i,j)=>{const a=(i%segments)/segments*TAU,b=j/rings*Math.PI*.5,p=point(a,b);let n;
-   if(j===0)n=[0,under?-1:1,0];else{const da=V.sub(point(a+.00001,b),point(a-.00001,b)),db=V.sub(point(a,b+.00001),point(a,b-.00001));n=V.mul(V.norm(V.cross(da,db)),under?-1:1);}if(j===rings)p[1]=-.075;return {p,n};};
+   if(j===0)n=[0,under?-1:1,0];else{const da=V.sub(point(a+.00001,b),point(a-.00001,b)),db=V.sub(point(a,b+.00001),point(a,b-.00001));n=V.mul(V.norm(V.cross(da,db)),under?-1:1);}if(j===rings)p[1]=-.075+.012*Math.cos(a);return {p,n};};
   const rows=Array.from({length:rings+1},(_,j)=>Array.from({length:segments},(_,i)=>sample(i,j)));
   const tri=(a,b,c)=>{if(V.dot(V.cross(V.sub(b.p,a.p),V.sub(c.p,a.p)),V.add(V.add(a.n,b.n),c.n))<0)[b,c]=[c,b];g.tri(a.p,b.p,c.p,color,[a.n,b.n,c.n]);};
   for(let j=0;j<rings;j++)for(let i=0;i<segments;i++){const a=rows[j][i],b=rows[j][(i+1)%segments],c=rows[j+1][(i+1)%segments],d=rows[j+1][i];if(j)tri(a,b,c);tri(a,c,d);}
  };
- bodyHalf(false);g.tag=3;bodyHalf(true);
+ const shellStart=g.v.length;bodyHalf(false);g.tag=3;bodyHalf(true);
+ // The two shell skins use their common actual x/z bounds. +X points up in
+ // the image; +Z points right. No change to the shell positions or normals.
+ const shellBounds=[Infinity,-Infinity,Infinity,-Infinity];
+ for(let k=shellStart;k<g.v.length;k+=12){shellBounds[0]=Math.min(shellBounds[0],g.v[k]);shellBounds[1]=Math.max(shellBounds[1],g.v[k]);shellBounds[2]=Math.min(shellBounds[2],g.v[k+2]);shellBounds[3]=Math.max(shellBounds[3],g.v[k+2]);}
+ for(let k=shellStart;k<g.v.length;k+=12){const uv=atlasUV(g.v[k+11]===1?'carapace':'plastron',(g.v[k+2]-shellBounds[2])/(shellBounds[3]-shellBounds[2]),(shellBounds[1]-g.v[k])/(shellBounds[1]-shellBounds[0]));g.v[k+9]=uv[0];g.v[k+10]=uv[1];}
  // A single soft neck-to-head loft seats inside the shell; the crown grows
  // continuously from the neck instead of intersecting a cylindrical collar.
- g.tag=2;const headRows=[[.58,-.04,0,0],[.64,-.04,.12,.12],[.79,-.03,.118,.118],[.95,-.018,.126,.139],[1.08,-.015,.14,.155],[1.20,-.025,.115,.138],[1.275,-.04,.066,.105],[1.31,-.04,0,0]];
- const headStart=g.v.length,headPoint=(u,v)=>{
+ g.tag=2;const headRows=[[.58,-.04,0,0],[.64,-.04,.12,.12],[.79,-.03,.105,.108],[.95,-.018,.126,.139],[1.08,-.015,.14,.155],[1.20,-.025,.115,.138],[1.275,-.04,.066,.105],[1.300,-.041,.030,.075],[1.31,-.04,0,0]];
+ const headPoint=(u,v)=>{
   const x=.58+.73*(1-Math.cos(u*Math.PI))*.5,p=marineProfile(headRows,x),a=v*TAU;
   if(x<=.95)return [x,p[1]+Math.cos(a)*p[2],Math.sin(a)*p[3]];
   const front=smooth01((x-1.08)/.23),taper=smooth01((1.31-x)/.04),mouth=smooth01((x-1.165)/.05)*(1-smooth01((x-1.295)/.015));
@@ -163,18 +207,26 @@ function turtleGeometry(low=false){let g=new Geometry();g.material=5;g.tag=1;
   // its skin and the oral crease is an inward displacement of that surface.
   return [x,p[1]+c*p[2]*shrink+front*taper*(.018*Math.max(0,-c)**2-.026*Math.max(0,c)**2),s*(p[3]*shrink+orbit)];
  };
- skinSurface(headPoint,low?12:44,low?8:24,[.62,.63,.43],true);
- for(let k=headStart;k<g.v.length;k+=36){const x=(g.v[k]+g.v[k+12]+g.v[k+24])/3,y=(g.v[k+1]+g.v[k+13]+g.v[k+25])/3;if(x>1.165&&y<-.05+.012*smooth01((x-1.08)/.23))for(const j of [11,23,35])g.v[k+j]=3;}
+ skinSurface(headPoint,low?12:44,low?8:24,[.62,.63,.43],true,'head');
+ const frontProfile=shapeProfile([[0,.49,.39,-.060,.075,.085,.055],[.12,.63,.33,-.065,.120,.150,.046],[.30,.86,.20,-.075,.160,.200,.028],[.50,1.13,.06,-.085,.130,.170,.018],[.72,1.39,-.12,-.095,.085,.120,.010],[.90,1.59,-.31,-.100,.035,.060,.004],[1,1.67,-.39,-.100,0,0,0]]);
  g.tag=2;for(let side of [-1,1]){
  // Each front flipper is a tapered, cambered three-dimensional foil, not a quad.
- const fin=(u,v)=>{const a=v*TAU,cap=Math.sqrt(Math.max(0,1-u*u)),width=(.10+.24*Math.sin(u*Math.PI))*cap*(1-u*.65);return [.35-u*.37-u*u*.22+Math.cos(a)*width,-.045-u*.045+Math.sin(a)*.026*cap*(1-u*.65),side*(.51+u*1.19)];};skinSurface(fin,low?10:34,low?6:18,[.6,.62,.42]);
- const back=(u,v)=>{const a=v*TAU,cap=Math.sqrt(Math.max(0,1-u*u)),width=(.08+.10*Math.sin(u*Math.PI))*cap*(1-u*.56);return [-.70-u*.58+Math.cos(a)*width,-.09+Math.sin(a)*.020*cap*(1-u*.4),side*(.48+u*.38)];};skinSurface(back,low?6:20,low?6:14,[.6,.62,.42]);
+ const fin=(u,v)=>{const [,z,x,y,lead,trail,h]=frontProfile.at(u),a=v*TAU,c=Math.cos(a);return [x+.5*(lead+trail)*c+.5*(lead-trail)*c*c,y+h*Math.sin(a),side*z];};skinSurface(fin,low?10:34,low?6:18,[.6,.62,.42],false,'front');
+ const back=(u,v)=>{const a=v*TAU,cap=Math.sqrt(Math.max(0,1-u*u)),width=(.08+.10*Math.sin(u*Math.PI))*cap*(1-u*.56);return [-.70-u*.58+Math.cos(a)*width,-.09+Math.sin(a)*.020*cap*(1-u*.4),side*(.48+u*.38)];};skinSurface(back,low?6:20,low?6:14,[.6,.62,.42],false,'rear');
  g.tag=4;if(low)ellipsoid([1.143,.041,side*.147],[.022,.024,.012],[.012,.02,.022],6,4);else{
  ellipsoid([1.14,.039,side*.137],[.022,.024,.012],[.052,.064,.045],18,12);ellipsoid([1.143,.041,side*.147],[.014,.017,.005],[.012,.02,.022],16,10);ellipsoid([1.151,.047,side*.152],[.004,.004,.003],[.80,.89,.78],10,6);
  // Fixed nostril anchors remain seated in the continuous snout surface.
  ellipsoid([1.255,.007,side*.043],[.007,.005,.005],[.06,.08,.05],9,6);}g.tag=2;
  }
- g.tube([-1.07,-.12,0],[-1.32,-.15,0],.060,.010,[.58,.61,.43],low?6:18);return g;}
+ // Keep the exact existing tube triangles/normals. Assign UV by its angular
+ // emission order, never atan: each side owns a continuous circumferential
+ // interval including separate V=0/1 seam copies. Reserve U=.98..1 for the
+ // terminal disc; each cap center uses its sector midpoint, giving nonzero UV
+ // area without moving or adding a geometric triangle.
+ const tailStart=g.v.length,tailSides=low?6:18;
+ g.tube([-1.07,-.12,0],[-1.32,-.15,0],.060,.010,[.58,.61,.43],tailSides);
+ for(let i=0;i<tailSides;i++){const a=i/tailSides,b=(i+1)/tailSides,uvs=[[0,a],[0,b],[.98,b],[0,a],[.98,b],[.98,a],[1,(a+b)*.5],[.98,a],[.98,b]];for(let j=0;j<9;j++){const uv=atlasUV('tail',...uvs[j]),k=tailStart+i*108+j*12;g.v[k+9]=uv[0];g.v[k+10]=uv[1];}}
+ return g;}
 // A closed, cambered eagle-ray body: ventral belly, swept wings and whip tail.
 function rayGeometry(low=false){
  const g=new Geometry();g.material=6;g.species=9;g.shadow=!low;g.tag=1;

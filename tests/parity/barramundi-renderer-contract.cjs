@@ -4,17 +4,28 @@
 const fs=require('node:fs'),path=require('node:path'),vm=require('node:vm'),cp=require('node:child_process'),crypto=require('node:crypto'),assert=require('node:assert/strict');
 const root=path.resolve(__dirname,'../..'),sha=x=>crypto.createHash('sha256').update(x).digest('hex');
 const source=fs.readFileSync(path.join(root,'src/engine.js'),'utf8'),baseline=cp.execFileSync('git',['show','1d6738d3fc0a67fd93696cd13cca7537eec76694:src/engine.js'],{cwd:root,encoding:'utf8'}),published=cp.execFileSync('git',['show','dbd54ec34adcdad177014d01d3536197ea21fb59:src/engine.js'],{cwd:root,encoding:'utf8'});
+const v49Commit='11bec02d5507c01ae9cc7ecf4f7ad0ed7e5f3629',v49=cp.execFileSync('git',['show',v49Commit+':src/engine.js'],{cwd:root,encoding:'utf8'});
+assert.equal(sha(v49),'f86edf42af9c55594893216ae16ab2d7ebdff2f511f1b4c8940875a65ae50c87','Exact published v49 helper source required');
 const context=text=>{const c=vm.createContext({console,Float32Array,Uint16Array,Uint32Array,BIO_NEUTRAL:[1,1,1,1],BIO_DEFAULT:[.5,.5,.5,.5]});vm.runInContext(text,c);return c;},cx=context(source),old=context(baseline),previous=context(published),Renderer=vm.runInContext('Renderer',cx);
 function replaceOnce(text,from,to){assert.equal(text.split(from).length,2,'Expected exactly one explicit allowed seam: '+from);return text.replace(from,to);}
 function turtleBlock(text){
  const anchor=' if(uMat==5){',start=text.indexOf(anchor);assert(start>=0&&text.indexOf(anchor,start+anchor.length)<0,'Unique turtle material branch required');
  let depth=0;for(let i=start+anchor.indexOf('{');i<text.length;i++){if(text[i]==='{')depth++;else if(text[i]==='}'&&!--depth)return {start,end:i+1,text:text.slice(start,i+1)};}throw Error('Unclosed turtle material branch');
 }
-// v45 changes only the material-5 body and repurposes its old unused slot.
-// Restore that explicit branch for comparison; every byte outside it, every
-// other shader and every vertex rig still has to match the frozen baseline.
+const v49Context=context(v49),v49Fragment=vm.runInContext('FS',v49Context),v49Setup=vm.runInContext('Renderer.prototype.setupSurfacePrograms.toString()',v49Context),scuteStart='// Five median and four paired costal shields share continuous boundaries.\n',visibilityStart='float visibility(vec3 n){';
+assert.equal(v49Fragment.split(scuteStart).length,2);assert.equal(v49Fragment.split(visibilityStart).length,2);
+const retiredScuteHelper=v49Fragment.slice(v49Fragment.indexOf(scuteStart),v49Fragment.indexOf(visibilityStart));
+assert.equal(sha(retiredScuteHelper),'d47574d17d46393832a3b49c91702f6234bd9ddd08f2af01b59eccb90d8584e5');
+const approvedTurtleBranches={v49:'070ed0c1e0530e039426a9f090e3243387c70be9453dfee418a4d555726fb48e',v50:'af612b0e95312e88ded0af2ffdb8efbae86e5697c0aa7a7f068ff8542d44f99d'};
+assert.equal(sha(turtleBlock(v49Fragment).text),approvedTurtleBranches.v49);
+// v45 repurposes the unused slot. v50 replaces only the reviewed material-5
+// body and removes its obsolete scute helper. Pin both approved bodies; restore
+// the helper from exact v49 bytes at its unique original boundary, never erase
+// arbitrary helpers. Every other shader byte and vertex rig remains protected.
 function normalizeTurtleFragment(actual,reference){
- let text=actual;if(text.includes('uniform sampler2D uTurtleSkin;'))text=replaceOnce(text,'uniform sampler2D uTurtleSkin;','uniform sampler2D uShellN;');
+ let text=actual;const branchHash=sha(turtleBlock(text).text);assert(Object.values(approvedTurtleBranches).includes(branchHash),'Review changed turtle material before modifying this scope contract');
+ if(branchHash===approvedTurtleBranches.v50){assert(!/\bturtleScuteField\b/.test(text),'Reviewed v50 retires the unused scute helper');text=replaceOnce(text,visibilityStart,retiredScuteHelper+visibilityStart);}
+ if(text.includes('uniform sampler2D uTurtleSkin;'))text=replaceOnce(text,'uniform sampler2D uTurtleSkin;','uniform sampler2D uShellN;');
  const a=turtleBlock(text),b=turtleBlock(reference);return text.slice(0,a.start)+b.text+text.slice(a.end);
 }
 // v46 approved deep-animal seams are pinned separately. Normalization cannot
@@ -41,6 +52,12 @@ function normalizeAbyssFragment(actual){
 }
 function normalizeFragment(actual,reference){return normalizeTurtleFragment(normalizeAbyssFragment(actual),reference);}
 function normalizeEntryTextures(text){
+ if(text.includes("'turtle_atlas_v50'")){
+  text=replaceOnce(text,"const atlas=name==='turtle_atlas_v50',wrap=atlas?g.CLAMP_TO_EDGE:g.REPEAT;g.texParameteri(g.TEXTURE_2D,g.TEXTURE_WRAP_S,wrap);g.texParameteri(g.TEXTURE_2D,g.TEXTURE_WRAP_T,wrap);","const wrap=name==='turtle_skin_v45'?g.MIRRORED_REPEAT:g.REPEAT;g.texParameteri(g.TEXTURE_2D,g.TEXTURE_WRAP_S,wrap);g.texParameteri(g.TEXTURE_2D,g.TEXTURE_WRAP_T,wrap);");
+  text=replaceOnce(text,'       // Six inset charts share this texture; cap mip support before it can cross a chart.\n       if(atlas)g.texParameteri(g.TEXTURE_2D,g.TEXTURE_MAX_LEVEL,3);\n','');
+  text=replaceOnce(text,'this.aniso.TEXTURE_MAX_ANISOTROPY_EXT,atlas?1:Math.min(8,g.getParameter(this.aniso.MAX_TEXTURE_MAX_ANISOTROPY_EXT))','this.aniso.TEXTURE_MAX_ANISOTROPY_EXT,Math.min(8,g.getParameter(this.aniso.MAX_TEXTURE_MAX_ANISOTROPY_EXT))');
+  text=replaceOnce(text,"'turtle_atlas_v50'","'turtle_skin_v45'");
+ }
  if(!text.includes("'turtle_skin_v45'"))return text;
  text=replaceOnce(text,"const wrap=name==='turtle_skin_v45'?g.MIRRORED_REPEAT:g.REPEAT;g.texParameteri(g.TEXTURE_2D,g.TEXTURE_WRAP_S,wrap);g.texParameteri(g.TEXTURE_2D,g.TEXTURE_WRAP_T,wrap);","g.texParameteri(g.TEXTURE_2D,g.TEXTURE_WRAP_S,g.REPEAT);g.texParameteri(g.TEXTURE_2D,g.TEXTURE_WRAP_T,g.REPEAT);");
  return replaceOnce(text,"'turtle_skin_v45'","'shell_nor_gl'");
@@ -61,22 +78,35 @@ function renderer(options={}){
  const r=Object.create(Renderer.prototype),g=r.gl=mockGL(options);r.batches=[];r.mobile=false;r.quality=2;r.surfacePrograms=new Map();r.surfaceProgramFailures=new Map();r.program={p:{legacy:true},u:{}};
  r.makeProgram=(v,f)=>{const call=g.programs.length+1;g.programs.push({v,f});if(options.failProgram===call)throw Error('injected optional compile failure');return {p:g.alloc('program'),u:{}};};return r;
 }
-const geo=m=>({indexed:mesh,material:18,species:100,shadow:true,importedMaterial:m}),report={scope:'CPU source and mocked GPU ownership only; native shader compilation, visual fidelity, performance and real-device acceptance pending',engineSHA256:sha(source),validatorSHA256:sha(fs.readFileSync(__filename)),assetSHA256:sha(raw),checks:[]};
+const geo=m=>({indexed:mesh,material:18,species:100,shadow:true,importedMaterial:m}),report={scope:'CPU source and mocked GPU ownership only; native shader compilation, visual fidelity, performance and real-device acceptance pending',engineSHA256:sha(source),validatorSHA256:sha(fs.readFileSync(__filename)),assetSHA256:sha(raw),normalization:{v49Commit,v49EngineSHA256:sha(v49),retiredScuteHelperSHA256:sha(retiredScuteHelper),approvedTurtleBranches,setupSurfaceProgramsSHA256:sha(v49Setup)},checks:[]};
 function check(name,fn){try{report.checks.push({name,passed:true,detail:fn()});}catch(e){report.checks.push({name,passed:false,error:e.stack});}}
-check('all shader bytes and texture transactions remain exact outside named v45/v46 seams',()=>{
+check('all shader bytes and texture transactions remain exact outside pinned v45/v46/v50 seams',()=>{
  const names=[...baseline.matchAll(/const ([A-Z_]*(?:VS|FS|GLSL))=/g)].map(x=>x[1]);for(const name of names){const actual=vm.runInContext(name,cx),reference=vm.runInContext(name,old);assert.equal(name==='FS'?normalizeFragment(actual,reference):normalizeAbyssVertex(actual,reference),reference,name);}
  for(const [k,m]of [[0,1],[0,2],[0,3],[1,6],[0,12],[0,16],[0,17],[11,0],[3,3],[2,5]])for(const shader of ['VS','FS']){const actual=vm.runInContext(`surfaceShaderSource(${shader},${k},${m})`,cx),reference=vm.runInContext(`surfaceShaderSource(${shader},${k},${m})`,old);assert.equal(shader==='FS'?normalizeFragment(actual,reference):normalizeAbyssVertex(actual,reference),reference);}
- assert.equal(normalizeEntryTextures(Renderer.prototype.loadTextures.toString()),vm.runInContext('Renderer.prototype.loadTextures.toString()',old));assert.equal(Renderer.prototype.setupSurfacePrograms.toString(),vm.runInContext('Renderer.prototype.setupSurfacePrograms.toString()',old));
+ assert.equal(normalizeEntryTextures(Renderer.prototype.loadTextures.toString()),vm.runInContext('Renderer.prototype.loadTextures.toString()',old));
+ // v47 shipped the 11th, abyss-only 10:0 variant. Compare this whole method
+ // exactly to published v49; no normalization can hide program/fallback edits.
+ assert.equal(Renderer.prototype.setupSurfacePrograms.toString(),v49Setup);
  const currentImport=vm.runInContext('importedFishShaderSources()',cx),publishedImport=vm.runInContext('importedFishShaderSources()',previous);assert.equal(normalizeAbyssVertex(currentImport.vertex,publishedImport.vertex),publishedImport.vertex);assert.equal(normalizeFragment(currentImport.fragment,publishedImport.fragment),publishedImport.fragment);assert.equal(replaceOnce(vm.runInContext('importedFishShaderSources.toString()',cx),newVariance,oldVariance),vm.runInContext('importedFishShaderSources.toString()',previous));
- return {shaderStrings:names.length,specializedSources:20,entryTexturePromiseUnchanged:true,allowedChanges:['material-5 body','unused slot-5 name and mirrored wrapping','pinned kind10 species27/29/30 normal and skin branches'],importedVertexOutsideDeadAbyssRigsExact:true,importedFragmentOutsideDeadTurtleBranchExact:true};
+ return {shaderStrings:names.length,specializedSources:20,entryTexturePromiseUnchanged:true,allowedChanges:['pinned material-5 body','exact v49 scute helper retirement','slot-5 name/wrap/aniso/max-mip literals','pinned kind10 species27/29/30 normal and skin branches'],programSetupExactPublishedV49:true,importedVertexOutsideDeadAbyssRigsExact:true,importedFragmentOutsideDeadTurtleBranchAndRetiredHelperExact:true};
 });
 check('narrow turtle normalization cannot hide fish, lighting, imported motion or loader changes',()=>{
  const fragment=vm.runInContext('FS',cx),reference=vm.runInContext('FS',old);
+ assert.equal(normalizeFragment(fragment,reference),reference,'Positive control must pass before negative controls');
  for(const [from,to]of [['if(uMat==6)','if(uMat==66)'],['vec3 L=normalize(vWorld.y<0.?uLightDir:uAirLightDir);','vec3 L=vec3(1.);'],['uniform sampler2D uRock;','uniform sampler2D uChangedRock;']]){const changed=replaceOnce(fragment,from,to);assert.notEqual(normalizeFragment(changed,reference),reference);}
  const vertex=vm.runInContext('VS',cx),oldVertex=vm.runInContext('VS',old);assert.throws(()=>normalizeAbyssVertex(replaceOnce(vertex,'p.z+=sin(wave)*amp*tail*tail;','p.z+=sin(wave)*amp*tail;'),oldVertex));assert.throws(()=>normalizeAbyssFragment(replaceOnce(fragment,'height=.000055*dome;','height=.24*dome;')));
- const loader=Renderer.prototype.loadTextures.toString(),oldLoader=vm.runInContext('Renderer.prototype.loadTextures.toString()',old);assert.notEqual(normalizeEntryTextures(replaceOnce(loader,'expiresAt=performance.now()+12000','expiresAt=performance.now()+99999')),oldLoader);
- const imported=vm.runInContext('importedFishShaderSources()',cx),prior=vm.runInContext('importedFishShaderSources()',previous);assert.notEqual(normalizeFragment(replaceOnce(imported.fragment,'vec3 albedo=importedAlbedo*(1.-metallic);','vec3 albedo=vec3(1.);'),prior.fragment),prior.fragment);assert.notEqual(replaceOnce(imported.vertex,'tangent.z+=slope*tangent.x;','tangent.z+=0.;'),prior.vertex);
- return {unrelatedFragmentMutations:3,loaderDeadlineMutation:1,importedAlbedoAndRigMutations:2};
+ assert.throws(()=>normalizeFragment(replaceOnce(fragment,'height=(grain-.5)*.00016;','height=(grain-.5)*.16;'),reference));
+ assert.notEqual(normalizeFragment(replaceOnce(fragment,'vec3 bumped=normal-','vec3 bumped=normal+'),reference),reference);
+ assert.throws(()=>normalizeFragment(replaceOnce(fragment,visibilityStart,retiredScuteHelper+visibilityStart),reference));
+ const loader=Renderer.prototype.loadTextures.toString(),oldLoader=vm.runInContext('Renderer.prototype.loadTextures.toString()',old);assert.equal(normalizeEntryTextures(loader),oldLoader,'Loader positive control must pass first');
+ for(const [from,to]of [['expiresAt=performance.now()+12000','expiresAt=performance.now()+99999'],['retryDelays=[150,400]','retryDelays=[150,999]'],['old.forEach(tex=>g.deleteTexture(tex));','old.forEach(tex=>{});'],['g.pixelStorei(g.UNPACK_FLIP_Y_WEBGL,false)','g.pixelStorei(g.UNPACK_FLIP_Y_WEBGL,true)'],['g.RGBA8,g.RGBA,g.UNSIGNED_BYTE,source','g.RGB8,g.RGBA,g.UNSIGNED_BYTE,source']])assert.notEqual(normalizeEntryTextures(replaceOnce(loader,from,to)),oldLoader);
+ for(const [from,to]of [['g.TEXTURE_MAX_LEVEL,3','g.TEXTURE_MAX_LEVEL,2'],['atlas?1:Math.min(8','atlas?2:Math.min(8'],['wrap=atlas?g.CLAMP_TO_EDGE:g.REPEAT','wrap=atlas?g.CLAMP_TO_EDGE:g.MIRRORED_REPEAT']])assert.throws(()=>normalizeEntryTextures(replaceOnce(loader,from,to)));
+ const setup=Renderer.prototype.setupSurfacePrograms.toString();assert.equal(setup,v49Setup);
+ for(const [from,to]of [['[2,5],[10,0]','[2,5]'],['(kind===10||kind===11)','(kind===11)'],['String(error?.message||error)',"'ignored'"]])assert.notEqual(replaceOnce(setup,from,to),v49Setup);
+ const imported=vm.runInContext('importedFishShaderSources()',cx),prior=vm.runInContext('importedFishShaderSources()',previous);
+ assert.equal(normalizeFragment(imported.fragment,prior.fragment),prior.fragment);assert.equal(normalizeAbyssVertex(imported.vertex,prior.vertex),prior.vertex);
+ assert.notEqual(normalizeFragment(replaceOnce(imported.fragment,'vec3 albedo=importedAlbedo*(1.-metallic);','vec3 albedo=vec3(1.);'),prior.fragment),prior.fragment);assert.notEqual(normalizeAbyssVertex(replaceOnce(imported.vertex,'tangent.z+=slope*tangent.x;','tangent.z+=0.;'),prior.vertex),prior.vertex);
+ return {positiveControls:5,unrelatedFragmentMutations:3,unrelatedHelperMutation:1,pinnedTurtleMutation:1,retiredHelperReintroduction:1,loaderTransactionMutations:5,pinnedLoaderSeamMutations:3,publishedProgramSetupMutations:3,importedAlbedoAndRigMutations:2};
 });
 check('frozen motion exact; derived source keeps one sRGB decode, source ORM and transported frame',()=>{
  assert.equal(sha(vm.runInContext('IMPORTED_FISH_MOTION_GLSL',cx)),'70973c8e2ef159b482920df6d7ac03eb3d0a8c5d3272f62c7e65342f8505fab1');

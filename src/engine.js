@@ -379,29 +379,6 @@ vec3 materialSurfaceNormal(vec3 normal,float localHeight,float strength){
  vec3 bumped=normal-(dh.x*rx+dh.y*ry)*(strength/determinant);
  return bumped*inversesqrt(max(dot(bumped,bumped),1.e-12));
 }
-// Five median and four paired costal shields share continuous boundaries.
-// This bounded partition needs no per-fragment search through shell seeds.
-// x follows the shell's long axis; y follows its normalized half-width.
-vec3 turtleScuteField(vec2 p){
- float radial=length(p),rim=abs(radial-.90)*.70;
- if(radial>.90){
-  float sector=(atan(p.y,p.x)+3.14159265)*(22./6.2831853),part=fract(sector);
-  float joint=min(part,1.-part)*(6.2831853/22.)*radial*.70;
-  return vec3(min(rim,joint),13.+floor(sector),2.);
- }
- float x=p.x+.022*p.y*p.y,z=abs(p.y);
- vec4 cuts=vec4(-.64,-.24,.16,.56),distances=abs(vec4(x)-cuts);
- float row=dot(step(cuts,vec4(x)),vec4(1.));
- float left=row<.5?-1.:row<1.5?-.64:row<2.5?-.24:row<3.5?.16:.56;
- float right=row<.5?-.64:row<1.5?-.24:row<2.5?.16:row<3.5?.56:1.;
- float u=clamp((x-left)/(right-left),0.,1.);
- float width=(.205+.13*4.*u*(1.-u))*(1.-.13*x*x);
- float longitudinal=abs(z-width)*.70;
- if(z<width)return vec3(min(rim,min(longitudinal,min(min(distances.x,distances.y),min(distances.z,distances.w)))),row,0.);
- float sideX=p.x-.055*z*z;vec3 sideCuts=vec3(-.46,-.035,.39),sideDistances=abs(vec3(sideX)-sideCuts);
- float sideRow=dot(step(sideCuts,vec3(sideX)),vec3(1.));
- return vec3(min(rim,min(longitudinal,min(sideDistances.x,min(sideDistances.y,sideDistances.z)))),5.+sideRow+(p.y<0.?0.:4.),1.);
-}
 float visibility(vec3 n){
  if(uShadows<.5)return 1.;vec3 sp=vShadow.xyz/vShadow.w*.5+.5;
  if(any(lessThan(sp,vec3(.001)))||any(greaterThan(sp,vec3(.999))))return 1.;
@@ -625,67 +602,33 @@ void main(){
  n=triNormal(uCoralN,vWorld*1.28,n,.20);rough=.91;occ=.64+.36*smoothstep(-.1,.44,vLocal.y);}
  if(uMat==4){vec3 q=vLocal*16.;float f=sin(q.x*2.7+sin(q.z*2.8+q.y)*2.3)+sin(q.z*2.9+sin(q.y*2.8+q.x)*2.0);float ridW=max(fwidth(f),.03),ridge=smoothstep(.18-ridW,.18+ridW,abs(f));float ridgeResolve=exp(-pow(max(length(dFdx(q)),length(dFdy(q))),2.)*.22);ridge=mix(.65,ridge,ridgeResolve);base*=.74+.32*ridge;vec3 gro=vec3(cos(q.x*2.7)*.1,0.,cos(q.z*2.9)*.1);n=normalize(n+gro*(1.-ridge)*1.35*ridgeResolve);base*=mix(vec3(.85),triMap(uCoral,vWorld*1.7,n)*1.4,.35);rough=.84;}
  if(uMat==5){
-  // One continuous local material at every LOD. The old radial wood-ring
-  // texture and world-normal-selected skin grid no longer enter this branch.
-  vec3 p=vLocal,seed=vec3(vGenes.x*23.,vGenes.y*17.,vGenes.z*29.);
-  float head=smoothstep(.84,1.02,p.x);
-  vec3 broadP=p*vec3(4.3,8.,5.7)+seed,fineP=p*mix(54.,28.,head)+seed*1.37;
-  float broadFoot=max(length(dFdx(broadP)),length(dFdy(broadP)));
-  float fineFoot=max(length(dFdx(fineP)),length(dFdy(fineP))),detail=1.-smoothstep(.35,1.3,fineFoot);
-  float rawMottle=noise(broadP),mottle=mix(.5,rawMottle,1.-smoothstep(.6,1.6,broadFoot)),fine=noise(fineP),height=0.;
-  if(vTag<1.5){
-   vec3 shield=turtleScuteField(vec2(p.x+.16,p.z/.70));
-   float tone=hash21(vec2(shield.y+vGenes.z*3.,vGenes.x*17.));
-   float seam=skinLine(shield.x,.0022),rawSeam=1.-smoothstep(.001,.004,shield.x);
-   float wear=smoothstep(.55,.78,mottle)*smoothstep(.008,.04,shield.x)*(.55+.45*mix(.5,fine,detail));
-   base=mix(vec3(.26,.265,.18),vec3(.39,.345,.22),.22+.55*tone)*(.78+.44*mottle);
-   base=mix(base,vec3(.49,.43,.29),wear*.26);base*=1.-seam*.16;
-   base*=1.+(fine-.5)*.035*detail;
-   rough=.64+.12*mottle-.10*wear;
-   height=-.00065*rawSeam+.00025*(fine-.5);
-  }else if(vTag<2.5||(vTag<3.5&&p.x>.95)){
-   // Pigment follows undeformed anatomy. Mirror wrapping gives continuous
-   // borders without relying on generated-image edges being exactly tileable.
-   // Fold the angle before implicit mip gradients; keep the axial sample finite.
-   vec2 finUV=p.xz*vec2(2.4,1.9)+vGenes.xy*vec2(5.,7.);
-   vec2 headUV=vec2((p.x-.78)*4.2+vGenes.x*5.,atan(max(abs(p.z),.000001),p.y+.02)*.31830988618);
-   vec3 skin=mix(texture(uTurtleSkin,finUV).rgb,texture(uTurtleSkin,headUV).rgb,head);
-   base=skin*vec3(.96,1.035,.96)*(.94+.12*mottle);
-   float grainDistance=abs(fine-.48),grainWidth=max(fwidth(fine),.006);
-   float grain=1.-smoothstep(max(0.,.035-grainWidth),.035+grainWidth,grainDistance);
-   float rawGrain=1.-smoothstep(.022,.055,grainDistance),grainArea=1.-head*.65;
-   base*=1.+((fine-.5)*.055+grain*.085*grainArea)*detail;
-   float underside=head*(1.-smoothstep(-.085,-.018,p.y));
-   base=mix(base,vec3(.52,.53,.39)*(.91+.15*mottle),underside*.55);
-   // Two larger forehead scales sit between the existing eyes. The neck and
-   // flippers retain soft fine leather instead of the same bright honeycomb.
-   vec2 forehead=vec2((p.x-1.145)/.105,p.z/.10);
-   float plate=max(abs(forehead.x)*.9+abs(forehead.y)*.14,abs(forehead.y));
-   float crown=smoothstep(.015,.065,p.y),plateArea=(1.-smoothstep(.90,1.08,plate))*crown;
-   float plateDistance=min(abs(p.z),abs(plate-1.)*.085),plateMask=crown*(1.-smoothstep(1.04,1.16,plate));
-   float plateEdge=skinLine(plateDistance,.0013)*plateMask,rawPlateEdge=(1.-smoothstep(.0007,.0026,plateDistance))*plateMask;
-   base=mix(base,vec3(.30,.305,.205)*(.92+.14*mottle),plateArea*.68);
-   base*=1.-plateArea*.08-plateEdge*.13;
-   float neck=smoothstep(.59,.65,p.x)*(1.-smoothstep(.76,.88,p.x))*(1.-smoothstep(.12,.20,abs(p.z)));
-   float creaseDistance=abs(sin((p.x-.62)*44.+rawMottle*.6))*.012;
-   float crease=skinLine(creaseDistance,.0014)*neck,rawCrease=(1.-smoothstep(.0007,.0028,creaseDistance))*neck;
-   base*=1.-crease*.045;rough=mix(.84,.75,head)+.025*(mottle-.5);
-   // The pale lower jaw is part of the same skin. Use its anatomical contour
-   // instead of flat triangle tags, so colour does not form a jagged patch.
-   float mouthY=-.05+.012*smoothstep(1.08,1.31,p.x);
-   float jaw=smoothstep(1.145,1.205,p.x)*(1.-smoothstep(mouthY-.009,mouthY+.005,p.y));
-   base=mix(base,vec3(.57,.55,.41)*(.94+.10*mottle),jaw*.78);rough=mix(rough,.65,jaw);
-   height=.00022*(fine-.5)-.00020*rawGrain*grainArea-.00025*rawCrease-.00028*rawPlateEdge;
-  }else if(vTag<3.5){
-   if(p.x<.95){
-    // Tag 3 also contains the beak; ventral seams belong only to the body.
-    float seam=skinLine(abs(p.z),.0018),rim=smoothstep(.66,.97,length(vec2(p.x+.16,p.z/.70)));
-    base=vec3(.755,.715,.565)*(.94+.10*mottle);base=mix(base,vec3(.61,.58,.445),rim*.18);
-    base*=1.-seam*.075;rough=.82+.045*mottle;height=.00012*(fine-.5)-.0003*(1.-smoothstep(.0008,.0032,abs(p.z)));
-   }else {base=vec3(.69,.675,.515)*(.94+.10*mottle);rough=.61;height=.00008*(fine-.5);}
-  }else rough=.12;
-  if(vTag<3.5)base*=vTint;
-  // Uniform quality gate; tag branches have reconverged before derivatives.
+  // Anatomical UVs share one color atlas across both LODs. Differentiate UVs
+  // before tag branches: explicit gradients stay valid at eyes and chart seams.
+  vec2 atlasDx=dFdx(vUV),atlasDy=dFdy(vUV);
+  float footprint=1024.*max(length(atlasDx),length(atlasDy));
+  float atlasDetail=1.-smoothstep(4.,8.,footprint);
+  vec3 grainP=vLocal*vec3(38.,46.,38.)+vGenes.xyz*13.;
+  float grainFoot=max(length(dFdx(grainP)),length(dFdy(grainP)));
+  float detail=(1.-smoothstep(.35,1.3,grainFoot))*atlasDetail;
+  float grain=noise(grainP),height=0.;
+  if(vTag<3.5){
+   // Measured low-frequency chart colors avoid sampling across internal atlas
+   // boundaries when an oblique/far fragment covers more than eight pixels.
+   vec3 meanColor;
+   if(vTag<1.5){meanColor=vec3(.32601,.26900,.18376);rough=.73;}
+   else if(vTag>2.5){meanColor=vec3(.61982,.53584,.39237);rough=.84;}
+   else if(vUV.x<.5){meanColor=vec3(.36989,.31379,.22561);rough=.80;}
+   else if(vUV.y<759./1024.){meanColor=vec3(.38596,.32870,.23533);rough=.82;}
+   else if(vUV.y<885./1024.){meanColor=vec3(.41013,.34835,.24655);rough=.84;}
+   else{meanColor=vec3(.41477,.35439,.26111);rough=.84;}
+   vec3 pigment=textureGrad(uTurtleSkin,vUV,atlasDx,atlasDy).rgb;
+   base=mix(meanColor,pigment,atlasDetail)*vTint;
+   // Fine leather grain is shallow and independent of painted pigment: dark
+   // markings are not converted into deep artificial grooves or white bevels.
+   rough+=(grain-.5)*.025*detail;
+   height=(grain-.5)*.00016;
+  }else{rough=.12;detail=0.;}
+  // All tag branches have reconverged before surface-normal derivatives.
   if(uQuality>0)n=materialSurfaceNormal(n,height,detail);
  }
  if(uMat==6){base/=max(vTint,vec3(.001));float fishScaleHeight=0.,fishScaleFade=0.;vec3 fishLocalWidth=fwidth(vLocal);
@@ -1428,7 +1371,7 @@ class Renderer{
  setMatrix4fv(p,n,transpose,v){const u=this.uniform(p,n);if(u!==null)this.gl.uniformMatrix4fv(u,transpose,v);}
  attr(index,size,stride,offset,divisor=0){let g=this.gl;g.enableVertexAttribArray(index);g.vertexAttribPointer(index,size,g.FLOAT,false,stride,offset);g.vertexAttribDivisor(index,divisor);}
  async loadTextures(forceFull=false){
-  const g=this.gl,pending=[],images=new Map(),timers=new Set(),names=['sand_diff','sand_nor_gl','rock_diff','rock_nor_gl','shell_diff','turtle_skin_v45','coral_diff','coral_nor_gl','caustics'];const full=forceFull||!this.mobile||this.quality===2;
+  const g=this.gl,pending=[],images=new Map(),timers=new Set(),names=['sand_diff','sand_nor_gl','rock_diff','rock_nor_gl','shell_diff','turtle_atlas_v50','coral_diff','coral_nor_gl','caustics'];const full=forceFull||!this.mobile||this.quality===2;
   const retryToken=Date.now().toString(36)+'-'+(this._textureRequestSequence=(this._textureRequestSequence||0)+1),retryDelays=[150,400];let aborted=false;
   const cancel=()=>{aborted=true;for(const timer of timers)clearTimeout(timer);timers.clear();for(const image of images.keys()){image.onload=null;image.onerror=null;image.removeAttribute('src');}images.clear();};
   try{await Promise.all(names.map((name,i)=>new Promise((resolve,reject)=>{
@@ -1443,8 +1386,10 @@ class Renderer{
       if(performance.now()>=expiresAt){img.onerror();return;}
       try{g.bindTexture(g.TEXTURE_2D,tex);g.pixelStorei(g.UNPACK_FLIP_Y_WEBGL,false);let source=img;
        if(!full&&name!=='caustics'&&img.width>1024){const c=document.createElement('canvas');c.width=c.height=1024;c.getContext('2d').drawImage(img,0,0,1024,1024);source=c;}
-       g.texImage2D(g.TEXTURE_2D,0,g.RGBA8,g.RGBA,g.UNSIGNED_BYTE,source);g.generateMipmap(g.TEXTURE_2D);g.texParameteri(g.TEXTURE_2D,g.TEXTURE_MIN_FILTER,g.LINEAR_MIPMAP_LINEAR);g.texParameteri(g.TEXTURE_2D,g.TEXTURE_MAG_FILTER,g.LINEAR);const wrap=name==='turtle_skin_v45'?g.MIRRORED_REPEAT:g.REPEAT;g.texParameteri(g.TEXTURE_2D,g.TEXTURE_WRAP_S,wrap);g.texParameteri(g.TEXTURE_2D,g.TEXTURE_WRAP_T,wrap);
-       if(this.aniso)g.texParameterf(g.TEXTURE_2D,this.aniso.TEXTURE_MAX_ANISOTROPY_EXT,Math.min(8,g.getParameter(this.aniso.MAX_TEXTURE_MAX_ANISOTROPY_EXT)));settled=true;detach(img);resolve();
+       g.texImage2D(g.TEXTURE_2D,0,g.RGBA8,g.RGBA,g.UNSIGNED_BYTE,source);g.generateMipmap(g.TEXTURE_2D);g.texParameteri(g.TEXTURE_2D,g.TEXTURE_MIN_FILTER,g.LINEAR_MIPMAP_LINEAR);g.texParameteri(g.TEXTURE_2D,g.TEXTURE_MAG_FILTER,g.LINEAR);const atlas=name==='turtle_atlas_v50',wrap=atlas?g.CLAMP_TO_EDGE:g.REPEAT;g.texParameteri(g.TEXTURE_2D,g.TEXTURE_WRAP_S,wrap);g.texParameteri(g.TEXTURE_2D,g.TEXTURE_WRAP_T,wrap);
+       // Six inset charts share this texture; cap mip support before it can cross a chart.
+       if(atlas)g.texParameteri(g.TEXTURE_2D,g.TEXTURE_MAX_LEVEL,3);
+       if(this.aniso)g.texParameterf(g.TEXTURE_2D,this.aniso.TEXTURE_MAX_ANISOTROPY_EXT,atlas?1:Math.min(8,g.getParameter(this.aniso.MAX_TEXTURE_MAX_ANISOTROPY_EXT)));settled=true;detach(img);resolve();
       }catch(error){detach(img,true);fail(error);}
      };
      img.onerror=()=>{

@@ -2,7 +2,8 @@
  * Run only after the actual-world visual acceptance; root serializes GPU work. */
 'use strict';
 const fs=require('node:fs'),path=require('node:path'),crypto=require('node:crypto'),assert=require('node:assert/strict');
-const root=path.resolve(__dirname,'../..');let browser;
+const root=path.resolve(__dirname,'../..'),option=(key,fallback)=>process.argv.find(a=>a.startsWith('--'+key+'='))?.slice(key.length+3)||fallback;
+const out=path.resolve(root,option('out','qa/parity/v01850-release/guide.json'));let browser;
 (async()=>{try{
  const {chromium}=require(process.env.PLAYWRIGHT_PATH||'playwright');browser=await chromium.launch(require('./browser-launch.cjs')(true));
  const page=await browser.newPage({viewport:{width:640,height:360},deviceScaleFactor:1});
@@ -19,5 +20,5 @@ const root=path.resolve(__dirname,'../..');let browser;
  });
  assert.equal(result.uid,'turtle-002');assert.equal(result.triangles,12970);assert.equal(result.drawCount,1);assert.equal(result.gl,0);assert.equal(result.lost,false);
  const bytes=Buffer.from(result.image.split(',')[1],'base64');delete result.image;result.sha256=crypto.createHash('sha256').update(bytes).digest('hex');
- fs.writeFileSync(path.join(root,'assets/guide_turtle.jpg'),bytes);fs.writeFileSync(path.join(root,'qa/parity/v01845-turtle/guide.json'),JSON.stringify(result,null,2)+'\n');console.log(JSON.stringify(result));
+ fs.writeFileSync(path.join(root,'assets/guide_turtle.jpg'),bytes);fs.mkdirSync(path.dirname(out),{recursive:true});fs.writeFileSync(out,JSON.stringify(result,null,2)+'\n');console.log(JSON.stringify(result));
 }finally{await browser?.close();}})().catch(e=>{console.error(e);process.exitCode=1;});

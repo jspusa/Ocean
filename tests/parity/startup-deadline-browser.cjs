@@ -11,7 +11,7 @@ const server=http.createServer((req,res)=>{
  const pathname=decodeURIComponent(new URL(req.url,'http://localhost').pathname),file=path.resolve(root,'.'+(pathname==='/'?'/index.html':pathname));
  if(!file.startsWith(root+path.sep)||!fs.existsSync(file)||!fs.statSync(file).isFile()){res.writeHead(404);res.end();return;}
  if(mode==='scene-body'&&pathname==='/assets/scene/index.json'){res.writeHead(503);res.end('fixture: stream index unavailable');return;}
- const stallImage=mode==='image-body'&&pathname==='/assets/turtle_skin_v45.jpg';
+ const stallImage=mode==='image-body'&&pathname==='/assets/turtle_atlas_v50.jpg';
  const stallScene=mode==='scene-body'&&pathname==='/assets/reef.mesh.gz';
  if(stallImage||stallScene){
   const row={url:req.url,kind:stallImage?'image':'scene',started:Date.now(),closed:null,complete:false};requests.push(row);held.push(res);

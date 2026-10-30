@@ -146,3 +146,5 @@
 ## 0.18.45 海龜皮膚
 
 `assets/turtle_skin_v45.jpg` 是本專案以內建 imagegen 生成的原創色彩素材；[完整提示詞與處理紀錄](docs/parity/TURTLE-SKIN-v01845.md) 保留生成來源及限制。沒有外部照片、Nintendo 素材或實體掃描輸入；鱗片、色斑與空間分布是遊戲美術近似，不是物種精密量測。連續頭喙、口溝與皮膚投影由本專案實作。
+
+v0.18.50 使用 `assets/turtle_atlas_v50.jpg`，原創全身六區色圖取代單張重複皮膚圖，搭配本專案的連續殼緣、頭頸、鰭與解剖 UV。使用內建 imagegen；[保留原圖、提示詞及技術處理紀錄](docs/parity/TURTLE-ATLAS-v01850-SOURCE.md)。仍為遊戲美術近似，非外部照片、掃描模型或完整 PBR 掃描。舊 v45 圖留作舊版相容素材。

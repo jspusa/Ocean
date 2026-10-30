@@ -2,13 +2,13 @@
  * IO fixtures. No GPU is used; browser fault injection verifies actual fetches. */
 'use strict';
 const fs=require('node:fs'),path=require('node:path'),vm=require('node:vm'),assert=require('node:assert/strict');
-const source=fs.readFileSync(path.join(__dirname,'../../src/engine.js'),'utf8'),names=['sand_diff','sand_nor_gl','rock_diff','rock_nor_gl','shell_diff','turtle_skin_v45','coral_diff','coral_nor_gl','caustics'];
+const source=fs.readFileSync(path.join(__dirname,'../../src/engine.js'),'utf8'),names=['sand_diff','sand_nor_gl','rock_diff','rock_nor_gl','shell_diff','turtle_atlas_v50','coral_diff','coral_nor_gl','caustics'];
 const flush=async()=>{for(let i=0;i<8;i++)await Promise.resolve();};
 function fixture({mobile=false,quality=2,assets={},failUpload=false}={}){
  const images=[],requests=[],timers=new Map(),timerDelays=[],textures=[],deleted=[],calls=[],canvases=[];let timerId=0,now=0,bound=null;
  class ImageFixture{constructor(){this.onload=null;this.onerror=null;this.width=this.height=2048;this.pending=false;images.push(this);}set src(value){this._src=value;this.pending=!!value;requests.push({image:this,url:value,at:now});}get src(){return this._src;}removeAttribute(name){assert.equal(name,'src');this._src=undefined;this.pending=false;calls.push(['cancel',this]);}}
  const ASSETS=Object.fromEntries(names.map(name=>[name,assets[name]||'assets/'+name+'.jpg?v=0.18.3&color=a%20b#reef'])),originalAssets={...ASSETS};
- const g={TEXTURE_2D:1,UNPACK_FLIP_Y_WEBGL:2,RGBA8:3,RGBA:4,UNSIGNED_BYTE:5,TEXTURE_MIN_FILTER:6,LINEAR_MIPMAP_LINEAR:7,TEXTURE_MAG_FILTER:8,LINEAR:9,TEXTURE_WRAP_S:10,TEXTURE_WRAP_T:11,REPEAT:12,MIRRORED_REPEAT:15,
+ const g={TEXTURE_2D:1,UNPACK_FLIP_Y_WEBGL:2,RGBA8:3,RGBA:4,UNSIGNED_BYTE:5,TEXTURE_MIN_FILTER:6,LINEAR_MIPMAP_LINEAR:7,TEXTURE_MAG_FILTER:8,LINEAR:9,TEXTURE_WRAP_S:10,TEXTURE_WRAP_T:11,REPEAT:12,MIRRORED_REPEAT:15,CLAMP_TO_EDGE:16,TEXTURE_MAX_LEVEL:17,
   createTexture(){const texture={id:textures.length,deleted:false};textures.push(texture);return texture;},
   bindTexture(_,texture){calls.push(['bind',texture.id]);assert(!texture.deleted,'no callback may bind deleted texture');bound=texture;},pixelStorei(...args){calls.push(['pixelStorei',...args]);},
   texImage2D(...args){calls.push(['upload',bound.id,args.at(-1)]);assert(!bound.deleted);if(failUpload)throw Error('simulated upload failure');},generateMipmap(...args){calls.push(['mipmap',...args]);},texParameteri(...args){assert(args.every(Number.isFinite),'sampler parameters must use real GL enum values');calls.push(['parameter',...args]);},texParameterf(...args){calls.push(['anisotropy',...args]);},getParameter:()=>16,
@@ -28,18 +28,18 @@ function fixture({mobile=false,quality=2,assets={},failUpload=false}={}){
 let passed=0,failed=0;async function check(name,fn){try{await fn();passed++;console.log('PASS '+name);}catch(error){failed++;console.error('FAIL '+name+'\n'+error.stack);}}
 (async()=>{
  await check('a transient HTTP image failure retries twice and preserves version/query/hash and original texture quality',async()=>{
-  const f=fixture(),op=f.begin(),initial=f.images[5],stale=initial.onload;assert.equal(f.images.length,9);assert.equal(f.requests[5].url,f.ASSETS.turtle_skin_v45);
+  const f=fixture(),op=f.begin(),initial=f.images[5],stale=initial.onload;assert.equal(f.images.length,9);assert.equal(f.requests[5].url,f.ASSETS.turtle_atlas_v50);
   f.emit(initial,'onerror');await flush();assert.equal(op.status.state,'pending');assert.equal(f.retries,1,'transient image errors must schedule exactly one retry');const before=f.calls.length;stale();assert.equal(f.calls.length,before,'stale failed-attempt load must not touch GL');
   const second=f.nextTimer();assert.notEqual(second,initial);f.emit(second,'onerror');await flush();const third=f.nextTimer();assert.notEqual(third,second);
-  const urls=f.requests.filter(request=>request.url.includes('turtle_skin_v45')).map(request=>request.url);assert.equal(urls.length,3);assert.equal(new Set(urls).size,3);
+  const urls=f.requests.filter(request=>request.url.includes('turtle_atlas_v50')).map(request=>request.url);assert.equal(urls.length,3);assert.equal(new Set(urls).size,3);
   for(const url of urls){const parsed=new URL(url,'https://example.test/Ocean/');assert.equal(parsed.searchParams.get('v'),'0.18.3');assert.equal(parsed.searchParams.get('color'),'a b');assert.equal(parsed.hash,'#reef');assert(url.includes('color=a%20b'));}
   assert.deepEqual(f.timerDelays.filter(delay=>delay<1000),[150,400]);f.succeedInitial(initial);f.emit(third,'onload');await op.promise;
-  assert.equal(op.status.state,'fulfilled');assert.equal(f.renderer.textures.length,9);assert.equal(f.renderer.textureFull,true);assert.equal(f.renderer.dirty,true);assert.deepEqual(f.deleted,f.old);assert.equal(f.calls.filter(call=>call[0]==='upload').length,9);assert.equal(f.calls.filter(call=>call[0]==='mipmap').length,9);assert.equal(f.calls.filter(call=>call[0]==='anisotropy'&&call.at(-1)===8).length,9);assert.equal(f.canvases.length,0);assert.deepEqual(f.ASSETS,f.originalAssets);
+  assert.equal(op.status.state,'fulfilled');assert.equal(f.renderer.textures.length,9);assert.equal(f.renderer.textureFull,true);assert.equal(f.renderer.dirty,true);assert.deepEqual(f.deleted,f.old);assert.equal(f.calls.filter(call=>call[0]==='upload').length,9);assert.equal(f.calls.filter(call=>call[0]==='mipmap').length,9);assert.equal(f.calls.filter(call=>call[0]==='anisotropy'&&call.at(-1)===8).length,8);assert.equal(f.calls.filter(call=>call[0]==='anisotropy'&&call.at(-1)===1).length,1);assert.equal(f.calls.filter(call=>call[0]==='parameter'&&call[2]===f.g.TEXTURE_MAX_LEVEL&&call[3]===3).length,1);assert.equal(f.canvases.length,0);assert.deepEqual(f.ASSETS,f.originalAssets);
  });
  await check('exhausted retry atomically cancels queued images and timers before deleting pending GPU textures',async()=>{
   const f=fixture(),op=f.begin(true),initial=f.images[5];f.emit(initial,'onerror');await flush();assert.equal(op.status.state,'pending');const second=f.nextTimer();f.emit(second,'onerror');await flush();const third=f.nextTimer();
-  const late=f.images.filter(image=>image.onload).map(image=>image.onload);f.emit(f.images[0],'onerror');assert.equal(f.retries,1);f.emit(third,'onerror');await assert.rejects(op.promise,/無法載入材質 turtle_skin_v45/);await flush();
-  assert.equal(op.status.state,'rejected');assert.equal(f.requests.filter(r=>r.url.includes('turtle_skin_v45')).length,3);assert.equal(f.timers.size,0);assert.equal(f.deleted.length,9);assert(f.old.every(texture=>!texture.deleted));assert.equal(f.renderer.textures,f.old);assert.equal(f.renderer.textureFull,false);assert.equal(f.renderer._textureUpgrade,null);
+  const late=f.images.filter(image=>image.onload).map(image=>image.onload);f.emit(f.images[0],'onerror');assert.equal(f.retries,1);f.emit(third,'onerror');await assert.rejects(op.promise,/無法載入材質 turtle_atlas_v50/);await flush();
+  assert.equal(op.status.state,'rejected');assert.equal(f.requests.filter(r=>r.url.includes('turtle_atlas_v50')).length,3);assert.equal(f.timers.size,0);assert.equal(f.deleted.length,9);assert(f.old.every(texture=>!texture.deleted));assert.equal(f.renderer.textures,f.old);assert.equal(f.renderer.textureFull,false);assert.equal(f.renderer._textureUpgrade,null);
   const before=f.calls.length;for(const callback of late)assert.doesNotThrow(callback);assert.equal(f.calls.length,before,'late queued callbacks must short-circuit before every GL operation');
  });
  await check('embedded data/blob image failures do not retry or append network query strings',async()=>{
