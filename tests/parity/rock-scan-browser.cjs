@@ -17,7 +17,12 @@ assert(profiles.every(p=>['desktop','touch'].includes(p)),'Choose desktop, touch
 const output=path.resolve(option('out','qa/parity/v01847-rock/visual/report.json'));
 const baseURL=new URL(option('url','http://127.0.0.1:8765/'));
 assert(baseURL.pathname.endsWith('/'),'--url must be a directory URL ending with /');
-const pairDirectory='qa/parity/v01847-rock/prepared',receiptPath=pairDirectory+'/receipt.json';
+const requestedPairDirectory=option('pair-dir','qa/parity/v01847-rock/prepared');
+assert(typeof requestedPairDirectory==='string'&&requestedPairDirectory.length,'--pair-dir requires a local QA directory');
+const absolutePairDirectory=fs.realpathSync(path.resolve(root,requestedPairDirectory));
+const qaRelative=path.relative(path.join(root,'qa'),absolutePairDirectory);
+assert(qaRelative&&!qaRelative.startsWith('..'+path.sep)&&qaRelative!=='..'&&!path.isAbsolute(qaRelative),'--pair-dir must be inside this checkout\'s local qa/ tree so the preview server can serve the exact files');
+const pairDirectory=path.relative(root,absolutePairDirectory).split(path.sep).join('/'),receiptPath=pairDirectory+'/receipt.json';
 const receiptBytes=fs.readFileSync(path.join(root,receiptPath)),receipt=JSON.parse(receiptBytes);
 const pairPaths=['assets/rock_diff.jpg','assets/rock_nor_gl.jpg'];
 const candidatePaths=['rock_diff.jpg','rock_nor_gl.jpg'].map(name=>pairDirectory+'/'+name);
@@ -26,10 +31,12 @@ const candidateIdentity=candidatePaths.map((file,i)=>{
  assert.equal(asset.role,i?'nor_gl':'Diffuse');
  assert.equal(sha(bytes),asset.candidate.sha256,'Prepared candidate differs from its receipt');
  assert.equal(bytes.length,asset.candidate.bytes);
- assert.deepEqual(asset.candidate.dimensions,[2048,2048]);
+ const dimensions=asset.candidate.dimensions;
+ assert(Array.isArray(dimensions)&&dimensions.length===2&&dimensions.every(n=>Number.isInteger(n)&&n>0&&n<=2048),'Prepared dimensions must be positive integers no larger than 2048 in either axis');
  assert.equal(asset.candidate.encoding.subsampling,0);
- return {path:file,bytes:bytes.length,sha256:sha(bytes),receiptRole:asset.role,dimensions:[2048,2048]};
+ return {path:file,bytes:bytes.length,sha256:sha(bytes),receiptRole:asset.role,dimensions:dimensions.slice()};
 });
+assert.deepEqual(candidateIdentity[0].dimensions,candidateIdentity[1].dimensions,'Diffuse and normal must retain the same aligned width/height grid');
 
 // Exact catalogue fixture and CPU contact proof from rock-material-browser.cjs.
 const indexPath='assets/scene/index.json',indexBytes=fs.readFileSync(path.join(root,indexPath));
@@ -91,9 +98,9 @@ const sourceIdentity=Object.fromEntries(sourcePaths.map(file=>{
  const data=fs.readFileSync(path.join(root,file));return [file,{bytes:data.length,sha256:sha(data)}];
 }));
 const report={status:'not-started',purpose:'visual-comparison-only',profiles:[],errors:[],fixtures:scenes,
- fixedTime:6,witness,sourceIdentity,candidateIdentity,receiptSHA256:sha(receiptBytes),
+ fixedTime:6,witness,sourceIdentity,candidateIdentity,pairDirectory,receiptSHA256:sha(receiptBytes),
  candidateCompressedByteBudget:receipt.compressed_bytes,
- method:'One actual production context per desktop/touch profile. Only renderer.textures[2] and [3] switch between loaded originals and prepared Rock Face candidates. Existing textureFull/mobile resolution, RGBA8, repeat wrap, trilinear mip filters, anisotropy and unflipped normal convention are retained. Default game FOV, near plane, exposure and clarity remain unchanged; time is 6. Actual home/contact and trench fixture locations are fixed. The full world stays installed. Frozen views settle streaming/shadows before each original/candidate/original-restored sequence. Native hardware Chrome only. Same-task full-frame capture is visual evidence; no timer queries, FPS, CPU cost, phone-hardware, battery or automatic realism acceptance. Original texture pointers are restored and added textures are deleted even after failure.'};
+ method:'One actual production context per desktop/touch profile. Only renderer.textures[2] and [3] switch between loaded originals and the receipt-verified local QA pair. Existing textureFull/mobile size policy, RGBA8, repeat wrap, trilinear mip filters, anisotropy and unflipped normal convention are retained. Source dimensions may differ from production, so original and candidate GPU upload dimensions/mip chains are recorded separately: a 1536-square full upload stays 1536, while the existing non-full width>1024 policy produces 1024-square. A passive pre-boot observer forwards native texImage2D/generateMipmap calls unchanged and records actual upload-source dimensions plus their generated mip chain; it creates no GPU resource and changes no Renderer method. Dimensions describe successful upload calls, not a direct GL allocation-size query or measured memory. Default game FOV, near plane, exposure and clarity remain unchanged; time is 6. Actual home/contact and trench fixture locations are fixed. The full world stays installed. Frozen views settle streaming/shadows before each original/candidate/original-restored sequence. Native hardware Chrome only. Same-task full-frame capture is visual evidence; no timer queries, FPS, CPU cost, phone-hardware, battery or automatic realism acceptance. Original texture pointers and observed native methods are restored and added textures are deleted even after failure.'};
 const save=()=>{fs.mkdirSync(path.dirname(output),{recursive:true});fs.writeFileSync(output,JSON.stringify(report,null,2)+'\n');};
 
 async function main(){
@@ -106,6 +113,37 @@ async function main(){
   for(const profile of profiles){
    const touch=profile==='touch',context=await browser.newContext({viewport:touch?{width:390,height:844}:{width:1280,height:800},
     deviceScaleFactor:touch?3:2,isMobile:touch,hasTouch:touch}),page=await context.newPage();
+   // Observe the original production uploads too, before any game code runs.
+   // WebGL exposes sampler parameters but no texture-width query. Keep the
+   // native calls/arguments and derive each mip chain from its real base upload.
+   await page.addInitScript(()=>{
+    const prototype=WebGL2RenderingContext.prototype,nativeImage=prototype.texImage2D,nativeMipmap=prototype.generateMipmap,records=new WeakMap();
+    const snapshot=texture=>{const record=records.get(texture);return record?JSON.parse(JSON.stringify(record)):null;};
+    const image=function(...args){
+     const result=nativeImage.apply(this,args);
+     if(args[0]===this.TEXTURE_2D){
+      const texture=this.getParameter(this.TEXTURE_BINDING_2D),source=args.length===6?args[5]:null;
+      const width=source?source.width:args[3],height=source?source.height:args[4],level=args[1];
+      if(texture&&Number.isInteger(width)&&Number.isInteger(height)&&Number.isInteger(level)){
+       const record=records.get(texture)||{uploads:0,mipmapCalls:0,levels:[]};record.uploads++;
+       const value={level,width,height,internalFormat:args[2],origin:'texImage2D'};
+       if(level===0){record.dimensions=[width,height];record.levels=[value];record.mipmapsGenerated=false;}else record.levels[level]=value;
+       records.set(texture,record);
+      }
+     }return result;
+    };
+    const mipmap=function(...args){
+     const result=nativeMipmap.apply(this,args);
+     if(args[0]===this.TEXTURE_2D){const texture=this.getParameter(this.TEXTURE_BINDING_2D),record=records.get(texture);
+      if(record?.dimensions){const [width,height]=record.dimensions;record.mipmapCalls++;record.mipmapsGenerated=true;
+       record.levels=Array.from({length:Math.floor(Math.log2(Math.max(width,height)))+1},(_,level)=>({level,width:Math.max(1,Math.floor(width/2**level)),height:Math.max(1,Math.floor(height/2**level)),internalFormat:record.levels[0].internalFormat,origin:level?'generateMipmap':'texImage2D'}));
+      }
+     }return result;
+    };
+    prototype.texImage2D=image;prototype.generateMipmap=mipmap;
+    window.__rockTextureUploads={snapshot,active:()=>prototype.texImage2D===image&&prototype.generateMipmap===mipmap,
+     restore(){if(prototype.texImage2D===image)prototype.texImage2D=nativeImage;if(prototype.generateMipmap===mipmap)prototype.generateMipmap=nativeMipmap;return prototype.texImage2D===nativeImage&&prototype.generateMipmap===nativeMipmap;}};
+   });
    const row={profile,status:'loading',sourceResponses:[],errors:[],views:[]},sourceJobs=[];
    report.profiles.push(row);save();
    page.on('pageerror',e=>row.errors.push(e.stack||e.message));
@@ -114,7 +152,7 @@ async function main(){
    page.on('response',response=>{
     const url=new URL(response.url());
     if(url.origin!==baseURL.origin||!url.pathname.startsWith(baseURL.pathname))return;
-    const file=url.pathname.slice(baseURL.pathname.length),expected=sourceIdentity[file];
+    const file=decodeURIComponent(url.pathname.slice(baseURL.pathname.length)),expected=sourceIdentity[file];
     if(!expected)return;
     sourceJobs.push(response.body().then(bytes=>{
      const observed={path:file,url:url.href,bytes:bytes.length,sha256:sha(bytes)};row.sourceResponses.push(observed);
@@ -130,7 +168,7 @@ async function main(){
     await page.bringToFront();const url=new URL(baseURL);url.searchParams.set('still','');
     await page.goto(url.href);await page.waitForFunction(()=>window.__ocean?.ready,null,{timeout:120000});
     await page.bringToFront();
-    row.initial=await page.evaluate(async({witness,candidateURLs})=>{
+    row.initial=await page.evaluate(async({witness,candidateURLs,candidateDimensions})=>{
      const g=renderer.gl,debug=g.getExtension('WEBGL_debug_renderer_info');
      const hardware=debug?g.getParameter(debug.UNMASKED_RENDERER_WEBGL):null;
      if(!hardware||/swiftshader|llvmpipe|softpipe|software/i.test(hardware))throw Error('Native hardware GPU required: '+hardware);
@@ -170,14 +208,19 @@ async function main(){
        anisotropy:renderer.aniso?g.getTexParameter(g.TEXTURE_2D,renderer.aniso.TEXTURE_MAX_ANISOTROPY_EXT):null
       };}finally{g.bindTexture(g.TEXTURE_2D,binding);}
      };
-     const textureParameters=original.slice(2,4).map(inspectTexture);
+     const textureParameters=original.slice(2,4).map(inspectTexture),uploadObserver=window.__rockTextureUploads;
+     if(!uploadObserver?.active())throw Error('Passive native upload observer is missing');
+     const originalTextureUploads=original.map(uploadObserver.snapshot),originalUploads=originalTextureUploads.slice(2,4),candidateUploads=[];
+     if(originalUploads.some(record=>!record?.mipmapsGenerated||record.levels[0].internalFormat!==g.RGBA8))throw Error('Original production RGBA8/mipmap upload was not observed');
+     const texturePairGPU=arm=>(arm==='candidate'?added:original.slice(2,4)).map((texture,i)=>({slot:i+2,...uploadObserver.snapshot(texture)}));
+     const originalGPU=texturePairGPU('original');
      const restore=()=>{renderer.textures[2]=original[2];renderer.textures[3]=original[3];};
      const cleanup=()=>{
       restore();const pointersRestored=renderer.textures===textureArray&&renderer.textures.length===original.length&&renderer.textures.every((tex,i)=>tex===original[i]);
       for(const tex of added)g.deleteTexture(tex);
-      return {pointersRestored,addedTexturesDeleted:added.every(tex=>!g.isTexture(tex)),gl:g.getError()};
+      return {pointersRestored,addedTexturesDeleted:added.every(tex=>!g.isTexture(tex)),nativeUploadMethodsRestored:uploadObserver.restore(),gl:g.getError()};
      };
-     window.__rockScan={textureArray,original,added,actor,selected,stream,methods,programs,surfacePrograms,initial,hash,restore,cleanup};
+     window.__rockScan={textureArray,original,added,actor,selected,stream,methods,programs,surfacePrograms,initial,hash,restore,cleanup,uploadObserver,texturePairGPU,originalGPU,candidateGPU:null,originalTextureUploads};
      // Match Renderer.loadTextures exactly, without replacing that method or
      // reloading unrelated textures. The existing textureFull policy owns size.
      try{
@@ -186,7 +229,7 @@ async function main(){
         const img=new Image(),timer=setTimeout(()=>{img.onload=img.onerror=null;img.removeAttribute('src');reject(Error('Candidate image timeout'));},12000);
         img.onload=()=>{clearTimeout(timer);resolve(img);};img.onerror=()=>{clearTimeout(timer);reject(Error('Candidate image load failed: '+candidateURLs[i]));};img.src=candidateURLs[i];
        });
-       if(image.width!==2048||image.height!==2048)throw Error('Candidate pair must retain aligned 2048-square sources');
+       if(image.width!==candidateDimensions[0]||image.height!==candidateDimensions[1])throw Error('Decoded candidate dimensions differ from the aligned receipt grid');
        const texture=g.createTexture();if(!texture)throw Error('Candidate texture allocation failed');added.push(texture);
        const binding=g.getParameter(g.TEXTURE_BINDING_2D),flip=g.getParameter(g.UNPACK_FLIP_Y_WEBGL);
        try{
@@ -197,13 +240,18 @@ async function main(){
         g.texParameteri(g.TEXTURE_2D,g.TEXTURE_WRAP_S,g.REPEAT);g.texParameteri(g.TEXTURE_2D,g.TEXTURE_WRAP_T,g.REPEAT);
         if(renderer.aniso)g.texParameterf(g.TEXTURE_2D,renderer.aniso.TEXTURE_MAX_ANISOTROPY_EXT,Math.min(8,g.getParameter(renderer.aniso.MAX_TEXTURE_MAX_ANISOTROPY_EXT)));
         if(JSON.stringify(inspectTexture(texture))!==JSON.stringify(textureParameters[i]))throw Error('Original/candidate sampler parameters differ');
+        const uploaded=uploadObserver.snapshot(texture),expectedDimensions=!renderer.textureFull&&image.width>1024?[1024,1024]:[image.width,image.height];
+        if(!uploaded?.mipmapsGenerated||JSON.stringify(uploaded.dimensions)!==JSON.stringify(expectedDimensions)||uploaded.levels[0].internalFormat!==g.RGBA8)throw Error('Actual candidate upload differs from the production size/mipmap policy');
+        candidateUploads.push(uploaded);
        }finally{g.bindTexture(g.TEXTURE_2D,binding);g.pixelStorei(g.UNPACK_FLIP_Y_WEBGL,flip);}
       }
       if(g.getError())throw Error('Candidate texture upload GL error');
      }catch(error){cleanup();throw error;}
-     return {...initial,shaderIdentity,textureParameters,candidateUpload:{count:added.length,format:'RGBA8',
-      dimensions:renderer.textureFull?[2048,2048]:[1024,1024],mips:true,normalFlip:false,onlySlots:[2,3]}};
-    },{witness,candidateURLs:candidatePaths.map(file=>new URL(file,baseURL).href)});
+     window.__rockScan.candidateGPU=texturePairGPU('candidate');
+     return {...initial,shaderIdentity,textureParameters,originalUpload:{count:2,format:'RGBA8',textures:originalUploads},candidateUpload:{count:added.length,format:'RGBA8',
+      sourceDimensions:candidateDimensions,dimensions:candidateUploads[0].dimensions,textures:candidateUploads,mips:true,normalFlip:false,onlySlots:[2,3]},
+      textureDimensionsChanged:originalUploads.some((record,i)=>JSON.stringify(record.dimensions)!==JSON.stringify(candidateUploads[i].dimensions))};
+    },{witness,candidateURLs:candidatePaths.map(file=>new URL(file,baseURL).href),candidateDimensions:candidateIdentity[0].dimensions});
     assert(row.initial.adaptive&&row.initial.compiled&&row.initial.streamed,'Fresh default world/adaptive entry required');
     assert.equal(row.initial.quality,touch?1:2);assert.equal(row.initial.scale,1);
     await verifyResponses();row.status='prepared';save();
@@ -276,7 +324,9 @@ async function main(){
        const validate=arm=>{
         clean();const checks={opticsUnchanged:JSON.stringify(conditions())===fixed,workloadUnchanged:JSON.stringify(workload())===work,
          actorsUnchanged:population()===actors,worldUnchanged:immutable()===world,programsAndMethodsUnchanged:programsMatch(),
-         batchReferencesUnchanged:renderer.batches.length===batchRefs.length&&renderer.batches.every((b,i)=>b===batchRefs[i]),texturePairIdentity:texturesMatch(arm)};
+         batchReferencesUnchanged:renderer.batches.length===batchRefs.length&&renderer.batches.every((b,i)=>b===batchRefs[i]),texturePairIdentity:texturesMatch(arm),
+         textureUploadRecordUnchanged:f.uploadObserver.active()&&JSON.stringify(f.texturePairGPU(arm))===JSON.stringify(arm==='candidate'?f.candidateGPU:f.originalGPU),
+         otherTextureUploadsUnchanged:f.original.every((texture,i)=>i===2||i===3||JSON.stringify(f.uploadObserver.snapshot(texture))===JSON.stringify(f.originalTextureUploads[i]))};
         const submitted=targets();checks.targetSubmitted=scene.group==='home'
          ?submitted.some(b=>b.selectedActorSubmitted&&(scene.far?b.minDistance>0:b.minDistance===0))
          :submitted.some(b=>[16,17].includes(b.material)&&b.submittedTriangles>0);
@@ -295,7 +345,7 @@ async function main(){
         const png=renderer.canvas.toDataURL('image/png'),error=g.getError();let maxRGB=0,nonzeroPixels=0;
         for(let i=0;i<pixels.length;i+=4){maxRGB=Math.max(maxRGB,pixels[i],pixels[i+1],pixels[i+2]);if(pixels[i]||pixels[i+1]||pixels[i+2])nonzeroPixels++;}
         if(error||maxRGB<=20||nonzeroPixels<=200)throw Error('Empty/dark/invalid capture; retain a failed visual receipt');
-        result.images.push({arm,width,height,png,rgbaSHA256:await f.hash(pixels),maxRGB,nonzeroPixels,gl:error,checks,targets:targets()});
+        result.images.push({arm,width,height,png,rgbaSHA256:await f.hash(pixels),maxRGB,nonzeroPixels,gl:error,checks,targets:targets(),texturePairGPU:f.texturePairGPU(arm)});
         validate(arm);
        }
        result.restoredPixelsMatch=result.images[0].rgbaSHA256===result.images[2].rgbaSHA256;
@@ -316,7 +366,7 @@ async function main(){
     row.status='passed-controlled-invariants-visual-review-required';
    }finally{
     try{row.cleanup=await page.evaluate(()=>window.__rockScan?.cleanup()||{notInitialized:true});
-     if(!row.cleanup.notInitialized)assert(row.cleanup.pointersRestored&&row.cleanup.addedTexturesDeleted&&!row.cleanup.gl,'Texture cleanup failed');
+     if(!row.cleanup.notInitialized)assert(row.cleanup.pointersRestored&&row.cleanup.addedTexturesDeleted&&row.cleanup.nativeUploadMethodsRestored&&!row.cleanup.gl,'Texture/observer cleanup failed');
     }catch(error){row.errors.push('Cleanup: '+error.message);report.errors.push('Cleanup: '+error.message);}
     await context.close();await Promise.all(sourceJobs);save();
    }

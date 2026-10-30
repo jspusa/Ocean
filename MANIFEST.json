@@ -1,5 +1,5 @@
 {
-  "version": "0.18.47",
+  "version": "0.18.48",
   "scope": "served game and build sources",
   "files": [
     {
@@ -9,8 +9,8 @@
     },
     {
       "path": "CREDITS.md",
-      "bytes": 15372,
-      "sha256": "79dcabfd764092561262df9e59f4e1e67e4629464744cd261516a5471a13b060"
+      "bytes": 16093,
+      "sha256": "90f2c23d8284d8446367baddaa7cecad5e30029b1f5c3b7f8bcab7f6bf0db576"
     },
     {
       "path": "LICENSE",
@@ -19,13 +19,13 @@
     },
     {
       "path": "README.md",
-      "bytes": 47499,
-      "sha256": "0b4669e78d81e9df2eb43bfa4613e58f8c928d44bf8855f139ba3b477be8e715"
+      "bytes": 48574,
+      "sha256": "aeb2da03498a034db0157499d4de439463f74501494178bd0c389d8ea1464c52"
     },
     {
       "path": "VERSION",
       "bytes": 8,
-      "sha256": "24f611a345b68e33a6308b48d0f591da7e42a8be4d39e1a7f82b8e9c953085bd"
+      "sha256": "c326f0f8804a53d15d387b81f7812e2293ee3737be8c8dc1bfd56d3adaacf1ff"
     },
     {
       "path": "assets/barramundi/CC0-1.0.txt",
@@ -308,14 +308,39 @@
       "sha256": "401f234343c2a405a6cec956812962a5b4b4034cb8c312384dea27f3c257b0c7"
     },
     {
+      "path": "assets/rock-surface/CC0-1.0.txt",
+      "bytes": 6533,
+      "sha256": "a43fc2004d1e073f1107a1f6146664d08dae6cea93cb828742a4bec6da828e91"
+    },
+    {
+      "path": "assets/rock-surface/LICENSE.md",
+      "bytes": 3134,
+      "sha256": "4857daf3553866756f858dd945e497b8868ce525be2dc8da608b625e147b2632"
+    },
+    {
+      "path": "assets/rock-surface/preparation-receipt.json",
+      "bytes": 7223,
+      "sha256": "c52d55c1c929484ad9622759a614b46e0ae0cc03c86f838aa29cf8b011235152"
+    },
+    {
+      "path": "assets/rock-surface/source-files.json",
+      "bytes": 34137,
+      "sha256": "c413c5c8ceeed4e92f9456a8785f06c96123e21dcd8da0d1b782c50fb4432fe5"
+    },
+    {
+      "path": "assets/rock-surface/source-info.json",
+      "bytes": 1038,
+      "sha256": "372158f39c740fb1a236d8344415d57145ceb20f8c89dc701a01f54afe45727e"
+    },
+    {
       "path": "assets/rock_diff.jpg",
-      "bytes": 903525,
-      "sha256": "4700e02d365e21bebb89696c321854bacedf12e1c3dcdc7a0aed4ffa622ddaef"
+      "bytes": 757507,
+      "sha256": "ed0102ccab22c65e11dfd715ac56b752cfe5486d0a347c71add3be1ed24ea50e"
     },
     {
       "path": "assets/rock_nor_gl.jpg",
-      "bytes": 1311852,
-      "sha256": "4627612be3a3462bfdc13eeec4d57b16a02d18753c7e85d3b55434b4648c0e0a"
+      "bytes": 763605,
+      "sha256": "ed025b06f325174558245e758d7dfda52ea041bf0d440af32a680c1cc558e363"
     },
     {
       "path": "assets/sand_diff.jpg",
@@ -1285,7 +1310,7 @@
     {
       "path": "index.html",
       "bytes": 16778,
-      "sha256": "67692d4f97f89ccf6a310e1ab28b04757f9899ef4dfa8149a5ccf4736815bdfe"
+      "sha256": "b8f2c15565254cfee30581cd4ed1f175e7dd518cc6fbfa631f08fa98b653ad1a"
     },
     {
       "path": "music/blue_silence.mp3",
@@ -1385,7 +1410,7 @@
     {
       "path": "src/config.js",
       "bytes": 841444,
-      "sha256": "49862fca90b8a8a9f22cf2fb45c5372d53c880dad64b053503d11987686e2874"
+      "sha256": "af907f5b69485478489199e9c054f93a99519bff05e29c9410f055874e1565c4"
     },
     {
       "path": "src/deepsea.js",
@@ -1580,7 +1605,7 @@
     {
       "path": "src/shell.html",
       "bytes": 12391,
-      "sha256": "7b573d2e63d577a6bf72fe432ca5834ee0b89a86c54bd4dc7436e39adac0f250"
+      "sha256": "5fd092cd1251120d00b4a43a0e3e9ca18d14336bddb3ea0666f9f91cae1d41cc"
     },
     {
       "path": "src/ship.js",

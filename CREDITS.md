@@ -1,3 +1,7 @@
+# 0.18.48 岩石表面攝影素材
+
+`assets/rock_diff.jpg` 與 `assets/rock_nor_gl.jpg` 改用 [Poly Haven Rock Boulder Dry](https://polyhaven.com/a/rock_boulder_dry)，攝影 Dimitrios Savva、處理 Rico Cilliers，以 [CC0-1.0](https://polyhaven.com/license) 釋出。本作將對齊的色彩／OpenGL 法線圖縮至 1536²，法線經方向重取樣及正規化，並以既有水下照明與岩體投影呈現。原圖是陸地乾燥岩石，不能稱作海底掃描或已鑑定的石灰岩；沒有加入來源網站的示範渲染或標誌。完整下載來源、雜湊、製作配方與授權見 [素材聲明](assets/rock-surface/LICENSE.md)。以下舊版的程序岩石來源說明只適用其歷史版本。
+
 # 0.18.43 完整貼圖金目鱸
 
 近岸新增 Microsoft 製作、以 CC0-1.0 釋出的 BarramundiFish 模型，來源為 Khronos glTF Sample Assets 固定版本。保留原網格、UV、法線與切線，轉為公尺尺寸，縮製 512／1024 貼圖；游動、路線與碰撞接入由本專案完成。來源模型沒有游動動畫，本站動作是簡化美術設定。完整來源、授權及轉換資訊見 [素材聲明](assets/barramundi/LICENSE.md) 與 [CC0 全文](assets/barramundi/CC0-1.0.txt)。金目鱸圖鑑縮圖由遊戲內相同模型渲染，不是實景照片。

@@ -1,0 +1,208 @@
+{
+  "assets": [
+    {
+      "candidate": {
+        "bytes": 757507,
+        "dimensions": [
+          1536,
+          1536
+        ],
+        "encoding": {
+          "optimize": true,
+          "progressive": false,
+          "quality": 88,
+          "subsampling": 0
+        },
+        "filename": "rock_diff.jpg",
+        "md5": "28cc8e006c6a1a1305e35fc2facd7e14",
+        "mode": "RGB",
+        "sha256": "ed0102ccab22c65e11dfd715ac56b752cfe5486d0a347c71add3be1ed24ea50e"
+      },
+      "color_interpretation": "sRGB color",
+      "metadata_policy": "No EXIF or ICC copied; decoded RGB values are not color transformed.",
+      "normal_convention": null,
+      "normalized_uv_alignment_unchanged": true,
+      "pixel_coordinates_unchanged": false,
+      "processing": {
+        "color_processing": "Resample decoded RGB; no tint or color-space transform",
+        "crop_rotation_or_channel_flip": false,
+        "filter": "Pillow Lanczos",
+        "input_dimensions": [
+          2048,
+          2048
+        ],
+        "normal_renormalized": false,
+        "output_dimensions": [
+          1536,
+          1536
+        ],
+        "resized": true,
+        "same_coordinate_grid_as_other_map": true
+      },
+      "resized": true,
+      "role": "Diffuse",
+      "source": {
+        "bytes": 3437626,
+        "filename": "rock_boulder_dry_diff_2k.jpg",
+        "md5": "fbc9cf377db427f54381f463c0639e1f",
+        "sha256": "c66de7f7b48ef1ba542c17af780787ca6d43da2160a46ff3544dd9fcdf65ca30",
+        "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/rock_boulder_dry/rock_boulder_dry_diff_2k.jpg",
+        "verified_api_md5": true
+      }
+    },
+    {
+      "angular_error": {
+        "fraction_above_10_degrees": 1.4411078559027777e-05,
+        "fraction_above_5_degrees": 0.007489946153428819,
+        "interpretation": "Encoding fidelity only; visual quality still needs in-game review. This excludes resizing loss relative to the source scan.",
+        "max": 13.766298197918664,
+        "mean": 1.6411119104462915,
+        "method": "Normalize decoded candidate RGB / 127.5 - 1; acos(clamped dot) versus normalized resized reference, every output pixel",
+        "p50": 1.4613024541697741,
+        "p95": 3.5304747824482563,
+        "p99": 4.778523152522621,
+        "pixels": 2359296,
+        "reference": "normalized resized float-direction reference, before RGB8/JPEG encoding; not original-scan equivalence",
+        "rms": 1.9221895285689987,
+        "unit": "degrees"
+      },
+      "candidate": {
+        "bytes": 763605,
+        "dimensions": [
+          1536,
+          1536
+        ],
+        "encoding": {
+          "optimize": true,
+          "progressive": false,
+          "quality": 90,
+          "subsampling": 0
+        },
+        "filename": "rock_nor_gl.jpg",
+        "md5": "4df0b229cb01f42f3b12134f0377babe",
+        "mode": "RGB",
+        "sha256": "ed025b06f325174558245e758d7dfda52ea041bf0d440af32a680c1cc558e363"
+      },
+      "color_interpretation": "linear normal data",
+      "metadata_policy": "No EXIF or ICC copied; decoded RGB values are not color transformed.",
+      "normal_convention": "OpenGL +Y; no channel flips",
+      "normalized_uv_alignment_unchanged": true,
+      "pixel_coordinates_unchanged": false,
+      "processing": {
+        "crop_rotation_or_channel_flip": false,
+        "filter": "Pillow Lanczos",
+        "input_dimensions": [
+          2048,
+          2048
+        ],
+        "normal_method": "Decode RGB to signed vectors, normalize, Lanczos each float component, renormalize, round to RGB8",
+        "normal_renormalized": true,
+        "output_dimensions": [
+          1536,
+          1536
+        ],
+        "reference": "Unquantized normalized resized directions, before RGB8/JPEG encoding",
+        "reference_dtype": "little-endian float64, row-major H x W x RGB",
+        "reference_max_unit_length_error": 2.220446049250313e-16,
+        "reference_sha256": "065c0163fb536298cfe1c910110a30cffffa41fe47d07caef510aab33df5f8d5",
+        "resized": true,
+        "same_coordinate_grid_as_other_map": true
+      },
+      "resized": true,
+      "role": "nor_gl",
+      "source": {
+        "bytes": 3307320,
+        "filename": "rock_boulder_dry_nor_gl_2k.jpg",
+        "md5": "513ef3fdaadd106c38a9c40919918cc0",
+        "sha256": "72a3c96d563fc17ac36c568802e106222e6480512d98e07318e1f431cea33dd6",
+        "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/rock_boulder_dry/rock_boulder_dry_nor_gl_2k.jpg",
+        "verified_api_md5": true
+      }
+    }
+  ],
+  "compressed_bytes": {
+    "candidate_pair": 1521112,
+    "original_pair": 6744946,
+    "reduction_from_source_fraction": 0.7744812189749184,
+    "v01846_production_pair_budget": 2215377,
+    "within_budget": true
+  },
+  "environment": {
+    "libjpeg": "6.2",
+    "numpy": "2.3.5",
+    "pillow": "12.3.0",
+    "python": "3.12.14"
+  },
+  "gpu_memory": {
+    "dimensions_and_texture_count": "reduced (two 1536 x 1536 textures)",
+    "note": "Accounting only, not measured GPU allocation or timing; mobile downscale stays runtime-owned. Both 1536 and 2048 candidates still downscale to 1024 in the existing non-full path.",
+    "pair_rgba8_base_level_bytes": 18874368,
+    "pair_rgba8_full_mip_chain_bytes": 25165808,
+    "within_current_2048_dimensions": true
+  },
+  "invariants": {
+    "fixed_encoding_runs_per_image": 1,
+    "normal_flip": false,
+    "output_dimensions": [
+      1536,
+      1536
+    ],
+    "production_assets_written": false,
+    "same_aligned_2048_square_grid": false,
+    "same_aligned_output_grid": true,
+    "semantic_edits": false
+  },
+  "provenance": {
+    "asset": "Rock Boulder Dry",
+    "asset_url": "https://polyhaven.com/a/rock_boulder_dry",
+    "authors": {
+      "Dimitrios Savva": "Photography",
+      "Rico Cilliers": "Processing"
+    },
+    "files_api_url": "https://api.polyhaven.com/files/rock_boulder_dry",
+    "info_api_url": "https://api.polyhaven.com/info/rock_boulder_dry",
+    "legal_text_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "license": "CC0-1.0",
+    "license_url": "https://polyhaven.com/license",
+    "metadata_files": [
+      {
+        "bytes": 34137,
+        "filename": "source-files.json",
+        "md5": "9587f95c7363528f2b64c1e536a14a82",
+        "sha256": "c413c5c8ceeed4e92f9456a8785f06c96123e21dcd8da0d1b782c50fb4432fe5"
+      },
+      {
+        "bytes": 1038,
+        "filename": "source-info.json",
+        "md5": "9c48b2ee917f50cfbfbce6ec1f752498",
+        "sha256": "372158f39c740fb1a236d8344415d57145ceb20f8c89dc701a01f54afe45727e"
+      }
+    ],
+    "publisher": "Poly Haven",
+    "source_dimensions_mm": [
+      1799.9999523162842,
+      1800.0001907348633
+    ],
+    "source_width_m": 1.8
+  },
+  "recipe": {
+    "asset": "rock_boulder_dry",
+    "default_v47_recipe_preserved": false,
+    "output_size": [
+      1536,
+      1536
+    ],
+    "source_size": [
+      2048,
+      2048
+    ]
+  },
+  "schema": 2,
+  "status": "prepared candidate; not installed or visually accepted",
+  "tool": {
+    "bytes": 13437,
+    "filename": "prepare_rock_surface.py",
+    "md5": "543722f3b6b1b13a96915b9b81c4b520",
+    "sha256": "4942e440bd5afd14af71192e95230038dd9372578b9f8737901db516bff3e102"
+  }
+}
