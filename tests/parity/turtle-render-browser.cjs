@@ -58,15 +58,16 @@ const save=()=>{fs.mkdirSync(path.dirname(out),{recursive:true});fs.writeFileSyn
    assert.equal(image.gl,0);assert.equal(image.cameraInRock,false,'Inspection camera inside rock');assert(image.mean>1&&image.max>30);assert(image.draws.some(n=>n>0),'Actual turtle was not submitted');console.log('PASS '+profile+' '+config.id);
   }
   report.motion=await page.evaluate(async()=>{
-   const {f,batches}=__turtleInspection,g=renderer.gl,rows=[];renderer.photoFov=renderer.mobile?84:44;
-   for(let i=0;i<120;i++){
-    const time=9+i/60;updateLife(time);const s=Math.sin(f.yaw),c=Math.cos(f.yaw),at=[f.p[0]+c*3.3+s*3.6,f.p[1]+1.6,f.p[2]-s*3.3+c*3.6];
+   const {f,batches}=__turtleInspection,g=renderer.gl,rows=[],period=2*Math.PI/1.45,intervals=Math.ceil(period*60);renderer.photoFov=renderer.mobile?84:44;
+   for(let i=0;i<=intervals;i++){
+    const time=9+i*period/intervals;updateLife(time);const s=Math.sin(f.yaw),c=Math.cos(f.yaw),at=[f.p[0]+c*3.3+s*3.6,f.p[1]+1.6,f.p[2]-s*3.3+c*3.6];
     await renderer.sceneStream.ready(at);const ok=renderer.render(at,f.p,time),size=32,bytes=new Uint8Array(size*size*4);g.readPixels(Math.floor(g.drawingBufferWidth/2)-16,Math.floor(g.drawingBufferHeight/2)-16,size,size,g.RGBA,g.UNSIGNED_BYTE,bytes);
     let max=0;for(let n=0;n<bytes.length;n+=4)max=Math.max(max,bytes[n],bytes[n+1],bytes[n+2]);rows.push({i,time,p:f.p.slice(),draws:batches.map(b=>b.drawCount),max,error:g.getError(),submitted:ok!==false});
-   }return {frames:rows,contextLost:g.isContextLost(),quality:renderer.quality,scale:renderer.dynamicScale};
+   }return {frames:rows,period,intervals,stepSeconds:period/intervals,contextLost:g.isContextLost(),quality:renderer.quality,scale:renderer.dynamicScale};
   });
   assert(report.motion.frames.every(f=>f.submitted&&!f.error&&f.max>10&&f.draws.some(n=>n>0)));assert.equal(report.motion.contextLost,false);assert.equal(report.motion.quality,report.initial.quality);assert.deepEqual(report.errors,[]);
-  report.status='passed-controlled-checks-visual-review-required';console.log('PASS '+profile+' 120 continuous real-pose rendered frames');
+  assert.equal(report.motion.frames.length,report.motion.intervals+1);assert(Math.abs(report.motion.frames.at(-1).time-report.motion.frames[0].time-report.motion.period)<1e-12);
+  report.status='passed-controlled-checks-visual-review-required';console.log('PASS '+profile+' '+report.motion.frames.length+' real-pose frames across one complete stroke cycle');
  }catch(error){report.status='failed';report.failure=error.stack;console.error(error);process.exitCode=1;}
  finally{save();await browser?.close();}
 })();

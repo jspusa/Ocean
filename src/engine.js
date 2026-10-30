@@ -1559,11 +1559,14 @@ class Renderer{
   // exactly one opaque surface; overlapping dithered surfaces fight in depth.
   const atomicGround=!shadowPass&&b.material===1,margin=atomicGround?0:.6;
   const max=(b.maxDistance||220)*lodScale,min=(b.minDistance||0)*lodScale,max2=(max+margin)*(max+margin),min2=Math.max(0,min-margin)**2;
+  // The anchored turtle stroke can leave its rest sphere. Triangle inequality
+  // covers every phase of the .07 X / .37 Y motion, before instance scaling.
+  const cullRadius=b.radius+(b.kind===2?Math.hypot(.07,.37):0);
   for(let k=0;k<b.instances.length;k++){
    const i=b.instances[k];if(i.ecologyPresent===false)continue;const p=i.p,sc=i.s||UNIT3,tint=i.tint||UNIT3;
    if(eye&&planes){const dx=p[0]-eye[0],dy=p[1]-eye[1],dz=p[2]-eye[2],d2=dx*dx+dy*dy+dz*dz;
     if((atomicGround?d2>=max2:d2>max2)||d2<min2)continue;
-    const r=b.radius*Math.max(sc[0],sc[1],sc[2])*((b.kind===8||b.kind===9||b.kind===10||b.kind===11||b.kind===12)?1.15:1);let outside=false;
+    const r=cullRadius*Math.max(sc[0],sc[1],sc[2])*((b.kind===8||b.kind===9||b.kind===10||b.kind===11||b.kind===12)?1.15:1);let outside=false;
     for(let n=0;n<6;n++){const pl=planes[n];if(pl[0]*p[0]+pl[1]*p[1]+pl[2]*p[2]+pl[3]<-r){outside=true;break;}}
     if(outside)continue;
     if(b.cullBounds&&!b.dynamic&&b.kind===0){

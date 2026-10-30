@@ -1,48 +1,101 @@
-/* Actual high/low turtle vertices through the production WebGL vertex shader.
- * GPU contact/normal evidence is separate from complete visual acceptance. */
+/* Current kind-2 fallback: all source-indexed vertices, a complete sampled
+ * cycle, and actual Renderer.updateBatch culling. Root owns GPU execution.
+ * Compiled-world delivery and a future imported turtle rig require other gates. */
 'use strict';
 const fs=require('node:fs'),path=require('node:path'),vm=require('node:vm'),assert=require('node:assert/strict'),crypto=require('node:crypto');
-const root=path.resolve(__dirname,'../..'),c=vm.createContext({console});
-for(const name of ['engine','world','next_reef'])vm.runInContext(fs.readFileSync(path.join(root,'src/'+name+'.js'),'utf8'),c);
-const vs=vm.runInContext('VS',c),out=path.resolve(process.argv.find(a=>a.startsWith('--out='))?.slice(6)||'qa/parity/v01837-realism/turtle-rig.json');
-const report={status:'running',method:'Actual authored high/low turtle vertices and production VS in headless native Chrome transform feedback; no physical-phone or whole-animal visual claim.',shaderSHA256:crypto.createHash('sha256').update(vs).digest('hex'),checks:[]};
-const check=(name,fn)=>{try{fn();report.checks.push({name,passed:true});}catch(e){report.checks.push({name,passed:false,error:e.message});}};
-const norm=v=>{const d=Math.hypot(...v);return v.map(x=>x/d);},cross=(a,b)=>[a[1]*b[2]-a[2]*b[1],a[2]*b[0]-a[0]*b[2],a[0]*b[1]-a[1]*b[0]];
-const fixtures=[];
-for(const [lod,expression]of [['high','turtleGeometry()'],['low','distantTurtle()']]){
- const g=JSON.parse(JSON.stringify(vm.runInContext(expression,c))),all=[];for(let i=0;i<g.v.length;i+=12)all.push({p:g.v.slice(i,i+3),n:g.v.slice(i+3,i+6),tag:g.v[i+11],lod});
- for(const [name,predicate]of [['rigid',v=>v.tag!==2],['root',v=>v.tag===2&&Math.abs(v.p[2])<=.5100001],['fin',v=>v.tag===2&&Math.abs(v.p[2])>1.05]]){
-  const rows=all.filter(predicate);assert(rows.length,lod+' '+name);const stride=Math.max(1,Math.floor(rows.length/60));
-  for(let i=0;i<rows.length;i+=stride)fixtures.push({...rows[i],name});
- }
-}
-const differential=[],eps=.0004;
-for(const z of [-1.7,-1.45,-.9,-.511,-.51,.48,.51,.511,.9,1.45,1.7])for(const n of [[0,1,0],norm([.4,.7,.2])]){
- const p=[.12,-.05,z],u=norm(cross(Math.abs(n[1])<.8?[0,1,0]:[1,0,0],n)),v=cross(n,u);
- differential.push({p,n,tag:2});for(const t of [u,v])for(const s of [-1,1])differential.push({p:p.map((x,i)=>x+s*eps*t[i]),n,tag:2});
-}
+const root=path.resolve(__dirname,'../..'),option=(key,fallback)=>process.argv.find(a=>a.startsWith('--'+key+'='))?.slice(key.length+3)||fallback,digest=value=>crypto.createHash('sha256').update(value).digest('hex');
+const enginePath=path.resolve(option('engine',path.join(root,'src/engine.js'))),sources={engine:fs.readFileSync(enginePath,'utf8'),world:fs.readFileSync(path.join(root,'src/world.js'),'utf8'),next_reef:fs.readFileSync(path.join(root,'src/next_reef.js'),'utf8')};
+const context=vm.createContext({console});for(const [name,source]of Object.entries(sources))vm.runInContext(source,context,{filename:name});
+const vs=vm.runInContext('VS',context),index=vm.runInContext('indexGeometry',context),out=path.resolve(option('out','qa/parity/v01849-turtle/rig.json'));
+const frequency=1.45,period=2*Math.PI/frequency,intervals=64,times=Array.from({length:intervals+1},(_,i)=>period*i/intervals);
+const policy={intervals,samples:times.length,frequency,period,stepSeconds:period/intervals,phase:.35,positionClosureTolerance:2e-6,normalClosureTolerance:2e-5,normalUnitTolerance:2e-5,rigidTolerance:1e-7,boundTolerance:2e-6,tangentNormalMinimumDot:.9999,planeInset:.0005};
+// Bind the independent continuous-phase bound to the current production rig.
+for(const anchor of ['if(uKind==2&&aTag>1.5&&aTag<2.5){','float z=abs(p.z),u=clamp((z-.51)/.94,0.,1.),wing=u*u*(3.-2.*u);','float beat=uTime*1.45+aExtra.x,phase=beat-z*.7;','n.z-=dx*n.x+dy*n.y;p.y+=.37*sin(phase)*wing;p.x-=.07*cos(beat)*wing;'])assert.equal(vs.split(anchor).length,2,'Current rig contract changed; review the all-phase proof: '+anchor);
+const meshes=[['high','turtleGeometry()'],['low','distantTurtle()']].map(([lod,expression])=>{
+ const mesh=index(vm.runInContext(expression,context).v),vertices=Array.from(mesh.vertices),indices=Array.from(mesh.indices),used=new Set(indices);
+ assert.equal(vertices.length%12,0);assert.equal(used.size,vertices.length/12,'Every indexed vertex must be referenced');assert(indices.every(i=>Number.isInteger(i)&&i>=0&&i<vertices.length/12));
+ let restRadius=0,allPhaseRadius=0,rigidVertices=0,movingVertices=0;
+ for(let i=0;i<vertices.length;i+=12){const p=vertices.slice(i,i+3),soft=vertices[i+11]>1.5&&vertices[i+11]<2.5,u=soft?Math.max(0,Math.min(1,(Math.abs(p[2])-.51)/.94)):0,w=u*u*(3-2*u),r=Math.hypot(...p);restRadius=Math.max(restRadius,r);allPhaseRadius=Math.max(allPhaseRadius,r+w*Math.hypot(.37,.07));if(w===0)rigidVertices++;else movingVertices++;}
+ assert(rigidVertices&&movingVertices);assert(restRadius<=mesh.radius+1e-6);
+ return {lod,vertices,indices,radius:mesh.radius,identity:{vertices:vertices.length/12,indices:indices.length,verticesSHA256:digest(Buffer.from(mesh.vertices.buffer,mesh.vertices.byteOffset,mesh.vertices.byteLength)),indicesSHA256:digest(Buffer.from(mesh.indices.buffer,mesh.indices.byteOffset,mesh.indices.byteLength))},proof:{restRadius,allPhaseRadius,rigidVertices,movingVertices,method:'Every actual indexed vertex: r + smoothstep(.51,1.45,abs(z))*hypot(.37,.07); other tags rigid. Triangle inequality bounds every continuous phase. Maximum instance scale bounds nonuniform scale and rotations. This conservative bound is not inferred from finite samples.'}};
+});
+const norm=v=>{const d=Math.hypot(...v);return v.map(x=>x/d);},cross=(a,b)=>[a[1]*b[2]-a[2]*b[1],a[2]*b[0]-a[0]*b[2],a[0]*b[1]-a[1]*b[0]],differential=[],eps=.0004;
+for(const z of [-1.7,-1.45,-.9,-.511,-.51,.48,.51,.511,.9,1.45,1.7])for(const n of [[0,1,0],norm([.4,.7,.2])]){const p=[.12,-.05,z],u=norm(cross(Math.abs(n[1])<.8?[0,1,0]:[1,0,0],n)),v=cross(n,u);differential.push({p,n,tag:2});for(const tangent of [u,v])for(const sign of [-1,1])differential.push({p:p.map((x,i)=>x+sign*eps*tangent[i]),n,tag:2});}
+const report={status:'running',scope:'current-kind-2-fallback-source-indexed-fixture',enginePath,sourceSHA256:Object.fromEntries(Object.entries(sources).map(([name,source])=>[name,digest(source)])),shaderSHA256:digest(vs),policy,
+ method:'Native installed Chrome; standalone 16x16 WebGL2 fixture. Exact production engine.js, VS, Renderer.batch and Renderer.updateBatch. All referenced indexed vertices from both current source builders use actual production buffers and instance packing. Fixed 64 intervals plus closure cover one sampled cycle. Every phase retains all-vertex error aggregates and readback hash; finite samples are not an all-phase proof. An independently anchored triangle-inequality bound covers continuous phases. Actual GPU-posed vertices define cull planes including yaw/pitch/nonuniform scale; real updateBatch runs in main and shadow modes. Fully outside negative controls must be rejected. No images, full-world startup, GPU timing, phone-hardware, whole-animal appearance or future imported-rig claim.',
+ compiledWorldAcceptance:{performedHere:false,requiredBeforeDelivery:true,gate:'tests/parity/turtle-render-browser.cjs must independently match both actual compiled/uploaded LOD buffers to the same current source indexed fixtures after the final build. This source fixture is not archive acceptance.'},fixtures:meshes.map(({lod,radius,identity,proof})=>({lod,radius,...identity,proof})),checks:[]};
+const check=(name,fn)=>{try{const detail=fn();report.checks.push({name,passed:true,detail});}catch(error){report.checks.push({name,passed:false,error:error.message});}},save=()=>{fs.mkdirSync(path.dirname(out),{recursive:true});fs.writeFileSync(out,JSON.stringify(report,null,2)+'\n');};
 (async()=>{let browser;
  try{
-  const {chromium}=require(process.env.PLAYWRIGHT_PATH||'playwright');browser=await chromium.launch(require('./browser-launch.cjs')(true));const page=await browser.newPage();await page.setContent('<canvas width="16" height="16"></canvas>');
-  const times=[0,.4,1.2,2.6,4.5],gpu=await page.evaluate(({vs,fixtures,differential,times})=>{
-   const gl=document.querySelector('canvas').getContext('webgl2'),debug=gl.getExtension('WEBGL_debug_renderer_info');
-   const compile=(type,source)=>{const s=gl.createShader(type);gl.shaderSource(s,source);gl.compileShader(s);if(!gl.getShaderParameter(s,gl.COMPILE_STATUS))throw Error(gl.getShaderInfoLog(s));return s;};
-   const p=gl.createProgram(),vertex=compile(gl.VERTEX_SHADER,vs),fragment=compile(gl.FRAGMENT_SHADER,'#version 300 es\nprecision highp float;out vec4 c;void main(){c=vec4(1.);}');
-   gl.attachShader(p,vertex);gl.attachShader(p,fragment);gl.transformFeedbackVaryings(p,['vWorld','vNormal'],gl.INTERLEAVED_ATTRIBS);gl.linkProgram(p);if(!gl.getProgramParameter(p,gl.LINK_STATUS))throw Error(gl.getProgramInfoLog(p));gl.useProgram(p);
-   const uniform=k=>gl.getUniformLocation(p,k),identity=[1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1];for(const k of ['uVP','uLightVP','uDynamicLightVP'])gl.uniformMatrix4fv(uniform(k),false,identity);gl.uniform1i(uniform('uKind'),2);gl.uniform1i(uniform('uMat'),5);
-   const buffer=gl.createBuffer();function capture(rows,time){
-    gl.uniform1f(uniform('uTime'),time);gl.bindBuffer(gl.TRANSFORM_FEEDBACK_BUFFER,buffer);gl.bufferData(gl.TRANSFORM_FEEDBACK_BUFFER,rows.length*24,gl.STREAM_READ);gl.bindBufferBase(gl.TRANSFORM_FEEDBACK_BUFFER,0,buffer);gl.enable(gl.RASTERIZER_DISCARD);gl.beginTransformFeedback(gl.POINTS);
-    for(const f of rows){gl.vertexAttrib3fv(0,f.p);gl.vertexAttrib3fv(1,f.n);gl.vertexAttrib3f(2,.5,.5,.5);gl.vertexAttrib3f(3,0,0,0);gl.vertexAttrib4f(4,0,1,1,1);gl.vertexAttrib3f(5,1,1,1);gl.vertexAttrib2f(6,.35,0);gl.vertexAttrib2f(7,0,0);gl.vertexAttrib1f(8,f.tag);gl.vertexAttrib4f(9,1,1,1,1);gl.vertexAttrib4f(10,.5,.5,.5,.5);gl.vertexAttrib4f(11,0,0,0,0);gl.drawArrays(gl.POINTS,0,1);}
-    gl.endTransformFeedback();gl.disable(gl.RASTERIZER_DISCARD);const a=new Float32Array(rows.length*6);gl.getBufferSubData(gl.TRANSFORM_FEEDBACK_BUFFER,0,a);return Array.from(a);
+  save();const {chromium}=require(process.env.PLAYWRIGHT_PATH||'playwright');browser=await chromium.launch(require('./browser-launch.cjs')(true));report.browserVersion=browser.version();const page=await browser.newPage();
+  // A fulfilled loopback document supplies secure-context WebCrypto without
+  // starting a server, loading the world, or making any real network request.
+  await page.route('**/*',route=>route.fulfill({status:200,contentType:'text/html',body:'<!doctype html><canvas width="16" height="16"></canvas>'}));
+  await page.goto('http://localhost/__ocean_turtle_rig_fixture__');page.on('pageerror',error=>(report.pageErrors||(report.pageErrors=[])).push(error.message));await page.addScriptTag({content:sources.engine});
+  const gpu=await page.evaluate(async({expectedVS,meshes,differential,times,policy})=>{
+   if(VS!==expectedVS)throw Error('Loaded VS differs from source receipt');if(!isSecureContext||!crypto.subtle)throw Error('Fulfilled loopback fixture must supply secure-context WebCrypto');const gl=document.querySelector('canvas').getContext('webgl2');if(!gl)throw Error('WebGL2 unavailable');
+   const debug=gl.getExtension('WEBGL_debug_renderer_info'),result={renderer:debug?gl.getParameter(debug.UNMASKED_RENDERER_WEBGL):null,lods:[],differential:[],culling:[],errors:[],cleanup:null},resources={shaders:[],program:null,feedback:null,buffer:null},batches=[];
+   const renderer=Object.assign(Object.create(Renderer.prototype),{gl,mobile:false,quality:2,batches:[],renderOrigin:[0,0,0]}),identity=new Float32Array([1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1]);
+   const hash=async bytes=>Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',bytes)),v=>v.toString(16).padStart(2,'0')).join(''),dot=(a,b)=>a.reduce((s,x,i)=>s+x*b[i],0),sub=(a,b)=>a.map((x,i)=>x-b[i]),norm=a=>{const n=Math.hypot(...a);return a.map(v=>v/n);},cross=(a,b)=>[a[1]*b[2]-a[2]*b[1],a[2]*b[0]-a[0]*b[2],a[0]*b[1]-a[1]*b[0]];
+   const actor=()=>({p:[0,0,0],s:[1,1,1],yaw:0,pitch:0,phase:policy.phase,tint:[1,1,1],bioMorph:[1,1,1,1],bioGenes:[.5,.5,.5,.5]});
+   const makeBatch=(mesh,instance)=>{const batch=renderer.batch({indexed:{vertices:new Float32Array(mesh.vertices),indices:new Uint32Array(mesh.indices),radius:mesh.radius},material:5},[instance],2,true);batches.push(batch);return batch;};
+   const glError=where=>{const error=gl.getError();if(error)result.errors.push({where,error});return error;};
+   try{
+    const compile=(type,source)=>{const shader=gl.createShader(type);resources.shaders.push(shader);gl.shaderSource(shader,source);gl.compileShader(shader);if(!gl.getShaderParameter(shader,gl.COMPILE_STATUS))throw Error(gl.getShaderInfoLog(shader));return shader;};
+    const program=resources.program=gl.createProgram();gl.attachShader(program,compile(gl.VERTEX_SHADER,VS));gl.attachShader(program,compile(gl.FRAGMENT_SHADER,'#version 300 es\nprecision highp float;out vec4 c;void main(){c=vec4(1.);}'));gl.transformFeedbackVaryings(program,['vWorld','vNormal'],gl.INTERLEAVED_ATTRIBS);gl.linkProgram(program);if(!gl.getProgramParameter(program,gl.LINK_STATUS))throw Error(gl.getProgramInfoLog(program));
+    const uniform=name=>gl.getUniformLocation(program,name);gl.useProgram(program);for(const name of ['uVP','uLightVP','uDynamicLightVP'])gl.uniformMatrix4fv(uniform(name),false,identity);gl.uniform1i(uniform('uKind'),2);gl.uniform1i(uniform('uMat'),5);
+    const feedback=resources.feedback=gl.createTransformFeedback(),buffer=resources.buffer=gl.createBuffer();
+    const capture=(batch,time)=>{
+     renderer.updateBatch(batch);if(batch.drawCount!==1)throw Error('Production instance packing failed');gl.useProgram(program);gl.uniform1f(uniform('uTime'),time);gl.uniform3fv(uniform('uRenderOrigin'),renderer.renderOrigin);gl.bindVertexArray(batch.vao);gl.bindTransformFeedback(gl.TRANSFORM_FEEDBACK,feedback);gl.bindBuffer(gl.TRANSFORM_FEEDBACK_BUFFER,buffer);gl.bufferData(gl.TRANSFORM_FEEDBACK_BUFFER,batch.vertexCount*24,gl.STREAM_READ);gl.bindBufferBase(gl.TRANSFORM_FEEDBACK_BUFFER,0,buffer);
+     gl.enable(gl.RASTERIZER_DISCARD);gl.beginTransformFeedback(gl.POINTS);gl.drawArraysInstanced(gl.POINTS,0,batch.vertexCount,1);gl.endTransformFeedback();gl.disable(gl.RASTERIZER_DISCARD);const output=new Float32Array(batch.vertexCount*6);gl.getBufferSubData(gl.TRANSFORM_FEEDBACK_BUFFER,0,output);gl.bindBufferBase(gl.TRANSFORM_FEEDBACK_BUFFER,0,null);gl.bindTransformFeedback(gl.TRANSFORM_FEEDBACK,null);gl.bindVertexArray(null);return output;
+    };
+    for(const mesh of meshes){
+     const instance=actor(),batch=makeBatch(mesh,instance),row={lod:mesh.lod,vertices:batch.vertexCount,indices:batch.count,phases:[],closure:null,maximumPosedRadius:0,extreme:null};result.lods.push(row);let first=null;
+     for(let sample=0;sample<times.length;sample++){
+      const time=times[sample],output=capture(batch,time),frame={sample,time,phaseRadians:sample*2*Math.PI/policy.intervals,vertices:batch.vertexCount,nonfinite:0,firstNonfinite:null,maximumNormalLengthError:0,maximumRigidPositionError:0,maximumRigidNormalError:0,maximumRadius:0,maximumFinVerticalStroke:0,maximumBoundExcess:0};if(!first)first=output.slice();
+      for(let vertex=0;vertex<batch.vertexCount;vertex++){
+       const at=vertex*6,base=vertex*12,p=Array.from(output.subarray(at,at+3)),n=Array.from(output.subarray(at+3,at+6)),rest=mesh.vertices.slice(base,base+3),tag=mesh.vertices[base+11],soft=tag>1.5&&tag<2.5,rigid=!soft||Math.abs(rest[2])<=.51;
+       for(let component=0;component<6;component++)if(!Number.isFinite(output[at+component])){frame.nonfinite++;if(!frame.firstNonfinite)frame.firstNonfinite={vertex,component};}if(!p.every(Number.isFinite)||!n.every(Number.isFinite))continue;
+       frame.maximumNormalLengthError=Math.max(frame.maximumNormalLengthError,Math.abs(Math.hypot(...n)-1));if(rigid)for(let k=0;k<3;k++){frame.maximumRigidPositionError=Math.max(frame.maximumRigidPositionError,Math.abs(p[k]-rest[k]));frame.maximumRigidNormalError=Math.max(frame.maximumRigidNormalError,Math.abs(n[k]-first[at+3+k]));}
+       if(soft&&Math.abs(rest[2])>1.05)frame.maximumFinVerticalStroke=Math.max(frame.maximumFinVerticalStroke,Math.abs(p[1]-rest[1]));const radius=Math.hypot(...p);frame.maximumRadius=Math.max(frame.maximumRadius,radius);frame.maximumBoundExcess=Math.max(frame.maximumBoundExcess,radius-mesh.proof.allPhaseRadius);if(radius>row.maximumPosedRadius){row.maximumPosedRadius=radius;row.extreme={vertex,time,sample,tag,rest,posed:p};}
+      }
+      frame.error=glError(mesh.lod+' phase '+sample);frame.readbackSHA256=await hash(output);row.phases.push(frame);if(sample===times.length-1){let position=0,normal=0;for(let i=0;i<output.length;i++)if(i%6<3)position=Math.max(position,Math.abs(output[i]-first[i]));else normal=Math.max(normal,Math.abs(output[i]-first[i]));row.closure={maximumPositionDelta:position,maximumNormalDelta:normal,vertices:batch.vertexCount,firstTime:times[0],lastTime:time};}
+     }
+     // The witness is an actual GPU-posed limb vertex, not a helper radius.
+     const poses=[{id:'identity',p:[0,0,0],s:[1,1,1],yaw:0,pitch:0,origin:[0,0,0]},{id:'yaw-pitch',p:[3,-7,5],s:[1,1,1],yaw:.73,pitch:.21,origin:[0,0,0]},{id:'nonuniform-yaw-pitch',p:[-4,-9,2],s:[.8,1.15,1.2],yaw:1.13,pitch:-.37,origin:[0,0,0]},{id:'nonuniform-shifted-origin',p:[12,-11,-4],s:[1.07,.92,1.11],yaw:-.91,pitch:.53,origin:[8,-16,4]}];
+     for(const pose of poses){
+      Object.assign(instance,{p:pose.p.slice(),s:pose.s.slice(),yaw:pose.yaw,pitch:pose.pitch});renderer.renderOrigin=pose.origin.slice();const output=capture(batch,row.extreme.time);let extreme=-Infinity,witness=null,nonfinite=0;
+      for(let vertex=0;vertex<batch.vertexCount;vertex++){const values=output.subarray(vertex*6,vertex*6+6),p=Array.from(values.subarray(0,3));if(!values.every(Number.isFinite)){nonfinite++;continue;}const relative=sub(p,instance.p),r=Math.hypot(...relative);if(r>extreme){extreme=r;witness={vertex,posed:p,normal:norm(relative),tag:mesh.vertices[vertex*12+11]};}}
+      if(!witness||nonfinite)throw Error('Invalid transformed cull witness: '+mesh.lod+' '+pose.id);const n=witness.normal,centerProjection=dot(n,instance.p);let maximumProjection=-Infinity,minimumProjection=Infinity;
+      for(let vertex=0;vertex<batch.vertexCount;vertex++){const projection=dot(n,sub(Array.from(output.subarray(vertex*6,vertex*6+3)),instance.p));maximumProjection=Math.max(maximumProjection,projection);minimumProjection=Math.min(minimumProjection,projection);}
+      const scale=Math.max(...instance.s),allPhaseBound=mesh.proof.allPhaseRadius*scale,visiblePlane=[...n,-centerProjection-maximumProjection+policy.planeInset],outsidePlane=[...n,-centerProjection-allPhaseBound-.01];
+      for(let slot=0;slot<6;slot++)for(const shadowPass of [false,true]){
+       const planes=[[1,0,0,10000],[-1,0,0,10000],[0,1,0,10000],[0,-1,0,10000],[0,0,1,10000],[0,0,-1,10000]];planes[slot]=visiblePlane;renderer.updateBatch(batch,instance.p,planes,shadowPass);const visibleDrawCount=batch.drawCount;planes[slot]=outsidePlane;renderer.updateBatch(batch,instance.p,planes,shadowPass);const outsideDrawCount=batch.drawCount;
+       result.culling.push({lod:mesh.lod,pose:pose.id,instance:{p:instance.p.slice(),s:instance.s.slice(),yaw:instance.yaw,pitch:instance.pitch},renderOrigin:renderer.renderOrigin.slice(),time:row.extreme.time,slot,shadowPass,witness,vertexCount:batch.vertexCount,nonfinite,restSphereRadius:batch.radius*scale,conservativeAllPhaseRadius:allPhaseBound,maximumPosedRadius:extreme,minimumProjection,maximumProjection,visiblePlane,visibleMaximumSignedDistance:maximumProjection+centerProjection+visiblePlane[3],visibleDrawCount,outsidePlane,outsideMaximumSignedDistance:maximumProjection+centerProjection+outsidePlane[3],outsideDrawCount,error:glError(mesh.lod+' cull '+pose.id+' '+slot+' '+shadowPass)});
+      }
+     }
+     renderer.renderOrigin=[0,0,0];
+    }
+    // Expected normals come from GPU-deformed tangents, not rig derivatives.
+    const differentialVertices=differential.flatMap(v=>[...v.p,...v.n,.5,.5,.5,0,0,v.tag]),differentialBatch=makeBatch({vertices:differentialVertices,indices:differential.map((_,i)=>i),radius:2},actor());
+    for(let sample=0;sample<times.length;sample++){
+     const output=capture(differentialBatch,times[sample]),frame={sample,time:times[sample],samples:differential.length,nonfinite:0,minimumNormalDot:1,witness:null};for(const value of output)if(!Number.isFinite(value))frame.nonfinite++;
+     for(let i=0;i<differential.length;i+=5){const at=k=>Array.from(output.subarray((i+k)*6,(i+k)*6+3)),expected=norm(cross(sub(at(2),at(1)),sub(at(4),at(3)))),n=Array.from(output.subarray(i*6+3,i*6+6)),value=dot(expected,n);if(!Number.isFinite(value)){frame.nonfinite++;if(!frame.witness)frame.witness={point:differential[i].p,reason:'nonfinite tangent normal'};}else if(value<frame.minimumNormalDot){frame.minimumNormalDot=value;frame.witness={point:differential[i].p,dot:value};}}
+     frame.error=glError('differential '+sample);frame.readbackSHA256=await hash(output);result.differential.push(frame);
+    }
+   }catch(error){result.failure=error.stack||error.message;}
+   finally{
+    gl.disable(gl.RASTERIZER_DISCARD);gl.bindTransformFeedback(gl.TRANSFORM_FEEDBACK,null);gl.bindVertexArray(null);gl.useProgram(null);gl.bindBufferBase(gl.TRANSFORM_FEEDBACK_BUFFER,0,null);const buffers=new Set();for(const batch of batches){for(const key of ['vb','eb','ib'])if(batch[key])buffers.add(batch[key]);gl.deleteVertexArray(batch.vao);}for(const buffer of buffers)gl.deleteBuffer(buffer);if(resources.buffer)gl.deleteBuffer(resources.buffer);if(resources.feedback)gl.deleteTransformFeedback(resources.feedback);if(resources.program)gl.deleteProgram(resources.program);for(const shader of resources.shaders)if(shader)gl.deleteShader(shader);result.cleanup={buffersDeleted:[...buffers].every(buffer=>!gl.isBuffer(buffer)),vertexArraysDeleted:batches.every(batch=>!gl.isVertexArray(batch.vao)),error:glError('cleanup'),contextLost:gl.isContextLost()};
    }
-   const motion=times.map(t=>capture(fixtures,t)),normals=times.map(t=>capture(differential,t));return {renderer:debug?gl.getParameter(debug.UNMASKED_RENDERER_WEBGL):null,error:gl.getError(),motion,normals};
-  },{vs,fixtures,differential,times});report.renderer=gpu.renderer;
-  check('native WebGL produces finite positions and normals without errors',()=>{assert(gpu.renderer&&!/swiftshader|software|llvmpipe/i.test(gpu.renderer));assert.equal(gpu.error,0);assert([...gpu.motion,...gpu.normals].every(a=>a.every(Number.isFinite)));});
-  check('shell, plastron, eyes, head and seated roots stay rigid at both LODs',()=>{
-   for(let i=0;i<fixtures.length;i++)if(fixtures[i].name!=='fin')for(const f of gpu.motion){assert.deepEqual(f.slice(i*6,i*6+3),fixtures[i].p.map(Math.fround),fixtures[i].lod+' '+fixtures[i].name+' '+fixtures[i].p);assert.deepEqual(f.slice(i*6+3,i*6+6),gpu.motion[0].slice(i*6+3,i*6+6));}
-  });
-  check('both low and high flippers retain a visible bounded stroke',()=>{for(const lod of ['low','high']){let max=0;for(let i=0;i<fixtures.length;i++)if(fixtures[i].lod===lod&&fixtures[i].name==='fin')for(const f of gpu.motion){const d=Math.abs(f[i*6+1]-fixtures[i].p[1]);assert(d<=.370001);max=Math.max(max,d);}assert(max>.15,lod+' fin motion');}});
-  check('animated normals follow independently measured surface tangents',()=>{let min=1;for(const frame of gpu.normals)for(let i=0;i<differential.length;i+=5){const at=k=>frame.slice((i+k)*6,(i+k)*6+3),a=at(1),b=at(2),d=at(3),e=at(4),expected=norm(cross(b.map((x,j)=>x-a[j]),e.map((x,j)=>x-d[j]))),n=frame.slice(i*6+3,i*6+6),dot=expected.reduce((s,x,j)=>s+x*n[j],0);min=Math.min(min,dot);assert(dot>.9999,'z='+differential[i].p[2]+' normal dot='+dot);}report.minimumNormalDot=min;});
-  report.status=report.checks.every(x=>x.passed)?'passed':'failed';report.samples=fixtures.length;for(const c of report.checks)console.log((c.passed?'PASS ':'FAIL ')+c.name+(c.error?' '+c.error:''));if(report.status==='failed')process.exitCode=1;
- }catch(e){report.status='failed';report.failure=e.stack;console.error(e);process.exitCode=1;}finally{await browser?.close();fs.mkdirSync(path.dirname(out),{recursive:true});fs.writeFileSync(out,JSON.stringify(report,null,2));}
+   return result;
+  },{expectedVS:vs,meshes,differential,times,policy});report.gpu=gpu;save();
+  check('native production VS completes with no GL, nonfinite or cleanup errors',()=>{assert(gpu.renderer&&!/swiftshader|software|llvmpipe|softpipe/i.test(gpu.renderer));assert(!gpu.failure,gpu.failure);assert.deepEqual(report.pageErrors||[],[]);assert.deepEqual(gpu.errors,[]);assert(gpu.cleanup.buffersDeleted&&gpu.cleanup.vertexArraysDeleted&&!gpu.cleanup.contextLost);assert.equal(gpu.cleanup.error,0);assert.equal(gpu.lods.length,2);for(const row of gpu.lods){assert.equal(row.phases.length,times.length);assert(row.phases.every(f=>f.nonfinite===0&&f.maximumNormalLengthError<=policy.normalUnitTolerance));}});
+  check('all source-indexed rigid vertices remain fixed throughout the complete sampled cycle',()=>{for(const row of gpu.lods)for(const frame of row.phases){assert(frame.maximumRigidPositionError<=policy.rigidTolerance,row.lod+' position '+JSON.stringify(frame));assert(frame.maximumRigidNormalError<=policy.rigidTolerance,row.lod+' normal '+JSON.stringify(frame));}});
+  check('both LODs retain bounded visible strokes and close their complete sampled cycle',()=>{for(const row of gpu.lods){const stroke=Math.max(...row.phases.map(f=>f.maximumFinVerticalStroke));assert(stroke>.15&&stroke<=.370001,row.lod+' stroke '+stroke);assert(row.phases.every(f=>f.maximumBoundExcess<=policy.boundTolerance),row.lod+' escapes analytic bound');assert(row.closure&&row.closure.maximumPositionDelta<=policy.positionClosureTolerance&&row.closure.maximumNormalDelta<=policy.normalClosureTolerance,row.lod+' closure '+JSON.stringify(row.closure));}});
+  check('independent surface tangents validate animated normals across the complete sampled cycle',()=>{assert.equal(gpu.differential.length,times.length);for(const frame of gpu.differential)assert(frame.nonfinite===0&&!frame.error&&frame.minimumNormalDot>policy.tangentNormalMinimumDot,JSON.stringify(frame));return {minimumNormalDot:Math.min(...gpu.differential.map(frame=>frame.minimumNormalDot))};});
+  check('actual updateBatch retains GPU-visible flippers in every plane slot, transform and collection pass',()=>{assert.equal(gpu.culling.length,meshes.length*4*6*2);for(const row of gpu.culling){assert(row.witness.tag>1.5&&row.witness.tag<2.5,'Witness must be actual soft limb skin');assert(row.visibleMaximumSignedDistance>policy.planeInset*.9);assert.equal(row.visibleDrawCount,1,JSON.stringify(row));}for(const lod of ['high','low'])assert(gpu.culling.some(row=>row.lod===lod&&row.pose==='identity'&&row.maximumProjection>row.restSphereRadius+policy.planeInset),'Fixture must expose the old rest-radius false rejection: '+lod);});
+  check('actual updateBatch rejects the fully outside negative control',()=>{assert.equal(gpu.culling.length,meshes.length*4*6*2);for(const row of gpu.culling){assert(row.outsideMaximumSignedDistance<-.009,'Every posed vertex must be outside');assert.equal(row.outsideDrawCount,0,JSON.stringify(row));assert.equal(row.error,0);}});
+  report.status=report.checks.every(row=>row.passed)?'passed-current-fallback-rig':'failed-current-fallback-rig';report.samples={sourceIndexedVertices:meshes.reduce((n,mesh)=>n+mesh.identity.vertices,0),phases:times.length,cullingCases:gpu.culling.length,differentialPoints:differential.length};for(const row of report.checks)console.log((row.passed?'PASS ':'FAIL ')+row.name+(row.error?' '+row.error:''));if(report.checks.some(row=>!row.passed))process.exitCode=1;
+ }catch(error){report.status='failed-current-fallback-rig';report.failure=error.stack||error.message;console.error(error);process.exitCode=1;}
+ finally{await browser?.close();save();}
 })();
