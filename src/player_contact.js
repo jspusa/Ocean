@@ -9,6 +9,8 @@ const OceanDiverContact=(()=>{
  const add=(a,b)=>a.map((v,k)=>v+b[k]),sub=(a,b)=>a.map((v,k)=>v-b[k]),mul=(a,s)=>a.map(v=>v*s),length=a=>Math.hypot(...a),dot=(a,b)=>a.reduce((s,v,k)=>s+v*b[k],0);
  const copy=p=>({p:p.p.slice(),yaw:p.yaw,pitch:p.pitch,scale:p.scale||.85});
  const angle=a=>Math.atan2(Math.sin(a),Math.cos(a));
+ const ground=(x,z)=>typeof contactGroundHeight==='function'?contactGroundHeight(x,z):groundHeight(x,z);
+ const coastal=()=>typeof OceanCoastalGround==='undefined'?null:OceanCoastalGround;
  function volumes(pose){
   const scale=pose.scale||.85,cy=Math.cos(pose.yaw),sy=Math.sin(pose.yaw),cp=Math.cos(pose.pitch),sp=Math.sin(pose.pitch);
   // kind 5 applies negative player pitch then negative player yaw. Roll is
@@ -17,7 +19,7 @@ const OceanDiverContact=(()=>{
  }
  function limits(p,r){
   const b=OceanTrench.worldBounds;
-  return p[0]>=b.left+r&&p[0]<=b.right-r&&p[2]>=b.top+r&&p[2]<=b.bottom-r&&p[1]>=groundHeight(p[0],p[2])+r&&p[1]<=-.05-r&&!OceanTrench.groundContact(p,r)&&
+  return p[0]>=b.left+r&&p[0]<=b.right-r&&p[2]>=b.top+r&&p[2]<=b.bottom-r&&p[1]>=ground(p[0],p[2])+r&&p[1]<=-.05-r&&!coastal()?.contact(p,r)&&!OceanTrench.groundContact(p,r)&&
    (typeof OceanRegions==='undefined'||!OceanRegions.pointBlocked(p,r));
  }
  function clear(pose,extra=0){return volumes(pose).every(s=>limits(s.p,s.r+extra)&&!OceanRockContact.overlaps(s.p,s.r+extra));}
@@ -37,7 +39,8 @@ const OceanDiverContact=(()=>{
    for(const offset of offsets){
     const s={p:add(q.p,offset.p),r:offset.r};
     const p=s.p.slice();p[0]=Math.max(b.left+s.r,Math.min(b.right-s.r,p[0]));p[2]=Math.max(b.top+s.r,Math.min(b.bottom-s.r,p[2]));
-    p[1]=Math.max(groundHeight(p[0],p[2])+s.r+epsilon,Math.min(-.05-s.r-epsilon,p[1]));
+    p[1]=Math.max(ground(p[0],p[2])+s.r+epsilon,Math.min(-.05-s.r-epsilon,p[1]));
+    const coast=coastal()?.contact(p,s.r);if(coast)for(let k=0;k<3;k++)p[k]+=coast.normal[k]*(coast.distance+epsilon);
     const floor=OceanTrench.groundContact(p,s.r);if(floor)for(let k=0;k<3;k++)p[k]+=floor.normal[k]*(floor.distance+epsilon);
     if(typeof OceanRegions!=='undefined')OceanRegions.resolve(p,s.r);
     OceanRockContact.resolve(p,s.r);
@@ -56,6 +59,7 @@ const OceanDiverContact=(()=>{
    // valid for straight translation only, not for this curved-path proof.
    if(extra>0&&(!limits(s.p,r)||OceanRockContact.overlaps(s.p,r)))return {fraction:0,normal:null};
    if(rock&&(!hit||rock.fraction<hit.fraction))hit=rock;
+   const coast=coastal()?.sweep(s.p,e.p,r);if(coast&&(!hit||coast.fraction<hit.fraction))hit=coast;
    const floor=OceanTrench.groundSweep(s.p,e.p,r);if(floor&&(!hit||floor.fraction<hit.fraction))hit=floor;
    if(typeof OceanRegions!=='undefined'&&OceanRegions.segmentBlocked(s.p,e.p,r)){
     let low=0,high=1;for(let j=0;j<12;j++){const mid=(low+high)*.5;if(OceanRegions.segmentBlocked(s.p,add(s.p,mul(sub(e.p,s.p),mid)),r))high=mid;else low=mid;}

@@ -1,3 +1,25 @@
+/* Finite rendered-triangle primitives shared by stone and coastal contact.
+ * They do not own world state, residency, topology or clearance policy. */
+const OceanTriangleContact=(()=>{
+ const sub=(a,b)=>[a[0]-b[0],a[1]-b[1],a[2]-b[2]],add=(a,b)=>[a[0]+b[0],a[1]+b[1],a[2]+b[2]],mul=(a,k)=>[a[0]*k,a[1]*k,a[2]*k],dot=(a,b)=>a[0]*b[0]+a[1]*b[1]+a[2]*b[2],cross=(a,b)=>[a[1]*b[2]-a[2]*b[1],a[2]*b[0]-a[0]*b[2],a[0]*b[1]-a[1]*b[0]],len=a=>Math.hypot(...a),unit=a=>{const l=len(a);return l>1e-12?mul(a,1/l):[0,1,0];};
+ function closest(p,v){const [a,b,c]=v,ab=sub(b,a),ac=sub(c,a),ap=sub(p,a),d1=dot(ab,ap),d2=dot(ac,ap);if(d1<=0&&d2<=0)return a;
+  const bp=sub(p,b),d3=dot(ab,bp),d4=dot(ac,bp);if(d3>=0&&d4<=d3)return b;const vc=d1*d4-d3*d2;if(vc<=0&&d1>=0&&d3<=0)return add(a,mul(ab,d1/(d1-d3)));
+  const cp=sub(p,c),d5=dot(ab,cp),d6=dot(ac,cp);if(d6>=0&&d5<=d6)return c;const vb=d5*d2-d1*d6;if(vb<=0&&d2>=0&&d6<=0)return add(a,mul(ac,d2/(d2-d6)));
+  const va=d3*d6-d5*d4;if(va<=0&&d4-d3>=0&&d5-d6>=0)return add(b,mul(sub(c,b),(d4-d3)/(d4-d3+d5-d6)));const den=1/(va+vb+vc);return add(a,add(mul(ab,vb*den),mul(ac,vc*den)));
+ }
+ function inTriangle(p,v){const n=cross(sub(v[1],v[0]),sub(v[2],v[0]));return [0,1,2].every(k=>dot(cross(sub(v[(k+1)%3],v[k]),sub(p,v[k])),n)>=-1e-8);}
+ function sphereTriangle(a,d,r,v,max){let hit=null;const offer=(t,normal,point)=>{if(t>=-1e-8&&t<=max&&dot(normal,d)<-1e-10){max=Math.max(0,t);hit={fraction:max,normal,point};}};
+  const n=unit(cross(sub(v[1],v[0]),sub(v[2],v[0]))),distance=dot(n,sub(a,v[0])),speed=dot(n,d);
+  if(Math.abs(speed)>1e-12)for(const side of [-1,1]){const t=(side*r-distance)/speed;if(t< -1e-8||t>max)continue;const p=add(a,mul(d,t)),q=sub(p,mul(n,side*r));if(inTriangle(q,v))offer(t,mul(n,side),q);}
+  if(r<=0)return hit;
+  for(let k=0;k<3;k++){
+   const start=v[k],edge=sub(v[(k+1)%3],start),offset=sub(a,start),ee=dot(edge,edge),ed=dot(edge,d),eo=dot(edge,offset),dd=dot(d,d),od=dot(offset,d),oo=dot(offset,offset),A=ee*dd-ed*ed,B=ee*od-eo*ed,C=ee*oo-eo*eo-r*r*ee,disc=B*B-A*C;
+   if(A>1e-16&&disc>=0){const t=(-B-Math.sqrt(disc))/A,y=eo+t*ed;if(t>=0&&t<=max&&y>=0&&y<=ee){const p=add(a,mul(d,t)),q=add(start,mul(edge,y/ee));offer(t,unit(sub(p,q)),q);}}
+   const discriminant=od*od-dd*(oo-r*r);if(dd>1e-16&&discriminant>=0){const t=(-od-Math.sqrt(discriminant))/dd;if(t>=0&&t<=max)offer(t,unit(sub(add(a,mul(d,t)),start)),start);}
+  }return hit;
+ }
+ return Object.freeze({closest,sweep:sphereTriangle});
+})();
 /* Immutable contact geometry is the actual rendered stone, with its full pose.
  * The catalogue is independent of GPU residency and quality. Mesh BVHs are built
  * once at load; queries visit bounded grid cells and intersecting BVH branches. */
@@ -46,11 +68,7 @@ const OceanRockContact=(()=>{
  function rayTriangle(a,d,v,minimum=EPS){const e1=sub(v[1],v[0]),e2=sub(v[2],v[0]),h=cross(d,e2),det=dot(e1,h);if(Math.abs(det)<1e-12)return Infinity;const s=sub(a,v[0]),u=dot(s,h)/det;if(u< -1e-9||u>1+1e-9)return Infinity;const q=cross(s,e1),w=dot(d,q)/det;if(w< -1e-9||u+w>1+1e-9)return Infinity;const t=dot(e2,q)/det;return t>=minimum?t:Infinity;}
  function rayHits(m,a,d,limit=Infinity,minimum=EPS){const hits=[],stack=[0];while(stack.length){const n=m.nodes[stack.pop()];stats.nodes++;if(!rayBox(a,d,n.lo,n.hi,limit))continue;if(n.triangles){for(const t of n.triangles){stats.triangles++;const hit=rayTriangle(a,d,triangle(m,t),minimum);if(Number.isFinite(hit)&&hit<=limit)hits.push(hit);}}else stack.push(n.left,n.right);}hits.sort((a,b)=>a-b);return hits.filter((v,k)=>!k||Math.abs(v-hits[k-1])>1e-6);}
  function inside(i,p){if(!i.m.closed)return false;const local=inverse(p,i);if(!local.every((v,k)=>v>=i.m.lo[k]-EPS&&v<=i.m.hi[k]+EPS))return false;return rayHits(i.m,local,[.937,.221,.311]).length%2===1;}
- function closest(p,v){const [a,b,c]=v,ab=sub(b,a),ac=sub(c,a),ap=sub(p,a),d1=dot(ab,ap),d2=dot(ac,ap);if(d1<=0&&d2<=0)return a;
-  const bp=sub(p,b),d3=dot(ab,bp),d4=dot(ac,bp);if(d3>=0&&d4<=d3)return b;const vc=d1*d4-d3*d2;if(vc<=0&&d1>=0&&d3<=0)return add(a,mul(ab,d1/(d1-d3)));
-  const cp=sub(p,c),d5=dot(ab,cp),d6=dot(ac,cp);if(d6>=0&&d5<=d6)return c;const vb=d5*d2-d1*d6;if(vb<=0&&d2>=0&&d6<=0)return add(a,mul(ac,d2/(d2-d6)));
-  const va=d3*d6-d5*d4;if(va<=0&&d4-d3>=0&&d5-d6>=0)return add(b,mul(sub(c,b),(d4-d3)/(d4-d3+d5-d6)));const den=1/(va+vb+vc);return add(a,add(mul(ab,vb*den),mul(ac,vc*den)));
- }
+ const closest=OceanTriangleContact.closest;
  function worldTriangle(i,t){return triangle(i.m,t).map(p=>forward(p,i));}
  function nearest(i,p,limit=Infinity,withTriangle=false){let best=limit*limit,result=null;const local=inverse(p,i),distance=n=>n.lo.reduce((sum,v,k)=>sum+Math.max(v-local[k],0,local[k]-n.hi[k])**2,0)*i.minScale*i.minScale,stack=[0];
   while(stack.length){const n=i.m.nodes[stack.pop()];stats.nodes++;if(distance(n)>best+EPS)continue;if(n.triangles){for(const t of n.triangles){stats.triangles++;const v=worldTriangle(i,t),q=closest(p,v),d=dot(sub(p,q),sub(p,q));if(d<best){best=d;result={point:q,distance:Math.sqrt(d),normal:unit(cross(sub(v[1],v[0]),sub(v[2],v[0])))};if(withTriangle)result.triangle=v;}}}else{const a=i.m.nodes[n.left],b=i.m.nodes[n.right];if(distance(a)<distance(b))stack.push(n.right,n.left);else stack.push(n.left,n.right);}}
@@ -61,17 +79,7 @@ const OceanRockContact=(()=>{
   const selected=found.filter(id=>intersects(instances[id].lo,instances[id].hi,lo,hi));stats.candidates+=selected.length;return selected;
  }
  function overlaps(p,r=0){if(!finite3(p)||!Number.isFinite(r)||r<0)return true;for(const id of candidates(p,p,r)){const i=instances[id];if(inside(i,p))return true;if(r>0&&nearest(i,p,r-EPS))return true;}return false;}
- function inTriangle(p,v){const n=cross(sub(v[1],v[0]),sub(v[2],v[0]));return [0,1,2].every(k=>dot(cross(sub(v[(k+1)%3],v[k]),sub(p,v[k])),n)>=-1e-8);}
- function sphereTriangle(a,d,r,v,max){let hit=null;const offer=(t,normal,point)=>{if(t>=-1e-8&&t<=max&&dot(normal,d)<-1e-10){max=Math.max(0,t);hit={fraction:max,normal,point};}};
-  const n=unit(cross(sub(v[1],v[0]),sub(v[2],v[0]))),distance=dot(n,sub(a,v[0])),speed=dot(n,d);
-  if(Math.abs(speed)>1e-12)for(const side of [-1,1]){const t=(side*r-distance)/speed;if(t< -1e-8||t>max)continue;const p=add(a,mul(d,t)),q=sub(p,mul(n,side*r));if(inTriangle(q,v))offer(t,mul(n,side),q);}
-  if(r<=0)return hit;
-  for(let k=0;k<3;k++){
-   const start=v[k],edge=sub(v[(k+1)%3],start),offset=sub(a,start),ee=dot(edge,edge),ed=dot(edge,d),eo=dot(edge,offset),dd=dot(d,d),od=dot(offset,d),oo=dot(offset,offset),A=ee*dd-ed*ed,B=ee*od-eo*ed,C=ee*oo-eo*eo-r*r*ee,disc=B*B-A*C;
-   if(A>1e-16&&disc>=0){const t=(-B-Math.sqrt(disc))/A,y=eo+t*ed;if(t>=0&&t<=max&&y>=0&&y<=ee){const p=add(a,mul(d,t)),q=add(start,mul(edge,y/ee));offer(t,unit(sub(p,q)),q);}}
-   const discriminant=od*od-dd*(oo-r*r);if(dd>1e-16&&discriminant>=0){const t=(-od-Math.sqrt(discriminant))/dd;if(t>=0&&t<=max)offer(t,unit(sub(add(a,mul(d,t)),start)),start);}
-  }return hit;
- }
+ const sphereTriangle=OceanTriangleContact.sweep;
  function sweep(a,b,r=0){if(!finite3(a)||!finite3(b)||!Number.isFinite(r)||r<0)return {fraction:0,normal:[0,1,0],point:a.slice()};const delta=sub(b,a);let hit=null,max=1;
   for(const id of candidates(a,b,r)){const i=instances[id],isInside=inside(i,a),near=nearest(i,a,isInside?Infinity:r+EPS);
    if(isInside||near&&near.distance<r-EPS){const normal=isInside?unit(sub(near.point,a)):unit(sub(a,near.point));if(isInside||dot(normal,delta)<0||len(delta)<EPS){hit={fraction:0,normal,point:near.point};max=0;continue;}}

@@ -58,6 +58,7 @@ qa/parity/v01844-*/
 qa/parity/v01845-*/
 qa/parity/audio-recheck-20261030/
 qa/parity/audio-recovery-20261030/
+qa/parity/v01851-environment/
 qa/parity/v01846-*/
 qa/parity/v01847-*/
 qa/parity/v01848-*/

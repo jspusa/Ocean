@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="zh-Hant" data-version="0.18.50">
+<html lang="zh-Hant" data-version="0.18.51">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#031329"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="description" content="重返蔚藍：從珊瑚礁一路游向深海海溝，與巨鯨和深海生物相遇。自由探索的 3D 海洋世界。">
@@ -17,7 +17,7 @@
  <div class="hero"><div class="eyebrow">一片海，任你遨遊</div><h1>往海的<br><span>更深處。</span></h1><p class="hero-copy">從珊瑚礁游向海溝，與巨鯨同行。<br>放慢呼吸，整片海都在眼前。</p><div class="hero-actions"><button id="startBtn" class="primary" disabled>入海 <span aria-hidden="true">↗</span></button></div><button id="shipContinue" class="textbtn ship-continue hidden">繼續上次探索</button><p class="intro-controls" id="introControls">WASD 游動 · 拖曳環視 · E／Q 浮潛</p></div>
  <div class="welcome-quiet-note" aria-hidden="true"><span></span>戴上耳機，聽海。</div>
  <aside class="ship-board hidden" hidden aria-hidden="true"><div class="ship-mode"><button id="shipModeJourney">航程故事</button><button id="shipModeFree" class="selected">自由探索</button></div><button id="tourStart" disabled>自動漫遊</button><label><input id="welcomeAudio" type="checkbox" checked>入海時開啟聲音</label><b id="shipProgress">00 / 06</b><div class="ship-progress"><i id="shipProgressLine"></i></div><h2 id="shipOrderName">自由探索</h2><p id="shipOrderDescription"></p><div id="shipCards"></div><nav><button id="shipLog">航程冊</button><button id="shipChart">海域地圖</button><button id="shipGallery">圖鑑與照片</button></nav><p id="shipStats"></p><p id="shipFinal" class="hidden"></p></aside>
- <footer class="welcome-bottom"><span id="saveStatus">進度自動保存</span><nav aria-label="首頁選單"><button id="welcomeActivities">調查與委託</button><button id="shipSettings">設定</button><button id="welcomeAbout">關於這片海</button></nav></footer>
+ <footer class="welcome-bottom"><span id="saveStatus">進度自動保存</span><nav aria-label="首頁選單"><button id="welcomeNavigation">海圖與泊位</button><button id="welcomeActivities">調查與委託</button><button id="shipSettings">設定</button><button id="welcomeAbout">關於這片海</button></nav></footer>
 </section>
 <main id="hud" class="hidden" aria-label="海中探索">
  <div class="topbar"><button id="homeBtn" class="hud-button hidden" title="返回首頁">返回首頁</button><span id="areaName" class="current-area">珊瑚花園</span><nav aria-label="探索選單"><button id="fieldToolsBtn" class="hud-button" aria-haspopup="dialog" aria-controls="panel" aria-expanded="false" title="探索選單（T）">選單</button><button id="pauseBtn" class="hud-button" title="暫停（Esc）" aria-label="暫停探索"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5v14M15 5v14"/></svg><span class="sr">暫停</span></button></nav></div>

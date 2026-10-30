@@ -181,7 +181,9 @@ function reefFishRadius(f){
 function reefFishMotionPose(f,time,out=f.p,context=null){
  const sp=SPECIES[f.species],form=ReefFishArt.forms[sp.id],home=f.home||f.center,radius=context?.exhibit?Math.min(f.radius,sp.size*2):reefFishRadius(f),omega=form.speed/Math.max(.1,radius),a=time*omega+f.phase,c=Math.cos(a),s=Math.sin(a),c2=Math.cos(a*.73+f.phase*.2),s2=Math.sin(a*.73+f.phase*.2);
  out[0]=home[0]+c*radius;out[2]=home[2]+s2*radius*.58;out[1]=home[1]+Math.sin(a*.63)*Math.min(.16,sp.size*.36);
- if(!context?.exhibit)out[1]=Math.max(out[1],groundHeight(out[0],out[2])+form.heightAbove*.55+sp.size*.25);
+ // Slope residents own a complete certified motion envelope. Reapplying a
+ // single center-height guard would alter that path on the steep floor.
+ if(!context?.exhibit&&!f.slopeHabitat)out[1]=Math.max(out[1],groundHeight(out[0],out[2])+form.heightAbove*.55+sp.size*.25);
  const dx=-s*radius*omega,dz=c2*radius*.58*.73*omega,dy=Math.cos(a*.63)*Math.min(.16,sp.size*.36)*.63*omega;
  f.yaw=Math.atan2(-dz,dx);f.pitch=clamp(Math.atan2(dy,Math.hypot(dx,dz)),-.12,.12);f.bank=Math.sin(a*.51)*.045;f.effort=.48;f.faunaVisibility=1;f.faunaVisible=true;f.retreat=0;f.faunaTime=time;return out;
 }
@@ -200,9 +202,13 @@ function ensureReefFish(renderer){
   for(let k=0;k<form.count;k++){const base=FaunaWorldRules.place({anchor:form.anchor,support:null},k),home=[base[0],base[1]+form.heightAbove,base[2]],phase=k*2.399963+.37;
    const f={fauna:true,reefFish:true,species:index,p:home.slice(),home,center:home.slice(),homeYaw:0,modelCenter:high.modelBounds.min.map((v,i)=>(v+high.modelBounds.max[i])*.5),s:[sp.size,sp.size,sp.size],radius:form.radius,height:form.heightAbove,phase,orbit:phase,bob:phase,speed:form.speed,yaw:0,pitch:0,retreat:0,faunaVisibility:1,tint:[1,1,1]};reefFishMotionPose(f,0);actors.push(f);life.push(f);
   }
+  FaunaWorldRules.appendSlopeActors(sp,actors);
   const hi=renderer.batch(high,actors,1,true);hi.maxDistance=8;hi.sceneRole='reef-fish-expansion';
   const lo=renderer.batch(low,actors,1,true);lo.minDistance=8;lo.maxDistance=70;lo.shadow=false;lo.sceneRole='reef-fish-expansion';
  }
  allLife=life.concat(decorLife);
  return true;
 }
+// A normal chart destination, never a teleport or an automatic species label.
+// Append after the established regions so all previous landmark indices stay.
+LANDMARKS.push({id:'mesophotic-slope',name:'東岸微光岩坡',en:'THE TWILIGHT SLOPE',x:274,y:-62,z:-180,radius:10,spawn:[274,-62,-180],yaw:-Math.PI/2,pitch:-.08,text:'沿著東岸岩坡向下探索，放慢速度觀察岩面附近的生物。',note:'原創西太平洋微光帶配置；物種深度有文獻依據，位置與數量不是現地調查。'});

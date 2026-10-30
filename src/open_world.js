@@ -3,6 +3,7 @@
    The old sculpted core is retained; new vistas are authored as linked destinations. */
 const OPEN_WORLD={bounds:{x:270,z:295,centerZ:-90},boat:[-24,0,43],version:'0.17.0'};
 const coreGroundHeight=groundHeight;
+const archBedCos=Math.cos(REEF_ARCH.yaw),archBedSin=Math.sin(REEF_ARCH.yaw);
 groundHeight=function(x,z){
  const core=coreGroundHeight(x,z);
  const c=Math.exp(-Math.pow(x/57,4)-Math.pow((z+22)/91,4));
@@ -12,7 +13,16 @@ groundHeight=function(x,z){
  const lagoon=11*Math.exp(-((x+35)**2/3200+(z-46)**2/2000));
  const contour=1.3*Math.sin(x*.039+z*.018)*Math.cos(z*.033)+.6*terrainNoise(x*.31,z*.28);
  const open=shelf+atoll+east+lagoon+contour;
- return Math.min(-5.2,mix(open,core,c));
+ let floor=Math.min(-5.2,mix(open,core,c));
+ // A visible, shallow scour through the stone passage gives the complete
+ // swimmer room above the real seabed. The 22-grid support vertices stay in
+ // the 30 cm central depression; a compact smooth rim rejoins the old floor.
+ const dx=x-REEF_ARCH.p[0],dz=z-REEF_ARCH.p[2];
+ if(Math.abs(dx)<12&&Math.abs(dz)<14){
+  const across=Math.abs(archBedCos*dx-archBedSin*dz),along=Math.abs(archBedSin*dx+archBedCos*dz);
+  if(across<9&&along<12)floor-=.30*(1-smooth01((across-6)/3))*(1-smooth01((along-9)/3));
+ }
+ return floor;
 };
 LANDMARKS[0].spawn=[0,-7.6,23];LANDMARKS[0].yaw=.03;LANDMARKS[0].pitch=-.055;
 LANDMARKS[2].spawn=[5,-17.5,-29];LANDMARKS[2].yaw=-.08;LANDMARKS[2].pitch=-.02;
@@ -23,6 +33,77 @@ LANDMARKS.push(
  {id:'pelagic',name:'遠洋迴廊',en:'BEYOND THE REEF',x:-10,z:-231,spawn:[-1,-31,-199],yaw:-.14,pitch:-.02,text:'遠方的回聲，終於有了輪廓。',note:'幻想大洋延伸區，不是鯨類出現預報。',radius:31},
  {id:'anchorage',name:'歸潮錨地',en:'HOME ON THE WATER',x:-24,z:43,spawn:[-18,-4.5,30],yaw:.03,pitch:-.05,text:'海面就在頭頂，船仍在等你。',note:'原創研究船與錨地。',radius:16}
 );
+// The visible coastal grid and its contact owner share samples and topology.
+// Samples are prepared after all regional ground extensions have registered;
+// the cache is independent of graphics quality and downloaded mesh residency.
+const OceanCoastalGround=(()=>{
+ const span=64,segments=22,count=10,tiles=new Map(),edge=260;
+ const sub=(a,b)=>[a[0]-b[0],a[1]-b[1],a[2]-b[2]],dot=(a,b)=>a[0]*b[0]+a[1]*b[1]+a[2]*b[2];
+ function tile(ix,iz){
+  const key=iz*count+ix;let t=tiles.get(key);if(t)return t;
+  const cx=(ix-4.5)*span,cz=(iz-4.5)*span-90,x=[],z=[],heights=new Float64Array((segments+1)**2);
+  for(let i=0;i<=segments;i++){x.push(Math.min(edge,cx+(i/segments-.5)*span));z.push(cz+(i/segments-.5)*span);}
+  for(let j=0;j<=segments;j++)for(let i=0;i<=segments;i++)heights[j*(segments+1)+i]=groundHeight(x[i],z[j]);
+  t={cx,cz,x,z,heights,renderX:x.map(v=>cx+Math.fround(v-cx)),renderZ:z.map(v=>cz+Math.fround(v-cz))};tiles.set(key,t);return t;
+ }
+ function prepare(){for(let iz=0;iz<count;iz++)for(let ix=0;ix<count;ix++)tile(ix,iz);}
+ function point(ix,iz,i,j,n=segments){
+  const t=tile(ix,iz);if(n===segments)return [t.x[i]-t.cx,t.heights[j*(segments+1)+i],t.z[j]-t.cz];
+  const x=Math.min(edge,t.cx+(i/n-.5)*span),z=t.cz+(j/n-.5)*span;return [x-t.cx,groundHeight(x,z),z-t.cz];
+ }
+ const index=(v,start,n)=>Math.max(0,Math.min(n-1,Math.floor((v-start)/span)));
+ function visit(minX,maxX,minZ,maxZ,lowest,fn){
+  if(maxX< -320||minX>edge||maxZ< -410||minZ>230)return;
+  for(let iz=index(minZ,-410,count);iz<=index(maxZ,-410,count);iz++)for(let ix=index(minX,-320,count);ix<=index(maxX,-320,count);ix++){
+   const t=tile(ix,iz),cell=(v,start)=>Math.max(0,Math.min(segments-1,Math.floor((v-start)/span*segments)));
+   const i0=cell(minX-.00001,t.cx-32),i1=cell(maxX+.00001,t.cx-32),j0=cell(minZ-.00001,t.cz-32),j1=cell(maxZ+.00001,t.cz-32);
+   for(let j=j0;j<=j1;j++)for(let i=i0;i<=i1;i++){
+    const x0=t.renderX[i],x1=t.renderX[i+1],z0=t.renderZ[j],z1=t.renderZ[j+1];if(x0===x1)continue;
+    const at=j*(segments+1)+i,h00=Math.fround(t.heights[at]),h10=Math.fround(t.heights[at+1]),h01=Math.fround(t.heights[at+segments+1]),h11=Math.fround(t.heights[at+segments+2]);
+    // Most swimming queries end here, before allocating triangle vectors.
+    if(lowest>Math.max(h00,h10,h01,h11))continue;
+    const a=[x0,h00,z0],b=[x1,h10,z0],c=[x1,h11,z1],d=[x0,h01,z1];fn([a,c,b]);fn([a,d,c]);
+   }
+  }
+ }
+ function height(x,z){
+  if(!Number.isFinite(x)||!Number.isFinite(z)||x< -320||x>edge||z< -410||z>230)return -Infinity;
+  const ix=index(x,-320,count),iz=index(z,-410,count),t=tile(ix,iz),cell=(v,start)=>Math.max(0,Math.min(segments-1,Math.floor((v-start)/span*segments)));
+  let i=cell(x,t.cx-32),j=cell(z,t.cz-32);while(i>0&&t.renderX[i]===t.renderX[i+1])i--;
+  // Float32 local coordinates can differ slightly from the analytic grid.
+  while(i>0&&x<t.renderX[i])i--;while(i<segments-1&&x>t.renderX[i+1])i++;
+  while(j>0&&z<t.renderZ[j])j--;while(j<segments-1&&z>t.renderZ[j+1])j++;
+  const u=(x-t.renderX[i])/(t.renderX[i+1]-t.renderX[i]),v=(z-t.renderZ[j])/(t.renderZ[j+1]-t.renderZ[j]),k=j*(segments+1)+i;
+  const a=Math.fround(t.heights[k]),b=Math.fround(t.heights[k+1]),c=Math.fround(t.heights[k+segments+2]),d=Math.fround(t.heights[k+segments+1]);
+  return u>=v?a+(b-a)*u+(c-b)*v:a+(c-d)*u+(d-a)*v;
+ }
+ function penetration(p,r,v){
+  const [a,b,c]=v,ab=sub(b,a),ac=sub(c,a),n=[ab[1]*ac[2]-ab[2]*ac[1],ab[2]*ac[0]-ab[0]*ac[2],ab[0]*ac[1]-ab[1]*ac[0]],length=Math.hypot(...n);for(let k=0;k<3;k++)n[k]/=length;
+  // Below the solid seabed, recover through its upward face. For an ordinary
+  // above-ground sphere use the finite triangle, including edges and corners.
+  const signed=dot(sub(p,a),n),verticalInside=[0,1,2].every(k=>{const u=v[k],w=v[(k+1)%3];return (w[0]-u[0])*(p[2]-u[2])-(w[2]-u[2])*(p[0]-u[0])<=1e-8;});
+  if(signed<0&&verticalInside)return {normal:n,distance:r-signed};
+  const q=OceanTriangleContact.closest(p,v),delta=sub(p,q),distance=Math.hypot(...delta);
+  if(distance>=r-.000001)return null;
+  return {normal:distance>1e-12?delta.map(v=>v/distance):n,distance:r-distance};
+ }
+ function contact(p,r=0){
+  if(!p.every(Number.isFinite)||!Number.isFinite(r)||r<0)return null;let best=null;
+  visit(p[0]-r,p[0]+r,p[2]-r,p[2]+r,p[1]-r,v=>{const hit=penetration(p,r,v);if(hit&&(!best||hit.distance>best.distance))best=hit;});return best;
+ }
+ function sweep(a,b,r=0){
+  if(!a.every(Number.isFinite)||!b.every(Number.isFinite)||!Number.isFinite(r)||r<0)return null;
+  const delta=sub(b,a);if(Math.hypot(...delta)<1e-12)return null;let best=null;
+  visit(Math.min(a[0],b[0])-r,Math.max(a[0],b[0])+r,Math.min(a[2],b[2])-r,Math.max(a[2],b[2])+r,Math.min(a[1],b[1])-r,v=>{
+   const inside=penetration(a,r,v);let hit;
+   if(inside){if(dot(inside.normal,delta)>=-1e-10)return;hit={fraction:0,normal:inside.normal};}
+   else hit=OceanTriangleContact.sweep(a,delta,r,v,best?.fraction??1);
+   if(hit&&(!best||hit.fraction<best.fraction))best=hit;
+  });return best;
+ }
+ return Object.freeze({prepare,point,height,contact,sweep});
+})();
+function contactGroundHeight(x,z){const y=OceanCoastalGround.height(x,z);return Number.isFinite(y)?y:groundHeight(x,z);}
 // Shared terrain tiles. No terrain generation or asset fetching on the swimming hot path.
 addGroundTiles=function(r){
  const span=64,count=10;
@@ -32,7 +113,7 @@ addGroundTiles=function(r){
    const g=new Geometry();g.material=1;g.shadow=true;const clipped=cx+span/2>260,coarse=lod&&!clipped,N=coarse?7:22;
    // The continuous trench slope owns terrain east of x=260. Collapse the
    // outer tile strip onto that shared coast instead of drawing a shelf over it.
-   function pt(i,j,n=N){let x=Math.min(260,cx+(i/n-.5)*span),z=cz+(j/n-.5)*span;return [x-cx,groundHeight(x,z),z-cz];}
+   function pt(i,j,n=N){return OceanCoastalGround.point(ix,iz,i,j,n);}
    function norm(p){const x=p[0]+cx,z=p[2]+cz,e=.20;return V.norm([groundHeight(x-e,z)-groundHeight(x+e,z),2*e,groundHeight(x,z-e)-groundHeight(x,z+e)]);}
    // The four-metre coast strip has only 88 triangles at full resolution.
    // Keep those samples in both LODs so its new eastern edge cannot crack.

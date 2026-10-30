@@ -13,6 +13,32 @@ const FaunaWorldRules=(()=>{
   // Collision/focus still use the current model's measured bounds.
   nautilus:{count:3,anchor:[-2,-82],height:2.6,originOffset:.455,support:null,radius:.6}
  };
+ // Immutable version-1 upper-slope pockets. These western-Pacific species are
+ // documented at these depths; abundance and routes are original game design.
+ // Centers sit seaward of the real x>=260 trench triangles. Complete animated
+ // envelopes are certified at dive preparation, never by a center-height test.
+ const slopeHabitats=Object.freeze([
+  {id:'slope-butterfly',species:'longnose_butterfly',count:2,radius:.32,bodyRadius:.22,bob:.072,phase:.37,homeYaw:0,offsets:[[0,0,-.32],[0,0,.32]],homes:[[272,-62,-180],[272,-62,-174],[272,-62,-186]]},
+  {id:'slope-lionfish-a',species:'lionfish',count:1,radius:.28,bodyRadius:.40,bob:.0392,phase:1.1,homeYaw:Math.PI/2,offsets:[[0,0,0]],homes:[[277,-81,-176],[277,-81,-182],[277,-81,-170]]},
+  {id:'slope-lionfish-b',species:'lionfish',count:1,optional:true,radius:.28,bodyRadius:.40,bob:.0392,phase:2.4,homeYaw:Math.PI/2,offsets:[[0,0,0]],homes:[[277,-82,-194],[277,-82,-200],[277,-82,-188]]}
+ ].map(d=>Object.freeze({...d,homes:Object.freeze(d.homes.map(p=>Object.freeze(p))),offsets:Object.freeze(d.offsets.map(p=>Object.freeze(p)))})));
+ const slopeByID=new Map(slopeHabitats.map(d=>[d.id,d]));
+ const slopeReach=d=>Math.hypot(d.radius,d.radius*(d.species==='lionfish'?.52:.58),d.bob);
+ function constrainSlopePoint(f,p){
+  const d=slopeByID.get(f.slopeHabitat);if(!d)return p;
+  const home=f.home,dx=p[0]-home[0],dy=p[1]-home[1],dz=p[2]-home[2],distance=Math.hypot(dx,dy,dz),reach=slopeReach(d);
+  if(distance>reach){const w=reach/distance;p[0]=home[0]+dx*w;p[1]=home[1]+dy*w;p[2]=home[2]+dz*w;}return p;
+ }
+ function appendSlopeActors(sp,actors){
+  for(const d of slopeHabitats){if(d.species!==sp.id)continue;
+   for(let slot=0;slot<d.count;slot++){
+    const home=d.homes[0].map((v,i)=>v+d.offsets[slot][i]),bounds=sp.modelBounds;
+    const f={fauna:true,species:SPECIES.indexOf(sp),slopeHabitat:d.id,slopeSlot:slot,p:home.slice(),home,center:home.slice(),homeYaw:d.homeYaw,modelCenter:bounds.min.map((v,i)=>(v+bounds.max[i])*.5),floorOffset:speciesTraits(sp).floorOffset,s:[sp.size,sp.size,sp.size],radius:d.radius,height:2,phase:d.phase,orbit:d.phase,bob:d.phase,speed:.04,yaw:d.homeYaw,pitch:0,retreat:0,faunaVisibility:1,tint:[1,1,1]};
+    if(sp.reefFish)f.reefFish=true;
+    actors.push(f);life.push(f);
+   }
+  }
+ }
  // Match the actual near-ground triangle grid, rather than its analytic height
  // function. A few centimetres of interpolation error is visible at macro scale.
  function surfaceHeight(x,z){
@@ -40,7 +66,7 @@ const FaunaWorldRules=(()=>{
   }
   throw new Error('No clear habitat near '+def.anchor.join(','));
  }
- return {sites,place,clearSite,surfaceHeight};
+ return {sites,place,clearSite,surfaceHeight,slopeHabitats,slopeReach,constrainSlopePoint,appendSlopeActors};
 })();
 function animalFocusPoint(f){
  if(!f?.fauna||!Array.isArray(f.modelCenter))return f.p.slice();
@@ -83,6 +109,7 @@ addLife=function(r){
    actors.push(f);life.push(f);
    if(def.support){if(!supports.has(def.support))supports.set(def.support,[]);supports.get(def.support).push({p:base.slice(),s:[1,1,1],yaw,phase:0});}
   }
+  FaunaWorldRules.appendSlopeActors(sp,actors);
   const hi=r.batch(high,actors,8,true);hi.maxDistance=sp.traits.micro?3:12;
   const lo=r.batch(low,actors,8,true);lo.minDistance=hi.maxDistance;lo.maxDistance=sp.traits.micro?22:120;lo.shadow=false;
  }

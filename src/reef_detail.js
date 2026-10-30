@@ -44,6 +44,7 @@ function structuralFanCoral(){const g=new Geometry();g.material=7;const col=[.85
  function grow(p,ang,len,rad,dep){let end=[p[0]+Math.sin(ang)*len,p[1]+Math.cos(ang)*len,p[2]+.021*Math.sin(p[1]*3+ang)];let mid=V.lerp(p,end,.5);mid[0]+=.023*Math.sin(ang*4);g.tube(p,mid,rad,rad*.80,col,5);g.tube(mid,end,rad*.80,rad*.65,col,5);if(dep){grow(end,ang+rr(.13,.38),len*.78,rad*.65,dep-1);grow(end,ang-rr(.13,.38),len*.77,rad*.65,dep-1);}else tips.push(end);}
  for(let j=0;j<8;j++)grow([0,0,0],(j/7-.5)*2.5,.37,.030,reefDetailLevel?3:2);
  tips.sort((a,b)=>Math.atan2(a[0],a[1]) - Math.atan2(b[0],b[1]));for(let i=1;i<tips.length;i++){if(V.dist(tips[i],tips[i-1])<.19)g.tube(tips[i],tips[i-1],.0028,.0025,col,4);}return g;}
+const REEF_ARCH=Object.freeze({p:Object.freeze([0,-16.6,-22.5]),yaw:.11,s:Object.freeze([1,1.06,1])});
 function archGeometry(){let g=new Geometry();g.material=2;g.rockContact={kind:'arch',closed:false,key:'reef-arch'};
  surface(g,(u,v)=>{let a=(u*.91+.045)*Math.PI,b=v*TAU,r=1.03+.26*Math.sin(a*6+b*2)+.19*Math.cos(b*5-a*3)+.30*geoNoise(Math.cos(a)*9,Math.sin(a)*9,b*2);return [Math.cos(a)*(4.4+Math.cos(b)*r),Math.sin(a)*(4.6+Math.cos(b)*r),Math.sin(b)*r*1.55+.20*Math.sin(a*6)];},94,30,[.92,.93,.88],1);return g;}
 function diverGeometry(){const g=new Geometry();g.material=11;const suit=[.15,.18,.20],panel=[.22,.26,.29],trim=[.77,.66,.34],rubber=[.023,.033,.035],metal=[.61,.64,.61],skin=[.58,.43,.34];
@@ -117,7 +118,7 @@ function buildReef(r){seed=441072;obstacles.length=0;reefPatches.length=0;addRoo
  const anemone=reefAnemoneHabitat(rockSurfaces);reefAnemoneHome=anemone.home;
  const anemoneBatch=r.batch(anemone.geometry,[anemone.instance],3);anemoneBatch.maxDistance=12;anemoneBatch.sceneRole='reef-anemone';
  // Eroded passage; thick geometry supplies genuine shadow, parallax and overhead enclosure.
- const arch=r.batch(archGeometry(),[{p:[0,-16.6,-22.5],yaw:.11,s:[1,1.06,1]}]);arch.maxDistance=95;
+ const arch=r.batch(archGeometry(),[{p:REEF_ARCH.p.slice(),yaw:REEF_ARCH.yaw,s:REEF_ARCH.s.slice()}]);arch.maxDistance=95;
  for(let j=0;j<9;j++){let a=.15+j/8*(Math.PI-.30);obstacles.push({p:[Math.cos(a)*4.4,-16.6+Math.sin(a)*4.87,-22.5],s:[1.06,1.15,1.48],rockContactLegacy:true});}
  // Broad buttresses continue into the water, with scaled-down, attached shelves.
  const walls=[{p:[-14,-29,-39],s:[7,16,11],yaw:.1},{p:[-20,-43,-60],s:[8.7,22,14],yaw:.4},{p:[20,-40,-54],s:[9,19,12],yaw:-.4},{p:[30,-52,-80],s:[12,22,16],yaw:.7},{p:[-31,-54,-89],s:[13,24,17],yaw:-.6},{p:[-20,-64,-116],s:[12,22,18],yaw:.4},{p:[20,-65,-121],s:[13,26,18],yaw:-.1}];

@@ -87,9 +87,10 @@ async function exportRecoverySave(){
  finally{button.disabled=false;}
 }
 function collide(pos,from=null){
+ const floorHeight=typeof contactGroundHeight==='function'?contactGroundHeight:groundHeight;
  const bounds=OceanTrench.worldBounds,rocks=typeof OceanRockContact==='undefined'?null:OceanRockContact;
  pos[0]=clamp(pos[0],bounds.left+.5,bounds.right-.5);pos[2]=clamp(pos[2],bounds.top+.5,bounds.bottom-.5);
- pos[1]=clamp(pos[1],groundHeight(pos[0],pos[2])+.82,-.65);
+ pos[1]=clamp(pos[1],floorHeight(pos[0],pos[2])+.82,-.65);
  let nearby=reefObstacleCandidates(pos);
  for(let n=0;n<nearby.length;n++){const id=nearby[n],ob=obstacles[id];if(rocks?.replacesLegacy(ob))continue;const sx=ob.s[0]+.4,sy=ob.s[1]+.4,sz=ob.s[2]+.4;let qx=(pos[0]-ob.p[0])/sx,qy=(pos[1]-ob.p[1])/sy,qz=(pos[2]-ob.p[2])/sz,d2=qx*qx+qy*qy+qz*qz;
   if(d2<1){if(d2<.0001)pos[1]=ob.p[1]+sy;else{const k=1/Math.sqrt(d2);pos[0]=ob.p[0]+qx*k*sx;pos[1]=ob.p[1]+qy*k*sy;pos[2]=ob.p[2]+qz*k*sz;}
@@ -97,20 +98,20 @@ function collide(pos,from=null){
    // discover later obstacles at the new position, never revisit earlier ones.
    nearby=reefObstacleCandidates(pos,pos,id);n=-1;
   }}
- pos[1]=clamp(pos[1],groundHeight(pos[0],pos[2])+.82,-.65);if(typeof OceanRegions!=='undefined')OceanRegions.resolve(pos,.4,from);
+ pos[1]=clamp(pos[1],floorHeight(pos[0],pos[2])+.82,-.65);if(typeof OceanRegions!=='undefined')OceanRegions.resolve(pos,.4,from);
  if(rocks){
   // A surface push can meet a sloping seabed or a regional wall. Recheck the
   // shared constraints; never put the point back inside a rock after clamping Y.
   rocks.resolve(pos,.4,from);
   for(let pass=0;pass<4;pass++){
-   const before=pos.slice();pos[1]=clamp(pos[1],groundHeight(pos[0],pos[2])+.82,-.65);
+   const before=pos.slice();pos[1]=clamp(pos[1],floorHeight(pos[0],pos[2])+.82,-.65);
    if(typeof OceanRegions!=='undefined')OceanRegions.resolve(pos,.4);
    rocks.resolve(pos,.4);if(V.dist(before,pos)<.00001)break;
   }
-  if(pos[1]<groundHeight(pos[0],pos[2])+.82-.00001||rocks.overlaps(pos,.4)){
-   const top=Math.max(groundHeight(pos[0],pos[2])+.82,rocks.topAt(pos[0],pos[2])+.4001),above=[pos[0],top,pos[2]];
+  if(pos[1]<floorHeight(pos[0],pos[2])+.82-.00001||rocks.overlaps(pos,.4)){
+   const top=Math.max(floorHeight(pos[0],pos[2])+.82,rocks.topAt(pos[0],pos[2])+.4001),above=[pos[0],top,pos[2]];
    if(top<=-.65&&!rocks.overlaps(above,.4)&&(typeof OceanRegions==='undefined'||!OceanRegions.pointBlocked(above,.4)))pos[1]=top;
-   else if(from&&!rocks.overlaps(from,.4)&&from[1]>=groundHeight(from[0],from[2])+.82){for(let k=0;k<3;k++)pos[k]=from[k];}
+   else if(from&&!rocks.overlaps(from,.4)&&from[1]>=floorHeight(from[0],from[2])+.82){for(let k=0;k<3;k++)pos[k]=from[k];}
   }
  }
  return pos;
@@ -549,7 +550,7 @@ function setupControls(){initPerformance(); $('viewBtn').onclick=()=>{settings.t
  $('welcomeAudio').checked=settings.startWithSound;
  window.visualViewport?.addEventListener('resize',()=>{if(renderer){renderer.resize();resetInput();}});
  canvas.addEventListener('webglcontextlost',e=>{e.preventDefault();oceanSelection.clear();resetInput();const voyageSaved=typeof saveVoyage==='function'&&saveVoyage(),journalSaved=persist();oceanAudio.pause();ready=false;handleFailure(new Error('WebGL context lost'),{contextLost:true,saved:voyageSaved&&journalSaved});});canvas.addEventListener('contextmenu',e=>e.preventDefault());window.addEventListener('resize',()=>{if(renderer){renderer.resize();resetInput();}});}
-async function boot(){try{loadJournal();applyRecoveryGraphics();window.__freeze=new URLSearchParams(location.search).has('still');const pause=()=>new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));await pause();if(!oceanSaveGuard.live)return;renderer=new Renderer($('ocean'),Math.round(settings.quality));renderer.quality=Math.round(settings.quality);renderer.resize();await renderer.loaded;if(!oceanSaveGuard.live)return;$('loadDetail').textContent='鋪展高密度礁體與材質';await pause();if(!await loadCompiledScene(renderer)){await prepareProceduralReef();try{buildReef(renderer);}finally{seaFanGeometryCache.clear();SCULPTED_CORAL=undefined;}$('loadDetail').textContent='讓魚群與海龜回到水裡';await pause();addLife(renderer);renderer.sceneLoad={compiled:false};}if(!oceanSaveGuard.live)return;if(typeof ensureReefFish!=='undefined')ensureReefFish(renderer);if(typeof ensureOarfish!=='undefined')ensureOarfish(renderer);if(typeof ensureFrilledShark!=='undefined')ensureFrilledShark(renderer);if(typeof ensureBarreleye!=='undefined')ensureBarreleye(renderer);if(typeof ensureAbyssCommunity!=='undefined')ensureAbyssCommunity(renderer);oceanBarramundi.ensure(renderer);initializeIndividuals(renderer);SPECIES.forEach(makeThumb);setupControls();initIndividualUI();initVoyage();oceanSaveGuard.loaded();await oceanFeatures.init();if(!oceanSaveGuard.live)return;oceanSelection.init();oceanDiveUI.init();setCount();updateSoundUI();document.body.classList.toggle('reduced-motion',settings.reduced);if(matchMedia('(pointer:coarse)').matches)$('introControls').textContent='左搖桿游動 · 拖曳環視 · ↑↓ 浮潛';updateLife(0);updateCamera();applyVisualSettings();if(renderer.sceneStream)await renderer.sceneStream.ready(eye);if(!oceanSaveGuard.live)return;
+async function boot(){try{loadJournal();applyRecoveryGraphics();window.__freeze=new URLSearchParams(location.search).has('still');const pause=()=>new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));await pause();if(!oceanSaveGuard.live)return;renderer=new Renderer($('ocean'),Math.round(settings.quality));renderer.quality=Math.round(settings.quality);renderer.resize();await renderer.loaded;if(!oceanSaveGuard.live)return;$('loadDetail').textContent='鋪展高密度礁體與材質';await pause();if(!await loadCompiledScene(renderer)){await prepareProceduralReef();try{buildReef(renderer);}finally{seaFanGeometryCache.clear();SCULPTED_CORAL=undefined;}$('loadDetail').textContent='讓魚群與海龜回到水裡';await pause();addLife(renderer);renderer.sceneLoad={compiled:false};}if(!oceanSaveGuard.live)return;if(typeof OceanCoastalGround!=='undefined')OceanCoastalGround.prepare();if(typeof ensureReefFish!=='undefined')ensureReefFish(renderer);if(typeof ensureOarfish!=='undefined')ensureOarfish(renderer);if(typeof ensureFrilledShark!=='undefined')ensureFrilledShark(renderer);if(typeof ensureBarreleye!=='undefined')ensureBarreleye(renderer);if(typeof ensureAbyssCommunity!=='undefined')ensureAbyssCommunity(renderer);oceanBarramundi.ensure(renderer);initializeIndividuals(renderer);SPECIES.forEach(makeThumb);setupControls();initIndividualUI();initVoyage();oceanSaveGuard.loaded();await oceanFeatures.init();if(!oceanSaveGuard.live)return;oceanSelection.init();oceanDiveUI.init();setCount();updateSoundUI();document.body.classList.toggle('reduced-motion',settings.reduced);if(matchMedia('(pointer:coarse)').matches)$('introControls').textContent='左搖桿游動 · 拖曳環視 · ↑↓ 浮潛';updateLife(0);updateCamera();applyVisualSettings();if(renderer.sceneStream)await renderer.sceneStream.ready(eye);if(!oceanSaveGuard.live)return;
  // Native audio construction can block synchronously, before any timeout can
  // run. Keep it out of boot entirely; startDive/toggleSound own the real gesture.
  $('loadDetail').textContent='呈現海底景色';

@@ -49,6 +49,7 @@ const oceanNavigation=(()=>{
  function init(){
   boat=renderer.batches.find(b=>b.sceneRole==='research-vessel');if(!boat)throw new Error('研究船場景缺少定位資料');
   apply();oceanFeatures.addMenu({id:'navigation',label:'海圖與入水地點',panel:'navigation'});
+  $('welcomeNavigation')?.addEventListener('click',()=>openPanel('navigation'));
   const oldJump=jumpTo;jumpTo=function(index){if(index===8&&active){player.p=entry();player.velocity=[0,0,0];OceanDiverContact.reset();resetInput();stopAuto();closePanel();cameraCut=true;toast('已回到研究船旁的入水處。');return;}oldJump(index);};
  }
  const feature={id:'navigation',initial:R.initial,sanitize:R.sanitize,init,prepareDive:startDive,drawMap,reset:apply,renderPanel(type){if(type!=='navigation')return false;render();return true;}};oceanFeatures.register(feature);

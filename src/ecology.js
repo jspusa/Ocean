@@ -281,6 +281,9 @@ const oceanEcology=(()=>{
    let current=runtime.reactions.get(f.uid);
    if(cloud){current=current||position.slice();const phase=(f.bioSeed||1)%97+time*.7,target=V.add(cloud.p,[Math.sin(phase)*.48,-.08+Math.cos(phase*1.3)*.20,Math.cos(phase)*.48]);const next=moveToward(current,target,1.05,dt);runtime.reactions.set(f.uid,next);const d=V.sub(next,current);f.p=next.slice();if(V.len(d)>.0001)f.yaw=Math.atan2(-d[2],d[0]);f.effort=.82;contactIntent(f,{speed:1.05});
    }else if(current){const next=moveToward(current,f.p,1.4,dt);if(V.dist(next,f.p)<.04)runtime.reactions.delete(f.uid);else {runtime.reactions.set(f.uid,next);f.p=next.slice();contactIntent(f,{speed:1.4});}}
+   // These four upper-slope residents stay near their cover when food drifts
+   // away. Project into the same certified body/route volume, without new rays.
+   if(f.slopeHabitat)FaunaWorldRules.constrainSlopePoint(f,f.p);
   }
   if(runtime.foodBatch){runtime.foodBatch.visible=runtime.food.length>0;for(let i=0;i<runtime.foodNodes.length;i++){const f=runtime.foodNodes[i],c=runtime.food[Math.floor(i/24)];if(!c){if(f.p[0]!==0||f.p[1]!==-500||f.p[2]!==0)f.p=[0,-500,0];continue;}const age=time-c.born,a=i*2.39996+age*.42,r=.06+((i%24)/24)*(.18+age*.038);f.p=[c.p[0]+Math.cos(a)*r,c.p[1]-.026*age+.09*Math.sin(a*1.4),c.p[2]+Math.sin(a)*r];}}
   movePartner(time,dt);

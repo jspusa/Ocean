@@ -24,7 +24,7 @@ check('Every legacy individual keeps its identity and original scale baseline',(
  for(const old of previous){const n=current.get(old.uid);assert(n,'missing '+old.uid);assert.equal(n.species??null,old.species);assert.equal(n.bioSeed,old.bioSeed);assert.equal(JSON.stringify(n.bioBaseScale??null),JSON.stringify(old.bioBaseScale));}
 });
 check('All eight new catalogue entries have actual metre-scaled distinct actors',()=>{
- assert.equal(FAUNA_SPECIES.length,8);assert.equal(actors.filter(f=>FAUNA_SPECIES.includes(SPECIES[f.species])).length,31);
+ assert.equal(FAUNA_SPECIES.length,8);assert.equal(actors.filter(f=>FAUNA_SPECIES.includes(SPECIES[f.species])).length,33);
  for(const sp of FAUNA_SPECIES){const found=actors.filter(f=>SPECIES[f.species]?.id===sp.id);assert(found.length>=3);for(const f of found){assert.equal(f.s[0],sp.size);assert(f.modelCenter.every(Number.isFinite));assert(f.home.every(Number.isFinite));assert.equal(f.uid.split('-')[0],sp.id);}}
 });
 check('Each new high and low mesh uses the same actual actor identities',()=>{

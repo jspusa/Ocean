@@ -34,7 +34,7 @@ function streamBatchNear(b,eye,padding=0,lodScale=1){
  if(!b.visible)return false;
  const reach=(b.maxDistance||220)*lodScale+.6+padding,limit=reach*reach;
  const shadow=b.shadow&&!b.dynamic&&b.kind!==3,cx=Math.round(eye[0]/16)*16,cy=Math.round(eye[1]/16)*16-4,cz=Math.round(eye[2]/16)*16-12;
- for(const f of b.instances){const p=f.p;let x=p[0]-eye[0],y=p[1]-eye[1],z=p[2]-eye[2];if(x*x+y*y+z*z<=limit)return true;
+ for(const f of b.instances){const p=f.p;let x=p[0]-eye[0],y=p[1]-eye[1],z=p[2]-eye[2];if(x*x+(b.material===1?0:y*y)+z*z<=limit)return true;
   if(shadow){x=p[0]-cx;y=p[1]-cy;z=p[2]-cz;if(x*x+y*y+z*z<=limit)return true;}}
  return false;
 }
@@ -63,7 +63,7 @@ class SceneStream{
   for(const m of this.meshes){let matches=m.pinned?7:0;
    if(!m.pinned)for(const b of m.batches){
     if(!b.visible)continue;const reach=(b.maxDistance||220)*scale+.6,required2=reach*reach,preload2=(reach+48)**2,keep2=(reach+128)**2,shadow=b.shadow&&!b.dynamic&&b.kind!==3;
-    for(const f of b.instances){const p=f.p;let x=p[0]-eye[0],y=p[1]-eye[1],z=p[2]-eye[2],distance=x*x+y*y+z*z;
+    for(const f of b.instances){const p=f.p;let x=p[0]-eye[0],y=p[1]-eye[1],z=p[2]-eye[2],distance=x*x+(b.material===1?0:y*y)+z*z;
      if(shadow){x=p[0]-cx;y=p[1]-cy;z=p[2]-cz;distance=Math.min(distance,x*x+y*y+z*z);}
      if(distance<=required2)matches|=1;if(distance<=preload2)matches|=2;if(distance<=keep2)matches|=4;
      if(matches===7)break;

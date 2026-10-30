@@ -23,7 +23,10 @@ for(const name of ['encounters','ecology','expedition','navigation','deepsea'])v
 // other init/reset functions only build UI or reset UI-only runtime objects.
 get('for(const module of registered)if(module.id!=="encounters"){module.init=undefined;module.reset=undefined;}voyage.state.features=oceanFeatures.read(voyage.state.features);oceanEncounters.feature.init();');
 get('const variableDeepUIDs=new Set(["coelacanth-002","pelican_eel-001","pelican_eel-002","pelican_eel-003","humpback_anglerfish-001","humpback_anglerfish-002"]);');
-const plain=x=>JSON.parse(JSON.stringify(x)),arrangement=()=>get('JSON.stringify({life:life.map(f=>[f.uid,f.home,f.center,f.phase,f.orbit,f.encounterPresent]),shoal:shoal.map(f=>[f.uid,f.phase,f.schoolHome,f.schoolGroup,f.schoolSpan])})'),identities=()=>get('JSON.stringify([...life,...decorLife,...shoal].map(f=>[f.uid,f.species,f.s,f.bioSeed,f.bioMorph,f.bioGenes,...(variableDeepUIDs.has(f.uid)?[]:[f.home,f.center])]))'),initialIdentities=identities(),initialPhotos=JSON.stringify(c.persistent.photos);
+// v51 slope residents also own versioned routes. Their identity/scales/genes
+// remain invariant; slope-encounters.cjs verifies every allowed moved home.
+get('const variableEncounterUIDs=new Set([...variableDeepUIDs,...life.filter(f=>f.slopeHabitat).map(f=>f.uid)]);');
+const plain=x=>JSON.parse(JSON.stringify(x)),arrangement=()=>get('JSON.stringify({life:life.map(f=>[f.uid,f.home,f.center,f.phase,f.orbit,f.encounterPresent]),shoal:shoal.map(f=>[f.uid,f.phase,f.schoolHome,f.schoolGroup,f.schoolSpan])})'),identities=()=>get('JSON.stringify([...life,...decorLife,...shoal].map(f=>[f.uid,f.species,f.s,f.bioSeed,f.bioMorph,f.bioGenes,...(variableEncounterUIDs.has(f.uid)?[]:[f.home,f.center])]))'),initialIdentities=identities(),initialPhotos=JSON.stringify(c.persistent.photos);
 let checks=0;function check(name,fn){fn();checks++;console.log('PASS '+name);}
 const dive=resume=>get('oceanFeatures.call("prepareDive",{resume:'+resume+',tour:false})');
 // Use production waypoint, storage writer/reader and voyage sanitization. Only

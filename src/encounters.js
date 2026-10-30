@@ -3,13 +3,13 @@
  * no per-frame randomness, new actors, geometry, or audio work is introduced. */
 const oceanEncounters=(()=>{
  'use strict';
- const DEFAULT_SEED=0x4f434541,initial=()=>({schema:2,seed:DEFAULT_SEED,protection:null,deepVersion:0});
+ const DEFAULT_SEED=0x4f434541,initial=()=>({schema:2,seed:DEFAULT_SEED,protection:null,deepVersion:0,slopeVersion:0});
  function cleanProtection(raw){
   if(!raw||!Array.isArray(raw.species)||!Array.isArray(raw.uids))return null;
   const species=new Set(SPECIES.map(s=>s.id)),uids=new Set(life.map(f=>f.uid));
   return {species:[...new Set(raw.species.slice(0,600).filter(id=>species.has(id)))].sort(),uids:[...new Set(raw.uids.slice(0,600).filter(uid=>uids.has(uid)))].sort()};
  }
- function sanitize(raw){const out=initial();if(Number.isInteger(raw?.seed)&&raw.seed>0&&raw.seed<=0xffffffff){out.seed=raw.seed;if(raw.schema===2){out.protection=cleanProtection(raw.protection);out.deepVersion=raw.deepVersion===1?1:0;}}return out;}
+ function sanitize(raw){const out=initial();if(Number.isInteger(raw?.seed)&&raw.seed>0&&raw.seed<=0xffffffff){out.seed=raw.seed;if(raw.schema===2){out.protection=cleanProtection(raw.protection);out.deepVersion=raw.deepVersion===1?1:0;out.slopeVersion=raw.slopeVersion===1?1:0;}}return out;}
  const state=()=>oceanFeatures.state('encounters'),baseline=new WeakMap();
  const hash=n=>{n=(n^61)^(n>>>16);n=Math.imul(n,9);n^=n>>>4;n=Math.imul(n,0x27d4eb2d);n^=n>>>15;return n>>>0;};
  const word=s=>{let n=2166136261;for(let i=0;i<s.length;i++)n=Math.imul(n^s.charCodeAt(i),16777619);return n>>>0;};
@@ -26,6 +26,24 @@ const oceanEncounters=(()=>{
   {uid:'humpback_anglerfish-002',species:'humpback_anglerfish',radius:.14,bodyRadius:.10,homes:[[413,-910,-216],[419,-910,-220],[416,-910,-223]]}
  ].map(d=>Object.freeze({...d,homes:Object.freeze(d.homes.map(p=>Object.freeze(p)))})));
  const deepByUID=new Map(deepHabitats.map(d=>[d.uid,d]));let deepAnchors=[],deepLayout=[];
+ const slopeHabitats=FaunaWorldRules.slopeHabitats,slopeByID=new Map(slopeHabitats.map(d=>[d.id,d]));let slopeLayout=[],slopeCatalogue=null,slopeSafety=new Map();
+ const slopeEnvelope=d=>d.bodyRadius+FaunaWorldRules.slopeReach(d)+.04;
+ function slopeSafe(d,index){
+  const catalogue=typeof OceanRockContact==='undefined'?null:OceanRockContact.catalogue();if(!catalogue)return false;
+  if(catalogue!==slopeCatalogue){slopeCatalogue=catalogue;slopeSafety=new Map();}
+  const key=d.id+':'+index;if(slopeSafety.has(key))return slopeSafety.get(key);
+  const radius=slopeEnvelope(d),safe=d.offsets.every(offset=>{const p=d.homes[index].map((v,i)=>v+offset[i]);return OceanTrench.containsPosition(p)&&!OceanTrench.groundContact(p,radius)&&!OceanRegions.pointBlocked(p,radius)&&!OceanRockContact.overlaps(p,radius);});
+  slopeSafety.set(key,safe);return safe;
+ }
+ function slopeApply(f,b,sp,saved,protectedGroups){
+  const d=slopeByID.get(f.slopeHabitat);if(!d||d.species!==sp.id||!d.offsets[f.slopeSlot])return;
+  const varied=saved.slopeVersion===1&&!protectedGroups.has(d.id),first=varied?Math.floor(value(saved.seed,d.id,30)*d.homes.length):0;let choice=-1;
+  for(let k=0;k<(varied?d.homes.length:1);k++){const i=(first+k)%d.homes.length;if(slopeSafe(d,i)){choice=i;break;}}
+  const before=f.home,home=choice>=0?d.homes[choice].map((v,i)=>v+d.offsets[f.slopeSlot][i]):b.home.slice();
+  f.home=home;f.center=home.slice();f.homeYaw=d.homeYaw;f.radius=d.radius;f.phase=d.phase+(varied?value(saved.seed,d.id,31)*Math.PI*2:0);f.orbit=f.phase;f.encounterPresent=choice>=0&&(!d.optional||!varied||value(saved.seed,d.id,32)>=.35);
+  if(before.some((v,i)=>v!==home[i])&&typeof animalRockMotion!=='undefined')animalRockMotion.delete(f);
+  slopeLayout.push({uid:f.uid,habitat:d.id,choice,home:home.slice(),present:f.encounterPresent});
+ }
  function deepSafe(home,definition,sp){
   const radius=definition.bodyRadius+Math.hypot(definition.radius,definition.radius*.42,sp.motionProfile.bob)+.03;
   return typeof OceanRockContact!=='undefined'&&!!OceanRockContact.catalogue()&&typeof OceanTrench!=='undefined'&&OceanTrench.containsPosition(home)&&!OceanTrench.groundContact(home,radius)&&!OceanRegions.pointBlocked(home,radius)&&!OceanRockContact.overlaps(home,radius);
@@ -77,7 +95,7 @@ const oceanEncounters=(()=>{
    return {id:s.id,group,home:[x,y,z],span,count:s.count,floor,...size};
   });
  }
- function original(f){let b=baseline.get(f);if(!b){b={phase:f.phase,orbit:f.orbit};if(deepByUID.has(f.uid))Object.assign(b,{home:f.home.slice(),center:f.center.slice(),homeYaw:f.homeYaw,radius:f.radius,habitatFloor:f.habitatFloor,habitatCeiling:f.habitatCeiling});baseline.set(f,b);}return b;}
+ function original(f){let b=baseline.get(f);if(!b){b={phase:f.phase,orbit:f.orbit};if(deepByUID.has(f.uid)||f.slopeHabitat)Object.assign(b,{home:f.home.slice(),center:f.center.slice(),homeYaw:f.homeYaw,radius:f.radius,habitatFloor:f.habitatFloor,habitatCeiling:f.habitatCeiling});baseline.set(f,b);}return b;}
  function deepApply(f,b,sp,saved,protectedActor){
   const d=deepByUID.get(f.uid);if(!d||d.species!==sp.id)return;
   const before=f.home.slice();f.home=b.home.slice();f.center=b.center.slice();for(const key of ['homeYaw','radius','habitatFloor','habitatCeiling'])f[key]=b[key];
@@ -105,17 +123,18 @@ const oceanEncounters=(()=>{
   // never later waypoint/mail/partner edits. Seed-only saves migrate once from
   // their saved context; only a genuinely new dive refreshes these inputs.
   if(!saved.protection)saved.protection=captureProtection();
-  const seed=saved.seed,protectedIDs=new Set(saved.protection.species),owned=new Set(saved.protection.uids),groups=new Map();deepLayout=[];deepAnchors=[];
+  const seed=saved.seed,protectedIDs=new Set(saved.protection.species),owned=new Set(saved.protection.uids),groups=new Map(),protectedGroups=new Set(life.filter(f=>f.slopeHabitat&&(owned.has(f.uid)||protectedIDs.has(SPECIES[f.species]?.id))).map(f=>f.slopeHabitat));deepLayout=[];deepAnchors=[];slopeLayout=[];
   for(const f of life){
    const b=original(f),sp=SPECIES[f.species],id=sp?.id||'',protectedActor=owned.has(f.uid)||protectedIDs.has(id),mobile=id==='barramundi'||f.species>0&&f.species<12||sp?.pelagic||sp?.cetacean||f.reefFish&&!['fire_goby','banggai_cardinal'].includes(id);
    f.encounterPresent=true;f.encounterEpoch=seed;
    if(Number.isFinite(b.phase))f.phase=b.phase;if(Number.isFinite(b.orbit))f.orbit=b.orbit;
    deepApply(f,b,sp,saved,protectedActor);
+   slopeApply(f,b,sp,saved,protectedGroups);
    if(sp?.abyss||sp?.trench||f.oarfish||f.frilledShark||f.barreleye||f.abyssCommunity)deepAnchors.push(f.home||f.center);
-   if(mobile&&!protectedActor){const offset=value(seed,f.uid,3)*Math.PI*2;if(Number.isFinite(b.phase))f.phase=b.phase+offset;if(Number.isFinite(b.orbit))f.orbit=b.orbit+offset;}
+   if(mobile&&!protectedActor&&!f.slopeHabitat){const offset=value(seed,f.uid,3)*Math.PI*2;if(Number.isFinite(b.phase))f.phase=b.phase+offset;if(Number.isFinite(b.orbit))f.orbit=b.orbit+offset;}
    // Only common swimming reef-fish pools vary attendance. Attached animals,
    // unique encounters and all deep-water routes remain continuously available.
-   if(!protectedActor&&(f.species>0&&f.species<8||f.reefFish&&['lyretail_anthias','longnose_butterfly'].includes(id))){const p=f.home||f.center,key=id+':'+Math.floor(p[0]/40)+':'+Math.floor(p[2]/40);if(!groups.has(key))groups.set(key,[]);groups.get(key).push(f);}
+   if(!protectedActor&&!f.slopeHabitat&&(f.species>0&&f.species<8||f.reefFish&&['lyretail_anthias','longnose_butterfly'].includes(id))){const p=f.home||f.center,key=id+':'+Math.floor(p[0]/40)+':'+Math.floor(p[2]/40);if(!groups.has(key))groups.set(key,[]);groups.get(key).push(f);}
   }
   for(const [key,members] of groups){const minimum=Math.min(members.length,Math.max(2,Math.ceil(members.length*.70))),count=minimum+Math.floor(value(seed,key,4)*(members.length-minimum+1));members.sort((a,b)=>value(seed,a.uid,5)-value(seed,b.uid,5));for(let i=count;i<members.length;i++)members[i].encounterPresent=false;}
   layout=schoolLayout(seed);let at=0;
@@ -124,7 +143,7 @@ const oceanEncounters=(()=>{
   if(typeof renderer!=='undefined'&&renderer){renderer.dirty=true;renderer.forceShadow=true;}
  }
  function newSeed(previous){let seed=0;try{const n=new Uint32Array(1);globalThis.crypto?.getRandomValues(n);seed=n[0];}catch(_){}if(!seed||seed===previous)seed=hash(previous+0x9e3779b9)||1;return seed===previous?(previous%0xffffffff)+1:seed;}
- function prepareDive({resume=false}={}){if(!resume){const saved=state();saved.seed=newSeed(saved.seed);saved.protection=captureProtection();saved.deepVersion=1;}apply();}
+ function prepareDive({resume=false}={}){if(!resume){const saved=state();saved.seed=newSeed(saved.seed);saved.protection=captureProtection();saved.deepVersion=1;saved.slopeVersion=1;}apply();}
  const feature={id:'encounters',initial,sanitize,init:apply,reset:apply,prepareDive};oceanFeatures.register(feature);
- return {initial,sanitize,feature,deepHomes:()=>deepAnchors,rules:{schools,envelope,terrainCeiling,deepHabitats},snapshot:()=>({seed:state().seed,deepVersion:state().deepVersion,deep:deepLayout.map(d=>({...d,home:d.home.slice()})),life:life.length,shoal:shoal.length,present:life.filter(f=>f.encounterPresent!==false).length,schools:layout.map(s=>s?{...s,home:s.home.slice()}:null)})};
+ return {initial,sanitize,feature,deepHomes:()=>deepAnchors,rules:{schools,envelope,terrainCeiling,deepHabitats,slopeHabitats,slopeEnvelope},snapshot:()=>({seed:state().seed,deepVersion:state().deepVersion,slopeVersion:state().slopeVersion,deep:deepLayout.map(d=>({...d,home:d.home.slice()})),slope:slopeLayout.map(d=>({...d,home:d.home.slice()})),life:life.length,shoal:shoal.length,present:life.filter(f=>f.encounterPresent!==false).length,schools:layout.map(s=>s?{...s,home:s.home.slice()}:null)})};
 })();

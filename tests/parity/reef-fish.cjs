@@ -20,13 +20,13 @@ function world(expansion=true,compiled=false){
  return {ctx,renderer,catalogue,get:s=>vm.runInContext(s,ctx),step:vm.runInContext('updateLife',ctx)};
 }
 const current=world(),original=world(false),entries=current.get('REEF_FISH_SPECIES'),fish=current.get('life.filter(f=>f.reefFish)');
-assert.equal(current.catalogue.length,original.catalogue.length+4);assert.equal(entries.length,4);assert.equal(fish.length,64);assert.equal(current.renderer.batches.length,8);
+assert.equal(current.catalogue.length,original.catalogue.length+4);assert.equal(entries.length,4);assert.equal(fish.length,66);assert.equal(current.renderer.batches.length,8);
 assert.equal(JSON.stringify(current.catalogue.slice(0,-entries.length)),JSON.stringify(original.catalogue));
-assert.equal(new Set(fish.map(f=>f.uid)).size,64);
+assert.equal(new Set(fish.map(f=>f.uid)).size,66);
 const initialCount=current.get('life.length');assert.equal(current.get('ensureReefFish(renderer)'),false);assert.equal(current.get('life.length'),initialCount);assert.equal(current.renderer.batches.length,8);
-console.log('PASS four usable species, 64 unique actors and eight shared LOD batches append idempotently');
+console.log('PASS four usable species, 66 unique actors and eight shared LOD batches append idempotently');
 if(header.life.some(i=>header.nodes[i].reefFish)){
- const baked=world(true,true),residents=baked.get('life.filter(f=>f.reefFish)');assert.equal(residents.length,64);assert.equal(baked.renderer.batches.length,0);
+ const baked=world(true,true),residents=baked.get('life.filter(f=>f.reefFish)');assert.equal(residents.length,66);assert.equal(baked.renderer.batches.length,0);
  const identity=f=>JSON.stringify([f.uid,Array.from(f.home),Array.from(f.s),f.bioSeed]);assert.deepEqual(Array.from(residents,identity),Array.from(fish,identity));assert.equal(baked.get('ensureReefFish(renderer)'),false);
  console.log('PASS compiled reef fish preserve the runtime identities and do not create duplicate actors or batches');
 }
@@ -61,6 +61,6 @@ const continuity=current.get(`(()=>{
  return {maxStep,minFloor,minRock};
 })()`);
 assert(continuity.maxStep<.01,'Dense 120 Hz motion must not teleport at obstacle boundaries');assert(continuity.minFloor>.02,'Complete fish bounds stay above the terrain');assert(continuity.minRock>=1,'Complete fish bounds stay outside reef obstacles');
-console.log('PASS 64 full-body paths over 180 seconds: max step '+continuity.maxStep.toFixed(6)+' m, floor clearance '+continuity.minFloor.toFixed(3)+' m');
+console.log('PASS 66 full-body paths over 180 seconds: max step '+continuity.maxStep.toFixed(6)+' m, floor clearance '+continuity.minFloor.toFixed(3)+' m');
 for(const sp of entries){const f=fish.find(f=>current.get('SPECIES')[f.species].id===sp.id),home=f.home.slice();current.get('reefFishMotionPose')(f,100,f.p,{exhibit:true,react:false});assert(f.p.every(Number.isFinite));assert.deepEqual(Array.from(f.home),Array.from(home));}
 console.log('PASS independent aquarium poses retain authored world homes');
