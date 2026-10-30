@@ -171,16 +171,22 @@ void main(){vec3 p=aPosition,n=aNormal;vLocal=p;vUV=aUV;vTag=aTag;
   float beat=uTime*max(.1,aPose.w)+aExtra.x;bool fin=aTag>2.5&&aTag<3.5,limb=aTag>4.5&&aTag<5.5;
   if(uSpecies==27){
    float tail=1.-smoothstep(-.50,.18,p.x),wave=beat+p.x*3.4,amp=.022+.013*aPose.y;
-   p.z+=sin(wave)*amp*tail*tail;n.x-=cos(wave)*3.4*amp*tail*tail*n.z;
-   if(fin&&abs(p.z)>.09)p.y+=sin(beat*.67+sign(p.z)*1.5)*.016*smoothstep(.09,.28,abs(p.z));
+   float u=clamp((p.x+.50)/.68,0.,1.),slope=-6.*u*(1.-u)/.68;
+   p.z+=sin(wave)*amp*tail*tail;n.x-=amp*(cos(wave)*3.4*tail*tail+sin(wave)*2.*tail*slope)*n.z;
+   if(fin&&abs(p.z)>.09){
+    float span=clamp((abs(p.z)-.09)/.19,0.,1.),flex=sin(beat*.67+sign(p.z)*1.5)*.016;
+    p.y+=sin(beat*.67+sign(p.z)*1.5)*.016*smoothstep(.09,.28,abs(p.z));
+    n.z-=flex*6.*span*(1.-span)/.19*sign(p.z)*n.y;
+   }
   }else if(uSpecies==28){
    if(limb){float w=smoothstep(-.16,.45,p.x),phase=beat+p.x*9.+aPosition.z*13.;p.y+=sin(phase)*.013*w;p.z+=cos(phase*.81)*.009*w;n.x-=cos(phase)*.117*w*n.y;}
    if(fin)p.y+=sin(beat*1.4+p.x*15.)*.007*smoothstep(.02,.09,abs(p.z));
   }else if(uSpecies==29){
-   float w=1.-smoothstep(-.52,.18,p.x),wave=beat+p.x*7.;p.z+=sin(wave)*.055*w*w;n.x-=cos(wave)*.385*w*w*n.z;
+   float w=1.-smoothstep(-.52,.18,p.x),wave=beat+p.x*7.,u=clamp((p.x+.52)/.70,0.,1.),slope=-6.*u*(1.-u)/.70;
+   p.z+=sin(wave)*.055*w*w;n.x-=.055*(cos(wave)*7.*w*w+sin(wave)*2.*w*slope)*n.z;
   }else if(uSpecies==30){
-   if(limb||aTag>5.5){float h=max(0.,p.y-.19),bend=sin(beat*.78)*.055;p.x+=bend*h;p.z+=cos(beat*.62)*.070*h;n.y-=bend*n.x;}
-   if(fin)p.z+=sin(beat+p.x*4.)*.012;
+   if(limb||aTag>5.5){float h=max(0.,p.y-.19),bend=sin(beat*.78)*.055;p.x+=bend*h;p.z+=cos(beat*.62)*.070*h;if(h>0.)n.y-=bend*n.x+cos(beat*.62)*.070*n.z;}
+   if(fin){p.z+=sin(beat+p.x*4.)*.012;n.x-=cos(beat+p.x*4.)*.048*n.z;}
   }else if(uSpecies==31&&limb){
    float w=smoothstep(.065,.46,abs(p.z)),gait=beat+p.x*24.+sign(p.z)*1.5708;
    p.x+=sin(gait)*.009*w;p.y+=max(0.,cos(gait))*.010*w;
@@ -818,6 +824,58 @@ void main(){
  }
  if(uKind==10){rough=uSpecies==31?.70:.49;if(vTag>2.5&&vTag<3.5){rough=.52;thickness=.3;}if(vTag>3.5&&vTag<4.5)rough=.16;}
  if(uKind==9||uKind==12)base=pelagicSkin(base);
+ // Abyss skin: model-local pigment and continuous height, independent of LOD.
+ // The dark oral lining, pale teeth, eyes and photophores keep their own tissue.
+ float abyssRoughOffset=0.;
+ if(uKind==10&&(uSpecies==27||uSpecies==29||uSpecies==30)){
+  float height=0.,resolve=0.;vec3 p=vLocal;
+  float localWidth=max(length(dFdx(p)),length(dFdy(p)));
+  bool body=vTag>.5&&vTag<1.5,fin=vTag>2.5&&vTag<3.5;
+  if(uSpecies==27&&(body||fin)){
+   float cloud=noise(p*vec3(39.,43.,43.)+vec3(vSeed*.7,1.8,4.2));
+   float flecks=noise(p*vec3(91.,83.,89.)+vec3(vSeed*.3,4.2,0.));
+   float blotch=smoothstep(.54,.74,cloud)*smoothstep(.51,.72,flecks),patchFade=exp(-localWidth*localWidth*8500.);
+   // Broad irregular pale blotches survive on the cheaper distant mesh too.
+   float skin=smoothstep(.275,.305,(base/max(vTint,vec3(.001))).b);
+   base=mix(base,vec3(.47,.50,.46)*vTint,mix(.07,blotch,patchFade)*skin*.48);
+   if(body){
+    // Fold the circumference at the sagittal plane. Matching integer rows
+    // avoid a texture seam at atan's wrap; every raised cell meets zero height.
+    vec2 q=vec2(p.x*86.,atan(abs(p.z)+.000001,p.y)*12.73239545);
+    vec2 cell=fract(vec2(q.x+mod(floor(q.y),2.)*.5,q.y))-.5;
+    float rim=length(cell*vec2(1.04,1.)),dome=1.-smoothstep(.27,.49,rim);
+    float footprint=max(length(dFdx(q)),length(dFdy(q)));
+    resolve=exp(-footprint*footprint*1.5)*(1.-smoothstep(.24,.35,p.x))*skin;
+    base*=1.-(1.-dome)*.025*resolve;
+    height=.000055*dome;
+    abyssRoughOffset=(cloud-.5)*.06+(1.-dome)*.045*resolve;
+   }else{
+    float ray=p.x*126.+p.y*18.+sin(p.z*17.)*.7;
+    resolve=exp(-pow(fwidth(ray),2.));base*=1.+sin(ray)*.038*resolve;
+    height=sin(ray)*.000055;abyssRoughOffset=.035;
+   }
+  }else if((uSpecies==29||uSpecies==30)&&(body||fin)){
+   float dark=1.-smoothstep(.18,.30,max(base.r,max(base.g,base.b)));
+   float grain=noise(p*vec3(54.,62.,58.)),coarse=noise(p*13.+vec3(2.4,1.1,vSeed*.4));
+   resolve=exp(-localWidth*localWidth*5000.)*dark;
+   if(uSpecies==29){
+    // Black extensible pouch: fine longitudinal tension folds follow its skin.
+    float folds=p.y*112.+p.z*49.+sin(p.x*12.)*1.8;
+    float foldFade=exp(-pow(fwidth(folds),2.));
+    base*=1.+dark*(1.20+(coarse-.5)*.20+sin(folds)*.055*foldFade);
+    height=((grain-.5)*.00007+sin(folds)*.000045)*dark;
+    abyssRoughOffset=dark*(-.17+(coarse-.5)*.08);
+   }else{
+    // Seadevil skin has fine irregular relief, not coelacanth scales.
+    base*=1.+dark*((coarse-.5)*.22+(grain-.5)*.07*resolve);
+    height=(grain-.5)*.00016*dark;abyssRoughOffset=(coarse-.5)*.08*dark;
+   }
+  }
+  // Tag branches reconverge before screen derivatives; quality 0 retains
+  // pigment and roughness while omitting the close-range micro-normal work.
+  if(uQuality>0)n=materialSurfaceNormal(n,height,resolve);
+ }
+ // End abyss skin.
  vec3 L=normalize(vWorld.y<0.?uLightDir:uAirLightDir);vec3 E=normalize(uCamera-uRenderOrigin-vRelative);
  float NoL=max(0.,dot(n,L)),NoV=max(.03,dot(n,E));float sh=uSunless>0?1.:visibility(n);float hemi=clamp(n.y*.5+.5,0.,1.);
  // Work in linear light; water-to-surface reflection is not dry-plastic gloss.
@@ -827,10 +885,11 @@ void main(){
   if(vTag>3.5&&vTag<4.5)rough=.12;
   else if(vTag>.5&&vTag<1.5){float f=max(.1,uSurfaceProfile.z),footprint=max(length(dFdx(vLocal*f)),length(dFdy(vLocal*f))),detail=exp(-footprint*footprint*.8);base*=1.+(noise(vLocal*f)-.5)*.035*detail;}
  }
+ if(uKind==10&&(uSpecies==27||uSpecies==29||uSpecies==30))rough=clamp(rough+abyssRoughOffset,.10,.98);
  vec3 albedo=pow(clamp(base,vec3(0.),vec3(1.)),vec3(2.2));float depth=max(0.,-vWorld.y);
  // Height-gradient materials already filter their micro detail. Differentiate
  // the original smooth normal here, not a derivative-derived bump normal.
- vec3 varianceNormal=(uMat==5||(uMat==6&&uKind==1))?geomN:n;
+ vec3 varianceNormal=(uMat==5||(uMat==6&&uKind==1)||(uKind==10&&(uSpecies==27||uSpecies==29||uSpecies==30)))?geomN:n;
  vec3 ddx=dFdx(varianceNormal),ddy=dFdy(varianceNormal);
  float normalVariance=.20*(dot(ddx,ddx)+dot(ddy,ddy));
  float a2=clamp(pow(rough,4.)+min(normalVariance,.16),.008,.97);
@@ -1299,7 +1358,7 @@ out vec4 frag;`);
  n=normalize(mat3(tangent,bitangent,n)*mapNormal);
  vec3 L=normalize(vWorld.y<0.?uLightDir:uAirLightDir);`);
  fragment=replace(fragment,'vec3 albedo=pow(clamp(base,vec3(0.),vec3(1.)),vec3(2.2));','vec3 albedo=importedAlbedo*(1.-metallic);');
- fragment=replace(fragment,'vec3 varianceNormal=(uMat==5||(uMat==6&&uKind==1))?geomN:n;','vec3 varianceNormal=geomN;');
+ fragment=replace(fragment,'vec3 varianceNormal=(uMat==5||(uMat==6&&uKind==1)||(uKind==10&&(uSpecies==27||uSpecies==29||uSpecies==30)))?geomN:n;','vec3 varianceNormal=geomN;');
  fragment=replace(fragment,'float F0=(uMat==6||uMat==5)?(vTag>3.5?.018:.006):uMat==11?.019:.005;','vec3 F0=mix(vec3(.006),importedAlbedo,metallic);');
  fragment=replace(fragment,'F0=.12;','F0=vec3(.12);');
  fragment=replace(fragment,'float F=F0+(1.-F0)*pow(1.-VoH,5.);','vec3 F=F0+(1.-F0)*pow(1.-VoH,5.);');

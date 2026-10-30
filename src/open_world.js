@@ -170,7 +170,7 @@ buildReef=function(r){
  // Above-water home base and distant islands are real meshes, not a wallpaper.
  const boat=r.batch(researchVessel(),[{p:OPEN_WORLD.boat.slice(),yaw:-.14}]);boat.maxDistance=600;boat.sceneRole='research-vessel';
  for(let k=0;k<3;k++){const isles=[{p:[-235,-13,120],s:[76,63,61],yaw:.7},{p:[168,-10,168],s:[89,48,70],yaw:.2},{p:[225,-6,-10],s:[52,41,76],yaw:.5}];const g=rockGeometry(k,true);g.material=15;const b=r.batch(g,[isles[k]]);b.maxDistance=1000;b.shadow=false;}
- reefGrowthFitReport=fitReefGrowth(rootEntries,!!r.gl);
+ reefGrowthFitReport=fitReefGrowth(rootEntries,!!r.gl,r.batches);
  // Attachment work is construction-only; no full source terrain/rock arrays
  // or query cache are retained for gameplay after their GPU/archive upload.
  }finally{r.batch=rootBatch;reefGroundSurfaces.length=0;rockHeightCache.clear();}

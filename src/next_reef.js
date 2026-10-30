@@ -33,7 +33,7 @@ function addGroundTiles(r){
 // Screen-projected caustics are already part of lighting, no baked shadow pictures.
 // Crown-shaped branching colonies: curved stems, fine taper, rounded light growing tips.
 function branchCoral(type=0){
- if(typeof SCULPTED_CORAL!=='undefined')return sculptedColony(type,reefDetailLevel?'high':'medium');
+ if(typeof SCULPTED_CORAL!=='undefined')return rootedBranchColony(sculptedColony(type,reefDetailLevel?'high':'medium'),'branch-'+type);
  const g=new Geometry();g.material=3;g.shadow=false;
  const palette=[[.82,.68,.44],[.48,.60,.76],[.48,.72,.66],[.87,.57,.49]],col=palette[type%4];
  const count=reefDetailLevel?64:12,sides=reefDetailLevel?6:4;
@@ -46,7 +46,21 @@ function branchCoral(type=0){
   const tip=col.map(v=>mix(v,.94,.45));g.sphere(prev,[.024,.037,.024],tip,sides,4);
   for(let b=0;b<2;b++){const a2=a+(b?-.8:.8),from=[Math.cos(a)*r*.88,h*.72,Math.sin(a)*r*.88],to=[prev[0]+Math.cos(a2)*.10,prev[1]-.035,prev[2]+Math.sin(a2)*.10];g.tube(from,to,.010,.005,tip,4);}
  }
- return g;
+ return rootedBranchColony(g,'branch-'+type);
+}
+// A narrow living holdfast, not a pedestal or collision proxy. Every branching
+// LOD contains these same closed triangles. Its upper part overlaps the existing
+// colony tissue; the original crown vertices and ecological random stream stay
+// untouched. The independent root component avoids XOR parity at that overlap.
+function rootedBranchColony(g,family,feet=null){
+ const color=g.v.slice(6,9).map(c=>c*.82),root=new Geometry();root.material=3;root.tag=8.25;
+ const ring=(y,r)=>Array.from({length:12},(_,i)=>[Math.cos(i/12*TAU)*r,y,Math.sin(i/12*TAU)*r]),rows=[ring(-.100,.050),ring(0,.080),ring(.065,.060)];
+ for(let i=0;i<12;i++){const j=(i+1)%12;root.tri([0,-.130,0],rows[0][i],rows[0][j],color);for(let k=0;k<2;k++){root.tri(rows[k][i],rows[k+1][j],rows[k][j],color);root.tri(rows[k][i],rows[k+1][i],rows[k+1][j],color);}root.tri([0,.080,0],rows[2][j],rows[2][i],color);}
+ g.v.push(...root.v);const tag=g.tag;g.tag=8.5;
+ // The far mesh has separate low branch origins. Slim connecting branchlets
+// meet each original stem above its open basal end, preserving its silhouette.
+ if(feet)for(const {base,fork} of feet){const end=V.lerp(base,fork,.08);g.tube([0,.035,0],end,.025,.035,color,4);}
+ g.tag=tag;g.reefGrowth=family;g.reefRoot={geometry:root,crownHeight:.10};return g;
 }
 function tableCoral(type=0){
  const g=new Geometry();g.material=3;g.shadow=false;const col=type?[.64,.69,.62]:[.80,.67,.45];
@@ -139,40 +153,74 @@ function replayReefGrowth(entries,payload,expectedSHA256){
  for(const item of payload.batchLimits)entries[item.entry].batch.maxDistance=item.to;
  return {mode:'verified-replay',actors:list.length,moved,maxHorizontal,maxVertical,failed:[]};
 }
-function fitReefGrowth(entries,live=false){
+// Predict the unchanged static initializer's IDs without writing genes/tints or
+// consuming the ecological RNG. Future batches only append after this prefix.
+function reefBranchGeneMap(batches){
+ const assigned=new Set([...(typeof allLife==='undefined'?[]:allLife),...(typeof shoal==='undefined'?[]:shoal)]),seen=new Set(),genes=new Map();let index=0;
+ for(const b of batches)for(const n of b.instances){if(seen.has(n))continue;seen.add(n);if(n.bioGenes){genes.set(n,n.bioGenes[0]);continue;}if(n.bioSeed!==undefined||assigned.has(n))continue;const id=bioHash(19721+(++index)*271);genes.set(n,bioValue(id,0));}return genes;
+}
+// Same vertex positions as material 3 in VS, before pitch/scale/yaw. Bake the
+// posed vertices first: analytically unbending a point would incorrectly treat
+// each GPU triangle as a curved surface rather than its actual linear face.
+function reefBranchPosition(p,gene){
+ const x=Math.fround(p[0]),y=Math.fround(p[1]),z=Math.fround(p[2]),g=Math.fround(gene),h=Math.max(0,y),hh=h*h;
+ return [Math.fround(x+(g-.5)*.20*hh),y,Math.fround(z+Math.sin(g*19)*.065*hh)];
+}
+function reefBranchCrown(g){
+ const m=indexGeometry(g.v),points=Array.from({length:m.vertices.length/12},(_,i)=>Array.from(m.vertices.subarray(i*12,i*12+3))),originalCount=points.length,faces=[],edges=[],edgeIDs=new Map(),height=g.reefRoot.crownHeight;
+ for(let k=0;k<m.indices.length;k+=3){const input=Array.from(m.indices.subarray(k,k+3)),polygon=[];let a=input[2];for(const b of input){const da=points[a][1]-height,db=points[b][1]-height;if((da>=0)!==(db>=0)){const key=Math.min(a,b)+':'+Math.max(a,b);let id=edgeIDs.get(key);if(id===undefined){const t=da/(da-db);id=points.length;points.push(V.lerp(points[a],points[b],t));edges.push({id,a,b,t});edgeIDs.set(key,id);}polygon.push(id);}if(db>=0)polygon.push(b);a=b;}for(let j=1;j+1<polygon.length;j++){const face=[polygon[0],polygon[j],polygon[j+1]];if(V.len(V.cross(V.sub(points[face[1]],points[face[0]]),V.sub(points[face[2]],points[face[0]])))>1e-12)faces.push(face);}}
+ const ids=[...new Set(faces.flat())],sample=ids.filter((_,i)=>i%Math.max(1,Math.floor(ids.length/48))===0);return {points,faces,ids,sample,geometry:g,originalCount,edges};
+}
+function reefBranchPosedCrown(c,gene){
+ const points=c.points.slice(0,c.originalCount).map(p=>reefBranchPosition(p,gene));for(const e of c.edges)points[e.id]=V.lerp(points[e.a],points[e.b],e.t);
+ const root={...c.geometry.reefRoot.geometry,v:c.geometry.reefRoot.geometry.v.slice()};for(let k=0;k<root.v.length;k+=12){const p=reefBranchPosition(root.v.slice(k,k+3),gene);for(let j=0;j<3;j++)root.v[k+j]=p[j];}
+ const lo=[Infinity,Infinity,Infinity],hi=[-Infinity,-Infinity,-Infinity];for(const i of c.ids)for(let k=0;k<3;k++){lo[k]=Math.min(lo[k],points[i][k]);hi[k]=Math.max(hi[k],points[i][k]);}
+ return {...c,points,geometry:{...c.geometry,reefRoot:{...c.geometry.reefRoot,geometry:root}},rootProbe:null,bounds:{lo,hi}};
+}
+function fitReefGrowth(entries,live=false,batches=null){
  if(live)return replayReefGrowth(entries,typeof REEF_GROWTH_REPLAY==='undefined'?null:REEF_GROWTH_REPLAY,typeof REEF_GROWTH_SOURCE_SHA256==='undefined'?null:REEF_GROWTH_SOURCE_SHA256);
- const contentStamp=reefGrowthContentStamp(entries);
+ const contentStamp=reefGrowthContentStamp(entries),branchGenes=reefBranchGeneMap(batches||[]);
  const poses=new Map(),geometryBounds=new Map(),crownMeshes=new Map(),surfaces=[],groups=new Map(),limitXZ=3.3,limitY=2.5;
  const transform=(p,n)=>{const sc=n.s||[1,1,1],cp=Math.cos(n.pitch||0),sp=Math.sin(n.pitch||0),c=Math.cos(n.yaw||0),s=Math.sin(n.yaw||0),x=(p[0]*cp-p[1]*sp)*sc[0],y=(p[0]*sp+p[1]*cp)*sc[1],z=p[2]*sc[2];return [n.p[0]+x*c+z*s,n.p[1]+y,n.p[2]-x*s+z*c];};
  const inverse=(p,n)=>{const sc=n.s||[1,1,1],c=Math.cos(n.yaw||0),s=Math.sin(n.yaw||0),cp=Math.cos(n.pitch||0),sp=Math.sin(n.pitch||0),dx=p[0]-n.p[0],dy=p[1]-n.p[1],dz=p[2]-n.p[2],x=(c*dx-s*dz)/sc[0],y=dy/sc[1],z=(s*dx+c*dz)/sc[2];return [x*cp+y*sp,-x*sp+y*cp,z];};
  const bounds=g=>{let b=geometryBounds.get(g);if(b)return b;b={lo:[Infinity,Infinity,Infinity],hi:[-Infinity,-Infinity,-Infinity]};for(let i=0;i<g.v.length;i+=12)for(let k=0;k<3;k++){b.lo[k]=Math.min(b.lo[k],g.v[i+k]);b.hi[k]=Math.max(b.hi[k],g.v[i+k]);}geometryBounds.set(g,b);return b;};
  const probe=s=>s.probe||(s.probe=OceanRockContact.surfaceProbe(s.geometry,s.pose));
  for(const e of entries){const b=e.batch,g=e.geometry;
-  if(g.reefGrowth&&!b.sceneRole?.startsWith('wreck-')){const key=g.reefGrowth+'/'+g.v.length;let crown=crownMeshes.get(key);if(!crown){const m=indexGeometry(g.v),points=Array.from({length:m.vertices.length/12},(_,i)=>Array.from(m.vertices.subarray(i*12,i*12+3))),faces=[],used=new Set();for(let k=0;k<m.indices.length;k+=3){const ids=Array.from(m.indices.subarray(k,k+3)),center=[0,1,2].map(j=>ids.reduce((sum,i)=>sum+points[i][j],0)/3);if(g.reefGrowth==='fan'?center[1]<.12:Math.hypot(center[0],center[2])<.16||center[1]<.08)continue;faces.push(ids);ids.forEach(i=>used.add(i));}const ids=[...used],sample=ids.filter((_,i)=>i%Math.max(1,Math.floor(ids.length/48))===0);crown={points,faces,ids,sample,geometry:g};crownMeshes.set(key,crown);}for(const n of e.instances){let a=poses.get(n);if(!a)poses.set(n,a={pose:n,family:g.reefGrowth,crowns:new Set(),batches:new Set()});a.crowns.add(crown);a.batches.add(b);}}
+  if(g.reefGrowth&&!b.sceneRole?.startsWith('wreck-')){const key=g.reefGrowth+'/'+g.v.length;let crown=crownMeshes.get(key);if(!crown){if(g.reefRoot)crown=reefBranchCrown(g);else{const m=indexGeometry(g.v),points=Array.from({length:m.vertices.length/12},(_,i)=>Array.from(m.vertices.subarray(i*12,i*12+3))),faces=[],used=new Set();for(let k=0;k<m.indices.length;k+=3){const ids=Array.from(m.indices.subarray(k,k+3)),center=[0,1,2].map(j=>ids.reduce((sum,i)=>sum+points[i][j],0)/3);if(g.reefGrowth==='fan'?center[1]<.12:Math.hypot(center[0],center[2])<.16||center[1]<.08)continue;faces.push(ids);ids.forEach(i=>used.add(i));}const ids=[...used],sample=ids.filter((_,i)=>i%Math.max(1,Math.floor(ids.length/48))===0);crown={points,faces,ids,sample,geometry:g};}crownMeshes.set(key,crown);}for(const n of e.instances){let a=poses.get(n);if(!a)poses.set(n,a={pose:n,family:g.reefGrowth,crowns:new Set(),batches:new Set()});a.crowns.add(crown);a.batches.add(b);}}
   if(b.dynamic||b.kind||!(g.rockContact||g.material===1||b.sceneRole==='wreck-hull'))continue;
   const bb=bounds(g);for(const n of e.instances){const corners=[];for(let k=0;k<8;k++)corners.push(transform([k&1?bb.hi[0]:bb.lo[0],k&2?bb.hi[1]:bb.lo[1],k&4?bb.hi[2]:bb.lo[2]],n));const s={geometry:g,pose:n,batch:b,entry:entries.indexOf(e),batchIndex:e.batchIndex,instance:e.instances.indexOf(n),lo:[0,1,2].map(k=>Math.min(...corners.map(p=>p[k]))),hi:[0,1,2].map(k=>Math.max(...corners.map(p=>p[k])))};surfaces.push(s);const key=(g.material||0)+'/'+JSON.stringify([n.p,n.s||[1,1,1],n.yaw||0,n.pitch||0]);let group=groups.get(key);if(!group)groups.set(key,group=[]);group.push(s);}
  }
  const heights=(x,z,near)=>{let lower=-Infinity,upper=-Infinity;for(const group of near){if(group[0].geometry.rockContact?.kind==='arch')continue;let lo=Infinity,hi=-Infinity;for(const s of group){const h=x<s.lo[0]||x>s.hi[0]||z<s.lo[2]||z>s.hi[2]?-Infinity:probe(s).height(x,z);lo=Math.min(lo,h);hi=Math.max(hi,h);}lower=Math.max(lower,lo);upper=Math.max(upper,hi);}return {lower,upper};};
- const clear=(a,n,relevant,full)=>{for(const crown of a.crowns){const wp=full?crown.points.map(p=>transform(p,n)):null;for(const i of full?crown.ids:crown.sample){const p=wp?wp[i]:transform(crown.points[i],n);for(const s of relevant){if(s.geometry.material===1){if(p[0]>=s.lo[0]&&p[0]<=s.hi[0]&&p[2]>=s.lo[2]&&p[2]<=s.hi[2]&&probe(s).height(p[0],p[2])>p[1]+1e-5)return false;}else if(!p.some((v,k)=>v<s.lo[k]||v>s.hi[k])&&probe(s).contains(p))return false;}}
-   if(full)for(const ids of crown.faces){const triangle=ids.map(i=>wp[i]),lo=[0,1,2].map(k=>Math.min(...triangle.map(p=>p[k]))),hi=[0,1,2].map(k=>Math.max(...triangle.map(p=>p[k])));for(const s of relevant){if(lo.some((v,k)=>v>s.hi[k]||hi[k]<s.lo[k]))continue;if(probe(s).intersectsTriangle(triangle))return false;}}
+ const clear=(a,n,relevant,full)=>{for(const crown of a.crowns){let candidates=relevant;if(crown.bounds){const corners=[];for(let k=0;k<8;k++)corners.push(transform([k&1?crown.bounds.hi[0]:crown.bounds.lo[0],k&2?crown.bounds.hi[1]:crown.bounds.lo[1],k&4?crown.bounds.hi[2]:crown.bounds.lo[2]],n));const lo=[0,1,2].map(k=>Math.min(...corners.map(p=>p[k]))),hi=[0,1,2].map(k=>Math.max(...corners.map(p=>p[k])));candidates=relevant.filter(s=>lo[0]<=s.hi[0]&&hi[0]>=s.lo[0]&&lo[2]<=s.hi[2]&&hi[2]>=s.lo[2]&&lo[1]<=s.hi[1]&&(s.geometry.material===1||hi[1]>=s.lo[1]));if(!candidates.length)continue;}
+   const pointBlocked=(p,s)=>s.geometry.material===1?p[0]>=s.lo[0]&&p[0]<=s.hi[0]&&p[2]>=s.lo[2]&&p[2]<=s.hi[2]&&probe(s).height(p[0],p[2])>p[1]+1e-5:!p.some((v,k)=>v<s.lo[k]||v>s.hi[k])&&probe(s).contains(p);
+   const faceBounds=triangle=>({lo:[0,1,2].map(k=>Math.min(...triangle.map(p=>p[k]))),hi:[0,1,2].map(k=>Math.max(...triangle.map(p=>p[k])))}),faceBlocked=(triangle,s,box=null)=>{const {lo,hi}=box||faceBounds(triangle);return !lo.some((v,k)=>v>s.hi[k]||hi[k]<s.lo[k])&&probe(s).intersectsTriangle(triangle);};
+   const remember=(type,index,s)=>{if(!crown.bounds)return;const recent=crown.rejections||(crown.rejections=[]);if(!recent.some(r=>r.type===type&&r.index===index&&r.surface===s)){recent.unshift({type,index,surface:s});if(recent.length>8)recent.pop();}};
+   // Failed witnesses are exact and candidate-specific, never a positive
+   // clearance cache. Re-test with the same production predicates before
+   // rejecting; if the witness clears, the full original gate still runs.
+   for(const r of crown.rejections||[]){if(!candidates.includes(r.surface))continue;const blocked=r.type==='point'?pointBlocked(transform(crown.points[r.index],n),r.surface):faceBlocked(r.index.map(i=>transform(crown.points[i],n)),r.surface);if(blocked)return false;}
+   const wp=full?crown.points.map(p=>transform(p,n)):null;
+   for(const i of full?crown.ids:crown.sample){const p=wp?wp[i]:transform(crown.points[i],n);for(const s of candidates)if(pointBlocked(p,s)){remember('point',i,s);return false;}}
+   if(full)for(const ids of crown.faces){const triangle=ids.map(i=>wp[i]),box=faceBounds(triangle);for(const s of candidates)if(faceBlocked(triangle,s,box)){remember('face',ids,s);return false;}}
   }return true;};
  const supportFor=(a,n,near,side=null)=>{let best=null;for(const group of side?[side]:near){if(group[0].geometry.rockContact?.kind==='arch')continue;let end=0;for(const s of group.slice().sort((a,b)=>(a.batch.minDistance||0)-(b.batch.minDistance||0))){if((s.batch.minDistance||0)>end)break;end=Math.max(end,s.batch.maxDistance||220);}const pivotDistance=V.dist(n.p,group[0].pose.p),cap=end-(pivotDistance+1.2)/.64,required=Math.max(...[...a.batches].map(b=>b.maxDistance&&b.maxDistance!==220?b.maxDistance:0));if(cap<required||best&&cap<=best.maxDistance)continue;let good=true;
   for(const s of group){const q=probe(s).nearest(n.p);if(!q||q.distance>.20*Math.max(...(n.s||[1,1,1]))){good=false;break;}const center=[0,1,2].map(k=>q.triangle.reduce((sum,p)=>sum+p[k],0)/3),d=V.dist(center,q.point),t=Math.min(.001,.0005/Math.max(1e-9,d)),point=q.point.map((v,k)=>mix(v,center[k],t)),local=inverse(point,n);if(local[1]>(a.family==='fan'?.06:.08)){good=false;break;}
-   for(const c of a.crowns){const p=c.rootProbe||(c.rootProbe=OceanRockContact.surfaceProbe(c.geometry,{p:[0,0,0]}));if(!p.contains(local)||p.nearest(local).distance<=1e-6){good=false;break;}}if(!good)break;
+   for(const c of a.crowns){const p=c.rootProbe||(c.rootProbe=OceanRockContact.surfaceProbe(c.geometry.reefRoot?.geometry||c.geometry,{p:[0,0,0]}));if(!p.contains(local)||p.nearest(local).distance<=1e-6){good=false;break;}}if(!good)break;
   }if(good)best={surfaces:group.map(s=>({entry:s.entry,batch:s.batchIndex,instance:s.instance})),maxDistance:cap,pivotDistance,minimumScale:.64,fadeAllowance:1.2};
  }return best;};
  const failed=[],moved=[];
- for(const a of poses.values()){const n=a.pose,authored=reefGrowthAuthoredRelocation(a.family,n),reach=authored?authored.limits.horizontal:limitXZ,from={p:n.p.slice(),s:(n.s||[1,1,1]).slice(),yaw:n.yaw||0,pitch:n.pitch||0},extent=Math.max(...[...a.crowns].map(c=>Math.max(...c.points.map(p=>Math.hypot(...p)))))*Math.max(...from.s),near=[...groups.values()].filter(g=>g.some(s=>from.p[0]+reach+extent>=s.lo[0]&&from.p[0]-reach-extent<=s.hi[0]&&from.p[2]+reach+extent>=s.lo[2]&&from.p[2]-reach-extent<=s.hi[2]));
+ for(const a of poses.values()){const unposedCrowns=a.crowns;if([...a.crowns].every(c=>!!c.geometry.reefRoot)){const gene=a.pose.bioGenes?.[0]??branchGenes.get(a.pose);if(!Number.isFinite(gene))throw Error('Branch growth needs the complete static batch sequence');a.crowns=new Set([...a.crowns].map(c=>reefBranchPosedCrown(c,gene)));}const n=a.pose,authored=reefGrowthAuthoredRelocation(a.family,n),reach=authored?authored.limits.horizontal:limitXZ,from={p:n.p.slice(),s:(n.s||[1,1,1]).slice(),yaw:n.yaw||0,pitch:n.pitch||0},extent=Math.max(...[...a.crowns].map(c=>Math.max(...c.points.map(p=>Math.hypot(...p)))))*Math.max(...from.s),near=[...groups.values()].filter(g=>g.some(s=>from.p[0]+reach+extent>=s.lo[0]&&from.p[0]-reach-extent<=s.hi[0]&&from.p[2]+reach+extent>=s.lo[2]&&from.p[2]-reach-extent<=s.hi[2]));
   const relevant=surfaces.filter(s=>from.p[0]+reach+extent>=s.lo[0]&&from.p[0]-reach-extent<=s.hi[0]&&from.p[2]+reach+extent>=s.lo[2]&&from.p[2]-reach-extent<=s.hi[2]);
-  a.from=from;const validRoot=h=>Number.isFinite(h.lower)&&Number.isFinite(h.upper)&&h.upper-h.lower<=.045*from.s[1],crownFits=clear(a,n,relevant,false)&&clear(a,n,relevant,true);
-  a.support=supportFor(a,n,near);if(a.support&&crownFits)continue;const reason={root:!a.support,crown:!crownFits};let found=null;
+  a.from=from;const branching=[...a.crowns].every(c=>!!c.geometry.reefRoot),validRoot=h=>Number.isFinite(h.lower)&&Number.isFinite(h.upper)&&h.upper-h.lower<=(branching?.10:.045)*from.s[1],crownFits=clear(a,n,relevant,false)&&clear(a,n,relevant,true);
+  a.support=supportFor(a,n,near);if(a.support&&crownFits){a.crowns=unposedCrowns;continue;}const reason={root:!a.support,crown:!crownFits};let found=null;
   if(authored){const candidate={...n,p:authored.to.p.slice(),yaw:authored.to.yaw,pitch:authored.to.pitch};if(clear(a,candidate,relevant,false)&&clear(a,candidate,relevant,true)){const support=supportFor(a,candidate,near);if(support){found=candidate;a.support=support;reason.authoredRelocation=authored.id;}}}
-  if(!authored)for(const radius of [0,.08,.16,.28,.44,.64,.90,1.20,1.55,2,2.6,limitXZ]){const count=radius?16:1;for(let i=0;i<count;i++){const angle=(i/count)*TAU+(n.yaw||0),x=from.p[0]+Math.cos(angle)*radius,z=from.p[2]+Math.sin(angle)*radius,h=heights(x,z,near);if(!validRoot(h))continue;const y=(h.lower+h.upper)*.5;if(Math.abs(y-from.p[1])>limitY)continue;const candidate={...n,p:[x,y,z]};if(clear(a,candidate,relevant,false)&&clear(a,candidate,relevant,true)){const support=supportFor(a,candidate,near);if(support){found=candidate;a.support=support;break;}}}if(found)break;}
+  if(!authored)for(const radius of [0,.08,.16,.28,.44,.64,.90,1.20,1.55,2,2.6,limitXZ]){const count=radius?16:1;for(let i=0;i<count;i++){const angle=(i/count)*TAU+(n.yaw||0),x=from.p[0]+Math.cos(angle)*radius,z=from.p[2]+Math.sin(angle)*radius,h=heights(x,z,near);if(!validRoot(h))continue;for(const lift of branching?[0,.035,.060,.085]:[0]){const y=(h.lower+h.upper)*.5+lift*from.s[1];if(Math.abs(y-from.p[1])>limitY)continue;const candidate={...n,p:[x,y,z]},rootSupport=branching?supportFor(a,candidate,near):null;if((!branching||rootSupport)&&clear(a,candidate,relevant,false)&&clear(a,candidate,relevant,true)){const support=rootSupport||supportFor(a,candidate,near);if(support){found=candidate;a.support=support;break;}}}if(found)break;}if(found)break;}
   // Cliff shelves can be wholly inside a vertical buttress. Seek its nearby
   // actual outer face, not its much higher roof. Grow along the measured normal
   // while the real basal tissue crosses that same single-LOD rock triangle.
   if(!found&&!authored){const side=near.filter(g=>g.length===1&&g[0].geometry.rockContact?.kind==='rock');const choices=[];for(const vertical of [0,.24,-.24,.55,-.55,.95,-.95])for(const group of side){const s=group[0],q=probe(s).nearest([from.p[0],from.p[1]+vertical,from.p[2]]);if(!q)continue;const delta=q.point.map((v,k)=>v-from.p[k]);if(Math.hypot(delta[0],delta[2])>limitXZ||Math.abs(delta[1])>limitY)continue;let normal=q.normal;if(probe(s).contains(q.point.map((v,k)=>v+normal[k]*.01)))normal=normal.map(v=>-v);if(normal[1]<-.25)continue;const horizontal=Math.hypot(normal[0],normal[2]),yaw=horizontal>1e-5?Math.atan2(normal[2],-normal[0]):from.yaw,pitch=Math.atan2(horizontal*from.s[1],normal[1]*from.s[0]);choices.push({candidate:{...n,p:q.point.slice(),yaw,pitch},distance:Math.hypot(...delta),group});}choices.sort((a,b)=>a.distance-b.distance);for(const q of choices)if(clear(a,q.candidate,relevant,false)&&clear(a,q.candidate,relevant,true)){const support=supportFor(a,q.candidate,near,q.group);if(support){found=q.candidate;a.support=support;reason.sideSurface=true;break;}}}
   if(found){n.p=found.p;n.yaw=found.yaw||0;if(found.pitch)n.pitch=found.pitch;else delete n.pitch;n.reefGrowthFit={from,delta:n.p.map((v,k)=>v-from.p[k]),limits:authored?{...authored.limits}:{horizontal:limitXZ,vertical:limitY},reason,...(authored?{authoredRelocation:authored.id}:{})};moved.push(n.reefGrowthFit);}else failed.push({family:a.family,p:from.p,reason});
+  a.crowns=unposedCrowns;
  }
  const limits=new Map();for(const a of poses.values())if(a.support)for(const b of a.batches)if(a.support.maxDistance<(b.maxDistance||220)){const cap=Math.min(limits.get(b)?.to??Infinity,a.support.maxDistance);limits.set(b,{entry:entries.findIndex(e=>e.batch===b),batch:entries.find(e=>e.batch===b).batchIndex,from:b.maxDistance??null,to:cap});}const batchLimits=[...limits.values()];for(const item of batchLimits)entries[item.entry].batch.maxDistance=item.to;
  const report={actors:poses.size,moved:moved.length,maxHorizontal:Math.max(0,...moved.map(m=>Math.hypot(m.delta[0],m.delta[2]))),maxVertical:Math.max(0,...moved.map(m=>Math.abs(m.delta[1]))),failed,batchLimits,replay:{format:'return-blue/reef-growth/1',contentStamp,failed,batchLimits,actors:[...poses.values()].map(a=>({family:a.family,from:a.from,to:{p:a.pose.p.slice(),s:(a.pose.s||[1,1,1]).slice(),yaw:a.pose.yaw||0,pitch:a.pose.pitch||0},fit:a.pose.reefGrowthFit||null,support:a.support||null}))}};
@@ -180,7 +228,7 @@ function fitReefGrowth(entries,live=false){
 }
 // Silhouette-first reef LODs preserve open branches, scallops and sponge cavities.
 function distantColony(type){
- const g=new Geometry();g.shadow=false;g.material=3;
+ const g=new Geometry();g.shadow=false;g.material=3;const feet=[];
  const colors=[[.61,.54,.43],[.49,.53,.52],[.45,.53,.47],[.60,.51,.37],[.53,.56,.46],[.66,.59,.42],[.69,.42,.30],[.42,.35,.40],[.61,.49,.41],[.55,.56,.45],[.57,.49,.46]],col=colors[type];
  if(type===3||type===4){return tableCoral(type===4?1:0,'far');}
  else if(type===5){return brainCoral(true);}
@@ -190,11 +238,12 @@ function distantColony(type){
   const mound=type>8,branches=mound?18:15;
   for(let k=0;k<branches;k++){
    const a=k*2.39996,r=Math.sqrt((k+.5)/branches)*.65,h=(.51+.22*Math.sqrt(1-r*r))*(mound?.76:1),base=[Math.cos(a)*r*.42,.015,Math.sin(a)*r*.42],fork=[Math.cos(a)*r*.80,h*.69,Math.sin(a)*r*.80];
+   feet.push({base,fork});
    g.tube(base,fork,.043,.028,col.map(c=>c*.83),4);
    for(let j=0;j<2;j++){const az=a+(j?-.62:.62),tip=[Math.cos(a)*r+Math.cos(az)*.052,h+Math.sin(k*3.1)*.035,Math.sin(a)*r+Math.sin(az)*.052];g.tube(fork,tip,.027,.016,col,4);}
   }
  }
- return g;
+ return feet.length?rootedBranchColony(g,type>8?'cauliflower-'+(type-9):'branch-'+(type===8?3:type),feet):g;
 }
 // Real curved branches and connecting branchlets form this open fan. There is
 // no perforated film: water and light pass through actual geometric openings.

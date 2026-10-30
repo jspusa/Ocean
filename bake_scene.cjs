@@ -6,16 +6,31 @@ const fs=require('node:fs'),path=require('node:path'),vm=require('node:vm'),zlib
 const {MODULES,fingerprint}=require('./scene_inputs.cjs'),inputs=fingerprint(__dirname);
 const R=__dirname,ctx=vm.createContext({console,Float32Array,Uint32Array,Math,Map,Set,Date,SCULPTED_CORAL:JSON.parse(fs.readFileSync(path.join(R,'assets/coral_forms.json'),'utf8'))});
 for(const n of MODULES)vm.runInContext(fs.readFileSync(path.join(R,'src',n),'utf8'),ctx,{filename:n});
-vm.runInContext(`
+// Give each offline phase its own bounded guard and a visible completion
+// record. The shared context and statement order are unchanged; no stage may
+// skip the final source, pose, contact or archive validation below.
+function phase(name,source,timeout=300000){
+ const start=Date.now(),cpu=process.cpuUsage();let passed=false;console.log('phase start:',name);
+ try{vm.runInContext(source,ctx,{timeout,filename:'bake:'+name});passed=true;}
+ finally{const elapsed=process.cpuUsage(cpu);console.log('phase '+(passed?'complete:':'failed:'),name,JSON.stringify({wallMs:Date.now()-start,cpuMs:(elapsed.user+elapsed.system)/1000}));}
+}
+phase('recorder',`
 const recorder={batches:[],batch(geo,instances,kind=0,dynamic=false){const b={mesh:indexGeometry(geo.v),instances,kind,dynamic,material:geo.material||0,species:geo.species??-1,visible:true,shadow:geo.shadow!==false,transparentShell:transparentShellRange(geo.transparentShell,geo.v.length/12)};this.batches.push(b);if(this.batches.length%20===0)console.log("baked",this.batches.length);return b;}};
-buildReef(recorder);addLife(recorder);initializeIndividuals(recorder);updateLife(0);
+`);
+// Posed crown/root fitting is construction-only; gameplay loads its verified
+// archive/replay. Subsequent smaller phases retain five-minute guards.
+phase('world and root fitting','buildReef(recorder)',1800000);
+phase('animal meshes','addLife(recorder)');
+phase('individual identities','initializeIndividuals(recorder)');
+phase('initial animal motion','updateLife(0)');
+phase('archive capture',`
 const nodeList=[],nodeMap=new Map();function nodeID(n){if(!nodeMap.has(n)){nodeMap.set(n,nodeList.length);nodeList.push(n);}return nodeMap.get(n);}
 const meshList=recorder.batches.map(b=>{let meta={};for(const k of ['kind','dynamic','material','species','visible','shadow','maxDistance','minDistance','shadowProxy','sceneRole','transparentShell'])if(b[k]!==undefined)meta[k]=b[k];return {meta,instanceIDs:b.instances.map(nodeID),mesh:b.mesh};});
 const growth=reefGrowthFitReport?.replay,growthRefs=reefGrowthFitReport?.actorRefs;
 if(!growth||growthRefs?.length!==growth.actors.length)throw Error('Reef growth compiler references are incomplete');
 const growthReplay={...growth,actors:growth.actors.map((actor,i)=>{const n=growthRefs[i],node=nodeMap.get(n);if(node===undefined)throw Error('Reef growth actor is absent from compiled batches');const pose={p:n.p,s:n.s||[1,1,1],yaw:n.yaw||0,pitch:n.pitch||0};if(JSON.stringify(pose)!==JSON.stringify(actor.to))throw Error('Reef growth pose changed after fitting');return {...actor,node};})};
 globalThis.capture={meshList,growthReplay,header:{format:'return-blue/indexed-scene/1',sourceVersion:OPEN_WORLD.version,nodes:nodeList,rockContact:OceanRockContact.catalogue(),obstacles,reefPatches,life:life.map(nodeID),decorLife:decorLife.map(nodeID),shoal:shoal.map(nodeID),diverBatch:recorder.batches.indexOf(diverBatch)}};
-`,ctx,{timeout:300000});
+`);
 const {meshList,header,growthReplay}=ctx.capture,chunks=[];let offset=0;
 if(!growthReplay||growthReplay.format!=='return-blue/reef-growth/1'||!Array.isArray(growthReplay.failed)||growthReplay.failed.length||!growthReplay.actors?.length||!/^[a-f0-9]{16}$/.test(growthReplay.contentStamp||'')){
  const failures=growthReplay?.failed;

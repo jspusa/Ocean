@@ -28,9 +28,9 @@ function branchCoral(type=0){const g=new Geometry();g.material=3;const colors=[[
  const n=depth>2?3:2;for(let k=0;k<n;k++){let a=k/n*TAU+rr(-.6,.6)+p[1]*3.1;let nd=V.norm([d[0]*.40+Math.cos(a)*.53,rr(.48,.96),d[2]*.40+Math.sin(a)*.53]);limb(end,nd,len*rr(.65,.82),r*.64,depth-1);}}
  for(let k=0;k<(reefDetailLevel?6:4);k++){let a=k/(reefDetailLevel?6:4)*TAU;limb([Math.cos(a)*.14,0,Math.sin(a)*.14],V.norm([Math.cos(a)*.77,1,Math.sin(a)*.77]),rr(.19,.33),rr(.038,.057),reefDetailLevel?3:2);}
  return g;}
-function cauliflowerCoral(type=0){if(typeof SCULPTED_CORAL!=='undefined')return sculptedColony(type?5:4,reefDetailLevel?'high':'medium',true);const g=new Geometry();g.material=3;let col=type?[.83,.53,.53]:[.67,.72,.50];
+function cauliflowerCoral(type=0){if(typeof SCULPTED_CORAL!=='undefined')return rootedBranchColony(sculptedColony(type?5:4,reefDetailLevel?'high':'medium',true),'cauliflower-'+type);const g=new Geometry();g.material=3;let col=type?[.83,.53,.53]:[.67,.72,.50];
  for(let j=0;j<(reefDetailLevel?64:28);j++){let a=j*2.39996,r=Math.sqrt(j/(reefDetailLevel?64:28))*.69,x=Math.cos(a)*r,z=Math.sin(a)*r,h=.26+Math.sqrt(Math.max(0,1-r*r))*.34;let p=[x*.8,.02,z*.8],q=[x,h,z];g.tube(p,q,.042,.034,col.map(c=>c*.80),7);for(let k=0;k<3;k++){let b=a+k*TAU/3;let e=[x+Math.cos(b)*.055,h+rr(.055,.16),z+Math.sin(b)*.055];g.tube(q,e,.028,.019,col,6);g.tube(e,V.add(e,[0,.015,0]),.019,.009,col.map(c=>mix(c,.85,.25)),5);}}
- return g;}
+ return rootedBranchColony(g,'cauliflower-'+type);}
 function tableCoral(type=0){let g=new Geometry();g.material=3;let col=type?[.60,.65,.56]:[.77,.67,.45];
  g.tube([0,0,0],[0,.64,0],.15,.07,col.map(c=>c*.6),9);
  for(let k=0;k<(reefDetailLevel?3:2);k++){let radius=1.05-k*.24,phase=k*1.91,arc=TAU*(k%2?.76:.97),h=.26+k*.26;
