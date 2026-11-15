@@ -121,7 +121,20 @@ check('all three sensor platforms sit above the actual near-ground triangles at 
  for(const p of Object.values(R.points).filter(p=>p.id.startsWith('abyss-')))for(const [x,z] of [[-1.2,-1.2],[1.2,1.2],[-1.2,1.2],[1.2,-1.2],[0,0]]){const top=p.p[1],floor=triangle(p.p[0]+x,p.p[2]+z);assert(top-floor>=.1,p.id+' platform buried in terrain');assert(top-floor<=.25,p.id+' platform floats over terrain');}
 });
 check('all 725 existing actors retain identity, dimensions and sampled original movement',()=>{
- const packed=zlib.gunzipSync(fs.readFileSync(path.join(root,'assets/reef.mesh.gz'))),header=JSON.parse(packed.subarray(8,8+packed.readUInt32LE(4))),ids=[...header.life,...header.decorLife,...header.shoal];const actual=ids.map(n=>header.nodes[n]).filter(f=>!Number.isInteger(f.species)||f.species<27);assert.equal(actual.length,725);
+ const packed=zlib.gunzipSync(fs.readFileSync(path.join(root,'assets/reef.mesh.gz'))),header=JSON.parse(packed.subarray(8,8+packed.readUInt32LE(4))),ids=[...header.life,...header.decorLife,...header.shoal],actors=ids.map(n=>header.nodes[n]);
+ // v0.18.51 appended these two authored individuals of an existing species.
+ // Their exact identity/ownership is checked before preserving the original
+ // 725-actor inventory; a general slope label is never an identity exemption.
+ const additions=[{uid:'lionfish-004',species:17,slopeHabitat:'slope-lionfish-a'},{uid:'lionfish-005',species:17,slopeHabitat:'slope-lionfish-b'}],addedIDs=new Set(additions.map(f=>f.uid));
+ assert.equal(vm.runInContext('SPECIES[17].id',context),'lionfish');
+ const legacyInventory=list=>{
+  const appended=list.filter(f=>addedIDs.has(f.uid));
+  assert.deepEqual(appended.map(f=>({uid:f.uid,species:f.species,slopeHabitat:f.slopeHabitat})).sort((a,b)=>a.uid.localeCompare(b.uid)),additions,'only the two exact authored slope lionfish are appended');
+  const actual=list.filter(f=>(!Number.isInteger(f.species)||f.species<27)&&!addedIDs.has(f.uid));assert.equal(actual.length,725,'original actor inventory remains exactly 725');return actual;
+ };
+ const actual=legacyInventory(actors),firstAddition=actors.find(f=>f.uid==='lionfish-004');
+ assert.throws(()=>legacyInventory(actors.concat({...firstAddition,uid:'unexpected-slope-lionfish'})),/original actor inventory remains exactly 725/,'an additional actor cannot hide behind a slope label');
+ assert.throws(()=>legacyInventory(actors.map(f=>f===firstAddition?{...f,slopeHabitat:'other-slope'}:f)),/only the two exact authored slope lionfish/,'a known UID cannot hide changed habitat ownership');
  for(const f of actual){const p=f.home||f.center;if(p)assert.equal(R.groundHeight(p[0],p[2]),baseGround(p[0],p[2]),f.uid||'legacy home');}
  const animal=vm.runInContext('animalTrajectory',context),fauna=vm.runInContext('faunaMotionPose',context);
  for(const original of actual.filter(f=>Number.isInteger(f.species))){for(const time of [0,17,71,139,283]){

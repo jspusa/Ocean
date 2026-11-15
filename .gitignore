@@ -3,6 +3,7 @@ qa/v08/*.png
 qa/v08/*.json
 qa/parity/*.png
 qa/parity/*.json
+qa/parity/*.json.gz
 qa/parity/*.jpg
 .DS_Store
 __pycache__/
