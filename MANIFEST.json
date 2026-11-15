@@ -1,5 +1,5 @@
 {
-  "version": "0.18.52",
+  "version": "0.18.53",
   "scope": "served game and build sources",
   "files": [
     {
@@ -19,13 +19,13 @@
     },
     {
       "path": "README.md",
-      "bytes": 51317,
-      "sha256": "5fc172e3c871b8461b44973af500e1f9222b82d8cbee13aeb9086df669df5141"
+      "bytes": 51668,
+      "sha256": "b994af957eb545ac9bbcfeffcd455036f4406d440043b64d9e36c6986de36ae5"
     },
     {
       "path": "VERSION",
       "bytes": 8,
-      "sha256": "bedd0f88d4ffef14afeeb86bd42c44e5edabfb4efba5f73d09eb2cde46e2299e"
+      "sha256": "b38a70a92ce984c58c902c112fe41c2be5c526ee531a687c0a087119cd1d824d"
     },
     {
       "path": "assets/barramundi/CC0-1.0.txt",
@@ -1315,7 +1315,7 @@
     {
       "path": "index.html",
       "bytes": 16833,
-      "sha256": "7856e32fe56c970021ce3903d0ab299326b726433ec1eec74192905212c2f064"
+      "sha256": "b3508d88f83f202a62cc74e2fa4beb3afcfb1fc78f3b9f1969cfa8f68cf03fd4"
     },
     {
       "path": "music/blue_silence.mp3",
@@ -1415,7 +1415,7 @@
     {
       "path": "src/config.js",
       "bytes": 841495,
-      "sha256": "9cd318639a8376bb6713c5f396ed1141982190fd017148d42427ee7534f457b2"
+      "sha256": "199238eaa9a4badee2e2782d359ee9e9647780cf83d3e8a729b599b347e97fdc"
     },
     {
       "path": "src/deepsea.js",
@@ -1594,8 +1594,8 @@
     },
     {
       "path": "src/scene_stream.js",
-      "bytes": 14322,
-      "sha256": "4acb9c309c040b43abc3be0546847776d8d152fdab57d2c0ecb367ebb39221aa"
+      "bytes": 15812,
+      "sha256": "aba4894d7349e5a2b3c1e408cb3fb5b00be25921b5b842088746be7c5b70bcb5"
     },
     {
       "path": "src/seasons.js",
@@ -1610,7 +1610,7 @@
     {
       "path": "src/shell.html",
       "bytes": 12446,
-      "sha256": "593e1fc8085b2dc92fa3cc8e5a95774233d430363780d68f48aa350d7510c816"
+      "sha256": "bfaf27fc1892dbaed39cda6a847c61db59b76838ed3e958cad96b3bd743f0298"
     },
     {
       "path": "src/ship.js",

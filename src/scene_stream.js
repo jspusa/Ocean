@@ -14,11 +14,32 @@ async function fetchSceneData(url,read,signal,timeoutMs=12000){
   timer=setTimeout(()=>reject(timeout()),timeoutMs);
  });
  try{return await Promise.race([stopped,(async()=>{
-  const response=await fetch(url,{signal:controller.signal});checkDeadline();
-  if(!response.ok)throw Error('region HTTP '+response.status);
+  let response;
+  try{response=await fetch(url,{signal:controller.signal});}
+  catch(cause){checkDeadline();if(cause?.name!=='TypeError')throw cause;const error=new Error(cause.message);error.code='OCEAN_SCENE_NETWORK';error.cause=cause;throw error;}
+  checkDeadline();
+  if(!response.ok){const error=Error('region HTTP '+response.status);error.code='OCEAN_SCENE_HTTP';error.status=response.status;throw error;}
   const value=await read(response);checkDeadline();return value;
  })()]);}
  finally{clearTimeout(timer);signal?.removeEventListener('abort',cancel);}
+}
+async function retrySceneStartupRead(read,signal){
+ for(let attempt=0;;attempt++){
+  if(signal?.aborted)throw new Error('region request cancelled');
+  try{return await read();}
+  catch(error){
+   const transient=error?.code==='OCEAN_SCENE_NETWORK'||error?.code==='OCEAN_SCENE_HTTP'&&(error.status===408||error.status===429||error.status>=500&&error.status<600);
+   // A timeout already spent its full twelve-second budget. Corrupt data and
+   // upload failures are not network failures and must reach fallback promptly.
+   if(attempt>=2||!transient||signal?.aborted)throw error;
+   await new Promise((resolve,reject)=>{
+    let timer;const cleanup=()=>{clearTimeout(timer);signal?.removeEventListener('abort',cancel);};
+    const cancel=()=>{cleanup();reject(new Error('region request cancelled'));};
+    if(signal?.aborted){cancel();return;}signal?.addEventListener('abort',cancel,{once:true});
+    timer=setTimeout(()=>{cleanup();resolve();},2000);
+   });
+  }
+ }
 }
 function waitForSceneUploadFrame(signal){
  return new Promise((resolve,reject)=>{
@@ -74,12 +95,12 @@ class SceneStream{
   }
   return {required,preload,keep};
  }
- request(id,priority=0){
+ request(id,priority=0,{startup=false}={}){
   if(this.disposed)return Promise.reject(new Error('region stream disposed'));
   if(this.jobs.has(id)){const job=this.jobs.get(id);job.priority=Math.min(job.priority,priority);return job.promise;}
   if((this.failures.get(id)||0)>=3)return Promise.reject(new Error('region needs manual retry'));
   if((this.retryAfter.get(id)||0)>performance.now())return Promise.reject(new Error('region retry pending'));
-  const job={id,priority,controller:new AbortController()};job.promise=new Promise((resolve,reject)=>{job.resolve=resolve;job.reject=reject;});this.jobs.set(id,job);this.queue.push(job);this.pump();return job.promise;
+  const job={id,priority,startup,controller:new AbortController()};job.promise=new Promise((resolve,reject)=>{job.resolve=resolve;job.reject=reject;});this.jobs.set(id,job);this.queue.push(job);this.pump();return job.promise;
  }
  enqueue(id,priority){
   // One observer per request, even if several meshes share its chunk and the
@@ -90,12 +111,13 @@ class SceneStream{
  }
  pump(){
   while(!this.disposed&&this.active<3&&this.queue.length){this.queue.sort((a,b)=>a.priority-b.priority);const job=this.queue.shift();this.active++;
-   this.load(job.id,job.controller.signal).then(()=>{this.failures.delete(job.id);this.retryAfter.delete(job.id);job.resolve();},error=>{this.failures.set(job.id,(this.failures.get(job.id)||0)+1);this.retryAfter.set(job.id,performance.now()+2000);job.reject(error);}).finally(()=>{this.active--;this.jobs.delete(job.id);this.pump();});}
+   this.load(job.id,job.controller.signal,job.startup).then(()=>{this.failures.delete(job.id);this.retryAfter.delete(job.id);job.resolve();},error=>{this.failures.set(job.id,(this.failures.get(job.id)||0)+1);this.retryAfter.set(job.id,performance.now()+2000);job.reject(error);}).finally(()=>{this.active--;this.jobs.delete(job.id);this.pump();});}
  }
- async load(id,signal){
+ async load(id,signal,startup=false){
   const chunk=this.index.chunks[id];
   const cap=(limit)=>{let size=0;return new TransformStream({transform(part,out){size+=part.byteLength;if(size>limit)throw Error('region exceeds manifest size');out.enqueue(part);}});};
-  const bytes=await fetchSceneData(new URL(chunk.url,this.url),response=>new Response(response.body.pipeThrough(cap(chunk.bytes)).pipeThrough(new DecompressionStream('gzip')).pipeThrough(cap(chunk.decodedBytes))).arrayBuffer(),signal);
+  const read=()=>fetchSceneData(new URL(chunk.url,this.url),response=>new Response(response.body.pipeThrough(cap(chunk.bytes)).pipeThrough(new DecompressionStream('gzip')).pipeThrough(cap(chunk.decodedBytes))).arrayBuffer(),signal);
+  const bytes=await(startup?retrySceneStartupRead(read,signal):read());
   if(bytes.byteLength!==chunk.decodedBytes)throw Error('incomplete region');if(this.disposed||signal?.aborted)throw Error('region stream disposed');
   // Count unique content, including HTTP-cache revisits only once. This is not
   // a wire-transfer or bandwidth meter.
@@ -148,9 +170,9 @@ class SceneStream{
   if(el.firstElementChild.textContent!==text)el.firstElementChild.textContent=text;
   const retry=document.getElementById('sceneStreamingRetry'),back=document.getElementById('sceneStreamingReturn');retry.hidden=!blocked;retry.onclick=()=>this.retry();back.hidden=!this.onReturn;back.onclick=()=>this.onReturn?.();
  }
- async ready(eye){
+ async ready(eye,{startup=false}={}){
   while(!this.disposed){const ids=this.needed(eye),chunks=new Set();for(const id of ids){const m=this.meshes[id];if(!m.resident)chunks.add(m.meta.chunk);}if(!chunks.size){this.status(false);this.stats();return;}
-   await Promise.all([...chunks].map(id=>this.request(id,0)));}
+   await Promise.all([...chunks].map(id=>this.request(id,0,{startup})));}
   throw Error('region stream disposed');
  }
  dispose(){this.disposed=true;for(const job of this.jobs.values())job.controller.abort();for(const job of this.queue){job.reject(new Error('region stream disposed'));this.jobs.delete(job.id);}this.queue.length=0;for(const m of this.meshes)if(m.resident)this.release(m);this.status(false);}
@@ -158,12 +180,12 @@ class SceneStream{
 async function loadStreamedScene(renderer,url){
  const first=renderer.batches.length;let stream;
  try{
-  const index=await fetchSceneData(url,response=>response.json());
+  const index=await retrySceneStartupRead(()=>fetchSceneData(url,response=>response.json()));
   if(index.format!=='return-blue/streamed-scene/1'||index.sourceVersion!==OPEN_WORLD.version||index.batches.length>600||index.meshes.length>600||index.nodes.length>20000||index.chunks.length>600)throw Error('unsupported regional scene');
   for(const b of index.batches)if(!index.meshes[b.meshID]||b.instanceIDs.some(id=>!index.nodes[id]))throw Error('invalid regional batch');
   for(const m of index.meshes){const c=index.chunks[m.chunk];if(!c||m.vertexOffset<0||m.indexOffset<0||m.vertexOffset%4||m.indexOffset%4||m.vertexFloats%12||m.indexCount%3||m.vertexOffset+m.vertexFloats*4>c.decodedBytes||m.indexOffset+m.indexCount*4>c.decodedBytes||!Number.isFinite(m.radius))throw Error('invalid regional mesh');}
   if(typeof OceanRockContact!=='undefined')OceanRockContact.install(index.rockContact);
-  stream=new SceneStream(renderer,index,url);renderer.sceneStream=stream;await stream.ready(typeof eye==='undefined'?[0,-7.3,13.5]:eye);
+  stream=new SceneStream(renderer,index,url);renderer.sceneStream=stream;await stream.ready(typeof eye==='undefined'?[0,-7.3,13.5]:eye,{startup:true});
   obstacles.push(...index.obstacles);reefPatches.push(...index.reefPatches);life.push(...index.life.map(id=>index.nodes[id]));decorLife.push(...index.decorLife.map(id=>index.nodes[id]));shoal.push(...index.shoal.map(id=>index.nodes[id]));allLife=life.concat(decorLife);diverBatch=renderer.batches[first+index.diverBatch];stream.stats();return true;
- }catch(error){if(typeof OceanRockContact!=='undefined')OceanRockContact.reset();stream?.dispose();renderer.batches.splice(first);renderer.sceneStream=null;console.warn('Regional scene unavailable; using the complete scene.',error);return false;}
+ }catch(error){const cancelled=stream?.disposed;if(typeof OceanRockContact!=='undefined')OceanRockContact.reset();stream?.dispose();renderer.batches.splice(first);renderer.sceneStream=null;if(cancelled)throw error;console.warn('Regional scene unavailable; using the complete scene.',error);return false;}
 }
