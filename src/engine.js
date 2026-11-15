@@ -1850,6 +1850,8 @@ class Renderer{
   if(this.msaaFBO){
    g.bindFramebuffer(g.READ_FRAMEBUFFER,this.msaaFBO);g.bindFramebuffer(g.DRAW_FRAMEBUFFER,this.sceneFBO);
    g.blitFramebuffer(0,0,this.canvas.width,this.canvas.height,0,0,this.canvas.width,this.canvas.height,g.COLOR_BUFFER_BIT|g.DEPTH_BUFFER_BIT,g.NEAREST);
+   // Post-processing reads the resolved textures; the next frame clears this source.
+   g.invalidateFramebuffer(g.READ_FRAMEBUFFER,this.msaaDiscardAttachments||(this.msaaDiscardAttachments=[g.COLOR_ATTACHMENT0,g.DEPTH_ATTACHMENT]));
   }
   const postUniforms=pp=>{g.useProgram(pp.p);this.bindTex(0,this.sceneColor);this.bindTex(1,this.sceneDepth);this.bindTex(2,this.shadowTexture);this.bindTex(3,this.volumeColor);
    this.set1i(pp,'uScene',0);this.set1i(pp,'uDepth',1);this.set1i(pp,'uVolumeShadow',2);this.set1i(pp,'uVolume',3);

@@ -12,6 +12,7 @@ qa/parity/v0186-cpu/
 qa/parity/pelagic-anatomy/
 qa/parity/*.cpuprofile
 qa/parity/*.rgba.gz
+qa/parity/*.depth-floatbits.gz
 qa/parity/v01820-*/
 qa/parity/v01821-*/
 qa/parity/v01822-*/
