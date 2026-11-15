@@ -13,6 +13,15 @@ function turtleBlock(text){
  let depth=0;for(let i=start+anchor.indexOf('{');i<text.length;i++){if(text[i]==='{')depth++;else if(text[i]==='}'&&!--depth)return {start,end:i+1,text:text.slice(start,i+1)};}throw Error('Unclosed turtle material branch');
 }
 const v49Context=context(v49),v49Fragment=vm.runInContext('FS',v49Context),v49Setup=vm.runInContext('Renderer.prototype.setupSurfacePrograms.toString()',v49Context),scuteStart='// Five median and four paired costal shields share continuous boundaries.\n',visibilityStart='float visibility(vec3 n){';
+// v54 adds only the reviewed fragment-only cetacean variant. Project its exact
+// three setup seams back to v49; every old key, VS recipe and failure path must
+// still match the complete historical method. No historical fixture is edited.
+const cetaceanSetupSeams=[
+ ['[10,0],[9,0]','[10,0]'],
+ ['(kind===9||kind===10||kind===11)&&material===0','(kind===10||kind===11)&&material===0'],
+ ['deep-terrain, cetacean/abyss/trench-fauna and anemone vertex arithmetic;','deep-terrain, abyss/trench-fauna and anemone vertex arithmetic;']
+];
+function normalizeCetaceanSetup(text){assert.equal(text.split('[9,0]').length,2,'Exactly one authored cetacean pair is allowed');for(const [from,to]of cetaceanSetupSeams)text=replaceOnce(text,from,to);return text;}
 assert.equal(v49Fragment.split(scuteStart).length,2);assert.equal(v49Fragment.split(visibilityStart).length,2);
 const retiredScuteHelper=v49Fragment.slice(v49Fragment.indexOf(scuteStart),v49Fragment.indexOf(visibilityStart));
 assert.equal(sha(retiredScuteHelper),'d47574d17d46393832a3b49c91702f6234bd9ddd08f2af01b59eccb90d8584e5');
@@ -78,17 +87,17 @@ function renderer(options={}){
  const r=Object.create(Renderer.prototype),g=r.gl=mockGL(options);r.batches=[];r.mobile=false;r.quality=2;r.surfacePrograms=new Map();r.surfaceProgramFailures=new Map();r.program={p:{legacy:true},u:{}};
  r.makeProgram=(v,f)=>{const call=g.programs.length+1;g.programs.push({v,f});if(options.failProgram===call)throw Error('injected optional compile failure');return {p:g.alloc('program'),u:{}};};return r;
 }
-const geo=m=>({indexed:mesh,material:18,species:100,shadow:true,importedMaterial:m}),report={scope:'CPU source and mocked GPU ownership only; native shader compilation, visual fidelity, performance and real-device acceptance pending',engineSHA256:sha(source),validatorSHA256:sha(fs.readFileSync(__filename)),assetSHA256:sha(raw),normalization:{v49Commit,v49EngineSHA256:sha(v49),retiredScuteHelperSHA256:sha(retiredScuteHelper),approvedTurtleBranches,setupSurfaceProgramsSHA256:sha(v49Setup)},checks:[]};
+const geo=m=>({indexed:mesh,material:18,species:100,shadow:true,importedMaterial:m}),report={scope:'CPU source and mocked GPU ownership only; native shader compilation, visual fidelity, performance and real-device acceptance pending',engineSHA256:sha(source),validatorSHA256:sha(fs.readFileSync(__filename)),assetSHA256:sha(raw),normalization:{v49Commit,v49EngineSHA256:sha(v49),retiredScuteHelperSHA256:sha(retiredScuteHelper),approvedTurtleBranches,setupSurfaceProgramsSHA256:sha(v49Setup),cetaceanSetupSeams},checks:[]};
 function check(name,fn){try{report.checks.push({name,passed:true,detail:fn()});}catch(e){report.checks.push({name,passed:false,error:e.stack});}}
 check('all shader bytes and texture transactions remain exact outside pinned v45/v46/v50 seams',()=>{
  const names=[...baseline.matchAll(/const ([A-Z_]*(?:VS|FS|GLSL))=/g)].map(x=>x[1]);for(const name of names){const actual=vm.runInContext(name,cx),reference=vm.runInContext(name,old);assert.equal(name==='FS'?normalizeFragment(actual,reference):normalizeAbyssVertex(actual,reference),reference,name);}
  for(const [k,m]of [[0,1],[0,2],[0,3],[1,6],[0,12],[0,16],[0,17],[11,0],[3,3],[2,5]])for(const shader of ['VS','FS']){const actual=vm.runInContext(`surfaceShaderSource(${shader},${k},${m})`,cx),reference=vm.runInContext(`surfaceShaderSource(${shader},${k},${m})`,old);assert.equal(shader==='FS'?normalizeFragment(actual,reference):normalizeAbyssVertex(actual,reference),reference);}
  assert.equal(normalizeEntryTextures(Renderer.prototype.loadTextures.toString()),vm.runInContext('Renderer.prototype.loadTextures.toString()',old));
- // v47 shipped the 11th, abyss-only 10:0 variant. Compare this whole method
- // exactly to published v49; no normalization can hide program/fallback edits.
- assert.equal(Renderer.prototype.setupSurfacePrograms.toString(),v49Setup);
+ // v47 shipped the 11th, abyss-only 10:0 variant. Preserve its whole v49 setup
+ // after projecting only the explicit v54 12th, fragment-only 9:0 addition.
+ assert.equal(normalizeCetaceanSetup(Renderer.prototype.setupSurfacePrograms.toString()),v49Setup);
  const currentImport=vm.runInContext('importedFishShaderSources()',cx),publishedImport=vm.runInContext('importedFishShaderSources()',previous);assert.equal(normalizeAbyssVertex(currentImport.vertex,publishedImport.vertex),publishedImport.vertex);assert.equal(normalizeFragment(currentImport.fragment,publishedImport.fragment),publishedImport.fragment);assert.equal(replaceOnce(vm.runInContext('importedFishShaderSources.toString()',cx),newVariance,oldVariance),vm.runInContext('importedFishShaderSources.toString()',previous));
- return {shaderStrings:names.length,specializedSources:20,entryTexturePromiseUnchanged:true,allowedChanges:['pinned material-5 body','exact v49 scute helper retirement','slot-5 name/wrap/aniso/max-mip literals','pinned kind10 species27/29/30 normal and skin branches'],programSetupExactPublishedV49:true,importedVertexOutsideDeadAbyssRigsExact:true,importedFragmentOutsideDeadTurtleBranchAndRetiredHelperExact:true};
+ return {shaderStrings:names.length,specializedSources:20,entryTexturePromiseUnchanged:true,allowedChanges:['pinned material-5 body','exact v49 scute helper retirement','slot-5 name/wrap/aniso/max-mip literals','pinned kind10 species27/29/30 normal and skin branches','exact fragment-only kind9 material0 setup addition'],legacyProgramSetupExactPublishedV49:true,importedVertexOutsideDeadAbyssRigsExact:true,importedFragmentOutsideDeadTurtleBranchAndRetiredHelperExact:true};
 });
 check('narrow turtle normalization cannot hide fish, lighting, imported motion or loader changes',()=>{
  const fragment=vm.runInContext('FS',cx),reference=vm.runInContext('FS',old);
@@ -101,12 +110,13 @@ check('narrow turtle normalization cannot hide fish, lighting, imported motion o
  const loader=Renderer.prototype.loadTextures.toString(),oldLoader=vm.runInContext('Renderer.prototype.loadTextures.toString()',old);assert.equal(normalizeEntryTextures(loader),oldLoader,'Loader positive control must pass first');
  for(const [from,to]of [['expiresAt=performance.now()+12000','expiresAt=performance.now()+99999'],['retryDelays=[150,400]','retryDelays=[150,999]'],['old.forEach(tex=>g.deleteTexture(tex));','old.forEach(tex=>{});'],['g.pixelStorei(g.UNPACK_FLIP_Y_WEBGL,false)','g.pixelStorei(g.UNPACK_FLIP_Y_WEBGL,true)'],['g.RGBA8,g.RGBA,g.UNSIGNED_BYTE,source','g.RGB8,g.RGBA,g.UNSIGNED_BYTE,source']])assert.notEqual(normalizeEntryTextures(replaceOnce(loader,from,to)),oldLoader);
  for(const [from,to]of [['g.TEXTURE_MAX_LEVEL,3','g.TEXTURE_MAX_LEVEL,2'],['atlas?1:Math.min(8','atlas?2:Math.min(8'],['wrap=atlas?g.CLAMP_TO_EDGE:g.REPEAT','wrap=atlas?g.CLAMP_TO_EDGE:g.MIRRORED_REPEAT']])assert.throws(()=>normalizeEntryTextures(replaceOnce(loader,from,to)));
- const setup=Renderer.prototype.setupSurfacePrograms.toString();assert.equal(setup,v49Setup);
- for(const [from,to]of [['[2,5],[10,0]','[2,5]'],['(kind===10||kind===11)','(kind===11)'],['String(error?.message||error)',"'ignored'"]])assert.notEqual(replaceOnce(setup,from,to),v49Setup);
+ const setup=Renderer.prototype.setupSurfacePrograms.toString();assert.equal(normalizeCetaceanSetup(setup),v49Setup);
+ for(const [from,to]of [['[0,2]','[0,20]'],['kind===2&&material===5','kind===2&&material===6'],['String(error?.message||error)',"'ignored'"],['[10,0],[9,0]','[10,0],[9,0],[8,0]']])assert.notEqual(normalizeCetaceanSetup(replaceOnce(setup,from,to)),v49Setup,'An old program/VS/fallback edit or unexpected pair must remain visible');
+ for(const [from,to]of [['[10,0],[9,0]','[10,0]'],['[10,0],[9,0]','[10,0],[9,0],[9,0]'],['(kind===9||kind===10||kind===11)&&material===0','(kind===9||kind===10||kind===11)&&material===1']])assert.throws(()=>normalizeCetaceanSetup(replaceOnce(setup,from,to)),'Each authored projection seam must match exactly once');
  const imported=vm.runInContext('importedFishShaderSources()',cx),prior=vm.runInContext('importedFishShaderSources()',previous);
  assert.equal(normalizeFragment(imported.fragment,prior.fragment),prior.fragment);assert.equal(normalizeAbyssVertex(imported.vertex,prior.vertex),prior.vertex);
  assert.notEqual(normalizeFragment(replaceOnce(imported.fragment,'vec3 albedo=importedAlbedo*(1.-metallic);','vec3 albedo=vec3(1.);'),prior.fragment),prior.fragment);assert.notEqual(normalizeAbyssVertex(replaceOnce(imported.vertex,'tangent.z+=slope*tangent.x;','tangent.z+=0.;'),prior.vertex),prior.vertex);
- return {positiveControls:5,unrelatedFragmentMutations:3,unrelatedHelperMutation:1,pinnedTurtleMutation:1,retiredHelperReintroduction:1,loaderTransactionMutations:5,pinnedLoaderSeamMutations:3,publishedProgramSetupMutations:3,importedAlbedoAndRigMutations:2};
+ return {positiveControls:5,unrelatedFragmentMutations:3,unrelatedHelperMutation:1,pinnedTurtleMutation:1,retiredHelperReintroduction:1,loaderTransactionMutations:5,pinnedLoaderSeamMutations:3,publishedProgramSetupMutations:4,cetaceanProjectionSeamMutations:3,importedAlbedoAndRigMutations:2};
 });
 check('frozen motion exact; derived source keeps one sRGB decode, source ORM and transported frame',()=>{
  assert.equal(sha(vm.runInContext('IMPORTED_FISH_MOTION_GLSL',cx)),'70973c8e2ef159b482920df6d7ac03eb3d0a8c5d3272f62c7e65342f8505fab1');

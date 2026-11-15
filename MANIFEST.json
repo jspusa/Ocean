@@ -1,5 +1,5 @@
 {
-  "version": "0.18.53",
+  "version": "0.18.54",
   "scope": "served game and build sources",
   "files": [
     {
@@ -19,13 +19,13 @@
     },
     {
       "path": "README.md",
-      "bytes": 51668,
-      "sha256": "b994af957eb545ac9bbcfeffcd455036f4406d440043b64d9e36c6986de36ae5"
+      "bytes": 52010,
+      "sha256": "8e5058e12cc5a25b1f145e2d1f02131e81217b163280f2de9136748f46b32bf9"
     },
     {
       "path": "VERSION",
       "bytes": 8,
-      "sha256": "b38a70a92ce984c58c902c112fe41c2be5c526ee531a687c0a087119cd1d824d"
+      "sha256": "6b800cb39454a42051257ef04978c7e7ed75eb569c6208b3e3f0c0049bf6d378"
     },
     {
       "path": "assets/barramundi/CC0-1.0.txt",
@@ -300,7 +300,7 @@
     {
       "path": "assets/reef-growth.json",
       "bytes": 837649,
-      "sha256": "e0a4d0fa33a3162d21bfbdf1058c16959a68455878c8ab1f168f57eb0b2b6c25"
+      "sha256": "3da8dccfd4a3ee0a7c7d014883a799df75246039f6dee4b54c3712f6e0fa279f"
     },
     {
       "path": "assets/reef.mesh.gz",
@@ -1315,7 +1315,7 @@
     {
       "path": "index.html",
       "bytes": 16833,
-      "sha256": "b3508d88f83f202a62cc74e2fa4beb3afcfb1fc78f3b9f1969cfa8f68cf03fd4"
+      "sha256": "a38662336861e2928b8c97910925bb9527b1708479fb07ddbe65a0a5fec5c085"
     },
     {
       "path": "music/blue_silence.mp3",
@@ -1415,7 +1415,7 @@
     {
       "path": "src/config.js",
       "bytes": 841495,
-      "sha256": "199238eaa9a4badee2e2782d359ee9e9647780cf83d3e8a729b599b347e97fdc"
+      "sha256": "3d902632c3046b10210752e0d9b20b16834a86aa1ee5dc5883b06958e044c2ba"
     },
     {
       "path": "src/deepsea.js",
@@ -1439,8 +1439,8 @@
     },
     {
       "path": "src/engine.js",
-      "bytes": 148219,
-      "sha256": "d59482eaa68681176e84f34d59b27cfa99b744ca9f42b458407955d08a9f1ad6"
+      "bytes": 148328,
+      "sha256": "f6415e867697f440aab2cded233ec39c2060d9b3f86c9782b2e776e7f0fddab7"
     },
     {
       "path": "src/expedition.js",
@@ -1610,7 +1610,7 @@
     {
       "path": "src/shell.html",
       "bytes": 12446,
-      "sha256": "bfaf27fc1892dbaed39cda6a847c61db59b76838ed3e958cad96b3bd743f0298"
+      "sha256": "6e14dfe182fb78477bb386c385598135fa8d83bfd9c287901e7cc555eb049906"
     },
     {
       "path": "src/ship.js",
