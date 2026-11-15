@@ -3,10 +3,10 @@
 'use strict';
 const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/strict'),zlib=require('node:zlib');
 const {getEventListeners}=require('node:events');
-const source=fs.readFileSync('src/scene_stream.js','utf8');
+const sourcePath=process.argv.find(arg=>arg.startsWith('--source='))?.slice(9)||'src/scene_stream.js',source=fs.readFileSync(sourcePath,'utf8');
 const flush=async()=>{for(let i=0;i<12;i++)await Promise.resolve();await new Promise(setImmediate);};
 function fixture(network,{positions=[[0,0,0]],meshesPerChunk=1,uploadMilliseconds=0}={}){
- let now=1000,nextTimer=1,catchCalls=0,cancelledFrames=0;const timers=new Map(),frames=new Set(),requests=[],uploads=[];
+ let now=1000,nextTimer=1,catchCalls=0,cancelledFrames=0;const timers=new Map(),frames=new Set(),requests=[],uploads=[],uploadYieldWaiters=new Set();
  class ObservedPromise extends Promise{catch(...args){catchCalls++;return super.catch(...args);}}
  const schedule=(fn,delay=0)=>{const id=nextTimer++;timers.set(id,{at:now+Math.max(0,Number(delay)||0),fn});return id;};
  const raw=Buffer.alloc(156);new Uint32Array(raw.buffer,raw.byteOffset+144,3).set([0,1,2]);const compressed=zlib.gzipSync(raw);
@@ -14,14 +14,29 @@ function fixture(network,{positions=[[0,0,0]],meshesPerChunk=1,uploadMillisecond
  for(let chunk=0;chunk<positions.length;chunk++)for(let copy=0;copy<meshesPerChunk;copy++){const meshID=index.meshes.length;index.meshes.push({chunk,vertexOffset:0,vertexFloats:36,indexOffset:144,indexCount:3,radius:1});index.batches.push({meshID,instanceIDs:[chunk],visible:true,shadow:false,dynamic:false,kind:0,maxDistance:10});}
  const renderer={mobile:false,quality:2,batches:[],gl:{UNSIGNED_SHORT:5123,deleteBuffer(){},deleteVertexArray(){}},deferredBatch(meta,instances){const b={...meta,instances,visible:meta.visible!==false,drawCount:0,indexType:5123};this.batches.push(b);return b;},attachBatchMesh(batch,mesh){batch.mesh=mesh;batch.drawCount=mesh.indices.length;uploads.push(batch);now+=uploadMilliseconds;}};
  const fetch=(url,options={})=>{const request={url:String(url),id:Number(String(url).match(/region-(\d+)/)?.[1]),signal:options.signal,at:now};requests.push(request);return network(request,{compressed,Response,ReadableStream});};
- const context=vm.createContext({console:{warn(){}},performance:{now:()=>now},location:{href:'https://example.test/Ocean/'},URL,fetch,Response,TransformStream,DecompressionStream,ReadableStream,AbortController,DOMException,Promise:ObservedPromise,setTimeout:schedule,clearTimeout:id=>timers.delete(id),requestAnimationFrame(fn){const id=schedule(()=>{frames.delete(id);fn();},16);frames.add(id);return id;},cancelAnimationFrame(id){if(frames.delete(id))cancelledFrames++;timers.delete(id);}});
+ const context=vm.createContext({console:{warn(){}},performance:{now:()=>now},location:{href:'https://example.test/Ocean/'},URL,fetch,Response,TransformStream,DecompressionStream,ReadableStream,AbortController,DOMException,Promise:ObservedPromise,setTimeout:schedule,clearTimeout:id=>timers.delete(id),requestAnimationFrame(fn){const id=schedule(()=>{frames.delete(id);fn();},16);frames.add(id);for(const resolve of uploadYieldWaiters)resolve();uploadYieldWaiters.clear();return id;},cancelAnimationFrame(id){if(frames.delete(id))cancelledFrames++;timers.delete(id);}});
  vm.runInContext(source,context,{filename:'scene_stream.js'});const SceneStream=vm.runInContext('SceneStream',context),stream=new SceneStream(renderer,index,'assets/scene/index.json');
  async function advance(milliseconds){const until=now+milliseconds;await flush();for(;;){const due=[...timers].filter(([,timer])=>timer.at<=until).sort((a,b)=>a[1].at-b[1].at||a[0]-b[0])[0];if(!due)break;now=due[1].at;timers.delete(due[0]);due[1].fn();await flush();}now=Math.max(now,until);await flush();}
- return {stream,renderer,requests,uploads,advance,get catchCalls(){return catchCalls;},get pendingFrames(){return frames.size;},get cancelledFrames(){return cancelledFrames;}};
+ const diagnostic=()=>JSON.stringify({now,requests:requests.map(r=>({id:r.id,at:r.at,aborted:r.signal?.aborted})),uploads:uploads.length,pendingFrames:frames.size,active:stream.active,jobs:[...stream.jobs.keys()],queue:stream.queue.map(j=>j.id),resident:stream.meshes.map(m=>m.resident)});
+ async function settle(promise,label){
+  let timer;try{return await Promise.race([promise,new Promise((_,reject)=>{timer=setTimeout(()=>reject(Error(label+' did not settle: '+diagnostic())),5000);})]);}finally{clearTimeout(timer);}
+ }
+ // Native gzip completion is not synchronized with a fixed number of event
+ // loop turns. Await the actual jobs, then drain their deterministic cleanup
+ // microtasks; the assertion still catches leaked jobs or concurrency slots.
+ async function idle(){
+  await settle(Promise.allSettled([...stream.jobs.values()].map(job=>job.promise)),'Chunk jobs');await flush();
+  assert.equal(stream.active,0,'Completed jobs must release every active slot: '+diagnostic());assert.equal(stream.jobs.size,0,'Completed jobs must leave no pending entries: '+diagnostic());
+ }
+ async function uploadYield(){
+  if(frames.size)return;
+  let wake;const event=new Promise(resolve=>{wake=resolve;uploadYieldWaiters.add(wake);});
+  try{await settle(event,'First post-download upload yield');}finally{uploadYieldWaiters.delete(wake);}
+ }
+ return {stream,renderer,requests,uploads,advance,idle,uploadYield,settle,get catchCalls(){return catchCalls;},get pendingFrames(){return frames.size;},get cancelledFrames(){return cancelledFrames;}};
 }
 function hangingHeaders(request){return new Promise((resolve,reject)=>{request.signal?.addEventListener('abort',()=>reject(request.signal.reason||new DOMException('aborted','AbortError')),{once:true});});}
 const successful=(_request,{compressed})=>Promise.resolve(new Response(compressed));
-async function drain(){for(let i=0;i<8;i++)await flush();}
 const checks=[];
 async function check(name,run){try{await run();checks.push(true);console.log('PASS '+name);}catch(error){checks.push(false);console.error('FAIL '+name+': '+error.message);}}
 (async()=>{
@@ -45,7 +60,7 @@ async function check(name,run){try{await run();checks.push(true);console.log('PA
  await check('timed out fetches release concurrency for another queued region',async()=>{
   const f=fixture((request,context)=>request.id<3?hangingHeaders(request):successful(request,context),{positions:[[0,0,0],[0,0,1],[0,0,2],[0,0,3]]});
   const ready=f.stream.ready([0,0,0]).catch(()=>{});await flush();assert.equal(f.requests.length,3);
-  await f.advance(12001);await drain();
+  await f.advance(12001);await f.idle();
   assert.equal(f.requests.length,4,'The fourth region must get a released request slot');
   assert.equal(f.requests[3].at,13000);assert.equal(f.uploads.length,1);
   assert.equal(f.renderer.batches[3].drawCount,3);assert.equal(f.requests.slice(0,3).every(request=>request.signal.aborted),true);
@@ -66,12 +81,12 @@ async function check(name,run){try{await run();checks.push(true);console.log('PA
   let online=false;const f=fixture((request,context)=>online?successful(request,context):Promise.resolve(new Response('',{status:404})),{positions:[[0,0,0],[200,0,0]]});
   async function exhaust(eye){f.stream.update(eye,false);await flush();for(let retry=0;retry<2;retry++){await f.advance(2000);f.stream.update(eye,false);await flush();}}
   await exhaust([0,0,0]);await exhaust([200,0,0]);assert.equal(f.requests.length,6);
-  f.stream.update([0,0,0],false);online=true;f.stream.retry();await drain();
+  f.stream.update([0,0,0],false);online=true;f.stream.retry();await f.idle();
   assert.equal(f.requests.length,7);assert.equal(f.requests[6].id,0);assert.equal(f.stream.update([0,0,0],false),true);
   f.stream.retry();await flush();assert.equal(f.requests.length,7,'Retry with no missing required region must do nothing');
   await f.advance(2000);assert.equal(f.stream.update([200,0,0],false),false);await flush();
   assert.equal(f.requests.length,7,'The distant failed region still needs its own explicit retry');
-  f.stream.retry();await drain();assert.equal(f.requests.length,8);assert.equal(f.requests[7].id,1);
+  f.stream.retry();await f.idle();assert.equal(f.requests.length,8);assert.equal(f.requests[7].id,1);
   assert.equal(f.stream.update([200,0,0],false),true);f.stream.dispose();
  });
  await check('waiting for a failed nearby region keeps already uploaded geometry intact',async()=>{
@@ -85,7 +100,7 @@ async function check(name,run){try{await run();checks.push(true);console.log('PA
   const f=fixture((request,context)=>request.id===0?successful(request,context):hangingHeaders(request),{positions:[[0,0,0],[200,0,0],[200,0,1],[200,0,2],[200,0,3]]});
   await f.stream.ready([0,0,0]);assert.equal(f.uploads.length,1);let outcome='pending';
   const ready=f.stream.ready([200,0,0]).then(()=>{outcome='resolved';},()=>{outcome='rejected';});await flush();
-  assert.equal(f.requests.length,4);f.stream.dispose();await drain();
+  assert.equal(f.requests.length,4);f.stream.dispose();await f.idle();
   assert.equal(outcome,'rejected');assert.equal(f.requests.slice(1).every(request=>request.signal.aborted),true);
   assert.equal(f.renderer.batches[0].drawCount,0);f.stream.stats();assert.equal(f.renderer.sceneLoad.pendingChunks,0);
   await f.advance(30000);f.stream.update([200,0,0],false);f.stream.retry();await flush();
@@ -93,10 +108,10 @@ async function check(name,run){try{await run();checks.push(true);console.log('PA
  });
  await check('dispose cancels a post-download upload yield without needing another animation frame',async()=>{
   const f=fixture(successful,{meshesPerChunk:3,uploadMilliseconds:5});let outcome='pending';
-  const ready=f.stream.ready([0,0,0]).then(()=>{outcome='resolved';},()=>{outcome='rejected';});await drain();
+  const ready=f.stream.ready([0,0,0]).then(()=>{outcome='resolved';},()=>{outcome='rejected';});await f.uploadYield();
   const signal=f.stream.jobs.get(0).controller.signal;
   assert.equal(f.uploads.length,1);assert.equal(f.pendingFrames,1);assert.equal(outcome,'pending');
-  f.stream.dispose();await drain();
+  f.stream.dispose();await f.idle();
   assert.equal(outcome,'rejected','Disposal must settle readiness while a hidden document supplies no RAF');
   assert.equal(f.pendingFrames,0);assert.equal(f.cancelledFrames,1);assert.equal(getEventListeners(signal,'abort').length,0);
   assert.equal(f.stream.active,0);assert.equal(f.stream.jobs.size,0);assert.equal(f.renderer.batches[0].drawCount,0);
@@ -105,15 +120,15 @@ async function check(name,run){try{await run();checks.push(true);console.log('PA
  });
  await check('completed upload yields release cancellation listeners and finish normally',async()=>{
   const f=fixture(successful,{meshesPerChunk:3,uploadMilliseconds:5});let outcome='pending';
-  const ready=f.stream.ready([0,0,0]).then(()=>{outcome='resolved';});await drain();
+  const ready=f.stream.ready([0,0,0]).then(()=>{outcome='resolved';});await f.uploadYield();
   const signal=f.stream.jobs.get(0).controller.signal;assert.equal(f.pendingFrames,1);
-  await f.advance(64);assert.equal(outcome,'resolved');assert.equal(f.uploads.length,3);
+  await f.advance(64);await f.settle(ready,'Completed upload readiness');await f.idle();assert.equal(outcome,'resolved');assert.equal(f.uploads.length,3);
   assert.equal(f.pendingFrames,0);assert.equal(f.cancelledFrames,0);assert.equal(getEventListeners(signal,'abort').length,0);
   assert.equal(f.stream.active,0);assert.equal(f.stream.jobs.size,0);f.stream.dispose();await ready;
  });
  await check('dispose at a completed chunk handoff cannot report readiness success',async()=>{
   const f=fixture(successful);const chunk=f.stream.request(0);chunk.then(()=>f.stream.dispose());
-  let outcome='pending';const ready=f.stream.ready([0,0,0]).then(()=>{outcome='resolved';},()=>{outcome='rejected';});await drain();
+  let outcome='pending';const ready=f.stream.ready([0,0,0]).then(()=>{outcome='resolved';},()=>{outcome='rejected';});await f.settle(ready,'Disposed handoff readiness');await f.idle();
   assert.equal(f.uploads.length,1);assert.equal(outcome,'rejected');assert.equal(f.stream.jobs.size,0);await ready;
  });
  await check('thousands of pending frames share one request observer for meshes in the same chunk',async()=>{

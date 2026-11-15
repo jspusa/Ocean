@@ -1,5 +1,5 @@
 /* Full-scene startup and the shared request boundary under deterministic IO.
- * No GPU, real waiting, or production-state overrides are used. */
+ * No GPU, arbitrary delays, or production-state overrides are used. */
 'use strict';
 const fs=require('node:fs'),path=require('node:path'),vm=require('node:vm'),assert=require('node:assert/strict'),zlib=require('node:zlib');
 const {getEventListeners}=require('node:events');
@@ -23,7 +23,10 @@ function fixture(network,{compression=DecompressionStream,response=Response,regi
  vm.runInContext(source,context,{filename:'scene-startup.js'});
  function observe(promise){const result={state:'pending'};result.promise=promise.then(value=>{result.state='resolved';result.value=value;},error=>{result.state='rejected';result.error=error;});return result;}
  async function advance(ms){const until=now+ms;await flush();for(;;){const next=[...timers].filter(([,timer])=>timer.at<=until).sort((a,b)=>a[1].at-b[1].at)[0];if(!next)break;now=next[1].at;timers.delete(next[0]);next[1].fn();await flush();}now=until;await flush();}
- return {context,renderer,requests,warnings,uploads,timers,advance,jump:ms=>{now+=ms;},observe,load:()=>observe(context.loadCompiledScene(renderer)),snapshot:()=>JSON.stringify({batches:renderer.batches,sceneLoad:renderer.sceneLoad,obstacles:context.obstacles,life:context.life,decorLife:context.decorLife,shoal:context.shoal,allLife:context.allLife,diverBatch:context.diverBatch})};
+ async function settle(promise,label){
+  let timer;try{return await Promise.race([promise,new Promise((_,reject)=>{timer=setTimeout(()=>reject(Error(label+' did not settle: '+JSON.stringify({now,requests:requests.map(r=>({url:r.url,at:r.at,aborted:r.signal?.aborted})),timers:timers.size,uploads:uploads.length,warnings:warnings.length}))),5000);})]);}finally{clearTimeout(timer);}
+ }
+ return {context,renderer,requests,warnings,uploads,timers,advance,settle,jump:ms=>{now+=ms;},observe,load:()=>observe(context.loadCompiledScene(renderer)),snapshot:()=>JSON.stringify({batches:renderer.batches,sceneLoad:renderer.sceneLoad,obstacles:context.obstacles,life:context.life,decorLife:context.decorLife,shoal:context.shoal,allLife:context.allLife,diverBatch:context.diverBatch})};
 }
 const checks=[];async function check(name,run){try{await run();checks.push(true);console.log('PASS '+name);}catch(error){checks.push(false);console.error('FAIL '+name+': '+error.stack);}}
 (async()=>{
@@ -35,6 +38,13 @@ const checks=[];async function check(name,run){try{await run();checks.push(true)
   let deliver,reads=0;const f=fixture(()=>new Promise(resolve=>{deliver=resolve;})),before=f.snapshot(),op=f.load();await flush();f.jump(60000);assert.equal(f.timers.size,1);assert.equal(f.requests[0].signal.aborted,false);
   deliver({ok:true,status:200,get body(){reads++;return new Response(packed).body;}});await op.promise;
   assert.equal(op.value,false,'elapsed deadline must win over late headers even before the timer callback');assert.equal(reads,0);assert.equal(f.requests[0].signal.aborted,true);assert.equal(f.timers.size,0);assert.equal(f.snapshot(),before);assert.match(String(f.warnings[0]),/timed out/);
+ });
+ await check('an expired fetch rejection cannot become a transient startup retry while deadline timers are suspended',async()=>{
+  let rejectIndex;const f=fixture(request=>request.url==='index.json'?new Promise((_resolve,reject)=>{rejectIndex=reject;}):new Promise(()=>{}),{regional:true}),before=f.snapshot(),op=f.load();await flush();
+  f.jump(12000);assert.equal(f.timers.size,1);assert.equal(f.requests[0].signal.aborted,false,'The elapsed deadline callback is deliberately still suspended');
+  rejectIndex(new TypeError('fixture late network failure'));await flush();
+  assert.equal(f.requests.length,2,'RED: an elapsed regional budget must start complete-scene fallback immediately, without retry backoff');assert.equal(f.requests[0].signal.aborted,true);assert.equal(f.requests[1].url,'scene.gz');assert.equal(f.requests[1].at,13000);assert.equal(f.timers.size,1,'Only the independent complete-scene deadline may remain');assert.match(String(f.warnings[0]),/timed out/);
+  await f.advance(59999);assert.equal(op.state,'pending');await f.advance(1);assert.equal(op.state,'resolved');assert.equal(op.value,false);assert.equal(f.requests.filter(request=>request.url==='index.json').length,1,'A late rejection must never retry the expired regional request');assert.equal(f.requests.length,2);assert.equal(f.requests[1].signal.aborted,true);assert.equal(f.timers.size,0);assert.equal(f.snapshot(),before);assert.equal(f.warnings.length,2);
  });
  await check('an expired valid body cannot upload when IO finishes before the suspended deadline callback',async()=>{
   let body,reads=0;const observedResponse=class extends Response{async arrayBuffer(){const value=await super.arrayBuffer();reads++;return value;}};
@@ -48,16 +58,16 @@ const checks=[];async function check(name,run){try{await run();checks.push(true)
   assert.equal(op.value,true);assert.equal(f.uploads.length,1);assert.equal(f.requests[0].signal.aborted,false);assert.equal(f.timers.size,0);assert.equal(f.warnings.length,0);
  });
  await check('body timeout releases startup and a late complete archive cannot upload or change the world',async()=>{
-  let body,reads=0;const observedResponse=class extends Response{async arrayBuffer(){const value=await super.arrayBuffer();reads++;return value;}};
+  let body,readCompleted,reads=0;const readCompletion=new Promise(resolve=>{readCompleted=resolve;}),observedResponse=class extends Response{async arrayBuffer(){const value=await super.arrayBuffer();reads++;readCompleted();return value;}};
   const f=fixture(()=>Promise.resolve(new Response(new ReadableStream({start(controller){body=controller;}}))),{response:observedResponse}),before=f.snapshot(),op=f.load();
   await f.advance(59999);assert.equal(op.state,'pending');await f.advance(1);assert.equal(op.state,'resolved');assert.equal(op.value,false);assert.equal(f.requests[0].signal.aborted,true);assert.equal(f.timers.size,0);assert.equal(f.snapshot(),before);
   // This transport deliberately ignores abort and delivers a valid archive late.
-  body.enqueue(packed);body.close();for(let i=0;i<12;i++)await flush();assert.equal(reads,1,'the late arrayBuffer must actually finish');assert.equal(f.snapshot(),before);assert.equal(f.uploads.length,0);assert.equal(f.warnings.length,1);
+  body.enqueue(packed);body.close();await f.settle(readCompletion,'Late complete archive arrayBuffer');await flush();assert.equal(reads,1,'the late arrayBuffer must actually finish');assert.equal(f.snapshot(),before);assert.equal(f.uploads.length,0);assert.equal(f.warnings.length,1);
  });
  await check('the complete-scene deadline includes asynchronous decompression and its late completion',async()=>{
-  let release,decoding=false,reads=0;const decoded=zlib.gunzipSync(packed),compression=class{constructor(){return new TransformStream({transform(_chunk,out){out.enqueue(decoded);},flush(){decoding=true;return new Promise(resolve=>{release=resolve;});}});}},observedResponse=class extends Response{async arrayBuffer(){const value=await super.arrayBuffer();reads++;return value;}};
-  const f=fixture(()=>Promise.resolve(new Response(packed)),{compression,response:observedResponse}),before=f.snapshot(),op=f.load();for(let i=0;i<6;i++)await flush();assert(decoding);assert.equal(reads,0);await f.advance(60000);
-  assert.equal(op.state,'resolved');assert.equal(op.value,false);assert.equal(f.requests[0].signal.aborted,true);assert.equal(f.snapshot(),before);release();for(let i=0;i<8;i++)await flush();assert.equal(reads,1);assert.equal(f.snapshot(),before);assert.equal(f.uploads.length,0);assert.equal(f.timers.size,0);
+  let release,decodeStarted,readCompleted,decoding=false,reads=0;const decodeStart=new Promise(resolve=>{decodeStarted=resolve;}),readCompletion=new Promise(resolve=>{readCompleted=resolve;}),decoded=zlib.gunzipSync(packed),compression=class{constructor(){return new TransformStream({transform(_chunk,out){out.enqueue(decoded);},flush(){decoding=true;decodeStarted();return new Promise(resolve=>{release=resolve;});}});}},observedResponse=class extends Response{async arrayBuffer(){const value=await super.arrayBuffer();reads++;readCompleted();return value;}};
+  const f=fixture(()=>Promise.resolve(new Response(packed)),{compression,response:observedResponse}),before=f.snapshot(),op=f.load();await f.settle(decodeStart,'Held decompression flush entry');assert(decoding);assert.equal(reads,0);await f.advance(60000);
+  assert.equal(op.state,'resolved');assert.equal(op.value,false);assert.equal(f.requests[0].signal.aborted,true);assert.equal(f.snapshot(),before);release();await f.settle(readCompletion,'Released decompression arrayBuffer');await flush();assert.equal(reads,1);assert.equal(f.snapshot(),before);assert.equal(f.uploads.length,0);assert.equal(f.timers.size,0);
  });
  await check('a valid full archive can stream beyond twelve seconds and completes once without a later abort',async()=>{
   let body,archiveReads=0;const f=fixture(()=>Promise.resolve({ok:true,status:200,body:new ReadableStream({start(controller){body=controller;}}),arrayBuffer(){archiveReads++;throw Error('compressed archive must remain streamed');}})),op=f.load();

@@ -16,7 +16,7 @@ async function fetchSceneData(url,read,signal,timeoutMs=12000){
  try{return await Promise.race([stopped,(async()=>{
   let response;
   try{response=await fetch(url,{signal:controller.signal});}
-  catch(cause){if(cause?.name!=='TypeError')throw cause;const error=new Error(cause.message);error.code='OCEAN_SCENE_NETWORK';error.cause=cause;throw error;}
+  catch(cause){checkDeadline();if(cause?.name!=='TypeError')throw cause;const error=new Error(cause.message);error.code='OCEAN_SCENE_NETWORK';error.cause=cause;throw error;}
   checkDeadline();
   if(!response.ok){const error=Error('region HTTP '+response.status);error.code='OCEAN_SCENE_HTTP';error.status=response.status;throw error;}
   const value=await read(response);checkDeadline();return value;
