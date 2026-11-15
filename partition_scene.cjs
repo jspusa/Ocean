@@ -23,7 +23,7 @@ fs.mkdirSync(folder,{recursive:true});const chunks=[],keep=new Set();
 function emit(items){
  if(!items.length)return;let offset=0;const parts=[],id=chunks.length;
  for(const item of items){const mesh=meshes[item.id];mesh.chunk=id;mesh.vertexOffset=offset;mesh.indexOffset=offset+item.vertices.length;parts.push(item.vertices,item.indices);offset+=item.vertices.length+item.indices.length;}
- const bytes=zlib.gzipSync(Buffer.concat(parts),{level:9}),sha256=hash(bytes),url='chunk-'+sha256.slice(0,20)+'.bin.gz';keep.add(url);fs.writeFileSync(path.join(folder,url),bytes);chunks.push({url,bytes:bytes.length,decodedBytes:offset,sha256});
+ const bytes=zlib.gzipSync(Buffer.concat(parts),{level:9});bytes[9]=255;const sha256=hash(bytes),url='chunk-'+sha256.slice(0,20)+'.bin.gz';keep.add(url);fs.writeFileSync(path.join(folder,url),bytes);chunks.push({url,bytes:bytes.length,decodedBytes:offset,sha256});
 }
 for(const items of groups.values()){
  let pending=[],bytes=0;

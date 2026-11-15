@@ -5,7 +5,9 @@
 const fs=require('node:fs'),path=require('node:path'),vm=require('node:vm'),assert=require('node:assert/strict'),{performance}=require('node:perf_hooks');
 const root=path.resolve(__dirname,'../..'),c=vm.createContext({console,performance}),read=n=>fs.readFileSync(path.join(root,'src',n+'.js'),'utf8');
 for(const n of ['engine','world','reef_detail','next_reef','individuals','open_world','trench'])vm.runInContext(read(n),c,{filename:n+'.js'});
-const source=read('regions');vm.runInContext(source.replace('function interval(s,a,d,r=0,near=0,far=1){','function interval(s,a,d,r=0,near=0,far=1){globalThis.__regionalIntervalCalls=(globalThis.__regionalIntervalCalls||0)+1;').replace('return Object.freeze({definitions,','return Object.freeze({__candidates:candidates,__roofColumns:roofColumns,definitions,'),c,{filename:'regions.js'});
+const source=read('regions'),intervalEntry='function interval(s,a,d,r=0,near=0,far=1){';
+assert.equal(source.split(intervalEntry).length,2,'The test must instrument exactly one actual general interval seam');
+vm.runInContext(source.replace(intervalEntry,intervalEntry+'globalThis.__regionalIntervalCalls=(globalThis.__regionalIntervalCalls||0)+1;').replace('return Object.freeze({definitions,','return Object.freeze({__candidates:candidates,__roofColumns:roofColumns,definitions,'),c,{filename:'regions.js'});
 vm.runInContext(fs.readFileSync(path.join(__dirname,'fixtures/region-query-v018.js'),'utf8'),c);
 vm.runInContext(`
  const querySamples=[],queryStats={sets:0,maps:0,mapGets:0,slices:0};
