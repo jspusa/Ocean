@@ -278,8 +278,24 @@ const OceanRegions=(()=>{
  }
  function ceilingAt(x,z,fromY=-Infinity){
   const column=roofColumns.get(Math.floor(x/tileSize)+','+Math.floor(z/tileSize));if(!column)return 0;
-  const a=[x,Number.isFinite(fromY)?fromY:-150,z],d=[0,150-a[1],0];let y=0;
-  for(const s of column){const hit=interval(s,a,d);if(hit&&hit[1]>0&&hit[0]>=0)y=Math.min(y,a[1]+hit[0]*d[1]);}return y;
+  const origin=Number.isFinite(fromY)?fromY:-150,delta=150-origin;let y=0;
+  // This ray is always vertical and only its entry height is used. Retain the
+  // general interval's directed bounds, plane arithmetic and tolerances without
+  // constructing origin/direction/result vectors or discarded contact normals.
+  roof:for(const s of column){
+   let near=0,far=1;
+   if(x<s.min[0]-1e-8||x>s.max[0]+1e-8)continue;
+   if(Math.abs(delta)<1e-10){if(origin<s.min[1]-1e-8||origin>s.max[1]+1e-8)continue;}
+   else{
+    let lo=(s.min[1]-origin)/delta,hi=(s.max[1]-origin)/delta;if(lo>hi)[lo,hi]=[hi,lo];if(lo>=near)near=lo;far=Math.min(far,hi);if(near>far+1e-9)continue;
+   }
+   if(z<s.min[2]-1e-8||z>s.max[2]+1e-8)continue;
+   for(const n of s.planes){const q=n[3]+0-(n[0]*x+n[1]*origin+n[2]*z),v=n[0]*0+n[1]*delta+n[2]*0;
+    if(Math.abs(v)<1e-10){if(q< -1e-8)continue roof;continue;}
+    const t=q/v;if(v>0)far=Math.min(far,t);else if(t>=near)near=t;if(near>far+1e-9)continue roof;
+   }
+   if(far>0&&near>=0)y=Math.min(y,origin+near*delta);
+  }return y;
  }
  function coverage(p){return ceilingAt(p[0],p[2],p[1])<0?1:0;}
  // Chisel-cut stone with true bevels. Plane faces stay aligned with collision

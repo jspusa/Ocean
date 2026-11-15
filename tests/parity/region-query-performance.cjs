@@ -5,16 +5,17 @@
 const fs=require('node:fs'),path=require('node:path'),vm=require('node:vm'),assert=require('node:assert/strict'),{performance}=require('node:perf_hooks');
 const root=path.resolve(__dirname,'../..'),c=vm.createContext({console,performance}),read=n=>fs.readFileSync(path.join(root,'src',n+'.js'),'utf8');
 for(const n of ['engine','world','reef_detail','next_reef','individuals','open_world','trench'])vm.runInContext(read(n),c,{filename:n+'.js'});
-const source=read('regions');vm.runInContext(source.replace('return Object.freeze({definitions,','return Object.freeze({__candidates:candidates,__roofColumns:roofColumns,definitions,'),c,{filename:'regions.js'});
+const source=read('regions');vm.runInContext(source.replace('function interval(s,a,d,r=0,near=0,far=1){','function interval(s,a,d,r=0,near=0,far=1){globalThis.__regionalIntervalCalls=(globalThis.__regionalIntervalCalls||0)+1;').replace('return Object.freeze({definitions,','return Object.freeze({__candidates:candidates,__roofColumns:roofColumns,definitions,'),c,{filename:'regions.js'});
 vm.runInContext(fs.readFileSync(path.join(__dirname,'fixtures/region-query-v018.js'),'utf8'),c);
 vm.runInContext(`
- const querySamples=[],queryStats={sets:0,maps:0,mapGets:0};
- const RealSet=Set,realArrayMap=Array.prototype.map,realMapGet=Map.prototype.get;
+ const querySamples=[],queryStats={sets:0,maps:0,mapGets:0,slices:0};
+ const RealSet=Set,realArrayMap=Array.prototype.map,realArraySlice=Array.prototype.slice,realMapGet=Map.prototype.get;
  let queryCounting=false;
  Set=class extends RealSet {constructor(...args){super(...args);if(queryCounting)queryStats.sets++;}};
  Array.prototype.map=function(...args){if(queryCounting)queryStats.maps++;return realArrayMap.apply(this,args);};
+ Array.prototype.slice=function(...args){if(queryCounting)queryStats.slices++;return realArraySlice.apply(this,args);};
  Map.prototype.get=function(...args){if(queryCounting)queryStats.mapGets++;return realMapGet.apply(this,args);};
- function countedQueries(fn,samples){queryStats.sets=queryStats.maps=queryStats.mapGets=0;queryCounting=true;try{for(const [x,z,y]of samples)fn(x,z,y);}finally{queryCounting=false;}return {...queryStats};}
+ function countedQueries(fn,samples){queryStats.sets=queryStats.maps=queryStats.mapGets=queryStats.slices=0;globalThis.__regionalIntervalCalls=0;queryCounting=true;try{for(const [x,z,y]of samples)fn(x,z,y);}finally{queryCounting=false;}return {...queryStats,intervals:globalThis.__regionalIntervalCalls};}
  function timedQueries(fn,samples,rounds){let checksum=0;const start=performance.now();for(let round=0;round<rounds;round++)for(const [x,z,y]of samples)checksum+=fn(x,z,y);return {ms:performance.now()-start,queries:samples.length*rounds,checksum};}
  // Include roof-free reef/offshore queries as well as the actual cave,
  // archive and 1400m terrace. Y changes test the real directed convex ray.
@@ -39,6 +40,8 @@ console.log(JSON.stringify({...measurement,roofIndex},null,2));
 if(!process.argv.includes('--baseline')){
  assert.equal(measurement.after.sets,0,'RED: exact ceiling rays must reuse immutable column candidates without allocating Sets');
  assert.equal(measurement.after.maps,0,'RED: exact ceiling rays must not build per-query broad-phase arrays');
+ assert.equal(measurement.after.intervals,0,'RED: vertical ceiling rays must not compute discarded general sweep normals');
+ assert.equal(measurement.after.slices,0,'RED: vertical ceiling rays must not allocate discarded plane-normal slices');
  assert(measurement.after.mapGets<=samples.length,'RED: each ceiling point must require at most one column lookup');
 }
 console.log('PASS exact roof rays, candidate Set/order, immutable geometry and deterministic regional query work');
