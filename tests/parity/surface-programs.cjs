@@ -119,6 +119,13 @@ check('interleaved cetacean body types share one fragment-only variant and retai
  const attempts=candidate.compiled.length;candidate.renderer.surfacePrograms.delete('9:0');for(const species of [20,23,24,35])assert.equal(candidate.renderer.surfaceProgram({kind:9,material:0,species}),candidate.renderer.program);
  assert.deepEqual(candidate.capture(),original.capture(),'missing specialization preserves the original generic draw path');assert.equal(candidate.compiled.length,attempts,'fallback may not compile during rendering');assert.equal(candidate.invalid.length,0);
 });
+check('a rejected cetacean compiler variant renders every body type through the original fallback without retrying',()=>{
+ const candidate=fixture(false),original=fixture(false),make=candidate.renderer.makeProgram;let attempts=0;
+ candidate.renderer.makeProgram=function(vertex,fragment){attempts++;if(fragment.includes('const int uKind=9;')&&fragment.includes('const int uMat=0;'))throw Error('cetacean compiler rejection');return make.call(this,vertex,fragment);};
+ candidate.renderer.setupSurfacePrograms();assert.equal(attempts,12);assert.equal(candidate.compiled.length,11);assert.match(candidate.renderer.surfaceProgramFailures.get('9:0'),/cetacean compiler rejection/);
+ for(const f of [candidate,original])for(const species of [20,23,24,35]){const id=f.batches.length;f.batches.push({id,vao:'vao'+id,ib:'ib'+id,kind:9,material:0,species,dynamic:true,visible:true,shadow:true,radius:1,count:3,vertexCount:3,maxDistance:90,data:new Float32Array(24),instances:[{p:[id*.1,-8,-5],s:[1,1,1],partnerFinPulse:.6}]});}
+ assert.deepEqual(candidate.capture(),original.capture(),'compiler rejection preserves full generic rendering IO');const bodies=candidate.records.filter(d=>d.pass==='colour'&&d.uniforms.uKind[0]===9);assert.deepEqual(bodies.map(d=>d.uniforms.uSpecies[0]),[20,23,24,35]);assert(bodies.every(d=>d.program===candidate.renderer.program.p));assert.equal(attempts,12,'failed cetacean rendering must not retry shader compilation');assert.equal(candidate.invalid.length,0);
+});
 check('twelve base programs compile once; fragment-only variants preserve original vertex arithmetic',()=>{
  const f=fixture();f.renderer.setupSurfacePrograms();assert.equal(f.compiled.length,12);
  for(const key of keys){const [kind,material]=key.split(':').map(Number),program=f.renderer.surfaceProgram({kind,material});assert.notEqual(program,f.renderer.program);assert(f.compiled.includes(program));
